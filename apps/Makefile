@@ -7,7 +7,7 @@ all:
 	# make -C box1D
 	# make -C box2D
 	# make -C histogram_full
-	# make -C test
+	make -C test
 
 clean:
 	make -C recursive_filter clean
@@ -18,4 +18,4 @@ clean:
 	# make -C box1D clean
 	# make -C box2D clean
 	# make -C histogram_full clean
-	# make -C test clean
+	make -C test clean

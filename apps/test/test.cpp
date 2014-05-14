@@ -1,205 +1,128 @@
 #include <iostream>
 #include <cstdio>
-#include <stdexcept>
+#include <cmath>
+
 #include <Halide.h>
-#include <common_inc/utils.h>
+
+#include "../../lib/split.h"
+
+#define WARP_SIZE  32
+#define MAX_THREAD 192
 
 using namespace Halide;
 
-class Args {                        ///< Command line arguments
-public:
-    int  width;                     ///< width exponent, actual image width = 2^width
-    int  filter;                    ///< box filter width exponent, actual filter width = 2^filter
-    int  block;                     ///< block exponent, actual block size = 2^block
-    bool nocheck;                   ///< skip checking Halide output with reference solution
-    bool verbose;                   ///< display input, reference output, halide output, difference
-    Args(int argc, char** argv);
-};
+using std::vector;
+using std::string;
+using std::cerr;
+using std::endl;
 
+template<typename T>
+vector<T> vec(T a, T b) { return Halide::Internal::vec(a,b); }
 
 
 int main(int argc, char **argv) {
-    Args args(argc, argv);
 
-    int BLOCK  = (1<<args.block);
-    int FILTER = (1<<args.filter);
-    int WIDTH  = (1<<args.width);
+    Arguments args("test", argc, argv);
 
-    bool  nocheck = args.nocheck ;
-    bool  verbose = args.verbose;
+    int   width   = args.width;
+    int   height  = args.width;
+    int   tile_width = args.block;
+
+    Image<int> image = generate_random_image<int>(width,height);
 
     // ----------------------------------------------------------------------------------------------
 
-    std::cerr << "\nCreating random array ... " << std::endl;
+    Func I("Input");
+    Func S("S");
 
-    int ref_sum = 0;
+    Var x("x"), y("y");
 
-    Image<int> image(WIDTH);
+    RDom rx(1, width-1, "rx");
 
-    srand(0);
-    for (int x=0; x<WIDTH; x++) {
-        image(x) = 1 + (rand() % 9);
+    I(x,y) = select((x<0 || x>width-1 || y<0 || y>height-1), 0, image(clamp(x,0,width-1), clamp(y,0,height-1)));
+
+    S(x,y) = I(x,y);
+    S(rx,y) = S(rx,y) + S(rx-1,y);
+
+    // ----------------------------------------------------------------------------------------------
+
+    Var xi("xi");
+    Var xo("xo");
+
+    RDom rxi(1, tile_width-1,       "rxi");
+    RDom rxo(1, width / tile_width, "rxo");
+
+    split(S, 0, x, xi, xo, rx, rxi, rxo, 1);
+
+    float_dependencies_to_root(S);
+    inline_function(S, "S$split$");
+    inline_function(S, "S$split$$Deps_x$");
+
+    // ----------------------------------------------------------------------------------------------
+
+    vector<Func> func_list;
+    extract_func_calls(S, func_list);
+
+    map<string,Func> functions;
+    for (size_t i=0; i<func_list.size(); i++) {
+        cerr << func_list[i] << endl;
+        functions[func_list[i].name()] = func_list[i];
     }
 
+    Target target = get_jit_target_from_environment();
+    if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
 
-    // ----------------------------------------------------------------------------------------------
+        Func S_intra = functions["S$split$$Intra_x$"];
 
-    int numThreads = std::max(1, std::min(256, FILTER/BLOCK));
-
-    // ----------------------------------------------------------------------------------------------
-
-    Var x("x"), p("p");
-
-    Func Input("Input");
-    Input(x) = select(x>=0 && x<WIDTH, image(clamp(x,0,WIDTH-1)), 0);
-
-    // ----------------------------------------------------------------------------------------------
+        Func SDebug("SDebug");
+        SDebug(x,y) = S_intra(x%tile_width, x/tile_width, y);
 
 
-    Func ScanInner ("ScanInner");
-    Func ScanOuter ("ScanOuter");
-    Func Scan      ("Scan");
+        Var t("t"), yi("yi"), yo("yo");
 
-    RDom rInner(0, BLOCK);
-    RDom rOuter(0, WIDTH/BLOCK);
-    RDom rSum  (0, FILTER);
+        S_intra.compute_at(SDebug, Var("blockidx"));
+        //S_intra.compute_root();
+        S_intra.split(y,yo,yi,MAX_THREAD/tile_width).reorder(xi,yi,xo,yo).gpu_threads(xi,yi); //.gpu_blocks(xo,yo);
+        S_intra.update(0).split(y,yi,yo,tile_width).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
+        //S_intra.update(0).gpu_blocks(xo,yo);
 
-    ScanInner(p,x)      = select(p==0 && x==0, sum(image(clamp(rSum,0,WIDTH-1))), 0);
-    ScanInner(p,rInner) = select(BLOCK*p+rInner+FILTER<0   || BLOCK*p+rInner+FILTER>WIDTH-1,  0, image(clamp(BLOCK*p+rInner+FILTER,  0,WIDTH-1)))
-                        - select(BLOCK*p+rInner-FILTER-1<0 || BLOCK*p+rInner-FILTER-1>WIDTH-1,0, image(clamp(BLOCK*p+rInner-FILTER-1,0,WIDTH-1)))
-                        + ScanInner(p, rInner)
-                        + ScanInner(p, rInner-1);
+        SDebug.compute_root();
+        SDebug.split(x, xo,xi, tile_width).split(y, yo,yi, tile_width/2);
+        SDebug.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
+        SDebug.gpu_blocks(xo,yo).gpu_threads(xi,yi);
 
-    ScanOuter(p,x)      = 0;
-    ScanOuter(rOuter,x) = select(rOuter<0, 0, ScanInner(rOuter, x))
-                        + ScanOuter(rOuter-1, x);
-
-    Scan(x) = ScanInner(x/BLOCK, x%BLOCK) + ScanOuter(x/BLOCK-1, BLOCK-1);
-
-    ScanInner.compute_root();
-    ScanOuter.compute_root();
-    Scan     .compute_root();
-
-    ScanInner.reorder(x, p);
-    ScanInner.cuda_tile(p, std::min(WIDTH/BLOCK, BLOCK));
-    ScanInner.update().reorder(Var(rInner.x.name()), p);
-    ScanInner.update().cuda_tile(p, std::min(WIDTH/BLOCK, BLOCK));
-
-    Scan.cuda_tile(x, std::min(WIDTH/BLOCK, BLOCK));
-
-    // ----------------------------------------------------------------------------------------------
-
-    ///
-    /// JIT compilation
-    ///
-
-    std::cerr << "\nJIT compilation ... " << std::endl;
-    Scan.compile_jit();
-
-    std::cerr << "Running ... " << std::endl;
-    Image<int> hl_out = Scan.realize(WIDTH);
-
-    // ----------------------------------------------------------------------------------------------
-
-
-    ///
-    /// Check the difference
-    ///
-
-    if (!nocheck || verbose) {
-        Image<int> ref(WIDTH);
-        Image<int> diff(WIDTH);
-
-        for (int y=0; y<WIDTH; y++) {
-            for (int x=0; x<2*FILTER+1; x++) {
-                ref(y) += (x-FILTER+y>=0 && x-FILTER+y<WIDTH ? image(x-FILTER+y) : 0);
+        Image<int> out = SDebug.realize(width,height);
+        Image<int> ref(width,height);
+        Image<int> diff(width,height);
+        int diff_sum = 0;
+        for (int v=0; v<height; v++) {
+            for (int u=0; u<width/tile_width; u++) {
+                for (int i=0; i<tile_width; i++) {
+                    ref(u*tile_width+i, v) = image(u*tile_width+i, v);
+                }
+            }
+        }
+        for (int v=0; v<height; v++) {
+            for (int u=0; u<width/tile_width; u++) {
+                for (int i=1; i<tile_width; i++) {
+                    ref(u*tile_width+i, v) += ref(u*tile_width+i-1,v);
+                }
+            }
+        }
+        for (int v=0; v<height; v++) {
+            for (int u=0; u<width; u++) {
+                diff(u,v) = out(u,v)-ref(u,v);
+                diff_sum += std::abs(diff(u,v));
             }
         }
 
-        int diff_sum = 0;
-        for (int x=0; x<WIDTH; x++) {
-            diff(x) = abs(ref(x) - hl_out(x));
-            diff_sum += diff(x);
+        if (width < 256) {
+            cerr << "Reference" << endl << ref << endl;
+            cerr << "Out" << endl << out << endl;
+            cerr << "Diff" << endl << diff << endl;
         }
-
-        if (verbose) {
-            std::cerr << "Input" << std::endl << image << std::endl;
-            std::cerr << "Reference" << std::endl << ref << std::endl;
-            std::cerr << "Halide output" << std::endl << hl_out << std::endl;
-        } else {
-            std::cerr << "\nDifference = " << diff_sum << std::endl;
-            std::cerr << std::endl;
-        }
+        cerr << "Diff" << endl << diff_sum << endl;
     }
 
     return EXIT_SUCCESS;
-}
-
-
-Args::Args(int argc, char** argv) :
-    width(20),
-    filter(10),
-    block(5),
-    nocheck(false),
-    verbose(false)
-{
-    std::string desc(
-            "\nUsage\n ./box1D [-width|-w] [-filter|-f f] [-block|-b] [-nocheck] [-verbose|-v] [-help]\n\n"
-            "\twidth\t  exponent to decide image width = 2^w [default = 2^20] \n"
-            "\tfilter\t  exponent to decide summation width = 2^f [default = 2^10] \n"
-            "\tblock\t  exponent to decide block size  = 2^b [default = 2^7] \n"
-            "\tnocheck\t  skip checking Halide result with reference solution [default = false]\n"
-            "\tverbose\t  print input image, refernce output, halide output and difference [default = false]\n"
-            "\thelp\t   show help message\n"
-            );
-
-
-    try {
-        for (int i=1; i<argc; i++) {
-            std::string option = argv[i];
-
-            if (!option.compare("-help") || !option.compare("--help")) {
-                throw std::runtime_error("Showing help message");
-            }
-
-            else if (!option.compare("--nocheck") || !option.compare("-nocheck")) {
-                nocheck = true;
-            }
-
-            else if (!option.compare("-v") || !option.compare("--v") || !option.compare("--verbose") || !option.compare("-verbose")) {
-                verbose = true;
-            }
-
-            else if (!option.compare("-b") || !option.compare("--b") || !option.compare("-block") || !option.compare("--block")) {
-                if ((i+1) < argc)
-                    block = atoi(argv[++i]);
-                else
-                    throw std::runtime_error("-block requires a int value");
-            }
-
-            else if (!option.compare("-f") || !option.compare("--f") || !option.compare("-filter") || !option.compare("--filter")) {
-                if ((i+1) < argc)
-                    filter = atoi(argv[++i]);
-                else
-                    throw std::runtime_error("-filter requires a int value");
-            }
-
-            else if (!option.compare("-w") || !option.compare("--w") || !option.compare("-width") || !option.compare("--width")) {
-                if ((i+1) < argc)
-                    width = atoi(argv[++i]);
-                else
-                    throw std::runtime_error("-width requires a int value");
-            }
-
-            else {
-                throw std::runtime_error("Bad command line option " + option);
-            }
-        }
-
-        if (filter> width)  throw std::runtime_error("Filter radius cannot be larger than width of image");
-
-    } catch (std::runtime_error& e) {
-        std::cerr << std::endl << e.what() << std::endl << desc << std::endl;
-        exit(EXIT_FAILURE);
-    }
 }

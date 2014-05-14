@@ -28,7 +28,7 @@ $(EXE): $(OBJ) $(SPLITLIB_LIB) $(HALIDE_LIB)
 	@$(MKDIR) $(BIN_DIR)
 	$(CXX) -lz -lpthread -ldl -g -Wall $(OBJ) $(HALIDE_LIB) $(SPLITLIB_LIB) -o $(EXE)
 
-$(SPLITLIB_LIB):
+$(SPLITLIB_LIB): $(SPLITLIB_INC)
 	make -C $(SPLITLIB_DIR)
 
 clean:
