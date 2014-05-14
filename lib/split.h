@@ -126,6 +126,7 @@ void swap_variables(Halide::Func F,
         Halide::Var a,
         Halide::Var b);
 
+void expand_multiple_reductions(Halide::Func S);
 
 // ----------------------------------------------------------------------------
 
@@ -322,8 +323,8 @@ public:
 
 // Reference image computation utils
 
-#define MIN_ELEMENT 0
-#define MAX_ELEMENT 2
+#define MIN_ELEMENT 1
+#define MAX_ELEMENT 1
 #define PRINT_WIDTH 3
 
 template<typename T>

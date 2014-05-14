@@ -597,3 +597,64 @@ void swap_variables(Func S, string func_name, Var a, Var b) {
         }
     }
 }
+
+
+void expand_multiple_reductions(Func S) {
+    vector<Func> func_list;
+    extract_func_calls(S, func_list);
+
+    for (size_t u=0; u<func_list.size(); u++) {
+        Function F = func_list[u].function();
+
+        // only process functions with multiple reduction defs
+        if (F.reductions().size() < 2)
+            continue;
+
+        int num_reductions = F.reductions().size();
+
+        vector<Function> Fsub;
+
+        for (size_t k=0; k<num_reductions; k++) {
+            Function function(F.name() + DELIM_START+int_to_string(k)+DELIM_END);
+
+            // pure args same as pure args of original function
+            // pure val is call to function corresponding to previous
+            // reduction def
+            vector<string> pure_args;
+            vector<Expr>   call_args;
+            vector<Expr>   pure_values;
+            for (size_t i=0; i<F.args().size(); i++) {
+                pure_args.push_back(F.args()[i]);
+                call_args.push_back(Var(F.args()[i]));
+            }
+            for (size_t i=0; i<F.values().size(); i++) {
+                if (k==0) {
+                    pure_values.push_back(F.values()[i]);
+                } else {
+                    pure_values.push_back(Call::make(Fsub[k-1], call_args, i));
+                }
+            }
+            function.define(pure_args, pure_values);
+
+            // extract the reduction from the original function
+            // and replace all calls to original function by calls to
+            // current function
+            ReductionDefinition reduction = F.reductions()[k];
+            for (size_t i=0; i<reduction.values.size(); i++) {
+                if (k != num_reductions-1) {
+                    reduction.values[i] = substitute_func_call(F.name(),
+                            function, reduction.values[i]);
+                }
+            }
+            function.define_reduction(reduction.args, reduction.values);
+
+            Fsub.push_back(function);
+
+            if (k == num_reductions-1) {
+                F.clear_all_definitions();
+                F.define(Fsub[k].args(), Fsub[k].values());
+                F.define_reduction(Fsub[k].reductions()[0].args, Fsub[k].reductions()[0].values);
+            }
+        }
+    }
+}
