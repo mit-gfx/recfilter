@@ -126,88 +126,19 @@ int main(int argc, char **argv) {
 
         Var t("t");
 
-        if (debug) {
-            cerr << "Debugging" << endl;
-
-            Func SDebug("SDebug");
-            SDebug(x,y) = S_intra0(x%tile_width, x/tile_width, y%tile_width, y/tile_width);
-
-            //S_intra0.compute_at(SDebug, Var("blockidx"));
-            S_intra0.compute_root();
-            S_intra0.split(yi,t,yi, MAX_THREAD/WARP_SIZE).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).gpu_blocks(xo,yo);
-            S_intra0.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi).gpu_blocks(xo,yo);
-            S_intra0.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi).gpu_blocks(xo,yo);
-
-            SDebug.compute_root();
-            SDebug.split(x, xo,xi, tile_width).split(y, yo,yi, tile_width);
-            SDebug.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
-            SDebug.gpu_blocks(xo,yo).gpu_threads(xi,yi);
-            SDebug.bound(x, 0, width).bound(y, 0, height);
-
-            Image<int> out = SDebug.realize(width,height);
-            Image<int> ref(width,height);
-            Image<int> diff(width,height);
-
-            for (int v=0; v<height/tile_width; v++) {
-                for (int u=0; u<width/tile_width; u++) {
-                    for (int j=0; j<tile_width; j++) {
-                        for (int i=0; i<tile_width; i++) {
-                            ref(u*tile_width+i, v*tile_width+j) = image(u*tile_width+i, v*tile_width+j);
-                        }
-                    }
-                }
-            }
-            for (int v=0; v<height/tile_width; v++) {
-                for (int u=0; u<width/tile_width; u++) {
-                    for (int j=0; j<tile_width; j++) {
-                        for (int i=1; i<tile_width; i++) {
-                            ref(u*tile_width+i, v*tile_width+j) += ref(u*tile_width+i-1, v*tile_width+j);
-                        }
-                    }
-                }
-            }
-            for (int v=0; v<height/tile_width; v++) {
-                for (int u=0; u<width/tile_width; u++) {
-                    for (int j=1; j<tile_width; j++) {
-                        for (int i=0; i<tile_width; i++) {
-                            ref(u*tile_width+i, v*tile_width+j) += ref(u*tile_width+i, v*tile_width+j-1);
-                        }
-                    }
-                }
-            }
-
-            for (int v=0; v<height; v++) {
-                for (int u=0; u<width; u++) {
-                    diff(u,v) = out(u,v)-ref(u,v);
-                }
-            }
-
-            cerr << "Reference" << endl << ref << endl;
-            cerr << "Out" << endl << out << endl;
-            cerr << "Diff" << endl << diff << endl;
-            exit(0);
-        }
-
-        assert(S_intra0.defined());
-        assert(S_tails .defined());
-        assert(S_intra .defined());
-        assert(S_ctailx.defined());
-        assert(S_ctaily.defined());
-        assert(S_final .defined());
-
-        // 7 times slower
         S_intra0.compute_at(S_tails, Var("blockidx"));
-        //S_intra0.compute_root();
-        S_intra0.split(yi,t,yi, MAX_THREAD/WARP_SIZE).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).gpu_blocks(xo,yo);
-        S_intra0.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi).gpu_blocks(xo,yo);
-        S_intra0.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi).gpu_blocks(xo,yo);
+        //S_intra0.split(yi,t,yi, MAX_THREAD/WARP_SIZE).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).gpu_blocks(xo,yo);
+        S_intra0.reorder_storage(xi,yi,xo,yo);
+        S_intra0.reorder(xi,yi,xo,yo).gpu_threads(yi);
+        S_intra0.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
+        S_intra0.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
 
         S_tails.compute_root();
         S_tails.reorder_storage(yi,xi,xo,yo);
-        S_tails.split(yi,t,yi, MAX_THREAD/WARP_SIZE).reorder(t,xi,yi,xo,yo);
-        S_tails.gpu_blocks(xo,yo).gpu_threads(xi,yi);
+        //S_tails.split(yi,t,yi, MAX_THREAD/WARP_SIZE).reorder(t,xi,yi,xo,yo);
+        S_tails.reorder(xi,yi,xo,yo);
+        S_tails.gpu_blocks(xo,yo).gpu_threads(xi);
 
-        // Twice faster than Nehab
         S_ctaily.compute_root();
         S_ctailx.reorder_storage(yi,yo,xi,xo);
         S_ctaily.split(xo,xo,t,MAX_THREAD/tile_width);
@@ -222,31 +153,22 @@ int main(int argc, char **argv) {
         S_ctailx.update().split(yo,yo,t,MAX_THREAD/tile_width);
         S_ctailx.update().reorder(rxo.x,xi,yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
 
-        // 19 times slower
         S_intra.compute_at(S_final, Var("blockidx"));
-        S_intra.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi);
-        S_intra.reorder(yi,xi,xo,yo).gpu_threads(xi);
+        S_intra.reorder_storage(xi,yi,xo,yo);
+        //S_intra.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi);
+        S_intra.reorder(xi,yi,xo,yo).gpu_threads(yi);
         S_intra.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
         S_intra.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
 
         S_final.compute_root();
         S_final.split(x, xo,xi, tile_width).split(y, yo,yi, tile_width);
-        S_final.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
-        S_final.gpu_blocks(xo,yo).gpu_threads(xi,yi);
+        //S_final.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
+        S.reorder(yi, xi, xo, yo);
+        S_final.gpu_blocks(xo,yo).gpu_threads(xi);
         S_final.bound(x, 0, width).bound(y, 0, height);
-
-        //S_intra0.trace_realizations();
-        //S_intra.trace_realizations();
-        //S_tails.trace_realizations();
-        //S_ctailx.trace_realizations();
-        //S_ctaily.trace_realizations();
-        //S_final.trace_realizations();
     }
     else {
         cerr << "Warning: No CPU scheduling" << endl;
-    }
-
-    if (debug) {
     }
 
     // ----------------------------------------------------------------------------------------------
