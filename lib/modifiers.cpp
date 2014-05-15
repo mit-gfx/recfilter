@@ -542,11 +542,13 @@ std::vector<string> extract_vars_in_expr(Halide::Expr expr) {
 void extract_func_calls(Halide::Func func, vector<Func>& func_list) {
     ExtractFuncCalls extract;
     for (int i=0; i<func.outputs(); i++) {
-        Expr expr = func.values()[i];
-        expr.accept(&extract);
-        func_list.push_back(func);
-        func_list.insert(func_list.end(),
-                extract.func_list.begin(), extract.func_list.end());
+        if (func.name().find("NO_REVEAL") == string::npos) {
+            Expr expr = func.values()[i];
+            expr.accept(&extract);
+            func_list.push_back(func);
+            func_list.insert(func_list.end(),
+                    extract.func_list.begin(), extract.func_list.end());
+        }
     }
 
     // remove duplicates
@@ -560,8 +562,4 @@ void extract_func_calls(Halide::Func func, vector<Func>& func_list) {
             i--;
         }
     }
-}
-
-bool same_expr(const Expr& a, const Expr& b) {
-    return ((a.type() == b.type()) && (equal(simplify(a-b), Expr(0))));
 }

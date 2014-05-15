@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
     int   height  = args.width;
     int   tile_width = args.block;
 
-    Image<int> image = generate_random_image<int>(width,height);
+    Image<float> image = generate_random_image<float>(width,height);
 
     // ----------------------------------------------------------------------------------------------
 
@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
     RDom rxi(1, tile_width-1,       "rxi");
     RDom rxo(1, width / tile_width, "rxo");
 
-    split(S, 0, x, xi, xo, rx, rxi, rxo, 1);
+    split(S, 0, x, xi, xo, rx, rxi, rxo);
 
     float_dependencies_to_root(S);
     inline_function(S, "S$split$");
@@ -91,9 +91,9 @@ int main(int argc, char **argv) {
         SDebug.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
         SDebug.gpu_blocks(xo,yo).gpu_threads(xi,yi);
 
-        Image<int> out = SDebug.realize(width,height);
-        Image<int> ref(width,height);
-        Image<int> diff(width,height);
+        Image<float> out = SDebug.realize(width,height);
+        Image<float> ref(width,height);
+        Image<float> diff(width,height);
         int diff_sum = 0;
         for (int v=0; v<height; v++) {
             for (int u=0; u<width/tile_width; u++) {

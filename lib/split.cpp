@@ -13,7 +13,8 @@ using std::map;
 // -----------------------------------------------------------------------------
 
 struct SplitInfo {
-    size_t filter_order;
+    int filter_order;
+    int filter_dim;
     Var var;
     Var inner_var;
     Var outer_var;
@@ -22,25 +23,57 @@ struct SplitInfo {
     RDom inner_rdom;
     RDom outer_rdom;
     Expr tile_width;
+    Func filter_weights;
     vector<Function> func_list;
 };
 
 // -----------------------------------------------------------------------------
 
-static string cleanup_reduction_domain_name(string name) {
-    string out = name;
-    while (out.find(".x$r") != out.npos)
-        out.erase(out.find(".x$r"));
-    return out;
+/// Multiply two matrices A and B of sizes m*n and n*p
+/// schedule serial computation on CPU
+static Func mult_matrix_2D(Func A, Func B, int m, int n, int p) {
+    Var i,j;
+    RDom k(0,n);
+    Func AB;
+    AB(i,j) = sum(A(i,k) * B(k,j));
+    AB.bound(i,0,m).bound(j,0,p);
+    return AB;
 }
 
-// -----------------------------------------------------------------------------
+static Func tail_weights(Func filter_weights, int filter_dim, int filter_order) {
+    assert(filter_weights.defined());
 
-static void assertf(bool cond, const char* msg) {
-    if (!cond) {
-        cerr << msg << endl;
-        assert(false);
+    Type type = filter_weights.values()[0].type();
+    Expr zero = Cast::make(type, 0);
+    Expr one  = Cast::make(type, 1);
+
+    // compute weight matrix to the power filter_order
+    vector<Func> M(filter_order);
+    for (size_t r=0; r<filter_order; r++) {
+        if (r == 0) {   // filter matrix to the power 1
+            Var i("i"), j("j");
+            M[0](i,j) = zero;
+            M[0](i,j) = select(i==j+1, one, M[0](i,j));
+            M[0](i,j) = select(j==filter_order-1, filter_weights(filter_dim, filter_order-1-i), M[0](i,j));
+            M[0].bound(i,0,filter_order).bound(j,0,filter_order);
+        }
+        else {          // filter matrix to the power more than 1
+            M[r] = mult_matrix_2D(M[r-1], M[0], filter_order, filter_order, filter_order);
+        }
+        M[r].compute_root();
     }
+
+    // columnwise sum of the weight matrix
+    string w_name = "W_NO_REVEAL_" + int_to_string(filter_dim);
+    Func W(w_name);
+    Var tail_elem("tail_elem");
+    RDom col(0, filter_order, "columns");
+
+    W(tail_elem) = sum(M[filter_order-1](filter_order-1-tail_elem, col));
+    W.bound(tail_elem, 0, filter_order);
+    W.compute_root();
+
+    return W;
 }
 
 // -----------------------------------------------------------------------------
@@ -178,7 +211,7 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
         vector<Expr> call_args_prev_tile;
 
         // use rxo for current tile term and rxo-1 previous tile term
-        // remove xi as arg
+        // remove xo as arg
         for (size_t j=0; j<F_tail.args().size(); j++) {
             if (F_tail.args()[j] == xo.name()) {
                 args.push_back(rxo);
@@ -205,121 +238,9 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
 
 // -----------------------------------------------------------------------------
 
-//static void create_pure_split(Function& F, SplitInfo& split_info) {
-//    string x    = split_info.var.name();
-//    Expr   tile = split_info.tile_width;
-//
-//    // index of pure arg in arg list
-//    int pure_arg_index = -1;
-//
-//    // basic checks
-//    {
-//        // check that x exists
-//        bool arg_found = false;
-//        for (size_t i=0; !arg_found && i<F.args().size(); i++) {
-//            if (x == F.args()[i]) {
-//                arg_found = true;
-//                pure_arg_index = i+1;
-//            }
-//        }
-//        assertf(arg_found, "Variable to split must exist");
-//    }
-//
-//    // inner and outer pure vars
-//    Var xi = split_info.inner_var;
-//    Var xo = split_info.outer_var;
-//
-//    Function F_split(F.name() + DELIM_START + x + DELIM_END);
-//
-//    // pure defintion of split term
-//    {
-//        vector<string> args;
-//        vector<Expr>   values;
-//
-//        // replace x by xo,xi in pure args list
-//        for (size_t i=0; i<F.args().size(); i++) {
-//            if (x == F.args()[i]) {
-//                args.push_back(xi.name());  // replace x by xi
-//            } else {
-//                args.push_back(F.args()[i]);
-//            }
-//        }
-//        args.insert(args.begin()+pure_arg_index, xo.name());    // add xo just before xi
-//
-//        // replace x by tile*xo+xi in RHS of pure def
-//        for (size_t i=0; i<F.outputs(); i++) {
-//            Expr value = substitute(x, tile*xo+xi, F.values()[i]);
-//            values.push_back(value);
-//        }
-//        F_split.define(args, values);
-//    }
-//
-//    // reduction definition of split term
-//    {
-//        for (size_t i=0; i<F.reductions().size(); i++) {
-//            vector<Expr> args;
-//            vector<Expr> values;
-//
-//            for (size_t j=0; j<F.reductions()[i].args.size(); j++) {
-//                Expr arg = F.reductions()[i].args[j];
-//                arg = substitute(x, xi, arg);                   // replace x by xi
-//                args.push_back(arg);
-//            }
-//            args.insert(args.begin()+pure_arg_index, Var(xo));  // add xo just before xi
-//
-//            for (size_t j=0; j<F.reductions()[i].values.size(); j++) {
-//                Expr value = F.reductions()[j].values[j];
-//
-//                // change calls to original Func by split Func
-//                value = substitute_func_call(F.name(), F_split, value);
-//
-//                // add xo as calling arg to split Func
-//                value = insert_arg_to_func_call(F_split.name(), pure_arg_index, Var(xo), value);
-//
-//                // replace x by xi in calls to intra tile Func
-//                value = substitute_in_func_call(F_split.name(), x, xi, value);
-//
-//                // replace all other instances of x by xo*tile+xi
-//                value = substitute(x, tile*xo+xi, value);
-//
-//                values.push_back(value);
-//            }
-//            F_split.define_reduction(args, values);
-//        }
-//    }
-//
-//    // modify the RHS of original Func to point to the split Func
-//    {
-//        vector<string> args = F.args();
-//        vector<Expr> call_args;
-//        vector<Expr> values;
-//
-//        // call F_split with xi=x%tile and xo=x/tile
-//        for (size_t i=0; i<F_split.args().size(); i++) {
-//            if (xi.name() == F_split.args()[i])
-//                call_args.push_back(Var(x)%tile);
-//            else if (xo.name() == F_split.args()[i])
-//                call_args.push_back(Var(x)/tile);
-//            else
-//                call_args.push_back(Var(F_split.args()[i]));
-//        }
-//
-//        // F_split calls
-//        for (int j=0; j<F.outputs(); j++) {
-//            values.push_back(Call::make(F_split, call_args, j));
-//        }
-//
-//        // redefine original Func to point to calls to split Func
-//        F.clear_all_definitions();
-//        F.define(args, values);
-//
-//        // extra functions generated
-//        split_info.func_list.push_back(F_split);
-//    }
-//}
-
 static void create_recursive_split(Function& F, SplitInfo& split_info) {
     Expr tile = split_info.tile_width;
+    int  dim  = split_info.filter_dim;
     int  order= split_info.filter_order;
     Var  x    = split_info.var;
     Var  xi   = split_info.inner_var;
@@ -338,6 +259,8 @@ static void create_recursive_split(Function& F, SplitInfo& split_info) {
 
     Function F_inter_deps(s4.c_str());
 
+    Func weight = tail_weights(split_info.filter_weights, dim, order);
+
     // tail dependencies to be added to the final term
     {
         vector<string> args = F_intra.args();
@@ -352,7 +275,7 @@ static void create_recursive_split(Function& F, SplitInfo& split_info) {
                     call_args.push_back(Var(arg));
             }
             for (int i=0; i<F_ctail.outputs(); i++) {
-                Expr val = Call::make(F_ctail, call_args, i);
+                Expr val = weight(k) * Call::make(F_ctail, call_args, i);
                 if (k==0) values[i] = val;
                 else      values[i]+= val;
             }
@@ -418,7 +341,7 @@ static Function split_function_dimensions(
     // setup mappings between variables, RDoms and their inner/outer variants
     for (size_t i=0; i<dimension.size(); i++) {
         if (dim_to_tile_width.find(dimension[i]) != dim_to_tile_width.end()) {
-            if (!same_expr(dim_to_tile_width[dimension[i]], tile[i])) {
+            if (!equal(dim_to_tile_width[dimension[i]], tile[i])) {
                 cerr << "Different tile widths specified for splitting same dimension" << endl;
                 assert(false);
             }
@@ -541,6 +464,7 @@ static Function split_function_dimensions(
 
 void split(
         Func& func,
+        Func filter_weights,
         vector<int>  dimension,
         vector<Var>  var,
         vector<Var>  inner_var,
@@ -675,24 +599,24 @@ void split(
     for (size_t i=0; i<num_splits && !funcs_to_split.empty(); i++) {
         // populate the split info
         SplitInfo split_info;
-        split_info.var          = var[i];
-        split_info.rdom         = rdom[i];
-        split_info.inner_var    = inner_var[i];
-        split_info.outer_var    = outer_var[i];
-        split_info.inner_rdom   = inner_rdom[i];
-        split_info.outer_rdom   = outer_rdom[i];
-        split_info.split_rdom   = split_rdom[i];
-        split_info.tile_width   = tile[i];
-        split_info.filter_order = order[i];
+        split_info.var            = var[i];
+        split_info.rdom           = rdom[i];
+        split_info.inner_var      = inner_var[i];
+        split_info.outer_var      = outer_var[i];
+        split_info.inner_rdom     = inner_rdom[i];
+        split_info.outer_rdom     = outer_rdom[i];
+        split_info.split_rdom     = split_rdom[i];
+        split_info.tile_width     = tile[i];
+        split_info.filter_order   = order[i];
+        split_info.filter_dim     = dimension[i];
+        split_info.filter_weights = filter_weights;
 
         queue<Function> funcs_to_split_in_next_dimension;
 
         while (!funcs_to_split.empty()) {
             Function f = funcs_to_split.front();
             funcs_to_split.pop();
-            if (check_for_pure_split(f, split_info)) {
-                //create_pure_split(f, split_info);
-            } else {
+            if (!check_for_pure_split(f, split_info)) {
                 create_recursive_split(f, split_info);
             }
 
@@ -724,8 +648,13 @@ void split(
         RDom outer_rdom,
         int order)
 {
-    split(func, vec(dimension), vec(var), vec(inner_var), vec(outer_var), vec(rdom),
-            vec(inner_rdom), vec(outer_rdom), vec(order));
+    // default weights = 1
+    Var x,y;
+    Func weight;
+    weight(x,y) = 1;
+
+    split(func, weight, vec(dimension), vec(var), vec(inner_var), vec(outer_var),
+            vec(rdom), vec(inner_rdom), vec(outer_rdom), vec(order));
 }
 
 void split(
@@ -739,6 +668,27 @@ void split(
         vector<RDom> outer_rdoms,
         int order)
 {
+    // default weights = 1
+    Var x,y;
+    Func weight;
+    weight(x,y) = 1;
+
     vector<int> orders(vars.size(), order);
-    split(func, dimensions, vars, inner_vars, outer_vars, rdoms, inner_rdoms,outer_rdoms, orders);
+    split(func, weight, dimensions, vars, inner_vars, outer_vars, rdoms, inner_rdoms,outer_rdoms, orders);
+}
+
+void split(
+        Func& func,
+        Func  weight,
+        vector<int>  dimensions,
+        vector<Var>  vars,
+        vector<Var>  inner_vars,
+        vector<Var>  outer_vars,
+        vector<RDom> rdoms,
+        vector<RDom> inner_rdoms,
+        vector<RDom> outer_rdoms,
+        int order)
+{
+    vector<int> orders(vars.size(), order);
+    split(func, weight, dimensions, vars, inner_vars, outer_vars, rdoms, inner_rdoms,outer_rdoms, orders);
 }

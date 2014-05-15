@@ -29,9 +29,6 @@ std::ostream &operator<<(std::ostream &s, Halide::Func f);
 
 std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f);
 
-template<typename T>
-std::ostream &operator<<(std::ostream &s, Halide::Image<T> image);
-
 // ----------------------------------------------------------------------------
 
 // Splitting routines
@@ -60,6 +57,19 @@ void split(
 
 void split(
         Halide::Func& F,
+        Halide::Func  filter_weights,
+        std::vector<int>          dimensions,
+        std::vector<Halide::Var>  vars,
+        std::vector<Halide::Var>  inner_vars,
+        std::vector<Halide::Var>  outer_vars,
+        std::vector<Halide::RDom> rdoms,
+        std::vector<Halide::RDom> inner_rdoms,
+        std::vector<Halide::RDom> outer_rdoms,
+        int order = 1);
+
+void split(
+        Halide::Func& F,
+        Halide::Func  filter_weights,
         std::vector<int>          dimensions,
         std::vector<Halide::Var>  vars,
         std::vector<Halide::Var>  inner_vars,
@@ -241,10 +251,6 @@ void extract_func_calls(
         Halide::Func func,                  /// Function to be analyzed
         std::vector<Halide::Func>& f_list   /// list returned as output
         );
-
-/// Compute is two Expr are same, computes simplify(a-b) and checks if
-/// if equals zero
-bool same_expr(const Halide::Expr& a, const Halide::Expr& b);
 
 // ----------------------------------------------------------------------------
 

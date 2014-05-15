@@ -45,7 +45,7 @@ static void merge(Function A, Function B, string merged_name) {
             can_merge &= Ar[i].domain.same_as(Br[i].domain);
             can_merge &= (Ar[i].args.size() == Br[i].args.size());
             for (size_t j=0; can_merge && j<Ar[i].args.size(); j++) {
-                can_merge &= same_expr(Ar[i].args[j], Br[i].args[j]);
+                can_merge &= equal(Ar[i].args[j], Br[i].args[j]);
             }
         }
         assert(can_merge && "Functions to be merged must have same args in reduction defs");
@@ -152,8 +152,7 @@ static void merge(Function A, Function B, string merged_name) {
             for (size_t i=0; identical && i<num_outputs_A; i++) {
                 Expr a = AB.values()[i];
                 Expr b = AB.values()[num_outputs_A+i];
-                identical &= same_expr(a,b);
-                identical &= same_expr(AB.values()[i], AB.values()[num_outputs_A+i]);
+                identical &= equal(a,b);
             }
 
             // compare reduction definition outputs (0, num_outputs_A-1) to
@@ -163,7 +162,7 @@ static void merge(Function A, Function B, string merged_name) {
                     Expr a = AB.reductions()[i].values[j];
                     Expr b = AB.reductions()[i].values[num_outputs_A+j];
                     a = increment_value_index_in_func_call(AB.name(), num_outputs_A, a);
-                    identical &= same_expr(a,b);
+                    identical &= equal(a,b);
                 }
             }
 

@@ -16,9 +16,6 @@ using std::string;
 using std::cerr;
 using std::endl;
 
-template<typename T>
-vector<T> vec(T a, T b) { return Halide::Internal::vec(a,b); }
-
 
 int main(int argc, char **argv) {
 
@@ -32,7 +29,7 @@ int main(int argc, char **argv) {
     int   tile_width = args.block;
     int   iterations = args.iterations;
 
-    Image<int> image = generate_random_image<int>(width,height);
+    Image<float> image = generate_random_image<float>(width,height);
 
     // ----------------------------------------------------------------------------------------------
 
@@ -40,9 +37,12 @@ int main(int argc, char **argv) {
     // Algorithm
     //
 
-    int filter_order = 1;
+    Image<float> weights(2,1);
+    weights(0,0) = 1.0f; // x dimension filtering weights
+    weights(1,0) = 1.0f; // y dimension filtering weights
 
     Func I("Input");
+    Func W("Weight");
     Func S("S");
 
     Var x("x");
@@ -53,9 +53,11 @@ int main(int argc, char **argv) {
 
     I(x,y) = select((x<0 || y<0 || x>width-1 || y>height-1), 0, image(clamp(x,0,width-1),clamp(y,0,height-1)));
 
+    W(x, y) = weights(x,y);
+
     S(x, y) = I(x,y);
-    S(rx,y) = S(rx,y) + S(rx-1,y);
-    S(x,ry) = S(x,ry) + S(x,ry-1);
+    S(rx,y) = S(rx,y) + W(0,0) * S(rx-1,y);
+    S(x,ry) = S(x,ry) + W(1,0) * S(x,ry-1);
 
     // ----------------------------------------------------------------------------------------------
 
@@ -71,8 +73,8 @@ int main(int argc, char **argv) {
     RDom rxo(1, width / tile_width, "rxo");
     RDom ryo(1, height/ tile_width, "ryo");
 
-    split(S, vec(0,1), vec(x,y), vec(xi,yi), vec(xo,yo),
-             vec(rx,ry), vec(rxi,ryi), vec(rxo,ryo), filter_order);
+    split(S, W, Internal::vec(0,1), Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
+             Internal::vec(rx,ry), Internal::vec(rxi,ryi), Internal::vec(rxo,ryo));
 
     // ----------------------------------------------------------------------------------------------
 
@@ -179,7 +181,7 @@ int main(int argc, char **argv) {
     cerr << "\nJIT compilation ... " << endl;
     S.compile_jit();
 
-    Buffer hl_out_buff(type_of<int>(), width,height);
+    Buffer hl_out_buff(type_of<float>(), width,height);
     {
         Timer t("Running ... ");
         for (int k=0; k<iterations; k++) {
@@ -196,9 +198,9 @@ int main(int argc, char **argv) {
 
     if (!nocheck) {
         cerr << "\nChecking difference ... " << endl;
-        Image<int> hl_out(hl_out_buff);
-        Image<int> diff(width,height);
-        Image<int> ref   = reference_recursive_filter<int>(image);
+        Image<float> hl_out(hl_out_buff);
+        Image<float> diff(width,height);
+        Image<float> ref   = reference_recursive_filter<float>(image);
 
         int diff_sum = 0;
         for (int y=0; y<height; y++) {

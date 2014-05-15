@@ -1,4 +1,5 @@
 all:
+	make -C ../lib
 	make -C recursive_filter
 	# make -C summed_table
 	# make -C scan1D
@@ -10,6 +11,7 @@ all:
 	make -C test
 
 clean:
+	make -C ../lib clean
 	make -C recursive_filter clean
 	# make -C summed_table clean
 	# make -C scan1D clean
