@@ -29,7 +29,10 @@ int main(int argc, char **argv) {
     int   tile_width = args.block;
     int   iterations = args.iterations;
 
-    Image<float> image = generate_random_image<float>(width,height);
+    Image<float> random_image = generate_random_image<float>(width,height);
+
+    ImageParam image(type_of<float>(), 2);
+    image.set(random_image);
 
     // ----------------------------------------------------------------------------------------------
 
@@ -38,8 +41,8 @@ int main(int argc, char **argv) {
     //
 
     Image<float> weights(2,1);
-    weights(0,0) = 1.0f; // x dimension filtering weights
-    weights(1,0) = 1.0f; // y dimension filtering weights
+    weights(0,0) = 0.5f; // x dimension filtering weights
+    weights(1,0) = 0.0f; // y dimension filtering weights
 
     Func I("Input");
     Func W("Weight");
@@ -48,10 +51,10 @@ int main(int argc, char **argv) {
     Var x("x");
     Var y("y");
 
-    RDom rx(1, width-1, "rx");
-    RDom ry(1, height-1,"ry");
+    RDom rx(1, image.width()-1, "rx");
+    RDom ry(1, image.height()-1,"ry");
 
-    I(x,y) = select((x<0 || y<0 || x>width-1 || y>height-1), 0, image(clamp(x,0,width-1),clamp(y,0,height-1)));
+    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
     W(x, y) = weights(x,y);
 
@@ -70,8 +73,8 @@ int main(int argc, char **argv) {
 
     RDom rxi(1, tile_width-1,       "rxi");
     RDom ryi(1, tile_width-1,       "ryi");
-    RDom rxo(1, width / tile_width, "rxo");
-    RDom ryo(1, height/ tile_width, "ryo");
+    RDom rxo(1, image.width() / tile_width, "rxo");
+    RDom ryo(1, image.height()/ tile_width, "ryo");
 
     split(S, W, Internal::vec(0,1), Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
              Internal::vec(rx,ry), Internal::vec(rxi,ryi), Internal::vec(rxo,ryo));
@@ -166,7 +169,7 @@ int main(int argc, char **argv) {
         //S_final.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
         S.reorder(yi, xi, xo, yo);
         S_final.gpu_blocks(xo,yo).gpu_threads(xi);
-        S_final.bound(x, 0, width).bound(y, 0, height);
+        S_final.bound(x, 0, image.width()).bound(y, 0, image.height());
     }
     else {
         cerr << "Warning: No CPU scheduling" << endl;
@@ -200,7 +203,7 @@ int main(int argc, char **argv) {
         cerr << "\nChecking difference ... " << endl;
         Image<float> hl_out(hl_out_buff);
         Image<float> diff(width,height);
-        Image<float> ref   = reference_recursive_filter<float>(image);
+        Image<float> ref = reference_recursive_filter<float>(random_image, weights);
 
         int diff_sum = 0;
         for (int y=0; y<height; y++) {
@@ -211,7 +214,7 @@ int main(int argc, char **argv) {
         }
 
         if (verbose) {
-            cerr << "Input" << endl << image << endl;
+            cerr << "Input" << endl << random_image << endl;
             cerr << "Reference" << endl << ref << endl;
             cerr << "Halide output" << endl << hl_out << endl;
             cerr << "Difference " << endl << diff << endl;

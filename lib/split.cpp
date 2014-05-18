@@ -29,49 +29,43 @@ struct SplitInfo {
 
 // -----------------------------------------------------------------------------
 
-/// Multiply two matrices A and B of sizes m*n and n*p
-/// schedule serial computation on CPU
-static Func mult_matrix_2D(Func A, Func B, int m, int n, int p) {
-    Var i,j;
-    RDom k(0,n);
-    Func AB;
-    AB(i,j) = sum(A(i,k) * B(k,j));
-    AB.bound(i,0,m).bound(j,0,p);
-    return AB;
-}
-
-static Func tail_weights(Func filter_weights, int filter_dim, int filter_order) {
+static Func tail_weights(Func filter_weights, Expr tile_width, int filter_dim, int filter_order) {
     assert(filter_weights.defined());
 
     Type type = filter_weights.values()[0].type();
     Expr zero = Cast::make(type, 0);
     Expr one  = Cast::make(type, 1);
 
-    // compute weight matrix to the power filter_order
-    vector<Func> M(filter_order);
-    for (size_t r=0; r<filter_order; r++) {
-        if (r == 0) {   // filter matrix to the power 1
-            Var i("i"), j("j");
-            M[0](i,j) = zero;
-            M[0](i,j) = select(i==j+1, one, M[0](i,j));
-            M[0](i,j) = select(j==filter_order-1, filter_weights(filter_dim, filter_order-1-i), M[0](i,j));
-            M[0].bound(i,0,filter_order).bound(j,0,filter_order);
-        }
-        else {          // filter matrix to the power more than 1
-            M[r] = mult_matrix_2D(M[r-1], M[0], filter_order, filter_order, filter_order);
-        }
-        M[r].compute_root();
-    }
+    Var i("i"), j("j"), r("r");
+    RDom m(0, filter_order, 1, tile_width, "matrix_mult_var");
+    RDom c(0, filter_order, "columns");
 
-    // columnwise sum of the weight matrix
-    string w_name = "W_NO_REVEAL_" + int_to_string(filter_dim);
-    Func W(w_name);
-    Var tail_elem("tail_elem");
-    RDom col(0, filter_order, "columns");
+    // filter matrix to power r= A^r_F [Nehab et al 2011, appendix A]
+    Func A("A");
+    A(i,j) = select(j==filter_order-1,
+            filter_weights(filter_dim, filter_order-1-i),
+            select(i==j+1, one, zero));
 
-    W(tail_elem) = sum(M[filter_order-1](filter_order-1-tail_elem, col));
-    W.bound(tail_elem, 0, filter_order);
+    // filter matrix to power r= A^r_F [Nehab et al 2011, appendix A]
+    Func Ar("Ar");
+    Ar(i,j,r)    = A(i, j);
+    //Ar(i,j,m.y) += Ar(i, m.x, m.y-1) * A(m.x, j);
+
+    // column-wise sum of the weight matrix of power r
+    Func W("Weight_NO_REVEAL_" + int_to_string(filter_dim));
+    W(i,j) = sum(Ar(filter_order-1-j, c, i));
+
+    Ar.compute_root().reorder(i,j,r);
+    //Ar.update().reorder(m.x,i,j,m.y);
+    //Ar.bound(i,0,filter_order).bound(j,0,filter_order).bound(r,0,tile_width);
+
+    cerr << tile_width << endl;
+
     W.compute_root();
+    //W.bound(j,0,filter_order).bound(i,0,tile_width);
+
+    Ar.trace_realizations();
+    W.trace_realizations();
 
     return W;
 }
@@ -188,6 +182,10 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
     Var  xi   = split_info.inner_var;
     Var  xo   = split_info.outer_var;
     RDom rxo  = split_info.outer_rdom;
+    int  dim  = split_info.filter_dim;
+    int  order= split_info.filter_order;
+
+    Func weight = split_info.filter_weights;
 
     // pure definition
     {
@@ -224,9 +222,10 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
             }
         }
 
+        // xi corresponds to k elements of the tail, where k is filter order
         for (int j=0; j<F_tail.outputs(); j++) {
             Expr val = Call::make(function, call_args_curr_tile, j) +
-                select(rxo>0, Call::make(function, call_args_prev_tile, j), 0);
+                weight(tile-1, xi) * select(rxo>0, Call::make(function, call_args_prev_tile, j), 0);
             values.push_back(val);
         }
 
@@ -246,6 +245,8 @@ static void create_recursive_split(Function& F, SplitInfo& split_info) {
     Var  xi   = split_info.inner_var;
     Var  xo   = split_info.outer_var;
 
+    Func weight = split_info.filter_weights;
+
     string s0 = F.name() + DELIM_START + INTRA_TILE_RESULT    + "_" + x.name() +  DELIM_END;
     string s1 = F.name() + DELIM_START + INTRA_TILE_SUB_RESULT+ "_" + x.name() +  DELIM_END;
     string s2 = F.name() + DELIM_START + INTRA_TILE_TAIL_TERM + "_" + x.name() +  DELIM_END;
@@ -258,8 +259,6 @@ static void create_recursive_split(Function& F, SplitInfo& split_info) {
     Function F_ctail = create_complete_tail_term(F_tail,  split_info, s3.c_str());
 
     Function F_inter_deps(s4.c_str());
-
-    Func weight = tail_weights(split_info.filter_weights, dim, order);
 
     // tail dependencies to be added to the final term
     {
@@ -275,7 +274,7 @@ static void create_recursive_split(Function& F, SplitInfo& split_info) {
                     call_args.push_back(Var(arg));
             }
             for (int i=0; i<F_ctail.outputs(); i++) {
-                Expr val = weight(k) * Call::make(F_ctail, call_args, i);
+                Expr val = weight(xi,k) * Call::make(F_ctail, call_args, i);
                 if (k==0) values[i] = val;
                 else      values[i]+= val;
             }
@@ -609,7 +608,7 @@ void split(
         split_info.tile_width     = tile[i];
         split_info.filter_order   = order[i];
         split_info.filter_dim     = dimension[i];
-        split_info.filter_weights = filter_weights;
+        split_info.filter_weights = tail_weights(filter_weights, tile[i], dimension[i], order[i]);
 
         queue<Function> funcs_to_split_in_next_dimension;
 

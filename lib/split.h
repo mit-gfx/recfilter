@@ -373,14 +373,13 @@ std::ostream &operator<<(std::ostream &s, Halide::Image<T> image) {
 
 template<typename T>
 Halide::Image<T> reference_recursive_filter(Halide::Image<T> in,
-        vector<T> weights_x,
-        vector<T> weights_y)
+        Halide::Image<T> weights)
 {
     int width = in.width();
     int height= in.height();
 
-    int order_x = weights_x.size();
-    int order_y = weights_y.size();
+    int order_x = weights.height();
+    int order_y = weights.height();
 
     Halide::Image<T> ref(width,height);
 
@@ -393,7 +392,7 @@ Halide::Image<T> reference_recursive_filter(Halide::Image<T> in,
     for (int y=0; y<height; y++) {          // x filtering
         for (int x=0; x<width; x++) {
             for (int k=1; k<=order_x; k++) {
-                ref(x,y) += (x>=k ? weights_x[k-1]*ref(x-k,y) : T(0));
+                ref(x,y) += (x>=k ? weights(0,k-1)*ref(x-k,y) : T(0));
             }
         }
     }
@@ -401,40 +400,12 @@ Halide::Image<T> reference_recursive_filter(Halide::Image<T> in,
     for (int y=0; y<height; y++) {          // y filtering
         for (int x=0; x<width; x++) {
             for (int k=1; k<=order_y; k++) {
-                ref(x,y) += (y>=k ? weights_y[k-1]*ref(x,y-k) : T(0));
+                ref(x,y) += (y>=k ? weights(1,k-1)*ref(x,y-k) : T(0));
             }
         }
     }
 
     return ref;
 }
-
-template<typename T>
-Halide::Image<T> reference_recursive_filter(Halide::Image<T> in) {
-    vector<T> weights_x;
-    vector<T> weights_y;
-    weights_x.push_back(T(1));
-    weights_y.push_back(T(1));
-    return reference_recursive_filter(in, weights_x, weights_y);
-}
-
-template<typename T>
-Halide::Image<T> reference_recursive_filter(Halide::Image<T> in, T weight) {
-    vector<T> weights_x;
-    vector<T> weights_y;
-    weights_x.push_back(weight);
-    weights_y.push_back(weight);
-    return reference_recursive_filter(in, weights_x, weights_y);
-}
-
-template<typename T>
-Halide::Image<T> reference_recursive_filter(Halide::Image<T> in, T weight_x, T weight_y) {
-    vector<T> weights_x;
-    vector<T> weights_y;
-    weights_x.push_back(weight_x);
-    weights_y.push_back(weight_y);
-    return reference_recursive_filter(in, weights_x, weights_y);
-}
-
 
 #endif // _SPLIT_H_
