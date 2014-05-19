@@ -40,9 +40,13 @@ int main(int argc, char **argv) {
     // Algorithm
     //
 
-    Image<float> weights(2,1);
+    Image<float> weights(2,3);
     weights(0,0) = 0.5f; // x dimension filtering weights
-    weights(1,0) = 0.0f; // y dimension filtering weights
+    weights(0,1) = 0.25f; // x dimension filtering weights
+    weights(0,2) = 0.0f; // x dimension filtering weights
+    weights(1,0) = 0.0f; // 0.75f; // y dimension filtering weights
+    weights(1,1) = 0.0f; // 0.375f; // y dimension filtering weights
+    weights(1,2) = 0.0f; // 0.1875f; // y dimension filtering weights
 
     Func I("Input");
     Func W("Weight");
@@ -54,13 +58,13 @@ int main(int argc, char **argv) {
     RDom rx(1, image.width()-1, "rx");
     RDom ry(1, image.height()-1,"ry");
 
-    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
+    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0.0f, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
     W(x, y) = weights(x,y);
 
     S(x, y) = I(x,y);
-    S(rx,y) = S(rx,y) + W(0,0) * S(rx-1,y);
-    S(x,ry) = S(x,ry) + W(1,0) * S(x,ry-1);
+    S(rx,y) = S(rx,y) + select(rx>0, W(0,0)*S(rx-1,y), 0.0f) + select(rx>1, W(0,1)*S(rx-2,y), 0.0f) + select(rx>2, W(0,2)*S(rx-3,y), 0.0f);
+    S(x,ry) = S(x,ry) + select(ry>0, W(1,0)*S(x,ry-1), 0.0f) + select(ry>1, W(1,1)*S(x,ry-2), 0.0f) + select(ry>2, W(1,2)*S(x,ry-3), 0.0f);
 
     // ----------------------------------------------------------------------------------------------
 
@@ -71,13 +75,13 @@ int main(int argc, char **argv) {
     Var xi("xi"), yi("yi");
     Var xo("xo"), yo("yo");
 
-    RDom rxi(1, tile_width-1,       "rxi");
-    RDom ryi(1, tile_width-1,       "ryi");
+    RDom rxi(1, tile_width-1, "rxi");
+    RDom ryi(1, tile_width-1, "ryi");
     RDom rxo(1, image.width() / tile_width, "rxo");
     RDom ryo(1, image.height()/ tile_width, "ryo");
 
     split(S, W, Internal::vec(0,1), Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
-             Internal::vec(rx,ry), Internal::vec(rxi,ryi), Internal::vec(rxo,ryo));
+             Internal::vec(rx,ry), Internal::vec(rxi,ryi), Internal::vec(rxo,ryo), Internal::vec(3,1));
 
     // ----------------------------------------------------------------------------------------------
 
@@ -170,6 +174,13 @@ int main(int argc, char **argv) {
         S.reorder(yi, xi, xo, yo);
         S_final.gpu_blocks(xo,yo).gpu_threads(xi);
         S_final.bound(x, 0, image.width()).bound(y, 0, image.height());
+
+        Func D;
+        D(x,y) = S_ctailx(x%3, x/3, 0, 0);
+        Image<float> h = D.realize(3*width/tile_width, 1);
+        //D(x,y) = S_tails(x%3, x/3, y%width, y/width)[1];
+        //Image<float> h = D.realize(3*width/tile_width, height);
+        cerr << h << endl;
     }
     else {
         cerr << "Warning: No CPU scheduling" << endl;
@@ -205,7 +216,7 @@ int main(int argc, char **argv) {
         Image<float> diff(width,height);
         Image<float> ref = reference_recursive_filter<float>(random_image, weights);
 
-        int diff_sum = 0;
+        float diff_sum = 0;
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {
                 diff(x,y) = std::abs(ref(x,y) - hl_out(x,y));

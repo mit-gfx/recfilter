@@ -32,40 +32,34 @@ struct SplitInfo {
 static Func tail_weights(Func filter_weights, Expr tile_width, int filter_dim, int filter_order) {
     assert(filter_weights.defined());
 
-    Type type = filter_weights.values()[0].type();
-    Expr zero = Cast::make(type, 0);
-    Expr one  = Cast::make(type, 1);
-
     Var i("i"), j("j"), r("r");
-    RDom m(0, filter_order, 1, tile_width, "matrix_mult_var");
-    RDom c(0, filter_order, "columns");
+    RDom c(0, filter_order, "c");
+    RDom m(0, filter_order, 0, filter_order, 0, filter_order, 1, tile_width-1, "m");
+
+    Func A("A");
+    Func Ar("Ar");
 
     // filter matrix to power r= A^r_F [Nehab et al 2011, appendix A]
-    Func A("A");
     A(i,j) = select(j==filter_order-1,
             filter_weights(filter_dim, filter_order-1-i),
-            select(i==j+1, one, zero));
+            select(i==j+1, 1, 0));
 
-    // filter matrix to power r= A^r_F [Nehab et al 2011, appendix A]
-    Func Ar("Ar");
-    Ar(i,j,r)    = A(i, j);
-    //Ar(i,j,m.y) += Ar(i, m.x, m.y-1) * A(m.x, j);
 
-    // column-wise sum of the weight matrix of power r
+    Ar(i, j, r) = select(r==0, A(i,j), 0);
+    Ar(m.y, m.z, m.w) += Ar(m.y, m.x, m.w-1) * A(m.x, m.z);
+
+    Ar.compute_root();
+    Ar.bound(i,0,filter_order).bound(j,0,filter_order).bound(r,0,tile_width);
+
+    // last row of matrix
     Func W("Weight_NO_REVEAL_" + int_to_string(filter_dim));
-    W(i,j) = sum(Ar(filter_order-1-j, c, i));
-
-    Ar.compute_root().reorder(i,j,r);
-    //Ar.update().reorder(m.x,i,j,m.y);
-    //Ar.bound(i,0,filter_order).bound(j,0,filter_order).bound(r,0,tile_width);
-
-    cerr << tile_width << endl;
+    W(r,j) = Ar(filter_order-1-j, filter_order-1, r);
 
     W.compute_root();
-    //W.bound(j,0,filter_order).bound(i,0,tile_width);
+    W.bound(j,0,filter_order).bound(r,0,tile_width);
 
-    Ar.trace_realizations();
-    W.trace_realizations();
+    Image<float> img = W.realize(4,filter_order);
+    cerr << "W" << endl << img << endl;
 
     return W;
 }
@@ -440,15 +434,11 @@ static Function split_function_dimensions(
                 Expr value = reductions[i].values[j];
 
                 // change calls to original Func by split Func
-                value = substitute_func_call(F.name(), Fsplit, value);
-
                 // add rxo as calling arg and replace rx by rxi to this function
+                value = substitute_func_call(F.name(), Fsplit, value);
                 value = insert_arg_to_func_call(Fsplit.name(), var_index+1, rxo, value);
-                value = substitute_in_func_call(Fsplit.name(), rx, rxi, value);
-
-                // replace all other instances of rx by rxo*tile+rxi
-                value = substitute(rx, tile_width*rxo+rxi, value);
-
+                value = substitute(rx, rxi, value);
+                //value = substitute_in_func_call(Fsplit.name(), rx, rxi, value);
                 reductions[i].values[j] = value;
             }
 
