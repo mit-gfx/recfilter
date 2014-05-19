@@ -32,6 +32,10 @@ struct SplitInfo {
 static Func tail_weights(Func filter_weights, Expr tile_width, int filter_dim, int filter_order) {
     assert(filter_weights.defined());
 
+    Type type = filter_weights.values()[0].type();
+    Expr zero = Cast::make(type, 0);
+    Expr one  = Cast::make(type, 1);
+
     Var i("i"), j("j"), r("r");
     RDom c(0, filter_order, "c");
     RDom m(0, filter_order, 0, filter_order, 0, filter_order, 1, tile_width-1, "m");
@@ -42,7 +46,7 @@ static Func tail_weights(Func filter_weights, Expr tile_width, int filter_dim, i
     // filter matrix to power r= A^r_F [Nehab et al 2011, appendix A]
     A(i,j) = select(j==filter_order-1,
             filter_weights(filter_dim, filter_order-1-i),
-            select(i==j+1, 1, 0));
+            select(i==j+1, one, zero));
 
 
     Ar(i, j, r) = select(r==0, A(i,j), 0);
