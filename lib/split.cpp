@@ -131,7 +131,7 @@ static Function create_intra_tile_term(Function F, SplitInfo split_info, string 
         }
 
         // change calls to original Func by intra tile Func
-        // replace rxo by xo in args
+        // replace outer RDom by xo in args
         for (size_t j=0; j<values.size(); j++) {
             values[j] = substitute_func_call(F.name(), function, values[j]);
             values[j] = substitute(r2D.x.name(), rxi, values[j]);
@@ -176,12 +176,13 @@ static Function create_intra_tail_term(Function F_intra, SplitInfo split_info, s
 static Function create_complete_tail_term(Function F_tail, SplitInfo split_info, string func_name) {
     Function function(func_name);
 
-    Expr tile = split_info.tile_width;
+    Var  x    = split_info.var;
     Var  xi   = split_info.inner_var;
     Var  xo   = split_info.outer_var;
     RDom rxo  = split_info.outer_rdom;
     int  dim  = split_info.filter_dim;
     int  order= split_info.filter_order;
+    Expr tile = split_info.tile_width;
 
     Func weight = split_info.filter_weights;
 
@@ -190,7 +191,7 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
         // pure definition simply initializes with the intra tile tail
         vector<Expr>   call_args;
         vector<Expr>   values;
-        for (size_t j=0; j<F_tail.args().size(); j++) {
+        for (int j=0; j<F_tail.args().size(); j++) {
             call_args.push_back(Var(F_tail.args()[j]));
         }
         for (int j=0; j<F_tail.outputs(); j++) {
@@ -201,30 +202,41 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
 
     // reduction definition
     {
-        vector<Expr> values;
         vector<Expr> args;
+        vector<Expr> values;
         vector<Expr> call_args_curr_tile;
         vector<Expr> call_args_prev_tile;
 
-        // use rxo for current tile term and rxo-1 previous tile term
-        // remove xo as arg
-        for (size_t j=0; j<F_tail.args().size(); j++) {
-            if (F_tail.args()[j] == xo.name()) {
-                args.push_back(rxo);
-                call_args_curr_tile.push_back(rxo);
-                call_args_prev_tile.push_back(max(rxo-1,0));
+        // rxo.x iterates over tail elems of prev tile to compute tail element of current tile
+        // rxo.y iterates over all tail elements of current tile
+        // rxo.z iterates over all tiles
+        RDom rxo(0,order, 0,order, 1,width/tile,  "r"+x.name()+"o");
+
+        for (int i=0; i<F_tail.args().size(); i++) {
+            string arg = F_tail.args()[i];
+            if (arg == xo.name()) {
+                // replace xo by rxo.z or rxo.z-1 as tile idx,
+                args.push_back(rxo.z);
+                call_args_curr_tile.push_back(rxo.z);
+                call_args_prev_tile.push_back(max(rxo.z-1,0));
+            } else if (arg == xi.name()) {
+                // replace xi by rxo.y as tail element index in args and current tile term
+                // replace xi by rxo.x as tail element in prev tile term because each rxo.y
+                // is computed from all prev tile tail elements
+                args.push_back(rxo.y);
+                call_args_curr_tile.push_back(rxo.y);
+                call_args_prev_tile.push_back(rxo.x);
             } else {
-                args.push_back(Var(F_tail.args()[j]));
-                call_args_curr_tile.push_back(Var(F_tail.args()[j]));
-                call_args_prev_tile.push_back(Var(F_tail.args()[j]));
+                args.push_back(Var(arg));
+                call_args_curr_tile.push_back(Var(arg));
+                call_args_prev_tile.push_back(Var(arg));
             }
         }
-
-        // xi corresponds to k elements of the tail, where k is filter order
-        for (int j=0; j<F_tail.outputs(); j++) {
-            Expr val = Call::make(function, call_args_curr_tile, j) +
-                weight(tile-1, xi) * select(rxo>0, Call::make(function, call_args_prev_tile, j), 0);
-            values.push_back(val);
+        for (int i=0; i<F_tail.outputs(); i++) {
+            // multiply each tail element with its weight before adding
+            values.push_back(
+                    Call::make(function, call_args_curr_tile, i) +
+                    select(rxo.z>0, weight(rxo.y-1,rxo.x) * Call::make(function, call_args_prev_tile, i), 0));
         }
 
         function.define_reduction(args, values);
@@ -442,7 +454,6 @@ static Function split_function_dimensions(
                 value = substitute_func_call(F.name(), Fsplit, value);
                 value = insert_arg_to_func_call(Fsplit.name(), var_index+1, rxo, value);
                 value = substitute(rx, rxi, value);
-                //value = substitute_in_func_call(Fsplit.name(), rx, rxi, value);
                 reductions[i].values[j] = value;
             }
 
@@ -500,6 +511,21 @@ void split(
             if (rdom[k].dimensions() != 1) {
                 cerr << "RDom to split must be 1D, each reduction "
                     << "definition should use a unique be 1D RDom";
+                assert(false);
+            }
+
+            // given inner RDom must be 1D, intra tile scans are 1D as full scan is 1D
+            if (inner_rdom[k].dimensions() != 1) {
+                cerr << "Inner RDom must be 1D, as splitting a 1D reduction"
+                    << "definition produces 1D intra-tile reductions";
+                assert(false);
+            }
+
+            // given outer RDom must be 2D, to iterate over all elements of intra-tile tails
+            // and over all tiles
+            if (outer_rdom[k].dimensions() != 2) {
+                cerr << "Outer RDom must be 2D, RDom.x must iterate over tail elements in the range "
+                    << "[0,filter_order] and RDom.y must iterate over all tiles [1,imaeg_width/tile_width]";
                 assert(false);
             }
 

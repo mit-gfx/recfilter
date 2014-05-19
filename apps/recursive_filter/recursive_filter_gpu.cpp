@@ -18,10 +18,8 @@ using std::endl;
 
 
 int main(int argc, char **argv) {
-
     Arguments args("recursive_filter", argc, argv);
 
-    bool  debug   = args.debug;
     bool  verbose = args.verbose;
     bool  nocheck = args.nocheck;
     int   width   = args.width;
@@ -40,10 +38,13 @@ int main(int argc, char **argv) {
     // Algorithm
     //
 
+    int filter_order_x = 3;
+    int filter_order_y = 1;
+
     Image<float> weights(2,3);
-    weights(0,0) = 0.5f; // x dimension filtering weights
-    weights(0,1) = 0.25f; // x dimension filtering weights
-    weights(0,2) = 0.0f; // x dimension filtering weights
+    weights(0,0) = 1.0f; //0.5f; // x dimension filtering weights
+    weights(0,1) = 1.0f; //0.25f; // x dimension filtering weights
+    weights(0,2) = 0.0f; //0.125f; // x dimension filtering weights
     weights(1,0) = 0.0f; // 0.75f; // y dimension filtering weights
     weights(1,1) = 0.0f; // 0.375f; // y dimension filtering weights
     weights(1,2) = 0.0f; // 0.1875f; // y dimension filtering weights
@@ -77,14 +78,14 @@ int main(int argc, char **argv) {
 
     RDom rxi(1, tile_width-1, "rxi");
     RDom ryi(1, tile_width-1, "ryi");
-    RDom rxo(1, image.width() / tile_width, "rxo");
-    RDom ryo(1, image.height()/ tile_width, "ryo");
+    RDom rxo(0, filter_order_x, 1, image.width() / tile_width, "rxo");
+    RDom ryo(0, filter_order_y, 1, image.height()/ tile_width, "ryo");
 
     split(S, W, Internal::vec(0,1), Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
-             Internal::vec(rx,ry), Internal::vec(rxi,ryi), Internal::vec(rxo,ryo), Internal::vec(3,1));
+             Internal::vec(rx,ry), Internal::vec(rxi,ryi), Internal::vec(rxo,ryo),
+             Internal::vec(filter_order_x, filter_order_y));
 
     // ----------------------------------------------------------------------------------------------
-
 
     //
     // Reordering split terms
