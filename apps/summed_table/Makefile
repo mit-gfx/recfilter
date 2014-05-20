@@ -1,28 +1,36 @@
-CXX=g++
-MKDIR=mkdir -p
-RM=rm -f
-
-BIN_DIR=../bin
-
 APP_NAME=summed_table
 
+CXX=g++
+MKDIR=mkdir -p
+RM=rm -rf
+
+BUILD_DIR=_build
+BIN_DIR=../bin
 EXE=$(BIN_DIR)/$(APP_NAME)
+
+SPLITLIB_DIR=../../lib/
+SPLITLIB_INC=$(SPLITLIB_DIR)/split.h
+SPLITLIB_LIB=$(SPLITLIB_DIR)/libSplit.a
 
 HALIDE_LIB=$(HALIDE_DIR)/bin/libHalide.a
 
-CPP := $(wildcard *.cpp)
+SRC := $(wildcard *.cpp)
+OBJ := $(addprefix $(BUILD_DIR)/,$(notdir $(SRC:.cpp=.o)))
+INC := $(wildcard *.h)
 
-OBJ := $(addprefix _build/,$(notdir $(CPP:.cpp=.o)))
+all: $(EXE)
 
-all: $(OBJ) $(EXE)
+$(BUILD_DIR)/%.o: %.cpp $(INC) $(SPLITLIB_INC)
+	@$(MKDIR) $(BUILD_DIR)
+	$(CXX) -c $< -o $@ -fno-rtti -I$(SPLITLIB_DIR) -I$(HALIDE_DIR)/include/
 
-_build/%.o: %.cpp
-	@$(MKDIR) _build
-	$(CXX) -c $< -o $@ -I$(HALIDE_DIR)/include/ -I../
-
-$(EXE): $(OBJ) $(HALIDE_LIB)
+$(EXE): $(OBJ) $(SPLITLIB_LIB) $(HALIDE_LIB)
 	@$(MKDIR) $(BIN_DIR)
-	$(CXX) $(OBJ) $(HALIDE_LIB) -o $(EXE) -lz -lpthread -ldl -g -Wall
+	$(CXX) -lz -lpthread -ldl -g -Wall $(OBJ) $(HALIDE_LIB) $(SPLITLIB_LIB) -o $(EXE)
+
+$(SPLITLIB_LIB): $(SPLITLIB_INC)
+	make -C $(SPLITLIB_DIR)
 
 clean:
-	$(RM) $(OBJ) $(EXE)
+	$(RM) $(BUILD_DIR)
+	$(RM) $(EXE)

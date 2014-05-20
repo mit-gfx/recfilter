@@ -1,4 +1,4 @@
-PROGRAM_NAME=recursive_filter
+APP_NAME=recursive_filter
 
 CXX=g++
 MKDIR=mkdir -p
@@ -6,7 +6,7 @@ RM=rm -rf
 
 BUILD_DIR=_build
 BIN_DIR=../bin
-EXE=$(BIN_DIR)/$(PROGRAM_NAME)
+EXE=$(BIN_DIR)/$(APP_NAME)
 
 SPLITLIB_DIR=../../lib/
 SPLITLIB_INC=$(SPLITLIB_DIR)/split.h
