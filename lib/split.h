@@ -31,29 +31,7 @@ std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f);
 
 // ----------------------------------------------------------------------------
 
-// Splitting routines
-
-void split(
-        Halide::Func& F,
-        int          dimension,
-        Halide::Var  var,
-        Halide::Var  inner_var,
-        Halide::Var  outer_var,
-        Halide::RDom rdom,
-        Halide::RDom inner_rdom,
-        Halide::RDom outer_rdom,
-        int order = 1);
-
-void split(
-        Halide::Func& F,
-        std::vector<int>          dimensions,
-        std::vector<Halide::Var>  vars,
-        std::vector<Halide::Var>  inner_vars,
-        std::vector<Halide::Var>  outer_vars,
-        std::vector<Halide::RDom> rdoms,
-        std::vector<Halide::RDom> inner_rdoms,
-        std::vector<Halide::RDom> outer_rdoms,
-        int order = 1);
+// Splitting routine
 
 void split(
         Halide::Func& F,
@@ -64,19 +42,6 @@ void split(
         std::vector<Halide::Var>  outer_vars,
         std::vector<Halide::RDom> rdoms,
         std::vector<Halide::RDom> inner_rdoms,
-        std::vector<Halide::RDom> outer_rdoms,
-        int order = 1);
-
-void split(
-        Halide::Func& F,
-        Halide::Func  filter_weights,
-        std::vector<int>          dimensions,
-        std::vector<Halide::Var>  vars,
-        std::vector<Halide::Var>  inner_vars,
-        std::vector<Halide::Var>  outer_vars,
-        std::vector<Halide::RDom> rdoms,
-        std::vector<Halide::RDom> inner_rdoms,
-        std::vector<Halide::RDom> outer_rdoms,
         std::vector<int> orders);
 
 // ----------------------------------------------------------------------------

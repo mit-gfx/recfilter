@@ -39,15 +39,15 @@ int main(int argc, char **argv) {
     //
 
     int filter_order_x = 3;
-    int filter_order_y = 1;
+    int filter_order_y = 3;
 
     Image<float> weights(2,3);
-    weights(0,0) = 1.0f; //0.5f; // x dimension filtering weights
-    weights(0,1) = 1.0f; //0.25f; // x dimension filtering weights
-    weights(0,2) = 0.0f; //0.125f; // x dimension filtering weights
-    weights(1,0) = 0.0f; // 0.75f; // y dimension filtering weights
-    weights(1,1) = 0.0f; // 0.375f; // y dimension filtering weights
-    weights(1,2) = 0.0f; // 0.1875f; // y dimension filtering weights
+    weights(0,0) = 0.125f; // x dimension filtering weights
+    weights(0,1) = 0.0625f;
+    weights(0,2) = 0.03125f;
+    weights(1,0) = 0.125f; // y dimension filtering weights
+    weights(1,1) = 0.0625f;
+    weights(1,2) = 0.03125f;
 
     Func I("Input");
     Func W("Weight");
@@ -78,12 +78,12 @@ int main(int argc, char **argv) {
 
     RDom rxi(1, tile_width-1, "rxi");
     RDom ryi(1, tile_width-1, "ryi");
-    RDom rxo(0, filter_order_x, 1, image.width() / tile_width, "rxo");
-    RDom ryo(0, filter_order_y, 1, image.height()/ tile_width, "ryo");
 
-    split(S, W, Internal::vec(0,1), Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
-             Internal::vec(rx,ry), Internal::vec(rxi,ryi), Internal::vec(rxo,ryo),
-             Internal::vec(filter_order_x, filter_order_y));
+    split(S, W, Internal::vec(0,1),
+            Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
+            Internal::vec(rx,ry), Internal::vec(rxi,ryi),
+//             Internal::vec(tile_width, tile_width),
+            Internal::vec(filter_order_x, filter_order_y));
 
     // ----------------------------------------------------------------------------------------------
 
@@ -107,7 +107,6 @@ int main(int argc, char **argv) {
     inline_function (S, "S$split$$Deps_x$");
     inline_function (S, "S$split$$Intra_x$");
     inline_function (S, "S$split$");
-//    inline_non_split_functions(S, 2);
 
     // ----------------------------------------------------------------------------------------------
 
@@ -124,15 +123,15 @@ int main(int argc, char **argv) {
         functions[func_list[i].name()] = func_list[i];
     }
 
+    Func S_intra0= functions["SIntra_Tail"];
+    Func S_tails = functions["STail"];
+    Func S_intra = functions["S$split$$Intra_x$$Intra_y$"];
+    Func S_ctailx= functions["S$split$$CTail_x$"];
+    Func S_ctaily= functions["SCTail_y"];
+    Func S_final = functions["S"];
+
     Target target = get_jit_target_from_environment();
     if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
-        Func S_intra0= functions["SIntra_Tail"];
-        Func S_tails = functions["STail"];
-        Func S_intra = functions["S$split$$Intra_x$$Intra_y$"];
-        Func S_ctailx= functions["S$split$$CTail_x$"];
-        Func S_ctaily= functions["SCTail_y"];
-        Func S_final = functions["S"];
-
         Var t("t");
 
         S_intra0.compute_at(S_tails, Var("blockidx"));
@@ -153,14 +152,14 @@ int main(int argc, char **argv) {
         S_ctaily.split(xo,xo,t,MAX_THREAD/tile_width);
         S_ctaily.reorder(yo,yi,xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
         S_ctaily.update().split(xo,xo,t,MAX_THREAD/tile_width);
-        S_ctaily.update().reorder(ryo.x,yi,xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
+        S_ctaily.update().reorder(xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
 
         S_ctailx.compute_root();
         S_ctailx.reorder_storage(yi,yo,xi,xo);
         S_ctailx.split(yo,yo,t,MAX_THREAD/tile_width);
         S_ctailx.reorder(xo,xi,yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
         S_ctailx.update().split(yo,yo,t,MAX_THREAD/tile_width);
-        S_ctailx.update().reorder(rxo.x,xi,yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
+        S_ctailx.update().reorder(yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
 
         S_intra.compute_at(S_final, Var("blockidx"));
         S_intra.reorder_storage(xi,yi,xo,yo);
@@ -175,13 +174,6 @@ int main(int argc, char **argv) {
         S.reorder(yi, xi, xo, yo);
         S_final.gpu_blocks(xo,yo).gpu_threads(xi);
         S_final.bound(x, 0, image.width()).bound(y, 0, image.height());
-
-        Func D;
-        D(x,y) = S_ctailx(x%3, x/3, 0, 0);
-        Image<float> h = D.realize(3*width/tile_width, 1);
-        //D(x,y) = S_tails(x%3, x/3, y%width, y/width)[1];
-        //Image<float> h = D.realize(3*width/tile_width, height);
-        cerr << h << endl;
     }
     else {
         cerr << "Warning: No CPU scheduling" << endl;
@@ -218,21 +210,24 @@ int main(int argc, char **argv) {
         Image<float> ref = reference_recursive_filter<float>(random_image, weights);
 
         float diff_sum = 0;
+        float all_sum = 0;
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {
                 diff(x,y) = std::abs(ref(x,y) - hl_out(x,y));
                 diff_sum += diff(x,y);
+                all_sum += ref(x,y);
             }
         }
+        float diff_ratio = 100.0f * diff_sum / all_sum;
 
         if (verbose) {
             cerr << "Input" << endl << random_image << endl;
             cerr << "Reference" << endl << ref << endl;
             cerr << "Halide output" << endl << hl_out << endl;
             cerr << "Difference " << endl << diff << endl;
-            cerr << "\nDifference = " << diff_sum << endl;
+            cerr << "\nDifference = " << diff_sum << " = " << diff_ratio << "%" << endl;
         } else {
-            cerr << "\nDifference = " << diff_sum << endl;
+            cerr << "\nDifference = " << diff_sum << " = " << diff_ratio << "%" << endl;
             cerr << endl;
         }
     }
