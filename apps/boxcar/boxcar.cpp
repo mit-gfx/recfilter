@@ -1,13 +1,10 @@
 #include <iostream>
-#include <cstdio>
-#include <cmath>
-
 #include <Halide.h>
 
 #include "../../lib/split.h"
 
-#define WARP_SIZE  32
-#define MAX_THREAD 192
+#define MAX_THREAD        192
+#define BOX_FILTER_FACTOR 16
 
 using namespace Halide;
 
@@ -18,7 +15,7 @@ using std::endl;
 
 
 int main(int argc, char **argv) {
-    Arguments args("recursive_filter", argc, argv);
+    Arguments args("boxcar", argc, argv);
 
     bool  verbose = args.verbose;
     bool  nocheck = args.nocheck;
@@ -27,31 +24,22 @@ int main(int argc, char **argv) {
     int   tile_width = args.block;
     int   iterations = args.iterations;
 
-    Image<float> random_image = generate_random_image<float>(width,height);
+    Image<int> random_image = generate_random_image<int>(width,height);
 
-    ImageParam image(type_of<float>(), 2);
+    ImageParam image(type_of<int>(), 2);
     image.set(random_image);
 
     // ----------------------------------------------------------------------------------------------
 
-    //
-    // Algorithm
-    //
+    int filter_order_x = 1;
+    int filter_order_y = 1;
 
-    int filter_order_x = 3;
-    int filter_order_y = 3;
-
-    Image<float> weights(2,3);
-    weights(0,0) = 0.125f; // x dimension filtering weights
-    weights(0,1) = 0.0625f;
-    weights(0,2) = 0.03125f;
-    weights(1,0) = 0.125f; // y dimension filtering weights
-    weights(1,1) = 0.0625f;
-    weights(1,2) = 0.03125f;
+    int box_x = width/BOX_FILTER_FACTOR;        // radius of box filter
+    int box_y = height/BOX_FILTER_FACTOR;
 
     Func I("Input");
-    Func W("Weight");
     Func S("S");
+    Func B("Boxcar");
 
     Var x("x");
     Var y("y");
@@ -59,19 +47,18 @@ int main(int argc, char **argv) {
     RDom rx(1, image.width()-1, "rx");
     RDom ry(1, image.height()-1,"ry");
 
-    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0.0f, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-
-    W(x, y) = weights(x,y);
+    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
     S(x, y) = I(x,y);
-    S(rx,y) = S(rx,y) + select(rx>0, W(0,0)*S(rx-1,y), 0.0f) + select(rx>1, W(0,1)*S(rx-2,y), 0.0f) + select(rx>2, W(0,2)*S(rx-3,y), 0.0f);
-    S(x,ry) = S(x,ry) + select(ry>0, W(1,0)*S(x,ry-1), 0.0f) + select(ry>1, W(1,1)*S(x,ry-2), 0.0f) + select(ry>2, W(1,2)*S(x,ry-3), 0.0f);
+    S(rx,y) = S(rx,y) + S(rx-1,y);
+    S(x,ry) = S(x,ry) + S(x,ry-1);
+
+    B(x,y) = S(min(x+box_x,image.width()-1), min(y+box_y,image.height()-1))
+           + select(x-box_x-1<0 || y-box_y-1<0, 0, S(max(x-box_x-1,0), max(y-box_y-1,0)))
+           - select(y-box_y-1<0, 0, S(min(x+box_x,image.width()-1), max(y-box_y-1,0)))
+           - select(x-box_x-1<0, 0, S(max(x-box_x-1,0), min(y+box_y,image.height()-1)));
 
     // ----------------------------------------------------------------------------------------------
-
-    //
-    // Splitting into tiles
-    //
 
     Var xi("xi"), yi("yi");
     Var xo("xo"), yo("yo");
@@ -79,42 +66,35 @@ int main(int argc, char **argv) {
     RDom rxi(1, tile_width-1, "rxi");
     RDom ryi(1, tile_width-1, "ryi");
 
-    split(S, W, Internal::vec(0,1),
+    split(S,Internal::vec(0,1),
             Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
             Internal::vec(rx,ry), Internal::vec(rxi,ryi),
             Internal::vec(filter_order_x, filter_order_y));
 
     // ----------------------------------------------------------------------------------------------
 
-    //
-    // Reordering split terms
-    //
-
-    float_dependencies_to_root(S);
-    merge_and_inline(S,
+    float_dependencies_to_root(B);
+    merge_and_inline(B,
             "S$split$$Intra2_x$$Intra2_y$",
             "S$split$$Intra2_x$$Intra_y$",
             "S$split$$Intra_x$$Intra2_y$",
             "SIntra_Tail");
-    merge_and_inline(S, "S$split$$Intra_x$$Tail_y$", "S$split$$Intra2_x$$Tail_y$" , "STail_y");
-    merge_and_inline(S, "S$split$$Intra_x$$CTail_y$", "S$split$$Intra2_x$$CTail_y$", "SCTail_y");
-    inline_function (S, "S$split$$Intra2_x$$Deps_y$");
-    inline_function (S, "S$split$$Intra2_x$");
-    swap_variables  (S, "STail_y", xi, yi);
-    merge_and_inline(S, "STail_y", "S$split$$Tail_x$", "STail");
-    inline_function (S, "S$split$$Intra_x$$Deps_y$");
-    inline_function (S, "S$split$$Deps_x$");
-    inline_function (S, "S$split$$Intra_x$");
-    inline_function (S, "S$split$");
+    merge_and_inline(B, "S$split$$Intra_x$$Tail_y$", "S$split$$Intra2_x$$Tail_y$" , "STail_y");
+    merge_and_inline(B, "S$split$$Intra_x$$CTail_y$", "S$split$$Intra2_x$$CTail_y$", "SCTail_y");
+    inline_function (B, "S$split$$Intra2_x$$Deps_y$");
+    inline_function (B, "S$split$$Intra2_x$");
+    swap_variables  (B, "STail_y", xi, yi);
+    merge_and_inline(B, "STail_y", "S$split$$Tail_x$", "STail");
+    inline_function (B, "S$split$$Intra_x$$Deps_y$");
+    inline_function (B, "S$split$$Deps_x$");
+    inline_function (B, "S$split$$Intra_x$");
+    inline_function (B, "S$split$");
+    inline_function (B, "S");
 
     // ----------------------------------------------------------------------------------------------
 
-    //
-    // Scheduling
-    //
-
     vector<Func> func_list;
-    extract_func_calls(S, func_list);
+    extract_func_calls(B, func_list);
 
     map<string,Func> functions;
     for (size_t i=0; i<func_list.size(); i++) {
@@ -159,19 +139,19 @@ int main(int argc, char **argv) {
         S_ctailx.update().split(yo,yo,t,MAX_THREAD/tile_width);
         S_ctailx.update().reorder(yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
 
-        S_intra.compute_at(S, Var("blockidx"));
+        S_intra.compute_at(B, Var("blockidx"));
         S_intra.reorder_storage(xi,yi,xo,yo);
         //S_intra.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi);
         S_intra.reorder(xi,yi,xo,yo).gpu_threads(yi);
         S_intra.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
         S_intra.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
 
-        S.compute_root();
-        S.split(x, xo,xi, tile_width).split(y, yo,yi, tile_width);
-        //S.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
-        S.reorder(yi, xi, xo, yo);
-        S.gpu_blocks(xo,yo).gpu_threads(xi);
-        S.bound(x, 0, image.width()).bound(y, 0, image.height());
+        B.compute_root();
+        B.split(x, xo,xi, tile_width).split(y, yo,yi, tile_width);
+        //B.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
+        B.reorder(yi, xi, xo, yo);
+        B.gpu_blocks(xo,yo).gpu_threads(xi);
+        B.bound(x, 0, image.width()).bound(y, 0, image.height());
     }
     else {
         cerr << "Warning: No CPU scheduling" << endl;
@@ -179,18 +159,14 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    //
-    // JIT compilation
-    //
-
     cerr << "\nJIT compilation ... " << endl;
-    S.compile_jit();
+    B.compile_jit();
 
-    Buffer hl_out_buff(type_of<float>(), width,height);
+    Buffer hl_out_buff(type_of<int>(), width,height);
     {
         Timer t("Running ... ");
         for (int k=0; k<iterations; k++) {
-            S.realize(hl_out_buff);
+            B.realize(hl_out_buff);
             if (k < iterations-1) {
                 hl_out_buff.free_dev_buffer();
             }
@@ -203,12 +179,24 @@ int main(int argc, char **argv) {
 
     if (!nocheck) {
         cerr << "\nChecking difference ... " << endl;
-        Image<float> hl_out(hl_out_buff);
-        Image<float> diff(width,height);
-        Image<float> ref = reference_recursive_filter<float>(random_image, weights);
+        Image<int> hl_out(hl_out_buff);
+        Image<int> diff(width,height);
+        Image<int> ref(width,height);
 
-        float diff_sum = 0;
-        float all_sum = 0;
+        for (int y=0; y<height; y++) {
+            for (int x=0; x<width; x++) {
+                ref(x,y) = 0;
+                for (int v=y-box_y; v<=y+box_y; v++) {
+                    for (int u=x-box_x; u<=x+box_x; u++) {
+                        if (v>=0 && u>=0 && v<height && u<width)
+                            ref(x,y) += random_image(u,v);
+                    }
+                }
+            }
+        }
+
+        int diff_sum = 0;
+        int all_sum = 0;
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {
                 diff(x,y) = std::abs(ref(x,y) - hl_out(x,y));
@@ -216,10 +204,11 @@ int main(int argc, char **argv) {
                 all_sum += ref(x,y);
             }
         }
-        float diff_ratio = 100.0f * diff_sum / all_sum;
+        float diff_ratio = 100.0f * float(diff_sum)/float(all_sum);
 
         if (verbose) {
             cerr << "Input" << endl << random_image << endl;
+            cerr << "Box filter footprint (" << 2*box_x+1 << "x" << 2*box_y+1 << ")" << endl;
             cerr << "Reference" << endl << ref << endl;
             cerr << "Halide output" << endl << hl_out << endl;
             cerr << "Difference " << endl << diff << endl;
@@ -230,5 +219,5 @@ int main(int argc, char **argv) {
         }
     }
 
-    return EXIT_SUCCESS;
+    return 0;
 }

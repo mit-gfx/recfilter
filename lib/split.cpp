@@ -467,6 +467,24 @@ static Function split_function_dimensions(
 
 void split(
         Func& func,
+        vector<int>  dimension,
+        vector<Var>  var,
+        vector<Var>  inner_var,
+        vector<Var>  outer_var,
+        vector<RDom> rdom,
+        vector<RDom> inner_rdom,
+        vector<int>  order)
+{
+    Var i,j;
+    Func filter_weights("default_filter_wt");    // default filter weight = 1
+    filter_weights(i,j) = Cast::make(func.values()[0].type(), 1);
+
+    split(func, filter_weights, dimension, var, inner_var, outer_var,
+            rdom, inner_rdom, order);
+}
+
+void split(
+        Func& func,
         Func filter_weights,
         vector<int>  dimension,
         vector<Var>  var,

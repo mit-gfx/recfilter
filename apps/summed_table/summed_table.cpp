@@ -34,7 +34,6 @@ int main(int argc, char **argv) {
     int filter_order_y = 1;
 
     Func I("Input");
-    Func W("Weight");
     Func S("S");
 
     Var x("x");
@@ -44,8 +43,6 @@ int main(int argc, char **argv) {
     RDom ry(1, image.height()-1,"ry");
 
     I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-
-    W(x, y) = 1;  // filter weights
 
     S(x, y) = I(x,y);
     S(rx,y) = S(rx,y) + S(rx-1,y);
@@ -59,7 +56,7 @@ int main(int argc, char **argv) {
     RDom rxi(1, tile_width-1, "rxi");
     RDom ryi(1, tile_width-1, "ryi");
 
-    split(S, W, Internal::vec(0,1),
+    split(S,Internal::vec(0,1),
             Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
             Internal::vec(rx,ry), Internal::vec(rxi,ryi),
             Internal::vec(filter_order_x, filter_order_y));
@@ -99,7 +96,6 @@ int main(int argc, char **argv) {
     Func S_intra = functions["S$split$$Intra_x$$Intra_y$"];
     Func S_ctailx= functions["S$split$$CTail_x$"];
     Func S_ctaily= functions["SCTail_y"];
-    Func S_final = functions["S"];
 
     Target target = get_jit_target_from_environment();
     if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
@@ -132,19 +128,19 @@ int main(int argc, char **argv) {
         S_ctailx.update().split(yo,yo,t,MAX_THREAD/tile_width);
         S_ctailx.update().reorder(yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
 
-        S_intra.compute_at(S_final, Var("blockidx"));
+        S_intra.compute_at(S, Var("blockidx"));
         S_intra.reorder_storage(xi,yi,xo,yo);
         //S_intra.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi);
         S_intra.reorder(xi,yi,xo,yo).gpu_threads(yi);
         S_intra.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
         S_intra.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
 
-        S_final.compute_root();
-        S_final.split(x, xo,xi, tile_width).split(y, yo,yi, tile_width);
-        //S_final.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
+        S.compute_root();
+        S.split(x, xo,xi, tile_width).split(y, yo,yi, tile_width);
+        //S.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
         S.reorder(yi, xi, xo, yo);
-        S_final.gpu_blocks(xo,yo).gpu_threads(xi);
-        S_final.bound(x, 0, image.width()).bound(y, 0, image.height());
+        S.gpu_blocks(xo,yo).gpu_threads(xi);
+        S.bound(x, 0, image.width()).bound(y, 0, image.height());
     }
     else {
         cerr << "Warning: No CPU scheduling" << endl;
@@ -208,9 +204,9 @@ int main(int argc, char **argv) {
             cerr << "Reference" << endl << ref << endl;
             cerr << "Halide output" << endl << hl_out << endl;
             cerr << "Difference " << endl << diff << endl;
-            cerr << "\nError = " << diff_sum << " ( " << diff_ratio << "% )" << endl;
+            cerr << "\nError = " << diff_sum << " ~ " << diff_ratio << "%" << endl;
         } else {
-            cerr << "\nError = " << diff_sum << " ( " << diff_ratio << "% )" << endl;
+            cerr << "\nError = " << diff_sum << " ~ " << diff_ratio << "%" << endl;
             cerr << endl;
         }
     }

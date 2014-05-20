@@ -44,6 +44,16 @@ void split(
         std::vector<Halide::RDom> inner_rdoms,
         std::vector<int> orders);
 
+void split(
+        Halide::Func& F,
+        std::vector<int>          dimensions,
+        std::vector<Halide::Var>  vars,
+        std::vector<Halide::Var>  inner_vars,
+        std::vector<Halide::Var>  outer_vars,
+        std::vector<Halide::RDom> rdoms,
+        std::vector<Halide::RDom> inner_rdoms,
+        std::vector<int> orders);
+
 // ----------------------------------------------------------------------------
 
 // Reordering routines
