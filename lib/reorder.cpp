@@ -12,212 +12,196 @@ using std::map;
 
 // -----------------------------------------------------------------------------
 
-static void merge(Function A, Function B, string merged_name) {
-    // basic checks
-    {
-        bool can_merge = true;
+static bool merge_feasible(Function A, Function B, string& error) {
+    bool can_merge = true;
 
-        bool brace_present = (
-                (merged_name.find(DELIM_START) != string::npos) ||
-                (merged_name.find(DELIM_START) != string::npos));
-        if (brace_present) {
-            cerr << "Bad Function name " << merged_name << ". ";
-            cerr << DELIM_START << " and " << DELIM_END << " ";
-            cerr << "are not allowed in Function names as they are used ";
-            cerr << "by splitting routines and carry special meaning";
-            assert(false);
-        }
+    // pure definitions must have same args
+    can_merge &= (A.args().size() == B.args().size());
+    for (size_t i=0; can_merge && i<A.args().size(); i++) {
+        can_merge &= (A.args()[i] == B.args()[i]);
+    }
+    if (!can_merge) {
+        error = "Functions to be merged must have same args in pure defs";
+    }
 
-        assert(A.name()!=merged_name && B.name()!=merged_name &&
-                "Name of merged function cannot be same as either of the merged functions");
+    // each reduction definition must have same args and reduction domain
+    vector<ReductionDefinition> Ar = A.reductions();
+    vector<ReductionDefinition> Br = B.reductions();
+    for (size_t i=0; can_merge && i<std::min(Ar.size(),Br.size()); i++) {
+        can_merge &= Ar[i].domain.same_as(Br[i].domain);
+        can_merge &= (Ar[i].args.size() == Br[i].args.size());
+        for (size_t j=0; can_merge && j<Ar[i].args.size(); j++) {
+            can_merge &= equal(Ar[i].args[j], Br[i].args[j]);
+        }
+    }
+    if (!can_merge) {
+        error = "Functions to be merged must have same args in reduction defs";
+    }
 
-        // pure definitions must have same args
-        can_merge &= (A.args().size() == B.args().size());
-        for (size_t i=0; can_merge && i<A.args().size(); i++) {
-            can_merge &= (A.args()[i] == B.args()[i]);
+    // A must not depend upon B
+    for (size_t i=0; can_merge && i<A.values().size(); i++) {
+        can_merge &= (!expr_depends_on_func(A.values()[i], B.name()));
+    }
+    for (size_t i=0; can_merge && i<A.reductions().size(); i++) {
+        for (size_t j=0; can_merge && j<A.reductions()[i].values.size(); j++) {
+            can_merge &= (!expr_depends_on_func(A.reductions()[i].values[j], B.name()));
         }
-        assert(can_merge && "Functions to be merged must have same args in pure defs");
+    }
+    if (!can_merge) {
+        error = "Functions to be merged must not call each other";
+    }
 
-        // each reduction definition must have same args and reduction domain
-        vector<ReductionDefinition> Ar = A.reductions();
-        vector<ReductionDefinition> Br = B.reductions();
-        for (size_t i=0; can_merge && i<std::min(Ar.size(),Br.size()); i++) {
-            can_merge &= Ar[i].domain.same_as(Br[i].domain);
-            can_merge &= (Ar[i].args.size() == Br[i].args.size());
-            for (size_t j=0; can_merge && j<Ar[i].args.size(); j++) {
-                can_merge &= equal(Ar[i].args[j], Br[i].args[j]);
-            }
+    // B must not depend upon A
+    for (size_t i=0; can_merge && i<B.values().size(); i++) {
+        can_merge &= (!expr_depends_on_func(B.values()[i], A.name()));
+    }
+    for (size_t i=0; can_merge && i<B.reductions().size(); i++) {
+        for (size_t j=0; can_merge && j<B.reductions()[i].values.size(); j++) {
+            can_merge &= (!expr_depends_on_func(B.reductions()[i].values[j], A.name()));
         }
-        assert(can_merge && "Functions to be merged must have same args in reduction defs");
+    }
+    if (!can_merge) {
+        error = "Functions to be merged must not call each other";
+    }
 
-        // A must not depend upon B
-        for (size_t i=0; can_merge && i<A.values().size(); i++) {
-            can_merge &= (!expr_depends_on_func(A.values()[i], B.name()));
-        }
-        for (size_t i=0; can_merge && i<A.reductions().size(); i++) {
-            for (size_t j=0; can_merge && j<A.reductions()[i].values.size(); j++) {
-                can_merge &= (!expr_depends_on_func(A.reductions()[i].values[j], B.name()));
-            }
-        }
-        assert(can_merge && "Functions to be merged must not call each other, first function calls second");
+    return can_merge;
+}
 
-        // B must not depend upon A
-        for (size_t i=0; can_merge && i<B.values().size(); i++) {
-            can_merge &= (!expr_depends_on_func(B.values()[i], A.name()));
+static bool check_duplicate(Function A, Function B) {
+    // duplicate functions can always be merged
+    string err;
+    bool duplicate = merge_feasible(A,B, err);
+
+    // no. of outputs and reduction definitions must be same
+    duplicate &= (A.outputs() == B.outputs());
+    duplicate &= (A.reductions().size() == B.reductions().size());
+
+    // compare pure defs
+    for (size_t i=0; duplicate && i<A.outputs(); i++) {
+        duplicate &= equal(A.values()[i], B.values()[i]);
+    }
+
+    // compare reduction definition outputs
+    for (size_t i=0; duplicate && i<A.reductions().size(); i++) {
+        for (size_t j=0; duplicate && j<A.reductions()[i].values.size(); j++) {
+            Expr a = A.reductions()[i].values[j];
+            Expr b = B.reductions()[i].values[j];
+            duplicate &= equal(a, substitute_func_call(B.name(),A,b));
         }
-        for (size_t i=0; can_merge && i<B.reductions().size(); i++) {
-            for (size_t j=0; can_merge && j<B.reductions()[i].values.size(); j++) {
-                can_merge &= (!expr_depends_on_func(B.reductions()[i].values[j], A.name()));
-            }
-        }
-        assert(can_merge && "Functions to be merged must not call each other, second function calls first");
+    }
+    return duplicate;
+}
+
+static void merge(Func S, Function A, Function B, string merged_name) {
+    string merge_error;
+    if (!merge_feasible(A,B,merge_error)) {
+        cerr << merge_error << std::endl;
+        assert(false);
     }
 
     size_t num_outputs_A = A.outputs();
     size_t num_outputs_B = B.outputs();
 
+    bool duplicate = check_duplicate(A,B);
+
     // merge procedure
+    Function AB(merged_name);
+
+    // merged tuple for pure definition
     {
-        if (merged_name.empty()) {
-            merged_name = "Merged{" + A.name() + "}{" + B.name() + "}";
+        vector<Expr> values;
+
+        // RHS of pure definitions of A
+        for (size_t j=0; j<num_outputs_A; j++) {
+            values.push_back(A.values()[j]);
         }
 
-        Function AB(merged_name);
+        // RHS of pure definitions of B
+        // if A and B are identical, no need to create a Tuple
+        // with RHS of both A and B, just RHS of A will suffice
+        for (size_t j=0; !duplicate && j<num_outputs_B; j++) {
+            values.push_back(B.values()[j]);
+        }
 
-        // merged tuple for pure definition
-        {
+        AB.define(A.args(), values);
+    }
+
+    // merged tuple for each of reduction definitions
+    {
+        vector<ReductionDefinition> Ar = A.reductions();
+        vector<ReductionDefinition> Br = B.reductions();
+        for (size_t i=0; i<std::max(Ar.size(),Br.size()); i++) {
             vector<Expr> values;
 
-            // RHS of pure definitions of A
+            // RHS of reduction definitions of A
             for (size_t j=0; j<num_outputs_A; j++) {
-                values.push_back(A.values()[j]);
-            }
-
-            // RHS of pure definitions of B
-            for (size_t j=0; j<num_outputs_B; j++) {
-                values.push_back(B.values()[j]);
-            }
-
-            AB.define(A.args(), values);
-        }
-
-        // merged tuple for each of reduction definitions
-        {
-            vector<ReductionDefinition> Ar = A.reductions();
-            vector<ReductionDefinition> Br = B.reductions();
-            for (size_t i=0; i<std::max(Ar.size(),Br.size()); i++) {
-                vector<Expr> values;
-
-                // RHS of reduction definitions of A
-                for (size_t j=0; j<num_outputs_A; j++) {
-                    if (i < Ar.size()) {
-                        // replace all recursive calls to A with calls to AB
-                        Expr val = substitute_func_call(A.name(), AB, Ar[i].values[j]);
-                        values.push_back(val);
-                    } else {
-                        // add redundant reduction if A has no more reduction definitions
-                        values.push_back(Call::make(AB, Ar[i].args, j));
-                    }
-                }
-
-                // RHS of reduction definitions of B
-                for (size_t j=0; j<num_outputs_B; j++) {
-                    if (i < Br.size()) {
-                        // replace all recursive calls to B with calls to AB and
-                        // increment value indices by number of outputs of A
-                        Expr val = substitute_func_call(B.name(), AB, Br[i].values[j]);
-                        val = increment_value_index_in_func_call(AB.name(), num_outputs_A, val);
-                        values.push_back(val);
-                    } else {
-                        // add redundant reduction if B has no more reduction definitions
-                        values.push_back(Call::make(AB, Br[i].args, j+num_outputs_A));
-                    }
-                }
-
-                AB.define_reduction(Ar[i].args, values);
-            }
-        }
-
-        // if both A and B are identical, no need to create a Tuple
-        // with RHS of both A and B, just RHS of either will suffice
-        {
-            bool identical = true;
-
-            // no. of outputs and reduction definitions must be same
-            identical &= (num_outputs_A == num_outputs_B);
-            identical &= (A.reductions().size() == B.reductions().size());
-
-            // compare pure defs (0, num_outputs_A-1) to
-            // (num_outputs_A, num_outputs_A+num_outputs_B-1)
-            for (size_t i=0; identical && i<num_outputs_A; i++) {
-                Expr a = AB.values()[i];
-                Expr b = AB.values()[num_outputs_A+i];
-                identical &= equal(a,b);
-            }
-
-            // compare reduction definition outputs (0, num_outputs_A-1) to
-            // (num_outputs_A, num_outputs_A+num_outputs_B-1), for all reduction defs
-            for (size_t i=0; identical && i<AB.reductions().size(); i++) {
-                for (size_t j=0; identical && j<num_outputs_A; j++) {
-                    Expr a = AB.reductions()[i].values[j];
-                    Expr b = AB.reductions()[i].values[num_outputs_A+j];
-                    a = increment_value_index_in_func_call(AB.name(), num_outputs_A, a);
-                    identical &= equal(a,b);
+                if (i < Ar.size()) {
+                    // replace all recursive calls to A with calls to AB
+                    Expr val = substitute_func_call(A.name(), AB, Ar[i].values[j]);
+                    values.push_back(val);
+                } else {
+                    // add redundant reduction if A has no more reduction definitions
+                    values.push_back(Call::make(AB, Ar[i].args, j));
                 }
             }
 
-            // if A and B are identical remove all Tuple entries (num_outputs_A,end)
-            if (identical) {
-                vector<string> args = AB.args();
-                vector<Expr> values = AB.values();
-                vector<ReductionDefinition> reductions = AB.reductions();
-
-                values.erase(values.begin()+num_outputs_A, values.end());
-                AB.clear_all_definitions();
-                AB.define(args,values);
-
-                for (size_t i=0; i<reductions.size(); i++) {
-                    vector<Expr> a = reductions[i].args;
-                    vector<Expr> v = reductions[i].values;
-                    v.erase(v.begin()+num_outputs_A, v.end());
-                    AB.define_reduction(a,v);
+            // RHS of reduction definitions of B
+            // if A and B are identical, no need to create a Tuple
+            // with RHS of both A and B, just RHS of A will suffice
+            for (size_t j=0; !duplicate && j<num_outputs_B; j++) {
+                if (i < Br.size()) {
+                    // replace all recursive calls to B with calls to AB and
+                    // increment value indices by number of outputs of A
+                    Expr val = substitute_func_call(B.name(), AB, Br[i].values[j]);
+                    val = increment_value_index_in_func_call(AB.name(), num_outputs_A, val);
+                    values.push_back(val);
+                } else {
+                    // add redundant reduction if B has no more reduction definitions
+                    values.push_back(Call::make(AB, Br[i].args, j+num_outputs_A));
                 }
+            }
 
-                // set number of outputs of A to 0 since A and B's outputs are same
-                num_outputs_A = 0;
-            }
-        }
-
-        // mutate A to index into merged function
-        {
-            vector<string> args = A.args();
-            vector<Expr> call_args;
-            vector<Expr> values;
-            for (size_t i=0; i<A.args().size(); i++) {
-                call_args.push_back(Var(A.args()[i]));
-            }
-            for (size_t i=0; i<A.values().size(); i++) {
-                values.push_back(Call::make(AB, call_args, i));
-            }
-            A.clear_all_definitions();
-            A.define(args, values);
-        }
-
-        // mutate B to index into merged function
-        {
-            vector<string> args = B.args();
-            vector<Expr> call_args;
-            vector<Expr> values;
-            for (size_t i=0; i<B.args().size(); i++) {
-                call_args.push_back(Var(B.args()[i]));
-            }
-            for (size_t i=0; i<B.values().size(); i++) {
-                values.push_back(Call::make(AB, call_args, i+num_outputs_A));
-            }
-            B.clear_all_definitions();
-            B.define(args, values);
+            AB.define_reduction(Ar[i].args, values);
         }
     }
+
+    // mutate A to index into merged function
+    {
+        vector<string> args = A.args();
+        vector<Expr> call_args;
+        vector<Expr> values;
+        for (size_t i=0; i<A.args().size(); i++) {
+            call_args.push_back(Var(A.args()[i]));
+        }
+        for (size_t i=0; i<A.values().size(); i++) {
+            values.push_back(Call::make(AB, call_args, i));
+        }
+        A.clear_all_definitions();
+        A.define(args, values);
+    }
+
+    // mutate B to index into merged function
+    {
+        vector<string> args = B.args();
+        vector<Expr> call_args;
+        vector<Expr> values;
+        for (size_t i=0; i<B.args().size(); i++) {
+            call_args.push_back(Var(B.args()[i]));
+        }
+        for (size_t i=0; i<B.values().size(); i++) {
+            if (duplicate) {
+                values.push_back(Call::make(AB, call_args, i));
+            } else {
+                values.push_back(Call::make(AB, call_args, i+num_outputs_A));
+            }
+        }
+        B.clear_all_definitions();
+        B.define(args, values);
+    }
+
+    // inline A and B
+    inline_function(S, Func(A));
+    inline_function(S, Func(B));
 }
 
 // -----------------------------------------------------------------------------
@@ -245,14 +229,13 @@ void merge(Func S, string func_a, string func_b, string merged_name) {
         assert(false);
     }
 
-    merge(FA, FB, merged_name);
+    merge(S, FA, FB, merged_name);
 }
 
 void merge(Func S, string func_a, string func_b, string func_c, string merged_name) {
     string func_ab = "Merged_%d" + int_to_string(rand());
     merge(S, func_a, func_b, func_ab);
     merge(S, func_c, func_ab, merged_name);
-    inline_function(S, func_ab);
 }
 
 void merge(Func S, string func_a, string func_b, string func_c, string func_d, string merged_name) {
@@ -261,38 +244,66 @@ void merge(Func S, string func_a, string func_b, string func_c, string func_d, s
     merge(S, func_a, func_b, func_ab);
     merge(S, func_c, func_d, func_cd);
     merge(S, func_ab,func_cd,merged_name);
-    inline_function(S, func_ab);
-    inline_function(S, func_cd);
 }
 
-void merge(Func A, Func B, string merged_name) {
-    Function FA = A.function();
-    Function FB = B.function();
-    merge(FA, FB, merged_name);
+void merge(Func S, std::vector<std::string> funcs, string merged) {
+    assert(funcs.size() > 1);
+    string func_prev_merge = funcs[0];
+    string func_next_merge;
+    for (size_t i=1; i<funcs.size(); i++) {
+        if (i == funcs.size()-1) {
+            func_next_merge = merged;
+        } else {
+            func_next_merge = "Merged_%d" + int_to_string(rand());
+        }
+        merge(S, funcs[i], func_prev_merge, func_next_merge);
+        func_prev_merge = func_next_merge;
+    }
 }
 
-void merge_and_inline(Func S, string func_a, string func_b, string merged_name) {
-    merge(S, func_a, func_b, merged_name);
-    inline_function(S, func_a);
-    inline_function(S, func_b);
-}
+void merge_duplicates_with_substring(Func S, string pattern) {
+    vector<Func> func_list;
+    extract_func_calls(S, func_list);
 
-void merge_and_inline(Func S, string func_a, string func_b, string func_c, string func_d, string merged_name) {
-    string func_ab = "Merged_%d" + int_to_string(rand());
-    string func_cd = "Merged_%d" + int_to_string(rand());
-    merge_and_inline(S, func_a, func_b, func_ab);
-    merge_and_inline(S, func_c, func_d, func_cd);
-    merge_and_inline(S, func_ab,func_cd,merged_name);
-}
+    for (size_t i=0; i<func_list.size(); i++) {
+        bool rebuild_func_list = false;
+        Function A = func_list[i].function();
 
-void merge_and_inline(Func S, string func_a, string func_b, string func_c, string merged_name) {
-    string func_ab = "Merged_%d" + int_to_string(rand());
-    merge_and_inline(S, func_a, func_b, func_ab);
-    merge_and_inline(S, func_c, func_ab, merged_name);
-}
+        if (A.name().find(pattern) == string::npos)
+            continue;
 
+        for (size_t j=0; !rebuild_func_list && j<func_list.size(); j++) {
+            Function B = func_list[j].function();
+
+            if (A.name() == B.name())
+                continue;
+
+            //cerr << "Testing for duplicates " << A.name() << " " << B.name() << endl;
+            if (check_duplicate(A, B)) {
+                string merged_name;
+                if (A.name().length() < B.name().length())
+                    merged_name = A.name();
+                else
+                    merged_name = B.name();
+
+                merge(S, A, B, merged_name);
+                rebuild_func_list = true;
+            }
+        }
+
+        if (rebuild_func_list) {
+            i = 0;
+            func_list.clear();
+            extract_func_calls(S, func_list);
+        }
+    }
+}
 
 // -----------------------------------------------------------------------------
+
+void inline_function(Function F, Function A) {
+    inline_function(Func(F), Func(A));
+}
 
 void inline_function(Func F, string func_name) {
     // extract all Function calls
@@ -345,41 +356,16 @@ void inline_function(Func F, Func A) {
 
 // -----------------------------------------------------------------------------
 
-void inline_pure_functions(Func F) {
-    // extract all Function calls
+void inline_functions_with_substring(Func F, string pattern) {
     vector<Func> func_list;
     extract_func_calls(F, func_list);
 
-    // find all Funcs which are pure
+    // find all Funcs containing pattern in their name
     for (size_t i=0; i<func_list.size(); i++) {
-        if (!func_list[i].is_reduction()) {
+        if (!func_list[i].is_reduction() &&
+                func_list[i].name().find(pattern) != string::npos)
+        {
             inline_function(F, func_list[i]);
-        }
-    }
-}
-
-void inline_non_split_functions(Func F, size_t num_splits) {
-    // extract all Function calls
-    vector<Func> func_list;
-    extract_func_calls(F, func_list);
-
-    // find all Funcs which are not split in all dimensions
-    for (size_t i=0; i<func_list.size(); i++) {
-        string name = func_list[i].name();
-        size_t delims = 0;
-        for (size_t j=0; j<name.length(); j++) {
-            char c = name[j];
-            if (c==DELIM_START || c==DELIM_END)
-                delims++;
-        }
-
-        assert(delims%2==0 && "Error in split function names");
-
-        // 2 delimiters are added initially, then each split adds 2 delimliters
-        if (delims>0 && delims!=(2+2*num_splits)) {
-            if (!func_list[i].is_reduction()) {             // we can only inline
-                inline_function(F, func_list[i]);           // pure functions
-            }
         }
     }
 }
@@ -513,6 +499,8 @@ void float_dependencies_to_root(Func F) {
     }
 }
 
+// ----------------------------------------------------------------------------
+
 void swap_variables(Func S, string func_name, Var a, Var b) {
     assert(!a.same_as(b) && "Variables to be swapped must be different");
 
@@ -597,6 +585,7 @@ void swap_variables(Func S, string func_name, Var a, Var b) {
     }
 }
 
+// ----------------------------------------------------------------------------
 
 void expand_multiple_reductions(Func S) {
     vector<Func> func_list;
@@ -614,7 +603,7 @@ void expand_multiple_reductions(Func S) {
         vector<Function> Fsub;
 
         for (size_t k=0; k<num_reductions; k++) {
-            Function function(F.name() + DELIM_START+int_to_string(k)+DELIM_END);
+            Function function(F.name() + DELIMITER + int_to_string(k));
 
             // pure args same as pure args of original function
             // pure val is call to function corresponding to previous
@@ -655,5 +644,71 @@ void expand_multiple_reductions(Func S) {
                 F.define_reduction(Fsub[k].reductions()[0].args, Fsub[k].reductions()[0].values);
             }
         }
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+void recompute(Halide::Func S, std::string caller, std::string func_name) {
+    Function A;
+    Function B;
+
+    vector<Func> func_list;
+    extract_func_calls(S, func_list);
+
+    for (size_t i=0; i<func_list.size(); i++) {
+        if (caller == func_list[i].name())
+            A = func_list[i].function();
+        if (func_name == func_list[i].name())
+            B = func_list[i].function();
+    }
+
+    if (!A.has_pure_definition()) {
+        cerr << func_name << "not found while trying to create a copy of "
+            << func_name << " for its calls in " << caller << endl;
+        assert(false);
+    }
+    if (!B.has_pure_definition()) {
+        cerr << caller << "not found while trying to create a copy of "
+            << func_name << " for its calls in " << caller << endl;
+        assert(false);
+    }
+
+    // create a new function as an extact duplicate of B, replacing recursive
+    // calls to B in reduction defs by calls to the new function
+    Function B_copy(B.name() + DELIMITER + RECOMPUTE_COPY);
+    B_copy.define(B.args(), B.values());
+    for (size_t i=0; i<B.reductions().size(); i++) {
+        vector<Expr> args   = B.reductions()[i].args;
+        vector<Expr> values = B.reductions()[i].values;
+        for (size_t j=0; j<args.size(); j++) {
+            args[j] = substitute_func_call(B.name(), B_copy, args[j]);
+        }
+        for (size_t j=0; j<values.size(); j++) {
+            values[j] = substitute_func_call(B.name(), B_copy, values[j]);
+        }
+        B_copy.define_reduction(args, values);
+    }
+
+    // replace all calls to B by the new B_copy in A
+    vector<string> pure_args = A.args();
+    vector<Expr> pure_values = A.values();
+    vector<ReductionDefinition> reductions = A.reductions();
+    for (size_t i=0; i<pure_values.size(); i++) {
+        pure_values[i] = substitute_func_call(B.name(), B_copy, pure_values[i]);
+    }
+    A.clear_all_definitions();
+    A.define(pure_args, pure_values);
+
+    for (size_t i=0; i<reductions.size(); i++) {
+        for (size_t j=0; j<reductions[i].args.size(); j++) {
+            reductions[i].args[j] = substitute_func_call(B.name(),
+                    B_copy, reductions[i].args[j]);
+        }
+        for (size_t j=0; j<reductions[i].values.size(); j++) {
+            reductions[i].values[j] = substitute_func_call(B.name(),
+                    B_copy, reductions[i].values[j]);
+        }
+        A.define_reduction(reductions[i].args, reductions[i].values);
     }
 }

@@ -73,28 +73,20 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    float_dependencies_to_root(B);
-    merge_and_inline(B,
-            "S$split$$Intra2_x$$Intra2_y$",
-            "S$split$$Intra2_x$$Intra_y$",
-            "S$split$$Intra_x$$Intra2_y$",
-            "SIntra_Tail");
-    merge_and_inline(B, "S$split$$Intra_x$$Tail_y$", "S$split$$Intra2_x$$Tail_y$" , "STail_y");
-    merge_and_inline(B, "S$split$$Intra_x$$CTail_y$", "S$split$$Intra2_x$$CTail_y$", "SCTail_y");
-    inline_function (B, "S$split$$Intra2_x$$Deps_y$");
-    inline_function (B, "S$split$$Intra2_x$");
-    swap_variables  (B, "STail_y", xi, yi);
-    merge_and_inline(B, "STail_y", "S$split$$Tail_x$", "STail");
-    inline_function (B, "S$split$$Intra_x$$Deps_y$");
-    inline_function (B, "S$split$$Deps_x$");
-    inline_function (B, "S$split$$Intra_x$");
-    inline_function (B, "S$split$");
-    inline_function (B, "S");
+    float_dependencies_to_root(S);
+    inline_function(S, "S--Intra_x-Deps_y");
+    inline_function(S, "S--Intra_x");
+    inline_function(S, "S--Deps_x");
+    inline_function(S, "S--Deps_x");
+    swap_variables (S, "S--Intra_x-Tail_y", xi, yi);
+    merge(S, "S--Intra_x-Tail_y", "S--Tail_x", "S--Tail");
+    recompute(S, "S", "S--Intra_x-Intra_y");
+    inline_function(B, "S");
 
     // ----------------------------------------------------------------------------------------------
 
     vector<Func> func_list;
-    extract_func_calls(B, func_list);
+    extract_func_calls(S, func_list);
 
     map<string,Func> functions;
     for (size_t i=0; i<func_list.size(); i++) {
@@ -102,11 +94,11 @@ int main(int argc, char **argv) {
         functions[func_list[i].name()] = func_list[i];
     }
 
-    Func S_intra0= functions["SIntra_Tail"];
-    Func S_tails = functions["STail"];
-    Func S_intra = functions["S$split$$Intra_x$$Intra_y$"];
-    Func S_ctailx= functions["S$split$$CTail_x$"];
-    Func S_ctaily= functions["SCTail_y"];
+    Func S_intra0= functions["S--Intra_x-Intra_y"];
+    Func S_tails = functions["S--Tail"];
+    Func S_intra = functions["S--Intra_x-Intra_y-Recomp"];
+    Func S_ctailx= functions["S--CTail_x"];
+    Func S_ctaily= functions["S--Intra_x-CTail_y"];
 
     Target target = get_jit_target_from_environment();
     if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {

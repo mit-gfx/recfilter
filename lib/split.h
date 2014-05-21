@@ -13,13 +13,11 @@
 // ----------------------------------------------------------------------------
 
 #define INTRA_TILE_RESULT     "Intra"
-#define INTRA_TILE_SUB_RESULT "Intra2"
 #define INTRA_TILE_TAIL_TERM  "Tail"
 #define INTER_TILE_TAIL_SUM   "CTail"
 #define INTER_TILE_DEPENDENCY "Deps"
-
-#define DELIM_START '$'
-#define DELIM_END   '$'
+#define RECOMPUTE_COPY        "Recomp"
+#define DELIMITER             '-'
 
 // ----------------------------------------------------------------------------
 
@@ -31,7 +29,7 @@ std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f);
 
 // ----------------------------------------------------------------------------
 
-// Splitting routine
+// Splitting routines
 
 void split(
         Halide::Func& F,
@@ -54,55 +52,18 @@ void split(
         std::vector<Halide::RDom> inner_rdoms,
         std::vector<int> orders);
 
+void split(
+        Halide::Func& F,
+        std::vector<int>          dimensions,
+        std::vector<Halide::Var>  vars,
+        std::vector<Halide::Var>  inner_vars,
+        std::vector<Halide::Var>  outer_vars,
+        std::vector<Halide::RDom> rdoms,
+        std::vector<Halide::RDom> inner_rdoms);
+
 // ----------------------------------------------------------------------------
 
 // Reordering routines
-
-void merge_and_inline(Halide::Func S,
-        std::string func_a,
-        std::string func_b,
-        std::string merged);
-
-void merge_and_inline(Halide::Func S,
-        std::string func_a,
-        std::string func_b,
-        std::string func_c,
-        string merged);
-
-void merge_and_inline(Halide::Func S,
-        std::string func_a,
-        std::string func_b,
-        std::string func_c,
-        std::string func_d,
-        string merged);
-
-void merge(Halide::Func S,
-        std::string func_a,
-        std::string func_b,
-        std::string merged);
-
-void merge(Halide::Func S,
-        std::string func_a,
-        std::string func_b,
-        std::string func_c,
-        string merged);
-
-void merge(Halide::Func S,
-        std::string func_a,
-        std::string func_b,
-        std::string func_c,
-        std::string func_d,
-        string merged);
-
-void merge(Halide::Func A, Halide::Func B);
-
-void inline_function(Halide::Func F, std::string func_name);
-
-void inline_function(Halide::Func F, Halide::Func A);
-
-void inline_non_split_functions(Halide::Func F, size_t num_splits);
-
-void inline_pure_functions(Halide::Func F);
 
 void float_dependencies_to_root(Halide::Func F);
 
@@ -112,6 +73,36 @@ void swap_variables(Halide::Func F,
         Halide::Var b);
 
 void expand_multiple_reductions(Halide::Func S);
+
+void recompute(Halide::Func S, std::string caller, std::string func);
+
+void merge(Halide::Func S,
+        std::string func_a,
+        std::string func_b,
+        std::string merged);
+
+void merge(Halide::Func S,
+        std::string func_a,
+        std::string func_b,
+        std::string func_c,
+        string merged);
+
+void merge(Halide::Func S,
+        std::string func_a,
+        std::string func_b,
+        std::string func_c,
+        std::string func_d,
+        string merged);
+
+void merge(Halide::Func S, std::vector<std::string> funcs, string merged);
+
+void merge_duplicates_with_substring(Halide::Func S, std::string pattern);
+
+void inline_function(Halide::Func F, std::string func_name);
+
+void inline_function(Halide::Func F, Halide::Func A);
+
+void inline_functions_with_substring(Halide::Func F, std::string pattern);
 
 // ----------------------------------------------------------------------------
 
@@ -302,27 +293,22 @@ public:
 
 // ----------------------------------------------------------------------------
 
-// Reference image computation utils
+// Random image generation and printing utils
 
 #define MIN_ELEMENT 1
 #define MAX_ELEMENT 1
 #define PRINT_WIDTH 3
 
 template<typename T>
-Halide::Image<T> generate_random_image(int width) {
-    Halide::Image<T> image(width);
-    for (int x=0; x<width; x++) {
-        image(x) = T(MIN_ELEMENT + (rand() % MAX_ELEMENT));
-    }
-    return image;
-}
-
-template<typename T>
-Halide::Image<T> generate_random_image(int width, int height) {
-    Halide::Image<T> image(width,height);
-    for (int y=0; y<height; y++) {
-        for (int x=0; x<width; x++) {
-            image(x,y) = T(MIN_ELEMENT + (rand() % MAX_ELEMENT));
+Halide::Image<T> generate_random_image(size_t w, size_t h=1, size_t c=1, size_t d=1) {
+    Halide::Image<T> image(w,h,c,d);
+    for (size_t t=0; t<d; t++) {
+        for (size_t z=0; z<c; z++) {
+            for (size_t y=0; y<h; y++) {
+                for (size_t x=0; x<w; x++) {
+                    image(x,y,z,t) = T(MIN_ELEMENT + (rand() % MAX_ELEMENT));
+                }
+            }
         }
     }
     return image;
@@ -331,56 +317,49 @@ Halide::Image<T> generate_random_image(int width, int height) {
 
 template<typename T>
 std::ostream &operator<<(std::ostream &s, Halide::Image<T> image) {
-    if (image.dimensions() > 1) {
-        for (size_t y=0; y<image.height(); y++) {
-            for (size_t x=0; x<image.width(); x++) {
+    if (image.dimensions() == 1) {
+        for (size_t x=image.min(0); x<image.min(0)+image.extent(0); x++) {
+            s << std::setw(PRINT_WIDTH) << image(x) << " ";
+        }
+        s << "\n";
+    }
+
+    if (image.dimensions() == 2) {
+        for (size_t y=image.min(1); y<image.min(1)+image.extent(1); y++) {
+            for (size_t x=image.min(0); x<image.min(0)+image.extent(0); x++) {
                 s << std::setw(PRINT_WIDTH) << image(x,y) << " ";
             }
             s << "\n";
         }
-    } else {
-        for (size_t x=0; x<image.width(); x++)
-            s << std::setw(PRINT_WIDTH) << image(x) << " ";
-        s << "\n";
+    }
+
+    if (image.dimensions() == 3) {
+        for (size_t z=image.min(2); z<image.min(2)+image.extent(2); z++) {
+            for (size_t y=image.min(1); y<image.min(1)+image.extent(1); y++) {
+                for (size_t x=image.min(0); x<image.min(0)+image.extent(0); x++) {
+                    s << std::setw(PRINT_WIDTH) << image(x,y,z) << " ";
+                }
+                s << "\n";
+            }
+            s << "\n\n";
+        }
+    }
+
+    if (image.dimensions() == 4) {
+        for (size_t w=image.min(3); w<image.min(3)+image.extent(3); w++) {
+            for (size_t z=image.min(2); z<image.min(2)+image.extent(2); z++) {
+                for (size_t y=image.min(1); y<image.min(1)+image.extent(1); y++) {
+                    for (size_t x=image.min(0); x<image.min(0)+image.extent(0); x++) {
+                        s << std::setw(PRINT_WIDTH) << image(x,y,z,w) << " ";
+                    }
+                    s << "\n";
+                }
+                s << "\n\n";
+            }
+            s << "\n\n";
+        }
     }
     return s;
-}
-
-template<typename T>
-Halide::Image<T> reference_recursive_filter(Halide::Image<T> in,
-        Halide::Image<T> weights)
-{
-    int width = in.width();
-    int height= in.height();
-
-    int order_x = weights.height();
-    int order_y = weights.height();
-
-    Halide::Image<T> ref(width,height);
-
-    for (int y=0; y<height; y++) {          // init the solution
-        for (int x=0; x<width; x++) {
-            ref(x,y) = in(x,y);
-        }
-    }
-
-    for (int y=0; y<height; y++) {          // x filtering
-        for (int x=0; x<width; x++) {
-            for (int k=1; k<=order_x; k++) {
-                ref(x,y) += (x>=k ? weights(0,k-1)*ref(x-k,y) : T(0));
-            }
-        }
-    }
-
-    for (int y=0; y<height; y++) {          // y filtering
-        for (int x=0; x<width; x++) {
-            for (int k=1; k<=order_y; k++) {
-                ref(x,y) += (y>=k ? weights(1,k-1)*ref(x,y-k) : T(0));
-            }
-        }
-    }
-
-    return ref;
 }
 
 #endif // _SPLIT_H_

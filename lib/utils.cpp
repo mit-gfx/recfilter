@@ -40,13 +40,14 @@ std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f) {
                 else
                     s << ")";
                 s << " = " << reduction_value[v];
-                if (f.reductions()[j].domain.domain().size() > 0)
+                if (f.reductions()[j].domain.defined()) {
                     s << " with  ";
-                for (size_t k=0; k<f.reductions()[j].domain.domain().size(); k++) {
-                    string r = f.reductions()[j].domain.domain()[k].var;
-                    s << r << "("
-                        << f.reductions()[j].domain.domain()[k].min   << ","
-                        << f.reductions()[j].domain.domain()[k].extent<< ") ";
+                    for (size_t k=0; k<f.reductions()[j].domain.domain().size(); k++) {
+                        string r = f.reductions()[j].domain.domain()[k].var;
+                        s << r << "("
+                            << f.reductions()[j].domain.domain()[k].min   << ","
+                            << f.reductions()[j].domain.domain()[k].extent<< ") ";
+                    }
                 }
                 s << "\n";
             }

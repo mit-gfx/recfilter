@@ -7,6 +7,7 @@
 
 using namespace Halide;
 
+using std::map;
 using std::vector;
 using std::string;
 using std::cerr;
@@ -14,7 +15,7 @@ using std::endl;
 
 
 int main(int argc, char **argv) {
-    Arguments args("recursive_filter", argc, argv);
+    Arguments args("summed_table", argc, argv);
 
     bool  verbose = args.verbose;
     bool  nocheck = args.nocheck;
@@ -29,9 +30,6 @@ int main(int argc, char **argv) {
     image.set(random_image);
 
     // ----------------------------------------------------------------------------------------------
-
-    int filter_order_x = 1;
-    int filter_order_y = 1;
 
     Func I("Input");
     Func S("S");
@@ -56,29 +54,19 @@ int main(int argc, char **argv) {
     RDom rxi(1, tile_width-1, "rxi");
     RDom ryi(1, tile_width-1, "ryi");
 
-    split(S,Internal::vec(0,1),
-            Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
-            Internal::vec(rx,ry), Internal::vec(rxi,ryi),
-            Internal::vec(filter_order_x, filter_order_y));
+    split(S,Internal::vec(0,1),   Internal::vec(x,y),
+            Internal::vec(xi,yi), Internal::vec(xo,yo),
+            Internal::vec(rx,ry), Internal::vec(rxi,ryi));
 
     // ----------------------------------------------------------------------------------------------
 
     float_dependencies_to_root(S);
-    merge_and_inline(S,
-            "S$split$$Intra2_x$$Intra2_y$",
-            "S$split$$Intra2_x$$Intra_y$",
-            "S$split$$Intra_x$$Intra2_y$",
-            "SIntra_Tail");
-    merge_and_inline(S, "S$split$$Intra_x$$Tail_y$", "S$split$$Intra2_x$$Tail_y$" , "STail_y");
-    merge_and_inline(S, "S$split$$Intra_x$$CTail_y$", "S$split$$Intra2_x$$CTail_y$", "SCTail_y");
-    inline_function (S, "S$split$$Intra2_x$$Deps_y$");
-    inline_function (S, "S$split$$Intra2_x$");
-    swap_variables  (S, "STail_y", xi, yi);
-    merge_and_inline(S, "STail_y", "S$split$$Tail_x$", "STail");
-    inline_function (S, "S$split$$Intra_x$$Deps_y$");
-    inline_function (S, "S$split$$Deps_x$");
-    inline_function (S, "S$split$$Intra_x$");
-    inline_function (S, "S$split$");
+    inline_function(S, "S--Intra_x-Deps_y");
+    inline_function(S, "S--Intra_x");
+    inline_function(S, "S--Deps_x");
+    swap_variables (S, "S--Intra_x-Tail_y", xi, yi);
+    merge(S, "S--Intra_x-Tail_y", "S--Tail_x", "S--Tail");
+    recompute(S, "S", "S--Intra_x-Intra_y");
 
     // ----------------------------------------------------------------------------------------------
 
@@ -91,11 +79,17 @@ int main(int argc, char **argv) {
         functions[func_list[i].name()] = func_list[i];
     }
 
-    Func S_intra0= functions["SIntra_Tail"];
-    Func S_tails = functions["STail"];
-    Func S_intra = functions["S$split$$Intra_x$$Intra_y$"];
-    Func S_ctailx= functions["S$split$$CTail_x$"];
-    Func S_ctaily= functions["SCTail_y"];
+    Func S_intra0= functions["S--Intra_x-Intra_y"];
+    Func S_tails = functions["S--Tail"];
+    Func S_intra = functions["S--Intra_x-Intra_y-Recomp"];
+    Func S_ctailx= functions["S--CTail_x"];
+    Func S_ctaily= functions["S--Intra_x-CTail_y"];
+
+    assert(S_intra0.defined());
+    assert(S_tails.defined());
+    assert(S_intra.defined());
+    assert(S_ctailx.defined());
+    assert(S_ctaily.defined());
 
     Target target = get_jit_target_from_environment();
     if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
@@ -115,7 +109,7 @@ int main(int argc, char **argv) {
         S_tails.gpu_blocks(xo,yo).gpu_threads(xi);
 
         S_ctaily.compute_root();
-        S_ctailx.reorder_storage(yi,yo,xi,xo);
+        S_ctaily.reorder_storage(xi,xo,yi,yo);
         S_ctaily.split(xo,xo,t,MAX_THREAD/tile_width);
         S_ctaily.reorder(yo,yi,xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
         S_ctaily.update().split(xo,xo,t,MAX_THREAD/tile_width);

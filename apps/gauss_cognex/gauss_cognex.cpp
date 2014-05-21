@@ -15,12 +15,9 @@ using std::string;
 using std::cerr;
 using std::endl;
 
-template<typename T>
-Image<T> reference_recursive_filter(Image<T> in, Image<T> weights);
-
 
 int main(int argc, char **argv) {
-    Arguments args("recursive_filter", argc, argv);
+    Arguments args("gauss_cognex", argc, argv);
 
     bool  verbose = args.verbose;
     bool  nocheck = args.nocheck;
@@ -29,26 +26,14 @@ int main(int argc, char **argv) {
     int   tile_width = args.block;
     int   iterations = args.iterations;
 
-    Image<float> random_image = generate_random_image<float>(width,height);
+    Image<int> random_image = generate_random_image<int>(width,height);
 
-    ImageParam image(type_of<float>(), 2);
+    ImageParam image(type_of<int>(), 2);
     image.set(random_image);
 
     // ----------------------------------------------------------------------------------------------
 
-    int filter_order_x = 3;
-    int filter_order_y = 3;
-
-    Image<float> weights(2,3);
-    weights(0,0) = 0.125f; // x dimension filtering weights
-    weights(0,1) = 0.0625f;
-    weights(0,2) = 0.03125f;
-    weights(1,0) = 0.125f; // y dimension filtering weights
-    weights(1,1) = 0.0625f;
-    weights(1,2) = 0.03125f;
-
     Func I("Input");
-    Func W("Weight");
     Func S("S");
 
     Var x("x");
@@ -56,14 +41,16 @@ int main(int argc, char **argv) {
 
     RDom rx(1, image.width()-1, "rx");
     RDom ry(1, image.height()-1,"ry");
+    RDom rz(1, image.width()-1, "rz");
+    RDom rw(1, image.height()-1,"rw");
 
-    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0.0f, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-
-    W(x, y) = weights(x,y);
+    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
     S(x, y) = I(x,y);
-    S(rx,y) = S(rx,y) + select(rx>0, W(0,0)*S(rx-1,y), 0.0f) + select(rx>1, W(0,1)*S(rx-2,y), 0.0f) + select(rx>2, W(0,2)*S(rx-3,y), 0.0f);
-    S(x,ry) = S(x,ry) + select(ry>0, W(1,0)*S(x,ry-1), 0.0f) + select(ry>1, W(1,1)*S(x,ry-2), 0.0f) + select(ry>2, W(1,2)*S(x,ry-3), 0.0f);
+    S(rx,y) = S(rx,y) + S(rx-1,y);
+    S(x,ry) = S(x,ry) + S(x,ry-1);
+    S(rz,y) = S(rz,y) + S(rz-1,y);
+    S(x,rw) = S(x,rw) + S(x,rw-1);
 
     // ----------------------------------------------------------------------------------------------
 
@@ -72,21 +59,34 @@ int main(int argc, char **argv) {
 
     RDom rxi(1, tile_width-1, "rxi");
     RDom ryi(1, tile_width-1, "ryi");
+    RDom rzi(1, tile_width-1, "rzi");
+    RDom rwi(1, tile_width-1, "rwi");
 
-    split(S, W, Internal::vec(0,1),
-            Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
-            Internal::vec(rx,ry), Internal::vec(rxi,ryi),
-            Internal::vec(filter_order_x, filter_order_y));
+    split(S, Internal::vec(0,1,0,1),     Internal::vec(x,y,x,y),     Internal::vec(xi,yi,xi,yi),
+             Internal::vec(xo,yo,xo,yo), Internal::vec(rx,ry,rz,rw), Internal::vec(rxi,ryi,rzi,rwi));
 
     // ----------------------------------------------------------------------------------------------
 
     float_dependencies_to_root(S);
-    inline_function(S, "S--Intra_x-Deps_y");
-    inline_function(S, "S--Intra_x");
-    inline_function(S, "S--Deps_x");
+
+    swap_variables (S, "S--Intra_x-Intra_y-Intra_x-Tail_y", xi, yi);
     swap_variables (S, "S--Intra_x-Tail_y", xi, yi);
-    merge(S, "S--Intra_x-Tail_y", "S--Tail_x", "S--Tail");
-    recompute(S, "S", "S--Intra_x-Intra_y");
+    merge(S,"S--Intra_x-Intra_y-Intra_x-Tail_y",
+            "S--Intra_x-Intra_y-Tail_x",
+            "S--Intra_x-Tail_y",
+            "S--Tail_x",
+            "S--Tail");
+
+    inline_function(S, "S--Intra_x-Intra_y-Intra_x-Deps_y");
+    inline_function(S, "S--Intra_x-Intra_y-Deps_x");
+    inline_function(S, "S--Intra_x-Deps_y");
+    inline_function(S, "S--Deps_x");
+
+    inline_function(S, "S--Intra_x-Intra_y-Intra_x");
+    inline_function(S, "S--Intra_x-Intra_y");
+    inline_function(S, "S--Intra_x");
+
+    recompute(S, "S", "S--Intra_x-Intra_y-Intra_x-Intra_y");
 
     // ----------------------------------------------------------------------------------------------
 
@@ -99,17 +99,21 @@ int main(int argc, char **argv) {
         functions[func_list[i].name()] = func_list[i];
     }
 
-    Func S_intra0= functions["S--Intra_x-Intra_y"];
-    Func S_tails = functions["S--Tail"];
-    Func S_intra = functions["S--Intra_x-Intra_y-Recomp"];
-    Func S_ctailx= functions["S--CTail_x"];
-    Func S_ctaily= functions["S--Intra_x-CTail_y"];
+    Func S_intra0 = functions["S--Intra_x-Intra_y-Intra_x-Intra_y"];
+    Func S_intra  = functions["S--Intra_x-Intra_y-Intra_x-Intra_y-Recomp"];
+    Func S_tails  = functions["S--Tail"];
+    Func S_ctailx = functions["S--CTail_x"];
+    Func S_ctaily = functions["S--Intra_x-CTail_y"];
+    Func S_ctailz = functions["S--Intra_x-Intra_y-CTail_x"];
+    Func S_ctailw = functions["S--Intra_x-Intra_y-Intra_x-CTail_y"];
 
     assert(S_intra0.defined());
     assert(S_tails.defined());
     assert(S_intra.defined());
     assert(S_ctailx.defined());
     assert(S_ctaily.defined());
+    assert(S_ctailz.defined());
+    assert(S_ctailw.defined());
 
     Target target = get_jit_target_from_environment();
     if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
@@ -121,6 +125,8 @@ int main(int argc, char **argv) {
         S_intra0.reorder(xi,yi,xo,yo).gpu_threads(yi);
         S_intra0.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
         S_intra0.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
+        S_intra0.update(2).reorder(rzi.x,yi,xo,yo).gpu_threads(yi);
+        S_intra0.update(3).reorder(rwi.x,xi,xo,yo).gpu_threads(xi);
 
         S_tails.compute_root();
         S_tails.reorder_storage(yi,xi,xo,yo);
@@ -129,7 +135,7 @@ int main(int argc, char **argv) {
         S_tails.gpu_blocks(xo,yo).gpu_threads(xi);
 
         S_ctaily.compute_root();
-        S_ctailx.reorder_storage(yi,yo,xi,xo);
+        S_ctaily.reorder_storage(xi,xo,yi,yo);
         S_ctaily.split(xo,xo,t,MAX_THREAD/tile_width);
         S_ctaily.reorder(yo,yi,xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
         S_ctaily.update().split(xo,xo,t,MAX_THREAD/tile_width);
@@ -142,12 +148,28 @@ int main(int argc, char **argv) {
         S_ctailx.update().split(yo,yo,t,MAX_THREAD/tile_width);
         S_ctailx.update().reorder(yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
 
+        S_ctailw.compute_root();
+        S_ctailw.reorder_storage(xi,xo,yi,yo);
+        S_ctailw.split(xo,xo,t,MAX_THREAD/tile_width);
+        S_ctailw.reorder(yo,yi,xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
+        S_ctailw.update().split(xo,xo,t,MAX_THREAD/tile_width);
+        S_ctailw.update().reorder(xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
+
+        S_ctailz.compute_root();
+        S_ctailz.reorder_storage(yi,yo,xi,xo);
+        S_ctailz.split(yo,yo,t,MAX_THREAD/tile_width);
+        S_ctailz.reorder(xo,xi,yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
+        S_ctailz.update().split(yo,yo,t,MAX_THREAD/tile_width);
+        S_ctailz.update().reorder(yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
+
         S_intra.compute_at(S, Var("blockidx"));
         S_intra.reorder_storage(xi,yi,xo,yo);
         //S_intra.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi);
         S_intra.reorder(xi,yi,xo,yo).gpu_threads(yi);
         S_intra.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
         S_intra.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
+        S_intra.update(2).reorder(rzi.x,yi,xo,yo).gpu_threads(yi);
+        S_intra.update(3).reorder(rwi.x,xi,xo,yo).gpu_threads(xi);
 
         S.compute_root();
         S.split(x, xo,xi, tile_width).split(y, yo,yi, tile_width);
@@ -162,14 +184,10 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    //
-    // JIT compilation
-    //
-
     cerr << "\nJIT compilation ... " << endl;
     S.compile_jit();
 
-    Buffer hl_out_buff(type_of<float>(), width,height);
+    Buffer hl_out_buff(type_of<int>(), width,height);
     {
         Timer t("Running ... ");
         for (int k=0; k<iterations; k++) {
@@ -186,12 +204,38 @@ int main(int argc, char **argv) {
 
     if (!nocheck) {
         cerr << "\nChecking difference ... " << endl;
-        Image<float> hl_out(hl_out_buff);
-        Image<float> diff(width,height);
-        Image<float> ref = reference_recursive_filter<float>(random_image, weights);
+        Image<int> hl_out(hl_out_buff);
+        Image<int> diff(width,height);
+        Image<int> ref(width,height);
 
-        float diff_sum = 0;
-        float all_sum = 0;
+        for (int y=0; y<height; y++) {
+            for (int x=0; x<width; x++) {
+                ref(x,y) = random_image(x,y);
+            }
+        }
+        for (int y=0; y<height; y++) {
+            for (int x=1; x<width; x++) {
+                ref(x,y) += ref(x-1,y);
+            }
+        }
+        for (int y=1; y<height; y++) {
+            for (int x=0; x<width; x++) {
+                ref(x,y) += ref(x,y-1);
+            }
+        }
+        for (int y=0; y<height; y++) {
+            for (int x=1; x<width; x++) {
+                ref(x,y) += ref(x-1,y);
+            }
+        }
+        for (int y=1; y<height; y++) {
+            for (int x=0; x<width; x++) {
+                ref(x,y) += ref(x,y-1);
+            }
+        }
+
+        int diff_sum = 0;
+        int all_sum = 0;
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {
                 diff(x,y) = std::abs(ref(x,y) - hl_out(x,y));
@@ -199,7 +243,7 @@ int main(int argc, char **argv) {
                 all_sum += ref(x,y);
             }
         }
-        float diff_ratio = 100.0f * diff_sum / all_sum;
+        float diff_ratio = 100.0f * float(diff_sum) / float(all_sum);
 
         if (verbose) {
             cerr << "Input" << endl << random_image << endl;
@@ -214,40 +258,4 @@ int main(int argc, char **argv) {
     }
 
     return EXIT_SUCCESS;
-}
-
-template<typename T>
-Image<T> reference_recursive_filter(Image<T> in, Image<T> weights)
-{
-    int width = in.width();
-    int height= in.height();
-
-    int order_x = weights.height();
-    int order_y = weights.height();
-
-    Halide::Image<T> ref(width,height);
-
-    for (int y=0; y<height; y++) {          // init the solution
-        for (int x=0; x<width; x++) {
-            ref(x,y) = in(x,y);
-        }
-    }
-
-    for (int y=0; y<height; y++) {          // x filtering
-        for (int x=0; x<width; x++) {
-            for (int k=1; k<=order_x; k++) {
-                ref(x,y) += (x>=k ? weights(0,k-1)*ref(x-k,y) : T(0));
-            }
-        }
-    }
-
-    for (int y=0; y<height; y++) {          // y filtering
-        for (int x=0; x<width; x++) {
-            for (int k=1; k<=order_y; k++) {
-                ref(x,y) += (y>=k ? weights(1,k-1)*ref(x,y-k) : T(0));
-            }
-        }
-    }
-
-    return ref;
 }
