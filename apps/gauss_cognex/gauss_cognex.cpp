@@ -72,9 +72,9 @@ int main(int argc, char **argv) {
     swap_variables (S, "S--Intra_y-Intra_x-Intra_y-Tail_x", xi, yi);
     swap_variables (S, "S--Intra_y-Tail_x", xi, yi);
     merge(S,"S--Intra_y-Intra_x-Intra_y-Tail_x",
-            "S--Intra_y-Intra_y-Tail_y",
+            "S--Intra_y-Intra_x-Tail_y",
             "S--Intra_y-Tail_x",
-            "S--Tail_y"
+            "S--Tail_y",
             "S--Tail");
 
     inline_function(S, "S--Intra_y-Intra_x-Intra_y-Deps_x");
