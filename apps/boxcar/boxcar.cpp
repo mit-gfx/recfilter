@@ -74,13 +74,12 @@ int main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------
 
     float_dependencies_to_root(S);
-    inline_function(S, "S--Intra_x-Deps_y");
-    inline_function(S, "S--Intra_x");
-    inline_function(S, "S--Deps_x");
-    inline_function(S, "S--Deps_x");
-    swap_variables (S, "S--Intra_x-Tail_y", xi, yi);
-    merge(S, "S--Intra_x-Tail_y", "S--Tail_x", "S--Tail");
-    recompute(S, "S", "S--Intra_x-Intra_y");
+    inline_function(S, "S--Intra_y-Deps_x");
+    inline_function(S, "S--Intra_y");
+    inline_function(S, "S--Deps_y");
+    swap_variables (S, "S--Intra_y-Tail_x", xi, yi);
+    merge(S, "S--Intra_y-Tail_x", "S--Tail_y", "S--Tail");
+    recompute(S, "S", "S--Intra_y-Intra_x");
     inline_function(B, "S");
 
     // ----------------------------------------------------------------------------------------------
@@ -94,11 +93,11 @@ int main(int argc, char **argv) {
         functions[func_list[i].name()] = func_list[i];
     }
 
-    Func S_intra0= functions["S--Intra_x-Intra_y"];
+    Func S_intra0= functions["S--Intra_y-Intra_x"];
     Func S_tails = functions["S--Tail"];
-    Func S_intra = functions["S--Intra_x-Intra_y-Recomp"];
-    Func S_ctailx= functions["S--CTail_x"];
-    Func S_ctaily= functions["S--Intra_x-CTail_y"];
+    Func S_intra = functions["S--Intra_y-Intra_x-Recomp"];
+    Func S_ctaily= functions["S--CTail_y"];
+    Func S_ctailx= functions["S--Intra_y-CTail_x"];
 
     Target target = get_jit_target_from_environment();
     if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
@@ -118,7 +117,7 @@ int main(int argc, char **argv) {
         S_tails.gpu_blocks(xo,yo).gpu_threads(xi);
 
         S_ctaily.compute_root();
-        S_ctailx.reorder_storage(yi,yo,xi,xo);
+        S_ctaily.reorder_storage(xi,xo,yi,yo);
         S_ctaily.split(xo,xo,t,MAX_THREAD/tile_width);
         S_ctaily.reorder(yo,yi,xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
         S_ctaily.update().split(xo,xo,t,MAX_THREAD/tile_width);

@@ -307,13 +307,18 @@ void inline_function(Function F, Function A) {
 
 void inline_function(Func F, string func_name) {
     // extract all Function calls
+    bool found = false;
     vector<Func> func_list;
     extract_func_calls(F, func_list);
-    for (size_t i=0; i<func_list.size(); i++) {
+    for (size_t i=0; !found && i<func_list.size(); i++) {
         if (func_name == func_list[i].name()) {
             inline_function(F, func_list[i]);
-            return;
+            found = true;
         }
+    }
+    if (!found) {
+        cerr << "Function " << func_name << " to be inlined not found" << endl;
+        assert(false);
     }
 }
 

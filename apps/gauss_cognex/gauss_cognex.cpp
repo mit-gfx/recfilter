@@ -69,24 +69,24 @@ int main(int argc, char **argv) {
 
     float_dependencies_to_root(S);
 
-    swap_variables (S, "S--Intra_x-Intra_y-Intra_x-Tail_y", xi, yi);
-    swap_variables (S, "S--Intra_x-Tail_y", xi, yi);
-    merge(S,"S--Intra_x-Intra_y-Intra_x-Tail_y",
-            "S--Intra_x-Intra_y-Tail_x",
-            "S--Intra_x-Tail_y",
-            "S--Tail_x",
+    swap_variables (S, "S--Intra_y-Intra_x-Intra_y-Tail_x", xi, yi);
+    swap_variables (S, "S--Intra_y-Tail_x", xi, yi);
+    merge(S,"S--Intra_y-Intra_x-Intra_y-Tail_x",
+            "S--Intra_y-Intra_y-Tail_y",
+            "S--Intra_y-Tail_x",
+            "S--Tail_y"
             "S--Tail");
 
-    inline_function(S, "S--Intra_x-Intra_y-Intra_x-Deps_y");
-    inline_function(S, "S--Intra_x-Intra_y-Deps_x");
-    inline_function(S, "S--Intra_x-Deps_y");
-    inline_function(S, "S--Deps_x");
+    inline_function(S, "S--Intra_y-Intra_x-Intra_y-Deps_x");
+    inline_function(S, "S--Intra_y-Intra_x-Deps_y");
+    inline_function(S, "S--Intra_y-Deps_x");
+    inline_function(S, "S--Deps_y");
 
-    inline_function(S, "S--Intra_x-Intra_y-Intra_x");
-    inline_function(S, "S--Intra_x-Intra_y");
-    inline_function(S, "S--Intra_x");
+    inline_function(S, "S--Intra_y-Intra_x-Intra_y");
+    inline_function(S, "S--Intra_y-Intra_x");
+    inline_function(S, "S--Intra_y");
 
-    recompute(S, "S", "S--Intra_x-Intra_y-Intra_x-Intra_y");
+    recompute(S, "S", "S--Intra_y-Intra_x-Intra_y-Intra_x");
 
     // ----------------------------------------------------------------------------------------------
 
@@ -99,13 +99,13 @@ int main(int argc, char **argv) {
         functions[func_list[i].name()] = func_list[i];
     }
 
-    Func S_intra0 = functions["S--Intra_x-Intra_y-Intra_x-Intra_y"];
-    Func S_intra  = functions["S--Intra_x-Intra_y-Intra_x-Intra_y-Recomp"];
+    Func S_intra0 = functions["S--Intra_y-Intra_x-Intra_y-Intra_x"];
+    Func S_intra  = functions["S--Intra_y-Intra_x-Intra_y-Intra_x-Recomp"];
     Func S_tails  = functions["S--Tail"];
-    Func S_ctailx = functions["S--CTail_x"];
-    Func S_ctaily = functions["S--Intra_x-CTail_y"];
-    Func S_ctailz = functions["S--Intra_x-Intra_y-CTail_x"];
-    Func S_ctailw = functions["S--Intra_x-Intra_y-Intra_x-CTail_y"];
+    Func S_ctailw = functions["S--CTail_y"];
+    Func S_ctailz = functions["S--Intra_y-CTail_x"];
+    Func S_ctaily = functions["S--Intra_y-Intra_x-CTail_y"];
+    Func S_ctailx = functions["S--Intra_y-Intra_x-Intra_y-CTail_x"];
 
     assert(S_intra0.defined());
     assert(S_tails.defined());

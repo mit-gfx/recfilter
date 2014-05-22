@@ -17,6 +17,7 @@ using std::map;
 struct SplitInfo {
     int filter_order;
     int filter_dim;
+    int reduction_def;
     Var var;
     Var inner_var;
     Var outer_var;
@@ -66,6 +67,96 @@ static Func tail_weights(Func filter_weights, Expr tile_width, int filter_dim, i
     W.bound(r,0,tile_width).bound(j,0,filter_order);
 
     return W;
+}
+
+// -----------------------------------------------------------------------------
+
+static void check_split_feasible(
+        Func& func,
+        vector<int>  dimension,
+        vector<Var>  var,
+        vector<Var>  inner_var,
+        vector<Var>  outer_var,
+        vector<RDom> rdom,
+        vector<RDom> inner_rdom,
+        vector<int>  order)
+{
+    size_t num_splits = var.size();
+
+    assert(num_splits == dimension.size()  && "Each split must have a mapped function dimension");
+    assert(num_splits == rdom.size()       && "Each split must have a mapped RDom");
+    assert(num_splits == inner_var.size()  && "Each split must have a mapped inner Var");
+    assert(num_splits == outer_var.size()  && "Each split must have a mapped outer Var");
+    assert(num_splits == inner_rdom.size() && "Each split must have a mapped inner RDom");
+    assert(num_splits == order.size()      && "Each split must have a mapped filter order");
+
+    Function F = func.function();
+
+    assert(F.has_pure_definition() &&  "Func to be split must be defined");
+    assert(!F.is_pure() && "Use Halide::Func::split for pure Funcs");
+
+
+    // check variables
+    for (size_t k=0; k<num_splits; k++) {
+        int dim = dimension[k];
+
+        // RDom to be split must be 1D, each reduction definition should be 1D reduction
+        if (rdom[k].dimensions() != 1) {
+            cerr << "RDom to split must be 1D, each reduction "
+                << "definition should use a unique be 1D RDom";
+            assert(false);
+        }
+
+        // given inner RDom must be 1D, intra tile scans are 1D as full scan is 1D
+        if (inner_rdom[k].dimensions() != 1) {
+            cerr << "Inner RDom must be 1D, as splitting a 1D reduction"
+                << "definition produces 1D intra-tile reductions";
+            assert(false);
+        }
+
+        // variable at given dimension must match the one to be split
+        if (F.args()[dim] != var[k].name()) {
+            cerr << "Variable at dimension " << dim << " must match the one "
+                << "specified for splitting"   << endl;
+            assert(false);
+        }
+
+        // RDom to be split must appear in exactly one reduction definition
+        size_t num_reductions_involving_rdom = 0;
+        for (size_t i=0; i<F.reductions().size(); i++) {
+            string rdom_name = rdom[k].x.name();
+            bool reduction_involves_rdom = false;
+            for (size_t j=0; j<F.reductions()[i].args.size(); j++) {
+                reduction_involves_rdom |= expr_depends_on_var(F.reductions()[i].args[j], rdom_name);
+            }
+            for (size_t j=0; j<F.reductions()[i].values.size(); j++) {
+                reduction_involves_rdom |= expr_depends_on_var(F.reductions()[i].values[j], rdom_name);
+            }
+            if (reduction_involves_rdom) {
+                num_reductions_involving_rdom++;
+            }
+        }
+        if (num_reductions_involving_rdom < 1) {
+            cerr << "RDom to be split must appear in one reduction definition, found in none";
+            assert(false);
+        }
+        if (num_reductions_involving_rdom > 1) {
+            cerr << "RDom to be split must appear in only one reduction definition, found in multiple";
+            assert(false);
+        }
+
+        // RDom to be split must not appear at any dimension other than the one specified
+        for (size_t i=0; i<F.reductions().size(); i++) {
+            string rdom_name = rdom[k].x.name();
+            bool reduction_involves_rdom = false;
+            for (size_t j=0; j<F.reductions()[i].args.size(); j++) {
+                if (j!=dim && expr_depends_on_var(F.reductions()[i].args[j], rdom_name)) {
+                    cerr << "RDom to be split must appear only at the specified dimensino, found in others";
+                    assert(false);
+                }
+            }
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -516,91 +607,18 @@ void split(
         vector<RDom> inner_rdom,
         vector<int>  order)
 {
-    size_t num_splits = var.size();
 
-    assert(num_splits == dimension.size()  && "Each split must have a mapped function dimension");
-    assert(num_splits == rdom.size()       && "Each split must have a mapped RDom");
-    assert(num_splits == inner_var.size()  && "Each split must have a mapped inner Var");
-    assert(num_splits == outer_var.size()  && "Each split must have a mapped outer Var");
-    assert(num_splits == inner_rdom.size() && "Each split must have a mapped inner RDom");
-    assert(num_splits == order.size()      && "Each split must have a mapped filter order");
+    check_split_feasible(func,dimension,var,inner_var,outer_var,rdom,inner_rdom,order);
 
     Function F = func.function();
 
-    assert(F.has_pure_definition() &&  "Func to be split must be defined");
-    assert(!F.is_pure() && "Use Halide::Func::split for pure Funcs");
-
-
-    // basic checks
-    {
-        // check variables
-        for (size_t k=0; k<num_splits; k++) {
-            int dim = dimension[k];
-
-            // RDom to be split must be 1D, each reduction definition should be 1D reduction
-            if (rdom[k].dimensions() != 1) {
-                cerr << "RDom to split must be 1D, each reduction "
-                    << "definition should use a unique be 1D RDom";
-                assert(false);
-            }
-
-            // given inner RDom must be 1D, intra tile scans are 1D as full scan is 1D
-            if (inner_rdom[k].dimensions() != 1) {
-                cerr << "Inner RDom must be 1D, as splitting a 1D reduction"
-                    << "definition produces 1D intra-tile reductions";
-                assert(false);
-            }
-
-            // variable at given dimension must match the one to be split
-            if (F.args()[dim] != var[k].name()) {
-                cerr << "Variable at dimension " << dim << " must match the one "
-                    << "specified for splitting"   << endl;
-                assert(false);
-            }
-
-            // RDom to be split must appear in exactly one reduction definition
-            size_t num_reductions_involving_rdom = 0;
-            for (size_t i=0; i<F.reductions().size(); i++) {
-                string rdom_name = rdom[k].x.name();
-                bool reduction_involves_rdom = false;
-                for (size_t j=0; j<F.reductions()[i].args.size(); j++) {
-                    reduction_involves_rdom |= expr_depends_on_var(F.reductions()[i].args[j], rdom_name);
-                }
-                for (size_t j=0; j<F.reductions()[i].values.size(); j++) {
-                    reduction_involves_rdom |= expr_depends_on_var(F.reductions()[i].values[j], rdom_name);
-                }
-                if (reduction_involves_rdom) {
-                    num_reductions_involving_rdom++;
-                }
-            }
-            if (num_reductions_involving_rdom < 1) {
-                cerr << "RDom to be split must appear in one reduction definition, found in none";
-                assert(false);
-            }
-            if (num_reductions_involving_rdom > 1) {
-                cerr << "RDom to be split must appear in only one reduction definition, found in multiple";
-                assert(false);
-            }
-
-            // RDom to be split must not appear at any dimension other than the one specified
-            for (size_t i=0; i<F.reductions().size(); i++) {
-                string rdom_name = rdom[k].x.name();
-                bool reduction_involves_rdom = false;
-                for (size_t j=0; j<F.reductions()[i].args.size(); j++) {
-                    if (j!=dim && expr_depends_on_var(F.reductions()[i].args[j], rdom_name)) {
-                        cerr << "RDom to be split must appear only at the specified dimensino, found in others";
-                        assert(false);
-                    }
-                }
-            }
-        }
-    }
-
+    size_t num_splits = var.size();
 
     vector<Expr> tile;
     vector<RDom> split_rdom;
     vector<RDom> outer_rdom;
     vector<Var>  image_width;
+
     for (size_t i=0; i<num_splits; i++) {
         // individual tile boundaries
         Expr inner_rdom_extent = simplify(inner_rdom[i].x.extent()+1);
@@ -651,50 +669,67 @@ void split(
     F.define(args, values);
     func = Func(F);
 
+    // list of structs with all the info about each split
+    vector<SplitInfo> split_info;
+
+    // reorder the splits such that the last scan is split first
+    // loop over all reduction definitions in reverse order and split
+    // them if needed
+    for (int u=Fsplit.reductions().size()-1; u>=0; u--) {
+        assert(Fsplit.reductions()[u].domain.defined() &&
+                "Reduction definition has no reduction domain");
+
+        // extract the RDom in the reduction definition and
+        // compare with the reduction domain to be split
+        for (size_t v=0; v<num_splits; v++) {
+            if (Fsplit.reductions()[u].domain.same_as(split_rdom[v].domain())) {
+                SplitInfo s;
+                s.reduction_def  = u;
+                s.var            = var[v];          // populate the split info
+                s.rdom           = rdom[v];
+                s.inner_var      = inner_var[v];
+                s.outer_var      = outer_var[v];
+                s.inner_rdom     = inner_rdom[v];
+                s.outer_rdom     = outer_rdom[v];
+                s.split_rdom     = split_rdom[v];
+                s.tile_width     = tile[v];
+                s.filter_order   = order[v];
+                s.filter_dim     = dimension[v];
+                s.image_width    = image_width[v];
+                s.filter_weights = tail_weights(filter_weights, tile[v], dimension[v], order[v]);
+                split_info.push_back(s);
+            }
+        }
+    }
+
     // apply the individual split for each reduction variable - separate
     // the intra tile copmutation from inter tile computation
     queue<Function> funcs_to_split;
     funcs_to_split.push(Fsplit);
 
-    for (size_t i=0; i<num_splits && !funcs_to_split.empty(); i++) {
-        // populate the split info
-        SplitInfo split_info;
-        split_info.var            = var[i];
-        split_info.rdom           = rdom[i];
-        split_info.inner_var      = inner_var[i];
-        split_info.outer_var      = outer_var[i];
-        split_info.inner_rdom     = inner_rdom[i];
-        split_info.outer_rdom     = outer_rdom[i];
-        split_info.split_rdom     = split_rdom[i];
-        split_info.tile_width     = tile[i];
-        split_info.filter_order   = order[i];
-        split_info.filter_dim     = dimension[i];
-        split_info.image_width    = image_width[i];
-        split_info.filter_weights = tail_weights(filter_weights, tile[i], dimension[i], order[i]);
-
+    for (size_t i=0; i<split_info.size() && !funcs_to_split.empty(); i++) {
         queue<Function> funcs_to_split_in_next_dimension;
-
         while (!funcs_to_split.empty()) {
             Function f = funcs_to_split.front();
             funcs_to_split.pop();
-            if (!check_for_pure_split(f, split_info)) {
-                create_recursive_split(f, split_info);
+
+            if (!check_for_pure_split(f, split_info[i])) {
+                create_recursive_split(f, split_info[i]);
             }
 
-            // accumulate all sub Func's created to list
-            // all these Func's have to be split for the next dimension
-            for (size_t k=0; k<split_info.func_list.size(); k++) {
-                funcs_to_split_in_next_dimension.push(split_info.func_list[k]);
+            // all newly created Func's have to be split for the next dimension
+            for (size_t k=0; k<split_info[i].func_list.size(); k++) {
+                funcs_to_split_in_next_dimension.push(split_info[i].func_list[k]);
             }
 
             // clear the list of sub Func's created
-            split_info.func_list.clear();
+            split_info[i].func_list.clear();
         }
 
         // transfer all sub Func's to list to Func's that will be split in the next dimension
         funcs_to_split = funcs_to_split_in_next_dimension;
     }
 
-    // inline the helped function F-split because it is no longer required
-    inline_function(func, func.name() + SPLIT_HELPER_NAME);
+    // inline the helper function F-split because it is no longer required
+    inline_function(func, Fsplit.name());
 }
