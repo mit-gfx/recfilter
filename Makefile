@@ -1,6 +1,6 @@
 all:
-	make -C lib
-	make -C apps
+	make -C lib -j12
+	make -C apps -j12
 
 clean:
 	make -C lib clean
