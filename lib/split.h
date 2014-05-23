@@ -12,6 +12,7 @@
 
 // ----------------------------------------------------------------------------
 
+#define SCAN_STAGE_ARG        "ScanStage"
 #define INTRA_TILE_RESULT     "Intra"
 #define INTRA_TILE_TAIL_TERM  "Tail"
 #define INTER_TILE_TAIL_SUM   "CTail"
@@ -206,8 +207,12 @@ Halide::Expr swap_vars_in_expr(
         Halide::Expr original   /// original expression
         );
 
-/// Extract all the variables referenced in a Expr
-std::vector<string> extract_vars_in_expr(Halide::Expr expr);
+/// Extract vars referenced in a Expr
+std::vector<std::string> extract_rvars_in_expr(Halide::Expr expr);
+std::vector<std::string> extract_params_in_expr(Halide::Expr expr);
+std::vector<std::string> extract_vars_or_rvars_in_expr(Halide::Expr expr);
+
+/// Extract all the params referenced in a Expr
 
 /// Extract the list of dependencies of a Function -
 /// Functions called in the pure and reduction definitions

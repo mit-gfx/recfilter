@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
 
         SI.compute_at(S, Var("blockidx"));
         SI.reorder_storage(xi,yi,xo,yo);
-#define BUG 1
+#define BUG 0
 #if BUG
         SI.split(yi,t,yi, MAX_THREAD/tile).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi);
 #else

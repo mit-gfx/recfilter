@@ -78,10 +78,23 @@ class ExtractVarsInExpr : public IRVisitor {
 private:
     using IRVisitor::visit;
     void visit(const Variable *op) {
-        var_list.push_back(op->name);
+        if (op->reduction_domain.defined()) {
+            rvar_list.push_back(op->name);
+            var_or_rvar_list.push_back(op->name);
+        }
+        else if (op->param.defined()) {
+            param_list.push_back(op->name);
+        }
+        else {
+            var_list.push_back(op->name);
+            var_or_rvar_list.push_back(op->name);
+        }
     }
 public:
     vector<string> var_list;
+    vector<string> rvar_list;
+    vector<string> var_or_rvar_list;
+    vector<string> param_list;
     ExtractVarsInExpr(void) {}
 };
 
@@ -532,14 +545,25 @@ Expr swap_callargs_in_func_call(string func_name, int a, int b, Expr original) {
     return s.mutate(original);
 }
 
-
-std::vector<string> extract_vars_in_expr(Halide::Expr expr) {
+vector<string> extract_vars_or_rvars_in_expr(Expr expr) {
     ExtractVarsInExpr extract;
     expr.accept(&extract);
-    return extract.var_list;
+    return extract.var_or_rvar_list;
 }
 
-void extract_func_calls(Halide::Func func, vector<Func>& func_list) {
+vector<string> extract_rvars_in_expr(Expr expr) {
+    ExtractVarsInExpr extract;
+    expr.accept(&extract);
+    return extract.rvar_list;
+}
+
+vector<string> extract_params_in_expr(Expr expr) {
+    ExtractVarsInExpr extract;
+    expr.accept(&extract);
+    return extract.param_list;
+}
+
+void extract_func_calls(Func func, vector<Func>& func_list) {
     ExtractFuncCalls extract;
     for (int i=0; i<func.outputs(); i++) {
         if (func.name().find("NO_REVEAL") == string::npos) {
