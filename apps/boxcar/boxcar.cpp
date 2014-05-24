@@ -31,9 +31,6 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    int filter_order_x = 1;
-    int filter_order_y = 1;
-
     int box_x = width/BOX_FILTER_FACTOR;        // radius of box filter
     int box_y = height/BOX_FILTER_FACTOR;
 
@@ -44,14 +41,14 @@ int main(int argc, char **argv) {
     Var x("x");
     Var y("y");
 
-    RDom rx(1, image.width()-1, "rx");
-    RDom ry(1, image.height()-1,"ry");
+    RDom rx(0, image.width(), "rx");
+    RDom ry(0, image.height(),"ry");
 
     I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
     S(x, y) = I(x,y);
-    S(rx,y) = S(rx,y) + S(rx-1,y);
-    S(x,ry) = S(x,ry) + S(x,ry-1);
+    S(rx,y) = S(rx,y) + select(rx>0, S(max(0,rx-1),y), 0);
+    S(x,ry) = S(x,ry) + select(ry>0, S(x,max(0,ry-1)), 0);
 
     B(x,y) = S(min(x+box_x,image.width()-1), min(y+box_y,image.height()-1))
            + select(x-box_x-1<0 || y-box_y-1<0, 0, S(max(x-box_x-1,0), max(y-box_y-1,0)))
@@ -63,13 +60,12 @@ int main(int argc, char **argv) {
     Var xi("xi"), yi("yi");
     Var xo("xo"), yo("yo");
 
-    RDom rxi(1, tile_width-1, "rxi");
-    RDom ryi(1, tile_width-1, "ryi");
+    RDom rxi(0, tile_width, "rxi");
+    RDom ryi(0, tile_width, "ryi");
 
     split(S,Internal::vec(0,1),
             Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
-            Internal::vec(rx,ry), Internal::vec(rxi,ryi),
-            Internal::vec(filter_order_x, filter_order_y));
+            Internal::vec(rx,ry), Internal::vec(rxi,ryi));
 
     // ----------------------------------------------------------------------------------------------
 

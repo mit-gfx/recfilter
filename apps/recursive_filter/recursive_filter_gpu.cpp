@@ -54,8 +54,8 @@ int main(int argc, char **argv) {
     Var x("x");
     Var y("y");
 
-    RDom rx(1, image.width()-1, "rx");
-    RDom ry(1, image.height()-1,"ry");
+    RDom rx(0, image.width(), "rx");
+    RDom ry(0, image.height(),"ry");
 
     I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0.0f, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
@@ -70,8 +70,8 @@ int main(int argc, char **argv) {
     Var xi("xi"), yi("yi");
     Var xo("xo"), yo("yo");
 
-    RDom rxi(1, tile_width-1, "rxi");
-    RDom ryi(1, tile_width-1, "ryi");
+    RDom rxi(0, tile_width, "rxi");
+    RDom ryi(0, tile_width, "ryi");
 
     split(S, W, Internal::vec(0,1),
             Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
