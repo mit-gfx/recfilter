@@ -261,26 +261,66 @@ static Function split_function_dimensions(Function F, vector<SplitInfo> split_in
     vector<Expr>   pure_values = F.values();
     vector<ReductionDefinition> reductions = F.reductions();
 
-    // add the scan stage arg to pure args
-    // set pure values to zero for all scan stages other than 0
-    // add scan stage value as arg to reductions, so that each
-    // reduction computes at its own stage
-    pure_args.push_back(xs.name());
-    for (size_t i=0; i<pure_values.size(); i++) {
-        pure_values[i] = select(xs==0, pure_values[i], 0);
-    }
-    for (size_t i=0; i<reductions.size(); i++) {
-        int scan_stage = -1;
-        for (size_t j=0; j<split_info.size(); j++) {
-            if (split_info[j].reduction_def == i) {
-                scan_stage = split_info[j].scan_stage;
+    // create the split function and add the scan stage arg
+    {
+        int scan_stage_var_index = pure_args.size();
+
+        // add the scan stage arg to pure args
+        pure_args.push_back(xs.name());
+
+        // set pure values to zero for all scan stages other than 0
+        for (size_t i=0; i<pure_values.size(); i++) {
+            pure_values[i] = select(xs==0, pure_values[i], 0);
+        }
+        Fsplit.define(pure_args, pure_values);
+
+        for (size_t i=0; i<reductions.size(); i++) {
+            // find the actual scan stage for this reduction
+            int scan_stage = -1;
+            for (size_t j=0; j<split_info.size(); j++) {
+                if (split_info[j].reduction_def == i) {
+                    scan_stage = split_info[j].scan_stage;
+                }
             }
+            if (scan_stage < 0) {
+                cerr << "Split operation not defined for all scans" << endl;
+                assert(false);
+            }
+
+            // add scan stage value as arg to reductions, so that each
+            // reduction computes at its own stage
+            reductions[i].args.push_back(scan_stage);
+
+            for (size_t j=0; j<reductions[i].values.size(); j++) {
+                Expr value = reductions[i].values[j];
+
+                // replace calls to original Func by split Func
+                value = substitute_func_call(F.name(), Fsplit, value);
+
+                // add scan stage value as arg to reduction args and recursive calls
+                value = insert_arg_to_func_call(Fsplit.name(),
+                        scan_stage_var_index, scan_stage, value);
+
+                // transfer data from one stage of computation to another
+                // since each stage computes in its own buffer
+                if (i>0) {
+                    Expr prev_scan_stage = reductions[i-1].args[scan_stage_var_index];
+                    if (!equal(prev_scan_stage,scan_stage)) {
+                        vector<Expr> call_args;
+                        for (size_t k=0; k<reductions[i].args.size(); k++) {
+                            if (equal(reductions[i].args[k], scan_stage)) {
+                                call_args.push_back(prev_scan_stage);
+                            } else {
+                                call_args.push_back(reductions[i].args[k]);
+                            }
+                        }
+                        value = Call::make(Fsplit, call_args, j) + value;
+                    }
+                }
+                reductions[i].values[j] = value;
+            }
+            Fsplit.define_reduction(reductions[i].args, reductions[i].values);
         }
-        if (scan_stage < 0) {
-            cerr << "Split operation not defined for all scans" << endl;
-            assert(false);
-        }
-        reductions[i].args.push_back(scan_stage);
     }
 
     // go to each function dimension and replace the Var with inner
@@ -386,15 +426,6 @@ static Function split_function_dimensions(Function F, vector<SplitInfo> split_in
             Fsplit.define_reduction(reductions[i].args, reductions[i].values);
         }
     }
-
-    //vector<string> pure_args = Fsplit.args();
-    //vector<Expr>   pure_values = Fsplit.values();
-    //vector<ReductionDefinition> reductions = Fsplit.reductions();
-
-    //for (size_t i=0; i<reductions(); i++) {
-    //}
-
-
 
     return Fsplit;
 }
@@ -689,7 +720,7 @@ void split(
 
     for (size_t i=0; i<num_splits; i++) {
         // individual tile boundaries
-        Expr inner_rdom_extent = simplify(inner_rdom[i].x.extent()+1);
+        Expr inner_rdom_extent = simplify(inner_rdom[i].x.extent());
         tile.push_back(inner_rdom_extent);
 
         // extent of reduction along dimensions to be split
@@ -746,15 +777,14 @@ void split(
             }
         }
 
-        // go to all scans in each dimension, and assign scan stages
+        // go to all dimensions, find all scans in that dimension and assign scan stages
         // all causal scans in same dimension must be computed in different stages so that
         // they don't stomp on each other's tails; same for anticausal scans
         for (size_t d=0; d<F.args().size(); d++) {
             size_t num_causal_scans = 0;
             size_t num_anticausal_scans = 0;
-            for (size_t i=0; i<split_info.size(); i++) {
-                // scan in same dimension
-                if (split_info[i].filter_dim == d) {
+            for (int i=split_info.size()-1; i>=0; i--) {    // reverse traversal because first
+                if (split_info[i].filter_dim == d) {        // scan will appear last in split_info list
                     if (check_causal_scan(F, split_info[i].rdom.x, split_info[i].reduction_def, d)) {
                         split_info[i].scan_causal = true;
                         split_info[i].scan_stage = num_causal_scans;
