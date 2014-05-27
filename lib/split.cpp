@@ -55,9 +55,9 @@ static bool check_causal_scan(Function f, RVar rx, size_t scan_id, size_t dimens
     Expr b = substitute(rx.name(), 1, arg);
     Expr c = simplify(a<b);
 
-    if (equal(c, Cast::make(c.type(),1))) {
+    if (equal(c, make_bool(true))) {
         return true;
-    } else if (equal(c, Cast::make(c.type(),0))) {
+    } else if (equal(c, make_bool(false))) {
         return false;
     } else {
         cerr << "Could not deduce causal or anticausal scan for reduction definition "
@@ -642,7 +642,7 @@ void split(
 {
     Var i,j;
     Func filter_weights("default_filter_wt");    // default filter weight = 1
-    filter_weights(i,j) = Cast::make(func.values()[0].type(), 1);
+    filter_weights(i,j) = make_one(func.values()[0].type());
 
     vector<int> order(dimension.size(), 1);     // default first order
 
@@ -662,7 +662,7 @@ void split(
 {
     Var i,j;
     Func filter_weights("default_filter_wt");    // default filter weight = 1
-    filter_weights(i,j) = Cast::make(func.values()[0].type(), 1);
+    filter_weights(i,j) = make_one(func.values()[0].type());
 
     split(func, filter_weights, dimension, var, inner_var, outer_var,
             rdom, inner_rdom, order);

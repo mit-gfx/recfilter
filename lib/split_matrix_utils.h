@@ -29,11 +29,9 @@ Func mult_matrix(Func A, Func B, Expr tile_width, int filter_order) {
     Var i, j, r;
     RDom m(0, filter_order, 0, filter_order, 0, filter_order);
 
-    Type type = A.output_types()[0];
-
     Func AB;
 
-    AB(i,   j,   r)  = Internal::Cast::make(type,0);
+    AB(i,   j,   r)  = Internal::make_zero(A.output_types()[0]);
     AB(m.y, m.z, r) += A(m.y, m.x, r) * B(m.x, m.z, r);
 
     AB.compute_root();
@@ -51,10 +49,10 @@ Func A(Func filter_weights, Expr tile_width, int scan_id, int filter_order) {
 
     Func A;
 
-    A(i,j) = Internal::Cast::make(type,0);
+    A(i,j) = Internal::make_zero(type);
     A(i,j) = select(j==filter_order-1,
             filter_weights(scan_id, filter_order-1-i),
-            select(i==j+1, 1, A(i,j)));
+            select(i==j+1, Internal::make_one(type), A(i,j)));
 
     A.compute_root();
     A.bound(i,0,filter_order).bound(j,0,filter_order);
@@ -71,7 +69,7 @@ Func Ar(Func A, Expr tile_width, int filter_order) {
     Func Ar;
 
     // filter matrix to power r= A^r_F [Nehab et al 2011, appendix A]
-    Ar(i, j, r) = select(r==0, A(i,j), 0);
+    Ar(i, j, r) = select(r==0, A(i,j), Internal::make_zero(A.output_types()[0]));
     Ar(m.y, m.z, m.w) += Ar(m.y, m.x, m.w-1) * A(m.x, m.z);
 
     Ar.compute_root();

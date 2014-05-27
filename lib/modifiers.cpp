@@ -132,8 +132,8 @@ public:
 // -----------------------------------------------------------------------------
 
 // Replace all
-// - all Func calls to func_name with identity if matching flag is set
-// - all Func calls other than func_name with identity if matching flag is not set
+// - all Func calls to func_name with 0 if matching flag is set
+// - all Func calls other than func_name with 0 if matching flag is not set
 class RemoveFunctionCall : public IRMutator {
 private:
     using IRMutator::visit;
@@ -160,20 +160,12 @@ private:
                 (( matching && op->name==func_name) ||
                  (!matching && op->name!=func_name)))
         {
-            if (identity.defined()) {
-                expr = Cast::make(op->func.output_types()[op->value_index], identity);
-            } else {
-                expr = Cast::make(op->func.output_types()[op->value_index], 0);
-            }
+            expr = make_zero(op->func.output_types()[op->value_index]);
         }
     }
 
-    // only associative operators
-    void visit (const Add *op) { identity = 0; mutate_binary_operator(this, op, &expr); }
-
     bool   matching;
     string func_name;
-    Expr   identity;
 
 public:
     vector<Expr> removed_expr;
