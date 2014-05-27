@@ -766,7 +766,7 @@ void split(
         s.filter_dim    = dimension[split_id];
         s.image_width   = image_width[split_id];
         s.filter_matrix = WeightMatrix::A(filter_weights,
-                tile[split_id], dimension[split_id], order[split_id]);
+                tile[split_id], split_id, order[split_id]);
 
         // construct the matrix of weight coefficients for completing tails
         Func A_FP = WeightMatrix::Ar(s.filter_matrix,
@@ -792,7 +792,7 @@ void split(
         s.complete_result_weight = WeightMatrix::matrix_last_row(A_FP,
                 s.tile_width, s.filter_order);
 
-        Image<int> gg = s.complete_result_weight.realize(1,4);
+        //Image<int> gg = s.complete_result_weight.realize(1,4);
 
         split_info.push_back(s);
     }

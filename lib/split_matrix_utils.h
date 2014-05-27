@@ -24,13 +24,16 @@ Func add_matrix(Func A, Func B) {
 Func mult_matrix(Func A, Func B, Expr tile_width, int filter_order) {
     assert(A.defined());
     assert(B.defined());
+    assert(A.output_types()[0] == B.output_types()[0]);
 
     Var i, j, r;
     RDom m(0, filter_order, 0, filter_order, 0, filter_order);
 
+    Type type = A.output_types()[0];
+
     Func AB;
 
-    AB(i,   j,   r)  = 0;
+    AB(i,   j,   r)  = Internal::Cast::make(type,0);
     AB(m.y, m.z, r) += A(m.y, m.x, r) * B(m.x, m.z, r);
 
     AB.compute_root();
@@ -39,16 +42,18 @@ Func mult_matrix(Func A, Func B, Expr tile_width, int filter_order) {
     return AB;
 }
 
-Func A(Func filter_weights, Expr tile_width, int filter_dim, int filter_order) {
+Func A(Func filter_weights, Expr tile_width, int scan_id, int filter_order) {
     assert(filter_weights.defined());
+
+    Type type = filter_weights.output_types()[0];
 
     Var i, j;
 
     Func A;
 
-    A(i,j) = 0;
+    A(i,j) = Internal::Cast::make(type,0);
     A(i,j) = select(j==filter_order-1,
-            filter_weights(filter_dim, filter_order-1-i),
+            filter_weights(scan_id, filter_order-1-i),
             select(i==j+1, 1, A(i,j)));
 
     A.compute_root();

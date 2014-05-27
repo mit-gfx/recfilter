@@ -46,6 +46,12 @@ int main(int argc, char **argv) {
     weights(1,0) = 0.125f; // y dimension filtering weights
     weights(1,1) = 0.0625f;
     weights(1,2) = 0.03125f;
+    weights(2,0) = 0.125f; // x dimension filtering weights
+    weights(2,1) = 0.0625f;
+    weights(2,2) = 0.03125f;
+    weights(3,0) = 0.125f; // y dimension filtering weights
+    weights(3,1) = 0.0625f;
+    weights(3,2) = 0.03125f;
 
     Func I("Input");
     Func W("Weight");
@@ -75,14 +81,14 @@ int main(int argc, char **argv) {
        select(ry>2, W(1,2)*S(x,ry-3), 0.0f);
 
     S(image.width()-1-rz, y) +=
-       select(rz<image.width()-1,   W(0,0)*S(image.width()-1-(rz-1),y), 0.0f) +
-       select(rz<image.width()-1-1, W(0,1)*S(image.width()-1-(rz-2),y), 0.0f) +
-       select(rz<image.width()-1-2, W(0,2)*S(image.width()-1-(rz-3),y), 0.0f);
+       select(rz<image.width()-1,   W(2,0)*S(image.width()-1-(rz-1),y), 0.0f) +
+       select(rz<image.width()-1-1, W(2,1)*S(image.width()-1-(rz-2),y), 0.0f) +
+       select(rz<image.width()-1-2, W(2,2)*S(image.width()-1-(rz-3),y), 0.0f);
 
     S(x,image.height()-1-rw) +=
-       select(rw<image.height()-1,   W(1,0)*S(x,image.height()-1-(rw-1)), 0.0f) +
-       select(rw<image.height()-1-1, W(1,1)*S(x,image.height()-1-(rw-2)), 0.0f) +
-       select(rw<image.height()-1-2, W(1,2)*S(x,image.height()-1-(rw-3)), 0.0f);
+       select(rw<image.height()-1,   W(3,0)*S(x,image.height()-1-(rw-1)), 0.0f) +
+       select(rw<image.height()-1-1, W(3,1)*S(x,image.height()-1-(rw-2)), 0.0f) +
+       select(rw<image.height()-1-2, W(3,2)*S(x,image.height()-1-(rw-3)), 0.0f);
 
     // ----------------------------------------------------------------------------------------------
 
@@ -240,12 +246,9 @@ int main(int argc, char **argv) {
     if (!nocheck) {
         cerr << "\nChecking difference ... " << endl;
 
-        Image<float> fo_weights(2,1);
-        fo_weights(0,0) = 1.0f; fo_weights(1,0) = 1.0f;
-
         Image<float> hl_out(hl_out_buff);
         Image<float> diff(width,height);
-        Image<float> ref = reference_recursive_filter<float>(random_image, fo_weights);
+        Image<float> ref = reference_recursive_filter<float>(random_image, weights);
 
         float diff_sum = 0;
         float all_sum = 0;
@@ -291,7 +294,7 @@ Image<T> reference_recursive_filter(Image<T> in, Image<T> weights) {
     for (int y=0; y<height; y++) {          // x filtering
         for (int x=0; x<width; x++) {
             for (int k=1; k<=order_x; k++) {
-//                ref(x,y) += (x>=k ? weights(0,k-1)*ref(x-k,y) : T(0));
+                ref(x,y) += (x>=k ? weights(0,k-1)*ref(x-k,y) : T(0));
             }
         }
     }
@@ -299,7 +302,7 @@ Image<T> reference_recursive_filter(Image<T> in, Image<T> weights) {
     for (int y=0; y<height; y++) {          // y filtering
         for (int x=0; x<width; x++) {
             for (int k=1; k<=order_y; k++) {
-//                ref(x,y) += (y>=k ? weights(1,k-1)*ref(x,y-k) : T(0));
+                ref(x,y) += (y>=k ? weights(1,k-1)*ref(x,y-k) : T(0));
             }
         }
     }
@@ -307,7 +310,7 @@ Image<T> reference_recursive_filter(Image<T> in, Image<T> weights) {
     for (int y=0; y<height; y++) {          // anticausal x filtering
         for (int x=0; x<width; x++) {
             for (int k=1; k<=order_x; k++) {
-                ref(width-1-x,y) += (x-k<=width-1 ? weights(0,k-1)*ref(width-1-(x-k),y) : T(0));
+                ref(width-1-x,y) += (x-k<=width-1 ? weights(2,k-1)*ref(width-1-(x-k),y) : T(0));
             }
         }
     }
@@ -315,7 +318,7 @@ Image<T> reference_recursive_filter(Image<T> in, Image<T> weights) {
     for (int y=0; y<height; y++) {          // anticausal y filtering
         for (int x=0; x<width; x++) {
             for (int k=1; k<=order_y; k++) {
-                ref(x,height-1-y) += (y-k<=height-1 ? weights(1,k-1)*ref(x,height-1-(y-k)) : T(0));
+                ref(x,height-1-y) += (y-k<=height-1 ? weights(3,k-1)*ref(x,height-1-(y-k)) : T(0));
             }
         }
     }
