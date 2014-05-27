@@ -1,4 +1,4 @@
-PROGRAM_NAME=bug
+PROGRAM_NAME=test_correctness
 
 CXX=g++
 MKDIR=mkdir -p

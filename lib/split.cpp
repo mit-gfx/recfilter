@@ -1,4 +1,5 @@
 #include "split.h"
+#include "split_matrix_utils.h"
 
 #define SPLIT_HELPER_NAME '-'
 
@@ -19,7 +20,7 @@ struct SplitInfo {
     int scan_stage;
     int filter_order;
     int filter_dim;
-    int reduction_def;
+    int scan_id;
     Var var;
     Var inner_var;
     Var outer_var;
@@ -29,54 +30,23 @@ struct SplitInfo {
     RDom inner_rdom;
     Expr tile_width;
     Expr image_width;
-    Func filter_weights;
-    vector<Function> func_list;
+
+    Func filter_matrix;
+    Func complete_tail_weight;
+    Func complete_result_weight;
+
+    Function intra_tile_scan;
+    Function incomplete_tail;
+    Function complete_tail;
+    Function dependencies;
 };
 
 // -----------------------------------------------------------------------------
 
-static Func tail_weights(Func filter_weights, Expr tile_width, int filter_dim, int filter_order) {
-    assert(filter_weights.defined());
+static bool check_causal_scan(Function f, RVar rx, size_t scan_id, size_t dimension) {
+    assert(scan_id < f.reductions().size());
 
-    Type type = filter_weights.values()[0].type();
-    Expr zero = Cast::make(type, 0);
-    Expr one  = Cast::make(type, 1);
-
-    Var i("i"), j("j"), r("r");
-    RDom c(0, filter_order, "c");
-    RDom m(0, filter_order, 0, filter_order, 0, filter_order, 1, tile_width-1, "m");
-
-    Func A("A");
-    Func Ar("Ar");
-
-    // filter matrix to power r= A^r_F [Nehab et al 2011, appendix A]
-    A(i,j) = select(j==filter_order-1,
-            filter_weights(filter_dim, filter_order-1-i),
-            select(i==j+1, one, zero));
-
-
-    Ar(i, j, r) = select(r==0, A(i,j), 0);
-    Ar(m.y, m.z, m.w) += Ar(m.y, m.x, m.w-1) * A(m.x, m.z);
-
-    Ar.compute_root();
-    Ar.bound(i,0,filter_order).bound(j,0,filter_order).bound(r,0,tile_width);
-
-    // last row of matrix
-    Func W("Weight_NO_REVEAL_" + int_to_string(filter_dim));
-    W(r,j) = Ar(filter_order-1-j, filter_order-1, r);
-
-    W.compute_root();
-    W.bound(r,0,tile_width).bound(j,0,filter_order);
-
-    return W;
-}
-
-// -----------------------------------------------------------------------------
-
-static bool check_causal_scan(Function f, RVar rx, size_t reduction_def, size_t dimension) {
-    assert(reduction_def < f.reductions().size());
-
-    ReductionDefinition reduction = f.reductions()[reduction_def];
+    ReductionDefinition reduction = f.reductions()[scan_id];
     Expr               arg       = reduction.args[dimension];
 
     // check if reduction arg increases on increasing the RVar
@@ -91,7 +61,7 @@ static bool check_causal_scan(Function f, RVar rx, size_t reduction_def, size_t 
         return false;
     } else {
         cerr << "Could not deduce causal or anticausal scan for reduction definition "
-            << reduction_def << " of " << f.name() << endl;
+            << scan_id << " of " << f.name() << endl;
         assert(false);
     }
 }
@@ -124,8 +94,17 @@ static void check_split_feasible(
 
 
     // check variables
-    for (size_t k=0; k<num_splits; k++) {
+    for (int k=0; k<num_splits; k++) {
         int dim = dimension[k];
+
+        // repeated scans in the same dimension must have the filter order and tile width
+        for (int i=0; i<k-1; i++) {
+            if (dimension[k]==dimension[i] && order[i]!=order[k]) {
+                cerr << "Different filter orders specified for two scans "
+                    << "in the same dimension" << endl;
+                assert(false);
+            }
+        }
 
         // RDom to be split must be 1D, each reduction definition should be 1D reduction
         if (rdom[k].dimensions() != 1) {
@@ -237,15 +216,7 @@ static Function split_function_dimensions(Function F, vector<SplitInfo> split_in
 
     // setup mappings between variables, RDoms and their inner/outer variants
     for (size_t i=0; i<split_info.size(); i++) {
-        if (dim_to_tile_width.find(split_info[i].filter_dim) != dim_to_tile_width.end()) {
-            if (!equal(dim_to_tile_width[split_info[i].filter_dim], split_info[i].tile_width)) {
-                cerr << "Different tile widths specified for splitting same dimension" << endl;
-                assert(false);
-            }
-        } else {
-            dim_to_tile_width[split_info[i].filter_dim] = split_info[i].tile_width;
-        }
-
+        dim_to_tile_width [split_info[i].filter_dim]   = split_info[i].tile_width;
         var_to_inner_var  [split_info[i].var.name()]   = split_info[i].inner_var;
         var_to_outer_var  [split_info[i].var.name()]   = split_info[i].outer_var;
         var_to_inner_expr [split_info[i].var.name()]   = split_info[i].inner_var;
@@ -278,7 +249,7 @@ static Function split_function_dimensions(Function F, vector<SplitInfo> split_in
             // find the actual scan stage for this reduction
             int scan_stage = -1;
             for (size_t j=0; j<split_info.size(); j++) {
-                if (split_info[j].reduction_def == i) {
+                if (split_info[j].scan_id == i) {
                     scan_stage = split_info[j].scan_stage;
                 }
             }
@@ -509,7 +480,8 @@ static Function create_intra_tail_term(Function F_intra, SplitInfo split_info, s
     return function;
 }
 
-static Function create_complete_tail_term(Function F_tail, SplitInfo split_info, string func_name) {
+static Function create_complete_tail_term(Function F_tail, SplitInfo split_info, string func_name)
+{
     Function function(func_name);
 
     Var  x    = split_info.var;
@@ -520,7 +492,7 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
     Expr tile = split_info.tile_width;
     RDom rxo  = split_info.outer_rdom;
 
-    Func weight = split_info.filter_weights;
+    Func weight = split_info.complete_tail_weight;
 
     // pure definition
     {
@@ -533,6 +505,7 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
         for (size_t i=0; i<F_tail.outputs(); i++) {
             values.push_back(Call::make(F_tail, call_args, i));
         }
+
         function.define(F_tail.args(), values);
     }
 
@@ -579,7 +552,7 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
 
 // -----------------------------------------------------------------------------
 
-static void create_recursive_split(Function& F, SplitInfo& split_info) {
+static void create_recursive_split(Function F, SplitInfo& split_info) {
     Expr tile = split_info.tile_width;
     int  dim  = split_info.filter_dim;
     int  order= split_info.filter_order;
@@ -587,7 +560,7 @@ static void create_recursive_split(Function& F, SplitInfo& split_info) {
     Var  xi   = split_info.inner_var;
     Var  xo   = split_info.outer_var;
 
-    Func weight = split_info.filter_weights;
+    Func weight = split_info.complete_result_weight;
 
     string s1 = F.name() + DELIMITER + INTRA_TILE_RESULT    + "_" + x.name();
     string s2 = F.name() + DELIMITER + INTRA_TILE_TAIL_TERM + "_" + x.name();
@@ -649,10 +622,10 @@ static void create_recursive_split(Function& F, SplitInfo& split_info) {
     }
 
     // extra functions generated
-    split_info.func_list.push_back(F_intra);
-    split_info.func_list.push_back(F_tail);
-    split_info.func_list.push_back(F_ctail);
-    split_info.func_list.push_back(F_inter_deps);
+    split_info.intra_tile_scan = F_intra;
+    split_info.incomplete_tail = F_tail;
+    split_info.complete_tail   = F_ctail;
+    split_info.dependencies    = F_inter_deps;
 }
 
 
@@ -711,17 +684,26 @@ void split(
 
     Function F = func.function();
 
-    size_t num_splits = var.size();
+    int num_splits = var.size();
 
     vector<Expr> tile;
     vector<RDom> split_rdom;
     vector<RDom> outer_rdom;
     vector<Expr> image_width;
 
-    for (size_t i=0; i<num_splits; i++) {
+    for (int i=0; i<num_splits; i++) {
+
         // individual tile boundaries
         Expr inner_rdom_extent = simplify(inner_rdom[i].x.extent());
         tile.push_back(inner_rdom_extent);
+
+        // tile width for splitting multiple scans in same dimension must be consistent
+        for (int j=0; j<i-1; j++) {
+            if (dimension[j] == dimension[i] && !equal(tile[i], tile[j])) {
+                cerr << "Different tile widths specified for splitting same dimension" << endl;
+                assert(false);
+            }
+        }
 
         // extent of reduction along dimensions to be split
         assert(extract_params_in_expr(rdom[i].x.extent()).size()==1 &&
@@ -749,51 +731,89 @@ void split(
     // reorder the splits such that the last scan is split first
     // loop over all reduction definitions in reverse order and split
     // them if needed
-    for (int u=F.reductions().size()-1; u>=0; u--) {
-        assert(F.reductions()[u].domain.defined() &&
+    for (int i=F.reductions().size()-1; i>=0; i--) {
+        assert(F.reductions()[i].domain.defined() &&
                 "Reduction definition has no reduction domain");
+
+        int split_id = -1;
 
         // extract the RDom in the reduction definition and
         // compare with the reduction domain to be split
-        for (size_t v=0; v<num_splits; v++) {
-            if (F.reductions()[u].domain.same_as(rdom[v].domain())) {
-                SplitInfo s;
-                s.reduction_def  = u;
-                s.scan_causal    = true;            // change it in next section
-                s.scan_stage     = 0;               // default, change it in next section
-                s.var            = var[v];
-                s.rdom           = rdom[v];
-                s.inner_var      = inner_var[v];
-                s.outer_var      = outer_var[v];
-                s.inner_rdom     = inner_rdom[v];
-                s.outer_rdom     = outer_rdom[v];
-                s.split_rdom     = split_rdom[v];
-                s.tile_width     = tile[v];
-                s.filter_order   = order[v];
-                s.filter_dim     = dimension[v];
-                s.image_width    = image_width[v];
-                s.filter_weights = tail_weights(filter_weights, tile[v], dimension[v], order[v]);
-                split_info.push_back(s);
+        for (int j=0; j<num_splits; j++) {
+            if (F.reductions()[i].domain.same_as(rdom[j].domain())) {
+                split_id = j;
             }
         }
 
-        // go to all dimensions, find all scans in that dimension and assign scan stages
-        // all causal scans in same dimension must be computed in different stages so that
-        // they don't stomp on each other's tails; same for anticausal scans
-        for (size_t d=0; d<F.args().size(); d++) {
-            size_t num_causal_scans = 0;
-            size_t num_anticausal_scans = 0;
-            for (int i=split_info.size()-1; i>=0; i--) {    // reverse traversal because first
-                if (split_info[i].filter_dim == d) {        // scan will appear last in split_info list
-                    if (check_causal_scan(F, split_info[i].rdom.x, split_info[i].reduction_def, d)) {
-                        split_info[i].scan_causal = true;
-                        split_info[i].scan_stage = num_causal_scans;
-                        num_causal_scans++;
-                    } else {
-                        split_info[i].scan_causal = false;
-                        split_info[i].scan_stage = num_anticausal_scans;
-                        num_anticausal_scans++;
-                    }
+        if (split_id < 0) {
+            cerr << "Could not find a split for scan " << i << endl;
+            cerr << endl;
+        }
+
+        SplitInfo s;
+        s.scan_id       = i;
+        s.scan_causal   = true;            // default, change it in next section
+        s.scan_stage    = 0;               // default, change it in next section
+        s.var           = var[split_id];
+        s.rdom          = rdom[split_id];
+        s.inner_var     = inner_var[split_id];
+        s.outer_var     = outer_var[split_id];
+        s.inner_rdom    = inner_rdom[split_id];
+        s.outer_rdom    = outer_rdom[split_id];
+        s.split_rdom    = split_rdom[split_id];
+        s.tile_width    = tile[split_id];
+        s.filter_order  = order[split_id];
+        s.filter_dim    = dimension[split_id];
+        s.image_width   = image_width[split_id];
+        s.filter_matrix = WeightMatrix::A(filter_weights,
+                tile[split_id], dimension[split_id], order[split_id]);
+
+        // construct the matrix of weight coefficients for completing tails
+        Func A_FP = WeightMatrix::Ar(s.filter_matrix,
+                s.tile_width, s.filter_order);
+
+        s.complete_tail_weight = WeightMatrix::matrix_last_row(A_FP,
+                s.tile_width, s.filter_order);
+
+        // check if there was another scan in the same image dimension
+        // accummulate weight coefficients because of all such scans
+        for (int j=split_info.size()-1; j>=0; j--) {
+            if (s.filter_dim == split_info[j].filter_dim) {
+                Func A = WeightMatrix::Ar(split_info[j].filter_matrix,
+                        s.tile_width, s.filter_order);
+                Func A_FB = WeightMatrix::Ar_sum_r(A,
+                        s.tile_width, s.filter_order);
+                A_FP = WeightMatrix::mult_matrix(A_FB, A_FP,
+                        s.tile_width, s.filter_order);
+            }
+        }
+
+        // last row of the weight matrix is the coefficients for tail elements
+        s.complete_result_weight = WeightMatrix::matrix_last_row(A_FP,
+                s.tile_width, s.filter_order);
+
+        Image<int> gg = s.complete_result_weight.realize(1,4);
+
+        split_info.push_back(s);
+    }
+
+
+    // go to all dimensions, find all scans in that dimension and assign scan stages
+    // all causal scans in same dimension must be computed in different stages so that
+    // they don't stomp on each other's tails; same for anticausal scans
+    for (int d=0; d<F.args().size(); d++) {
+        int num_causal_scans = 0;
+        int num_anticausal_scans = 0;
+        for (int i=split_info.size()-1; i>=0; i--) {    // reverse traversal because first
+            if (split_info[i].filter_dim == d) {        // scan will appear last in split_info list
+                if (check_causal_scan(F, split_info[i].rdom.x, split_info[i].scan_id, d)) {
+                    split_info[i].scan_causal = true;
+                    split_info[i].scan_stage = num_causal_scans;
+                    num_causal_scans++;
+                } else {
+                    split_info[i].scan_causal = false;
+                    split_info[i].scan_stage = num_anticausal_scans;
+                    num_anticausal_scans++;
                 }
             }
         }
@@ -801,41 +821,31 @@ void split(
 
 
     // create a function whose dimensions are split without
-    // affecting computation, all split operations affect this function
+    // affecting computation
     Function Fsplit = split_function_dimensions(F, split_info);
-
-    // apply the individual split for each reduction variable - separate
-    // the intra tile copmutation from inter tile computation
-    queue<Function> funcs_to_split;
-    funcs_to_split.push(Fsplit);
 
     int max_scan_stage = -1;
 
-    for (size_t i=0; i<split_info.size() && !funcs_to_split.empty(); i++) {
+    for (size_t i=0; i<split_info.size(); i++) {
         max_scan_stage = std::max(max_scan_stage, split_info[i].scan_stage);
 
-        queue<Function> funcs_to_split_in_next_dimension;
-        while (!funcs_to_split.empty()) {
-            Function f = funcs_to_split.front();
-            funcs_to_split.pop();
+        Function function_to_split;
 
-            if (!check_for_pure_split(f, split_info[i])) {
-                create_recursive_split(f, split_info[i]);
-            }
-
-            // all newly created Func's have to be split for the next dimension
-            for (size_t k=0; k<split_info[i].func_list.size(); k++) {
-                funcs_to_split_in_next_dimension.push(split_info[i].func_list[k]);
-            }
-
-            // clear the list of sub Func's created
-            split_info[i].func_list.clear();
+        // operate on Fsplit for the first split, subsequent splits operate on
+        // result of previous split
+        if (i==0) {
+            function_to_split = Fsplit;
+        } else {
+            function_to_split = split_info[i-1].intra_tile_scan;
         }
 
-        // transfer all sub Func's to list to Func's that will be split in the next dimension
-        funcs_to_split = funcs_to_split_in_next_dimension;
-    }
+        // check if there is a reduction in the current dimension
+        if (check_for_pure_split(function_to_split, split_info[i])) {
+            continue;
+        }
 
+        create_recursive_split(function_to_split, split_info[i]);
+    }
 
     // modify the original function to index into the split function
     {

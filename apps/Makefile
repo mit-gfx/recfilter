@@ -6,7 +6,7 @@ all:
 	#make -C gauss_boxcar
 	make -C gauss_anticausal
 	make -C gauss_cognex
-	make -C test
+	make -C test_correctness
 
 clean:
 	make -C ../lib clean
@@ -16,4 +16,4 @@ clean:
 	#make -C gauss_boxcar clean
 	make -C gauss_anticausal clean
 	make -C gauss_cognex clean
-	make -C test clean
+	make -C test_correctness clean

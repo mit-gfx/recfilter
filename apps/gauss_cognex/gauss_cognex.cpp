@@ -238,8 +238,8 @@ int main(int argc, char **argv) {
         int all_sum = 0;
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {
-                diff(x,y) = std::abs(ref(x,y) - hl_out(x,y));
-                diff_sum += diff(x,y);
+                diff(x,y) = ref(x,y) - hl_out(x,y);
+                diff_sum += std::abs(diff(x,y));
                 all_sum += ref(x,y);
             }
         }
