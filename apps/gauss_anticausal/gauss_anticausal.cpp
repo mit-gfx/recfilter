@@ -36,25 +36,24 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    int filter_order_x = 3;
-    int filter_order_y = 3;
+    int fx = 3;
+    int fy = 3;
 
-    Image<float> weights(2,3);
-    weights(0,0) = 0.125f; // x dimension filtering weights
-    weights(0,1) = 0.0625f;
-    weights(0,2) = 0.03125f;
-    weights(1,0) = 0.125f; // y dimension filtering weights
-    weights(1,1) = 0.0625f;
-    weights(1,2) = 0.03125f;
-    weights(2,0) = 0.125f; // x dimension filtering weights
-    weights(2,1) = 0.0625f;
-    weights(2,2) = 0.03125f;
-    weights(3,0) = 0.125f; // y dimension filtering weights
-    weights(3,1) = 0.0625f;
-    weights(3,2) = 0.03125f;
+    Image<float> W(4,3);
+    W(0,0) = 0.125f; // x dimension filtering weights
+    W(0,1) = 0.0625f;
+    W(0,2) = 0.03125f;
+    W(1,0) = 0.125f; // y dimension filtering weights
+    W(1,1) = 0.0625f;
+    W(1,2) = 0.03125f;
+    W(2,0) = 0.125f; // x dimension filtering weights
+    W(2,1) = 0.0625f;
+    W(2,2) = 0.03125f;
+    W(3,0) = 0.125f; // y dimension filtering weights
+    W(3,1) = 0.0625f;
+    W(3,2) = 0.03125f;
 
     Func I("Input");
-    Func W("Weight");
     Func S("S");
 
     Var x("x");
@@ -66,8 +65,6 @@ int main(int argc, char **argv) {
     RDom rw(0, image.height(),"rw");
 
     I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0.0f, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-
-    W(x, y) = weights(x,y);
 
     S(x, y) = I(x,y);
     S(rx,y) +=
@@ -100,11 +97,14 @@ int main(int argc, char **argv) {
     RDom rzi(0, tile_width, "rzi");
     RDom rwi(0, tile_width, "rwi");
 
-    split(S,
-//            W,
-            Internal::vec(0,1,0,1),    Internal::vec(x,y,x,y),    Internal::vec(xi,yi,xi,yi),
-            Internal::vec(xo,yo,xo,yo),Internal::vec(rx,ry,rz,rw),Internal::vec(rxi,ryi,rzi,rwi));
-//            Internal::vec(filter_order_x, filter_order_y, filter_order_x, filter_order_y));
+    split(S, W,
+            Internal::vec(0,  1,  0,  1),
+            Internal::vec(x,  y,  x,  y),
+            Internal::vec(xi, yi, xi, yi),
+            Internal::vec(xo, yo, xo, yo),
+            Internal::vec(rx, ry, rz, rw),
+            Internal::vec(rxi,ryi,rzi,rwi),
+            Internal::vec(fx, fy, fx, fy));
 
     // ----------------------------------------------------------------------------------------------
 
@@ -248,7 +248,7 @@ int main(int argc, char **argv) {
 
         Image<float> hl_out(hl_out_buff);
         Image<float> diff(width,height);
-        Image<float> ref = reference_recursive_filter<float>(random_image, weights);
+        Image<float> ref = reference_recursive_filter<float>(random_image, W);
 
         float diff_sum = 0;
         float all_sum = 0;

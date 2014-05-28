@@ -24,9 +24,9 @@ int main(int argc, char **argv) {
     int   tile_width = args.block;
     int   iterations = args.iterations;
 
-    Image<int> random_image = generate_random_image<int>(width,height);
+    Image<float> random_image = generate_random_image<float>(width,height);
 
-    ImageParam image(type_of<int>(), 2);
+    ImageParam image(type_of<float>(), 2);
     image.set(random_image);
 
     // ----------------------------------------------------------------------------------------------
@@ -145,7 +145,7 @@ int main(int argc, char **argv) {
     cerr << "\nJIT compilation ... " << endl;
     S.compile_jit();
 
-    Buffer hl_out_buff(type_of<int>(), width,height);
+    Buffer hl_out_buff(type_of<float>(), width,height);
     {
         Timer t("Running ... ");
         for (int k=0; k<iterations; k++) {
@@ -162,9 +162,9 @@ int main(int argc, char **argv) {
 
     if (!nocheck) {
         cerr << "\nChecking difference ... " << endl;
-        Image<int> hl_out(hl_out_buff);
-        Image<int> diff(width,height);
-        Image<int> ref(width,height);
+        Image<float> hl_out(hl_out_buff);
+        Image<float> diff(width,height);
+        Image<float> ref(width,height);
 
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {

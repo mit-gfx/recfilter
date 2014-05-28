@@ -21,15 +21,16 @@ int main(int argc, char **argv) {
     image.set(random_image);
 
     // ----------------------------------------------------------------------------------------------
-    int fx = 1;
-    int fy = 1;
+    int fx = 2;
+    int fy = 0;
 
-    Image<float> weights(2,1);
-    weights(0,0) = 1.0;
-    weights(1,0) = 1.0;
+    Image<float> W(4,2);
+    W(0,0) = 1.000f; W(0,1) = 1.000f;
+    W(1,0) = 1.000f; W(1,1) = 1.000f;
+    W(2,0) = 0*0.250f; W(2,1) = 0*0.125f;
+    W(3,0) = 0*0.125f; W(3,1) = 0*0.0625f;
 
     Func I("Input");
-    Func W("Weight");
     Func S("S");
 
     Var x("x");
@@ -40,15 +41,13 @@ int main(int argc, char **argv) {
     RDom rz(0, image.width(),"rz");
     RDom rw(0, image.width(),"rw");
 
-    W(x,y) = weights(x,y);
-
     I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
     S(x, y) = I(x,y);
-    S(rx,y) = S(rx,y) + select(rx>0, W(0,0)*S(max(0,rx-1),y), 0.0f);
-    S(ry,y) = S(ry,y) + select(ry>0, W(0,0)*S(max(0,ry-1),y), 0.0f);
-//    S(rz,y) = S(rz,y) + select(rz>0, S(max(0,rz-1),y), 0);
-//    S(rw,y) = S(rw,y) + select(rw>0, S(max(0,rw-1),y), 0);
+    S(rx,y) = S(rx,y) + select(rx>0, W(0,0)*S(max(0,rx-1),y), 0.0f) + select(rx>1, W(0,1)*S(max(0,rx-2),y), 0.0f);
+    S(ry,y) = S(ry,y) + select(ry>0, W(1,0)*S(max(0,ry-1),y), 0.0f) + select(ry>1, W(1,1)*S(max(0,ry-2),y), 0.0f);
+    S(rz,y) = S(rz,y) + select(rz>0, W(2,0)*S(max(0,rz-1),y), 0.0f) + select(rz>1, W(2,1)*S(max(0,rz-2),y), 0.0f);
+    S(rw,y) = S(rw,y) + select(rw>0, W(3,0)*S(max(0,rw-1),y), 0.0f) + select(rw>1, W(3,1)*S(max(0,rw-2),y), 0.0f);
 
     // ----------------------------------------------------------------------------------------------
 
@@ -60,13 +59,13 @@ int main(int argc, char **argv) {
     RDom rzi(0, tile, "rzi");
     RDom rwi(0, tile, "rwi");
 
-    split(S,W,Internal::vec(  0,  0),
-              Internal::vec(  x,  x),
-              Internal::vec( xi, xi),
-              Internal::vec( xo, xo),
-              Internal::vec( rx, ry),
-              Internal::vec(rxi,ryi),
-              Internal::vec( fx, fx)
+    split(S,W,Internal::vec(  0,  0,  0,  0),
+              Internal::vec(  x,  x,  x,  x),
+              Internal::vec( xi, xi, xi, xi),
+              Internal::vec( xo, xo, xo, xo),
+              Internal::vec( rx, ry, rz, rw),
+              Internal::vec(rxi,ryi,rzi,rwi),
+              Internal::vec( fx, fx, fx, fx)
             );
 
     // ----------------------------------------------------------------------------------------------
@@ -92,23 +91,31 @@ int main(int argc, char **argv) {
         }
     }
     for (int y=0; y<height; y++) {
-        for (int x=1; x<width; x++) {
-            ref(x,y) += weights(0,0)*ref(x-1,y);
+        for (int x=0; x<width; x++) {
+            ref(x,y) +=
+                (x>0 ? W(0,0)*ref(x-1,y) : 0.0f) +
+                (x>1 ? W(0,1)*ref(x-2,y) : 0.0f);
         }
     }
     for (int y=0; y<height; y++) {
-        for (int x=1; x<width; x++) {
-            ref(x,y) += weights(0,0)*ref(x-1,y);
+        for (int x=0; x<width; x++) {
+            ref(x,y) +=
+                (x>0 ? W(1,0)*ref(x-1,y) : 0.0f) +
+                (x>1 ? W(1,1)*ref(x-2,y) : 0.0f);
         }
     }
     for (int y=0; y<height; y++) {
-        for (int x=1; x<width; x++) {
-            ref(x,y) += 0*ref(x-1,y);
+        for (int x=0; x<width; x++) {
+            ref(x,y) +=
+                (x>0 ? W(2,0)*ref(x-1,y) : 0.0f) +
+                (x>1 ? W(2,1)*ref(x-2,y) : 0.0f);
         }
     }
     for (int y=0; y<height; y++) {
-        for (int x=1; x<width; x++) {
-            ref(x,y) += 0*ref(x-1,y);
+        for (int x=0; x<width; x++) {
+            ref(x,y) +=
+                (x>0 ? W(3,0)*ref(x-1,y) : 0.0f) +
+                (x>1 ? W(3,1)*ref(x-2,y) : 0.0f);
         }
     }
 
