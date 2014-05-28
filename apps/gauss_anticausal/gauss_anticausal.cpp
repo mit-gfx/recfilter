@@ -78,14 +78,14 @@ int main(int argc, char **argv) {
        select(ry>2, W(1,2)*S(x,ry-3), 0.0f);
 
     S(image.width()-1-rz, y) +=
-       select(rz<image.width()-1,   W(2,0)*S(image.width()-1-(rz-1),y), 0.0f) +
-       select(rz<image.width()-1-1, W(2,1)*S(image.width()-1-(rz-2),y), 0.0f) +
-       select(rz<image.width()-1-2, W(2,2)*S(image.width()-1-(rz-3),y), 0.0f);
+       select(rz<0, W(2,0)*S(image.width()-1-(rz-1),y), 0.0f) +
+       select(rz<1, W(2,1)*S(image.width()-1-(rz-2),y), 0.0f) +
+       select(rz<2, W(2,2)*S(image.width()-1-(rz-3),y), 0.0f);
 
     S(x,image.height()-1-rw) +=
-       select(rw<image.height()-1,   W(3,0)*S(x,image.height()-1-(rw-1)), 0.0f) +
-       select(rw<image.height()-1-1, W(3,1)*S(x,image.height()-1-(rw-2)), 0.0f) +
-       select(rw<image.height()-1-2, W(3,2)*S(x,image.height()-1-(rw-3)), 0.0f);
+       select(rw<0, W(3,0)*S(x,image.height()-1-(rw-1)), 0.0f) +
+       select(rw<1, W(3,1)*S(x,image.height()-1-(rw-2)), 0.0f) +
+       select(rw<2, W(3,2)*S(x,image.height()-1-(rw-3)), 0.0f);
 
     // ----------------------------------------------------------------------------------------------
 
@@ -250,8 +250,8 @@ int main(int argc, char **argv) {
         Image<float> diff(width,height);
         Image<float> ref = reference_recursive_filter<float>(random_image, W);
 
-        float diff_sum = 0;
-        float all_sum = 0;
+        float diff_sum = 0.0f;
+        float all_sum = 0.0f;
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {
                 diff(x,y) = std::abs(ref(x,y) - hl_out(x,y));

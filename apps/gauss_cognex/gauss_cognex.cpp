@@ -234,8 +234,8 @@ int main(int argc, char **argv) {
             }
         }
 
-        int diff_sum = 0;
-        int all_sum = 0;
+        float diff_sum = 0.0f;
+        float all_sum = 0.0f;
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {
                 diff(x,y) = ref(x,y) - hl_out(x,y);

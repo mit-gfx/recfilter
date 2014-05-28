@@ -9,8 +9,6 @@ using std::cerr;
 using std::endl;
 
 int main(int argc, char **argv) {
-    Arguments args("test_repeated_causal", argc, argv);
-
     int width  = 20;
     int height = 1;
     int tile   = 4;
@@ -21,8 +19,8 @@ int main(int argc, char **argv) {
     image.set(random_image);
 
     // ----------------------------------------------------------------------------------------------
+
     int fx = 2;
-    int fy = 0;
 
     Image<float> W(4,2);
     W(0,0) = 1.000f; W(0,1) = 1.000f;
@@ -73,7 +71,6 @@ int main(int argc, char **argv) {
     std::vector<Func> func_list;
     extract_func_calls(S, func_list);
     for (size_t i=0; i<func_list.size(); i++) {
-        cerr << func_list[i] << endl;
         func_list[i].compute_root();
     }
 
@@ -119,8 +116,8 @@ int main(int argc, char **argv) {
         }
     }
 
-    int diff_sum = 0;
-    int all_sum = 0;
+    float diff_sum = 0.0f;
+    float all_sum = 0.0f;
     for (int y=0; y<height; y++) {
         for (int x=0; x<width; x++) {
             diff(x,y) = ref(x,y) - hl_out(x,y);
