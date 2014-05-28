@@ -31,9 +31,9 @@ struct SplitInfo {
     Expr tile_width;
     Expr image_width;
 
-    Func filter_matrix;
-    Func complete_tail_weight;
-    Func complete_result_weight;
+    Image<float> filter_matrix;
+    Image<float> complete_tail_weight;
+    Image<float> complete_result_weight;
 
     Function intra_tile_scan;
     Function incomplete_tail;
@@ -201,6 +201,7 @@ static bool check_for_pure_split(Function F, SplitInfo split_info) {
     return !rdom_exists_in_reduction_def;
 }
 
+// -----------------------------------------------------------------------------
 
 static Function split_function_dimensions(Function F, vector<SplitInfo> split_info) {
     Function Fsplit(F.name() + SPLIT_HELPER_NAME);
@@ -480,8 +481,7 @@ static Function create_intra_tail_term(Function F_intra, SplitInfo split_info, s
     return function;
 }
 
-static Function create_complete_tail_term(Function F_tail, SplitInfo split_info, string func_name)
-{
+static Function create_complete_tail_term(Function F_tail, SplitInfo split_info, string func_name) {
     Function function(func_name);
 
     Var  x    = split_info.var;
@@ -492,7 +492,7 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
     Expr tile = split_info.tile_width;
     RDom rxo  = split_info.outer_rdom;
 
-    Func weight = split_info.complete_tail_weight;
+    Image<float> weight = split_info.complete_tail_weight;
 
     // pure definition
     {
@@ -560,7 +560,7 @@ static void create_recursive_split(Function F, SplitInfo& split_info) {
     Var  xi   = split_info.inner_var;
     Var  xo   = split_info.outer_var;
 
-    Func weight = split_info.complete_result_weight;
+    Image<float> weight = split_info.complete_result_weight;
 
     string s1 = F.name() + DELIMITER + INTRA_TILE_RESULT    + "_" + x.name();
     string s2 = F.name() + DELIMITER + INTRA_TILE_TAIL_TERM + "_" + x.name();
@@ -640,37 +640,22 @@ void split(
         vector<RDom> rdom,
         vector<RDom> inner_rdom)
 {
-    Var i,j;
-    Func filter_weights("default_filter_wt");    // default filter weight = 1
-    filter_weights(i,j) = make_one(func.values()[0].type());
+    vector<int> order(dimension.size(), 1);         // default first order
 
-    vector<int> order(dimension.size(), 1);     // default first order
+    Image<float> weights(dimension.size(), 1);      // default filter weight = 1
+    for (size_t i=0; i<weights.width(); i++) {
+        for (size_t j=0; j<weights.height(); j++) {
+            weights(i,j) = 1.0f;
+        }
+    }
 
-    split(func, filter_weights, dimension, var, inner_var, outer_var,
+    split(func, weights, dimension, var, inner_var, outer_var,
             rdom, inner_rdom, order);
 }
 
 void split(
         Func& func,
-        vector<int>  dimension,
-        vector<Var>  var,
-        vector<Var>  inner_var,
-        vector<Var>  outer_var,
-        vector<RDom> rdom,
-        vector<RDom> inner_rdom,
-        vector<int>  order)
-{
-    Var i,j;
-    Func filter_weights("default_filter_wt");    // default filter weight = 1
-    filter_weights(i,j) = make_one(func.values()[0].type());
-
-    split(func, filter_weights, dimension, var, inner_var, outer_var,
-            rdom, inner_rdom, order);
-}
-
-void split(
-        Func& func,
-        Func filter_weights,
+        Image<float> filter_weights,
         vector<int>  dimension,
         vector<Var>  var,
         vector<Var>  inner_var,
@@ -765,25 +750,19 @@ void split(
         s.filter_order  = order[split_id];
         s.filter_dim    = dimension[split_id];
         s.image_width   = image_width[split_id];
-        s.filter_matrix = WeightMatrix::A(filter_weights,
-                tile[split_id], split_id, order[split_id]);
+        s.filter_matrix = WeightMatrix::A(filter_weights, s.scan_id);
 
+#if 0
         // construct the matrix of weight coefficients for completing tails
-        Func A_FP = WeightMatrix::Ar(s.filter_matrix,
-                s.tile_width, s.filter_order);
+        Func A_FP = WeightMatrix::Ar(s.filter_matrix, s.tile_width, s.filter_order);
 
-        s.complete_tail_weight = WeightMatrix::matrix_last_row(A_FP,
-                s.tile_width, s.filter_order);
+        s.complete_tail_weight = WeightMatrix::matrix_last_row(A_FP, s.tile_width, s.filter_order);
 
         // check if there was another scan in the same image dimension
         // accummulate weight coefficients because of all such scans
         for (int j=split_info.size()-1; j>=0; j--) {
             if (s.filter_dim == split_info[j].filter_dim) {
-                Func A = WeightMatrix::Ar(split_info[j].filter_matrix,
-                        s.tile_width, s.filter_order);
-                Func A_FB = WeightMatrix::Ar_sum_r(A,
-                        s.tile_width, s.filter_order);
-                A_FP = WeightMatrix::mult_matrix(A_FB, A_FP,
+                A_FP = WeightMatrix::mult_matrix(A_FP, split_info[j].filter_matrix,
                         s.tile_width, s.filter_order);
             }
         }
@@ -791,8 +770,33 @@ void split(
         // last row of the weight matrix is the coefficients for tail elements
         s.complete_result_weight = WeightMatrix::matrix_last_row(A_FP,
                 s.tile_width, s.filter_order);
+#endif
 
-        //Image<int> gg = s.complete_result_weight.realize(1,4);
+        // construct the matrix of weight coefficients for completing tails
+        const int* tile_width_ptr = as_const_int(s.tile_width);
+        if (!tile_width_ptr) {
+            cerr << "Could not convert tile width expression "
+                 << s.tile_width << " to integer" << endl;
+            assert(false);
+        }
+
+        Image<float> A_FP = WeightMatrix::Ar(s.filter_matrix, *tile_width_ptr);
+
+        s.complete_tail_weight = WeightMatrix::matrix_last_row(A_FP);
+
+        // check if there was another scan in the same image dimension
+        // accummulate weight coefficients because of all such scans
+        for (int j=split_info.size()-1; j>=0; j--) {
+            if (s.filter_dim == split_info[j].filter_dim) {
+                A_FP = WeightMatrix::accumulate_weights(A_FP, split_info[j].filter_matrix);
+            }
+        }
+
+        // last row of the weight matrix is the coefficients for tail elements
+        s.complete_result_weight = WeightMatrix::matrix_last_row(A_FP);
+
+        cerr << s.complete_tail_weight << endl << s.complete_result_weight << "=======" << endl;
+
 
         split_info.push_back(s);
     }

@@ -34,17 +34,7 @@ std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f);
 
 void split(
         Halide::Func& F,
-        Halide::Func  filter_weights,
-        std::vector<int>          dimensions,
-        std::vector<Halide::Var>  vars,
-        std::vector<Halide::Var>  inner_vars,
-        std::vector<Halide::Var>  outer_vars,
-        std::vector<Halide::RDom> rdoms,
-        std::vector<Halide::RDom> inner_rdoms,
-        std::vector<int> orders);
-
-void split(
-        Halide::Func& F,
+        Halide::Image<float> filter_weights,
         std::vector<int>          dimensions,
         std::vector<Halide::Var>  vars,
         std::vector<Halide::Var>  inner_vars,
