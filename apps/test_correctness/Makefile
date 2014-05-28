@@ -1,12 +1,8 @@
-PROGRAM_NAME=test_correctness
-
 CXX=g++
 MKDIR=mkdir -p
 RM=rm -rf
 
-BUILD_DIR=_build
 BIN_DIR=../bin
-EXE=$(BIN_DIR)/$(PROGRAM_NAME)
 
 SPLITLIB_DIR=../../lib/
 SPLITLIB_INC=$(SPLITLIB_DIR)/split.h
@@ -14,23 +10,16 @@ SPLITLIB_LIB=$(SPLITLIB_DIR)/libSplit.a
 
 HALIDE_LIB=$(HALIDE_DIR)/bin/libHalide.a
 
-SRC := $(wildcard *.cpp)
-OBJ := $(addprefix $(BUILD_DIR)/,$(notdir $(SRC:.cpp=.o)))
-INC := $(wildcard *.h)
+TESTS=$(BIN_DIR)/test_repeated_causal
 
-all: $(EXE)
+all: $(TESTS)
 
-$(BUILD_DIR)/%.o: %.cpp $(INC) $(SPLITLIB_INC)
-	@$(MKDIR) $(BUILD_DIR)
-	$(CXX) -c $< -o $@ -fno-rtti -I$(SPLITLIB_DIR) -I$(HALIDE_DIR)/include/
-
-$(EXE): $(OBJ) $(SPLITLIB_LIB) $(HALIDE_LIB)
+$(BIN_DIR)/test_repeated_causal: test_repeated_causal.cpp $(INC) $(SPLITLIB_INC)
 	@$(MKDIR) $(BIN_DIR)
-	$(CXX) -lz -lpthread -ldl -g -Wall $(OBJ) $(HALIDE_LIB) $(SPLITLIB_LIB) -o $(EXE)
+	$(CXX) test_repeated_causal.cpp -fno-rtti -I$(SPLITLIB_DIR) -I$(HALIDE_DIR)/include/ -lz -lpthread -ldl -g -Wall $(HALIDE_LIB) $(SPLITLIB_LIB) -o $(BIN_DIR)/test_repeated_causal
 
 $(SPLITLIB_LIB):
 	make -C $(SPLITLIB_DIR)
 
 clean:
-	$(RM) $(BUILD_DIR)
-	$(RM) $(EXE)
+	$(RM) $(TESTS)

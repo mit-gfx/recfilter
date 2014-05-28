@@ -9,7 +9,7 @@ using std::cerr;
 using std::endl;
 
 int main(int argc, char **argv) {
-    Arguments args("test_correctness", argc, argv);
+    Arguments args("test_repeated_causal", argc, argv);
 
     int width  = 20;
     int height = 1;
