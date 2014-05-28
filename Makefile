@@ -5,4 +5,3 @@ all:
 clean:
 	make -C lib clean
 	make -C apps clean
-

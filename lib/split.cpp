@@ -21,15 +21,19 @@ struct SplitInfo {
     int filter_order;
     int filter_dim;
     int scan_id;
+
     Var var;
     Var inner_var;
     Var outer_var;
+
     RDom rdom;
     RDom split_rdom;
     RDom outer_rdom;
     RDom inner_rdom;
+
     Expr tile_width;
     Expr image_width;
+    Expr num_tiles;
 
     Image<float> filter_matrix;
     Image<float> complete_tail_weight;
@@ -454,7 +458,7 @@ static Function create_intra_tail_term(Function F_intra, SplitInfo split_info, s
 
     // pure args same as F_intra except for scan stage arg
     // args for calling F_intra
-    // - xi replaced by tail indices
+    // - xi replaced by causal/anticausal tail indices
     // - scan stage arg set to actual scan stage
     for (size_t i=0; i<F_intra.args().size(); i++) {
         if (SCAN_STAGE_ARG == F_intra.args()[i]) {
@@ -462,7 +466,11 @@ static Function create_intra_tail_term(Function F_intra, SplitInfo split_info, s
         }
         else if (xi.name() == F_intra.args()[i]) {
             args.push_back(xi.name());
-            call_args.push_back(tile-xi-1);
+            if (split_info.scan_causal) {
+                call_args.push_back(tile-xi-1);
+            } else {
+                call_args.push_back(xi);
+            }
         }
         else {
             args.push_back(F_intra.args()[i]);
@@ -491,6 +499,7 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
     int  order= split_info.filter_order;
     Expr tile = split_info.tile_width;
     RDom rxo  = split_info.outer_rdom;
+    Expr num_tiles = split_info.num_tiles;
 
     Image<float> weight = split_info.complete_tail_weight;
 
@@ -499,6 +508,7 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
         // pure definition simply initializes with the intra tile tail
         vector<Expr> call_args;
         vector<Expr> values;
+
         for (size_t i=0; i<F_tail.args().size(); i++) {
             call_args.push_back(Var(F_tail.args()[i]));
         }
@@ -520,9 +530,18 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
             string arg = F_tail.args()[i];
             if (arg == xo.name()) {
                 // replace xo by rxo.z or rxo.z-1 as tile idx,
-                args.push_back(rxo.z);
-                call_args_curr_tile.push_back(rxo.z);
-                call_args_prev_tile.push_back(max(rxo.z-1,0));
+                if (split_info.scan_causal) {
+                    args.push_back(rxo.z);
+                    call_args_curr_tile.push_back(rxo.z);
+                    call_args_prev_tile.push_back(
+                            max(simplify(rxo.z-1), 0));
+                } else {
+        cerr << "here:"<<num_tiles<<";" << endl;
+                    args.push_back(num_tiles-1-rxo.z);
+                    call_args_curr_tile.push_back(num_tiles-1-rxo.z);
+                    call_args_prev_tile.push_back(
+                            min(simplify(num_tiles-rxo.z), simplify(num_tiles-1)));
+                }
             } else if (arg == xi.name()) {
                 // replace xi by rxo.y as tail element index in args and current tile term
                 // replace xi by rxo.x as tail element in prev tile term because each rxo.y
@@ -536,11 +555,12 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
                 call_args_prev_tile.push_back(Var(arg));
             }
         }
+
+        // multiply each tail element with its weight before adding
         for (size_t i=0; i<F_tail.outputs(); i++) {
-            // multiply each tail element with its weight before adding
             values.push_back(
                     Call::make(function, call_args_curr_tile, i) +
-                    select(rxo.z>0, weight(tile-rxo.y-1,rxo.x) *
+                    select(rxo.z>0, weight(simplify(tile-rxo.y-1), rxo.x) *
                         Call::make(function, call_args_prev_tile, i), 0));
         }
 
@@ -553,12 +573,13 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
 // -----------------------------------------------------------------------------
 
 static void create_recursive_split(Function F, SplitInfo& split_info) {
-    Expr tile = split_info.tile_width;
     int  dim  = split_info.filter_dim;
     int  order= split_info.filter_order;
     Var  x    = split_info.var;
     Var  xi   = split_info.inner_var;
     Var  xo   = split_info.outer_var;
+    Expr tile = split_info.tile_width;
+    Expr num_tiles = split_info.num_tiles;
 
     Image<float> weight = split_info.complete_result_weight;
 
@@ -587,7 +608,12 @@ static void create_recursive_split(Function F, SplitInfo& split_info) {
                     call_args.push_back(Var(arg));
             }
             for (int i=0; i<F_ctail.outputs(); i++) {
-                Expr val = weight(xi,k) * Call::make(F_ctail, call_args, i);
+                Expr val;
+                if (split_info.scan_causal) {
+                    val = weight(xi,k) * Call::make(F_ctail, call_args, i);
+                } else {
+                    val = weight(tile-1-xi,k) * Call::make(F_ctail, call_args, i);
+                }
                 if (k==0) values[i] = val;
                 else      values[i]+= val;
             }
@@ -604,16 +630,28 @@ static void create_recursive_split(Function F, SplitInfo& split_info) {
         for (size_t i=0; i<F_intra.args().size(); i++) {
             if (xo.name() == F_intra.args()[i]) {
                 intra_call_args.push_back(xo);
-                inter_call_args.push_back(max(xo-1,0));  // prev tile
+                if (split_info.scan_causal) {
+                    inter_call_args.push_back(
+                            max(simplify(xo-1),0));  // prev tile
+                } else {
+                    inter_call_args.push_back(
+                            min(simplify(xo+1), simplify(num_tiles-1)));
+                }
             } else {
                 intra_call_args.push_back(Var(F_intra.args()[i]));
                 inter_call_args.push_back(Var(F_intra.args()[i]));
             }
         }
         for (int i=0; i<F.outputs(); i++) {
-            Expr val = Call::make(F_intra, intra_call_args, i) +
-                select(xo>0, Call::make(F_inter_deps, inter_call_args, i), 0);
-            values.push_back(val);
+            if (split_info.scan_causal) {
+                Expr val = Call::make(F_intra, intra_call_args, i) +
+                    select(xo>0, Call::make(F_inter_deps, inter_call_args, i), 0);
+                values.push_back(val);
+            } else {
+                Expr val = Call::make(F_intra, intra_call_args, i) +
+                    select(xo<num_tiles-1, Call::make(F_inter_deps, inter_call_args, i), 0);
+                values.push_back(val);
+            }
         }
 
         // redefine original Func to point to calls to split Func
@@ -671,20 +709,24 @@ void split(
 
     int num_splits = var.size();
 
-    vector<Expr> tile;
+    vector<Expr> tile_width;
     vector<RDom> split_rdom;
     vector<RDom> outer_rdom;
     vector<Expr> image_width;
+    vector<Expr> num_tiles;
 
     for (int i=0; i<num_splits; i++) {
 
         // individual tile boundaries
         Expr inner_rdom_extent = simplify(inner_rdom[i].x.extent());
-        tile.push_back(inner_rdom_extent);
 
-        // tile width for splitting multiple scans in same dimension must be consistent
+        tile_width .push_back(inner_rdom_extent);
+        image_width.push_back(rdom[i].x.extent());
+        num_tiles  .push_back(image_width[i]/tile_width[i]);
+
+        // tile width for splitting multiple scans in same dimension must be same
         for (int j=0; j<i-1; j++) {
-            if (dimension[j] == dimension[i] && !equal(tile[i], tile[j])) {
+            if (dimension[j] == dimension[i] && !equal(tile_width[i], tile_width[j])) {
                 cerr << "Different tile widths specified for splitting same dimension" << endl;
                 assert(false);
             }
@@ -694,15 +736,13 @@ void split(
         assert(extract_params_in_expr(rdom[i].x.extent()).size()==1 &&
                 "RDom extent must have a single image parameter");
 
-        image_width.push_back(rdom[i].x.extent());
-
         // outer_rdom.x: over tail elems of prev tile to compute tail of current tile
         // outer_rdom.y: over all tail elements of current tile
         // outer_rdom.z: over all tiles
         outer_rdom.push_back(RDom(
                     0,order[i],
                     0,order[i],
-                    1, image_width[i]/tile[i]-1,
+                    1, simplify(num_tiles[i]-1),
                     "r"+var[i].name()+"o"));
 
         // 2D RDom which contains intra tile and inter tile RDom as two dimensions
@@ -739,6 +779,8 @@ void split(
         s.scan_id       = i;
         s.scan_causal   = true;            // default, change it in next section
         s.scan_stage    = 0;               // default, change it in next section
+        s.filter_order  = order[split_id];
+        s.filter_dim    = dimension[split_id];
         s.var           = var[split_id];
         s.rdom          = rdom[split_id];
         s.inner_var     = inner_var[split_id];
@@ -746,31 +788,10 @@ void split(
         s.inner_rdom    = inner_rdom[split_id];
         s.outer_rdom    = outer_rdom[split_id];
         s.split_rdom    = split_rdom[split_id];
-        s.tile_width    = tile[split_id];
-        s.filter_order  = order[split_id];
-        s.filter_dim    = dimension[split_id];
         s.image_width   = image_width[split_id];
+        s.tile_width    = tile_width[split_id];
+        s.num_tiles     = num_tiles[split_id];
         s.filter_matrix = WeightMatrix::A(filter_weights, s.scan_id);
-
-#if 0
-        // construct the matrix of weight coefficients for completing tails
-        Func A_FP = WeightMatrix::Ar(s.filter_matrix, s.tile_width, s.filter_order);
-
-        s.complete_tail_weight = WeightMatrix::matrix_last_row(A_FP, s.tile_width, s.filter_order);
-
-        // check if there was another scan in the same image dimension
-        // accummulate weight coefficients because of all such scans
-        for (int j=split_info.size()-1; j>=0; j--) {
-            if (s.filter_dim == split_info[j].filter_dim) {
-                A_FP = WeightMatrix::mult_matrix(A_FP, split_info[j].filter_matrix,
-                        s.tile_width, s.filter_order);
-            }
-        }
-
-        // last row of the weight matrix is the coefficients for tail elements
-        s.complete_result_weight = WeightMatrix::matrix_last_row(A_FP,
-                s.tile_width, s.filter_order);
-#endif
 
         // construct the matrix of weight coefficients for completing tails
         const int* tile_width_ptr = as_const_int(s.tile_width);
@@ -865,10 +886,10 @@ void split(
             }
             for (size_t j=0; j<var.size(); j++) {
                 if (inner_var[j].name() == arg) {
-                    call_args[i] = var[j] % tile[j];
+                    call_args[i] = simplify(var[j] % tile_width[j]);
                 }
                 else if (outer_var[j].name() == arg) {
-                    call_args[i] = var[j] / tile[j];
+                    call_args[i] = simplify(var[j] / tile_width[j]);
                 }
             }
         }
