@@ -35,7 +35,6 @@ struct SplitInfo {
     Expr image_width;
     Expr num_tiles;
 
-    Image<float> filter_matrix;
     Image<float> complete_tail_weight;
     Image<float> complete_result_weight;
 
@@ -790,7 +789,6 @@ void split(
         s.image_width   = image_width[split_id];
         s.tile_width    = tile_width[split_id];
         s.num_tiles     = num_tiles[split_id];
-        s.filter_matrix = filter_weights;
 
         // construct the matrix of weight coefficients for completing tails
         const int* tile_width_ptr = as_const_int(s.tile_width);
