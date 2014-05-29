@@ -594,7 +594,11 @@ static void create_recursive_split(Function F, SplitInfo& split_info) {
 
     // tail dependencies to be added to the final term
     {
-        vector<string> args = F_intra.args();
+        vector<string> args;
+        for (size_t i=0; i<F_intra.args().size(); i++) {
+            if (F_intra.args()[i] != SCAN_STAGE_ARG)
+                args.push_back(F_intra.args()[i]);
+        }
         vector<Expr> values(F.outputs());
         for (int k=0; k<order; k++) {
             vector<Expr> call_args;
@@ -626,7 +630,8 @@ static void create_recursive_split(Function F, SplitInfo& split_info) {
         vector<Expr> intra_call_args;
         vector<Expr> inter_call_args;
         for (size_t i=0; i<F_intra.args().size(); i++) {
-            if (xo.name() == F_intra.args()[i]) {
+            string arg = F_intra.args()[i];
+            if (xo.name() == arg) {
                 intra_call_args.push_back(xo);
                 if (split_info.scan_causal) {
                     inter_call_args.push_back(
@@ -636,8 +641,10 @@ static void create_recursive_split(Function F, SplitInfo& split_info) {
                             min(simplify(xo+1), simplify(num_tiles-1)));
                 }
             } else {
-                intra_call_args.push_back(Var(F_intra.args()[i]));
-                inter_call_args.push_back(Var(F_intra.args()[i]));
+                intra_call_args.push_back(Var(arg));
+                if (arg != SCAN_STAGE_ARG) {
+                    inter_call_args.push_back(Var(arg));
+                }
             }
         }
         for (int i=0; i<F.outputs(); i++) {
@@ -813,6 +820,7 @@ void split(
 
         // last row of the weight matrix is the coefficients for tail elements
         s.complete_result_weight = WeightMatrix::transpose(A_FP);
+        cerr << s.complete_tail_weight << endl;
         cerr << s.complete_result_weight << endl;
 
         split_info.push_back(s);
