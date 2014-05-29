@@ -26,9 +26,9 @@ int main(int argc, char **argv) {
     int   tile_width = args.block;
     int   iterations = args.iterations;
 
-    Image<int> random_image = generate_random_image<int>(width,height);
+    Image<float> random_image = generate_random_image<float>(width,height);
 
-    ImageParam image(type_of<int>(), 2);
+    ImageParam image(type_of<float>(), 2);
     image.set(random_image);
 
     // ----------------------------------------------------------------------------------------------
@@ -187,7 +187,7 @@ int main(int argc, char **argv) {
     cerr << "\nJIT compilation ... " << endl;
     S.compile_jit();
 
-    Buffer hl_out_buff(type_of<int>(), width,height);
+    Buffer hl_out_buff(type_of<float>(), width,height);
     {
         Timer t("Running ... ");
         for (int k=0; k<iterations; k++) {
@@ -204,9 +204,8 @@ int main(int argc, char **argv) {
 
     if (!nocheck) {
         cerr << "\nChecking difference ... " << endl;
-        Image<int> hl_out(hl_out_buff);
-        Image<int> diff(width,height);
-        Image<int> ref(width,height);
+        Image<float> hl_out(hl_out_buff);
+        Image<float> ref(width,height);
 
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {
@@ -234,27 +233,7 @@ int main(int argc, char **argv) {
             }
         }
 
-        float diff_sum = 0.0f;
-        float all_sum = 0.0f;
-        for (int y=0; y<height; y++) {
-            for (int x=0; x<width; x++) {
-                diff(x,y) = ref(x,y) - hl_out(x,y);
-                diff_sum += std::abs(diff(x,y));
-                all_sum += ref(x,y);
-            }
-        }
-        float diff_ratio = 100.0f * float(diff_sum) / float(all_sum);
-
-        if (verbose) {
-            cerr << "Input" << endl << random_image << endl;
-            cerr << "Reference" << endl << ref << endl;
-            cerr << "Halide output" << endl << hl_out << endl;
-            cerr << "Difference " << endl << diff << endl;
-            cerr << "\nError = " << diff_sum << " ~ " << diff_ratio << "%" << endl;
-        } else {
-            cerr << "\nError = " << diff_sum << " ~ " << diff_ratio << "%" << endl;
-            cerr << endl;
-        }
+        cerr << CheckResult(ref,hl_out) << endl;
     }
 
     return EXIT_SUCCESS;

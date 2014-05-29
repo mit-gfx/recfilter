@@ -24,9 +24,29 @@
 
 // Printing Utils
 
+struct CheckResult {
+    Halide::Image<float> ref, out;
+    CheckResult(
+            Halide::Image<float> r,
+            Halide::Image<float> o) :
+        ref(r), out(o) {}
+};
+
+struct CheckResultVerbose {
+    Halide::Image<float> ref, out;
+    CheckResultVerbose(
+            Halide::Image<float> r,
+            Halide::Image<float> o) :
+        ref(r), out(o) {}
+};
+
 std::ostream &operator<<(std::ostream &s, Halide::Func f);
 
 std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f);
+
+std::ostream &operator<<(std::ostream &s, CheckResult v);
+
+std::ostream &operator<<(std::ostream &s, CheckResultVerbose v);
 
 // ----------------------------------------------------------------------------
 

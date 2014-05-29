@@ -3,8 +3,9 @@
 
 #include "../../lib/split.h"
 
-#define MAX_THREAD        192
-#define BOX_FILTER_FACTOR 32
+#include "ls_hist_defs.h"
+
+#define MAX_THREAD 192
 
 using namespace Halide;
 
@@ -24,9 +25,9 @@ int main(int argc, char **argv) {
     int   tile_width = args.block;
     int   iterations = args.iterations;
 
-    Image<int> random_image = generate_random_image<int>(width,height);
+    Image<float> random_image = generate_random_image<float>(width,height);
 
-    ImageParam image(type_of<int>(), 2);
+    ImageParam image(type_of<float>(), 2);
     image.set(random_image);
 
     // ----------------------------------------------------------------------------------------------
@@ -34,28 +35,55 @@ int main(int argc, char **argv) {
     int box_x = width/BOX_FILTER_FACTOR;        // radius of histogram filter
     int box_y = height/BOX_FILTER_FACTOR;
 
-    Func I("Input");
-    Func L("Lookup_table");
-    Func S("S");
-    Func H("Hist");
-    Func G("Gaussian");
+    Var x("x"), y("y"), b("b");
 
-    Var x("x");
-    Var y("y");
+    // input image
+    Func I("Input");
+    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
+
+
+    // Lookup table for converting pixel value into smooth histogram
+    Func L("Lookup_table");
+    vector<Expr> hist_tuple;
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER0) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER1) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER2) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER3) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER4) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER5) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER6) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER7) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER8) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER9) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER10) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER11) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER12) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER13) );
+    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER14) );
+    L(x,y) = hist_tuple;
+
+
+    // ----------------------------------------------------------------------------------------------
 
     RDom rx(1, image.width()-1, "rx");
     RDom ry(1, image.height()-1,"ry");
 
-    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
+    // summed area table for computing local histogram
+    Func S("S");
+    S(x, y, b) = L(x,y)[b];
+    S(rx,y, b) = S(rx,y, b) + S(rx-1,y, b);
+    S(x,ry, b) = S(x,ry, b) + S(x,ry-1, b);
 
-    S(x, y) = I(x,y);
-    S(rx,y) = S(rx,y) + S(rx-1,y);
-    S(x,ry) = S(x,ry) + S(x,ry-1);
+    // histogram computation
+    Func H("Hist");             // histogram
+    H(x, y, b) = S(min(x+box_x,image.width()-1), min(y+box_y,image.height()-1),b)
+           + select(x-box_x-1<0 || y-box_y-1<0, 0, S(max(x-box_x-1,0), max(y-box_y-1,0),b))
+           - select(y-box_y-1<0, 0, S(min(x+box_x,image.width()-1), max(y-box_y-1,0),b))
+           - select(x-box_x-1<0, 0, S(max(x-box_x-1,0), min(y+box_y,image.height()-1),b));
 
-    H(x,y) = S(min(x+box_x,image.width()-1), min(y+box_y,image.height()-1))
-           + select(x-box_x-1<0 || y-box_y-1<0, 0, S(max(x-box_x-1,0), max(y-box_y-1,0)))
-           - select(y-box_y-1<0, 0, S(min(x+box_x,image.width()-1), max(y-box_y-1,0)))
-           - select(x-box_x-1<0, 0, S(max(x-box_x-1,0), min(y+box_y,image.height()-1)));
+    // spatial smoothing of histogram
+    Func G("Gaussian");
+
 
     // ----------------------------------------------------------------------------------------------
 
@@ -66,8 +94,11 @@ int main(int argc, char **argv) {
     RDom ryi(1, tile_width-1, "ryi");
 
     split(S,Internal::vec(0,1),
-            Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
-            Internal::vec(rx,ry), Internal::vec(rxi,ryi));
+            Internal::vec(x,y),
+            Internal::vec(xi,yi),
+            Internal::vec(xo,yo),
+            Internal::vec(rx,ry),
+            Internal::vec(rxi,ryi));
 
     // ----------------------------------------------------------------------------------------------
 
@@ -78,6 +109,7 @@ int main(int argc, char **argv) {
     swap_variables (S, "S--Intra_y-Tail_x", xi, yi);
     merge(S, "S--Intra_y-Tail_x", "S--Tail_y", "S--Tail");
     recompute(S, "S", "S--Intra_y-Intra_x");
+    inline_function(H, "L");
     inline_function(H, "S");
 
     // ----------------------------------------------------------------------------------------------
@@ -168,9 +200,8 @@ int main(int argc, char **argv) {
 
     if (!nocheck) {
         cerr << "\nChecking difference ... " << endl;
-        Image<int> hl_out(hl_out_buff);
-        Image<int> diff(width,height);
-        Image<int> ref(width,height);
+        Image<float> hl_out(hl_out_buff);
+        Image<float> ref(width,height);
 
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {
@@ -184,28 +215,7 @@ int main(int argc, char **argv) {
             }
         }
 
-        float diff_sum = 0.0f;
-        float all_sum = 0.0f;
-        for (int y=0; y<height; y++) {
-            for (int x=0; x<width; x++) {
-                diff(x,y) = std::abs(ref(x,y) - hl_out(x,y));
-                diff_sum += diff(x,y);
-                all_sum += ref(x,y);
-            }
-        }
-        float diff_ratio = 100.0f * float(diff_sum)/float(all_sum);
-
-        if (verbose) {
-            cerr << "Input" << endl << random_image << endl;
-            cerr << "Box filter footprint (" << 2*box_x+1 << "x" << 2*box_y+1 << ")" << endl;
-            cerr << "Reference" << endl << ref << endl;
-            cerr << "Halide output" << endl << hl_out << endl;
-            cerr << "Difference " << endl << diff << endl;
-            cerr << "\nError = " << diff_sum << " ~ " << diff_ratio << "%" << endl;
-        } else {
-            cerr << "\nError = " << diff_sum << " ~ " << diff_ratio << "%" << endl;
-            cerr << endl;
-        }
+        cerr << CheckResult(ref,hl_out) << endl;
     }
 
     return 0;

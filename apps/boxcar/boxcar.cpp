@@ -167,7 +167,6 @@ int main(int argc, char **argv) {
     if (!nocheck) {
         cerr << "\nChecking difference ... " << endl;
         Image<float> hl_out(hl_out_buff);
-        Image<float> diff(width,height);
         Image<float> ref(width,height);
 
         for (int y=0; y<height; y++) {
@@ -181,29 +180,7 @@ int main(int argc, char **argv) {
                 }
             }
         }
-
-        float diff_sum = 0.0f;
-        float all_sum = 0.0f;
-        for (int y=0; y<height; y++) {
-            for (int x=0; x<width; x++) {
-                diff(x,y) = std::abs(ref(x,y) - hl_out(x,y));
-                diff_sum += diff(x,y);
-                all_sum += ref(x,y);
-            }
-        }
-        float diff_ratio = 100.0f * float(diff_sum)/float(all_sum);
-
-        if (verbose) {
-            cerr << "Input" << endl << random_image << endl;
-            cerr << "Box filter footprint (" << 2*box_x+1 << "x" << 2*box_y+1 << ")" << endl;
-            cerr << "Reference" << endl << ref << endl;
-            cerr << "Halide output" << endl << hl_out << endl;
-            cerr << "Difference " << endl << diff << endl;
-            cerr << "\nError = " << diff_sum << " ~ " << diff_ratio << "%" << endl;
-        } else {
-            cerr << "\nError = " << diff_sum << " ~ " << diff_ratio << "%" << endl;
-            cerr << endl;
-        }
+        cerr << CheckResult(ref,hl_out) << endl;
     }
 
     return 0;

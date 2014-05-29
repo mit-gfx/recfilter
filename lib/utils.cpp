@@ -1,5 +1,67 @@
 #include "split.h"
 
+std::ostream &operator<<(std::ostream &s, CheckResult v) {
+    Halide::Image<float> ref = v.ref;
+    Halide::Image<float> out = v.out;
+
+    assert(ref.width() == out.width());
+    assert(ref.height() == out.height());
+
+    int width = ref.width();
+    int height = ref.height();
+
+    Halide::Image<float> diff(width, height);
+
+    float diff_sum = 0.0f;
+    float max_val  = 0.0f;
+
+    for (int y=0; y<height; y++) {
+        for (int x=0; x<width; x++) {
+            diff(x,y) = float(ref(x,y)) - float(out(x,y));
+            diff_sum += std::abs(diff(x,y) * diff(x,y));
+            max_val = std::max(ref(x,y), max_val);
+        }
+    }
+    float mse  = diff_sum/float(width*height);
+
+    s << "Mean sq error = " << mse << "\n\n";
+
+    return s;
+}
+
+std::ostream &operator<<(std::ostream &s, CheckResultVerbose v) {
+    Halide::Image<float> ref = v.ref;
+    Halide::Image<float> out = v.out;
+
+    assert(ref.width() == out.width());
+    assert(ref.height() == out.height());
+    assert(ref.channels() == out.channels());
+
+    int width = ref.width();
+    int height = ref.height();
+
+    Halide::Image<float> diff(width, height);
+
+    float diff_sum = 0.0f;
+    float max_val  = 0.0f;
+
+    for (int y=0; y<height; y++) {
+        for (int x=0; x<width; x++) {
+            diff(x,y) = float(ref(x,y)) - float(out(x,y));
+            diff_sum += std::abs(diff(x,y) * diff(x,y));
+            max_val = std::max(ref(x,y), max_val);
+        }
+    }
+    float mse  = diff_sum/float(width*height);
+
+    s << "Reference" << "\n" << ref << "\n";
+    s << "Halide output" << "\n" << out << "\n";
+    s << "Difference " << "\n" << diff << "\n";
+    s << "Mean sq error = " << mse << "\n\n";
+
+    return s;
+}
+
 std::ostream &operator<<(std::ostream &s, Halide::Func f) {
     s << f.function();
     return s;
@@ -55,3 +117,6 @@ std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f) {
     }
     return s;
 }
+
+
+

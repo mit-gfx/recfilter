@@ -536,7 +536,6 @@ static Function create_complete_tail_term(Function F_tail, SplitInfo split_info,
                     call_args_prev_tile.push_back(
                             max(simplify(rxo.z-1), 0));
                 } else {
-        cerr << "here:"<<num_tiles<<";" << endl;
                     args.push_back(num_tiles-1-rxo.z);
                     call_args_curr_tile.push_back(num_tiles-1-rxo.z);
                     call_args_prev_tile.push_back(
@@ -791,7 +790,7 @@ void split(
         s.image_width   = image_width[split_id];
         s.tile_width    = tile_width[split_id];
         s.num_tiles     = num_tiles[split_id];
-        s.filter_matrix = WeightMatrix::A(filter_weights, s.scan_id);
+        s.filter_matrix = filter_weights;
 
         // construct the matrix of weight coefficients for completing tails
         const int* tile_width_ptr = as_const_int(s.tile_width);
@@ -801,23 +800,22 @@ void split(
             assert(false);
         }
 
-        Image<float> A_FP = WeightMatrix::Ar(s.filter_matrix, *tile_width_ptr);
-
-        s.complete_tail_weight = WeightMatrix::matrix_last_row(A_FP);
+        Image<float> A_FP = WeightMatrix::A_FP(filter_weights, s.scan_id, *tile_width_ptr);
+        s.complete_tail_weight = WeightMatrix::transpose(A_FP);
 
         // check if there was another scan in the same image dimension
         // accummulate weight coefficients because of all such scans
         for (int j=split_info.size()-1; j>=0; j--) {
             if (s.filter_dim == split_info[j].filter_dim) {
-                A_FP = WeightMatrix::accumulate_weights(A_FP, split_info[j].filter_matrix);
+                Image<float> A_FB = WeightMatrix::A_FB(filter_weights,
+                        split_info[j].scan_id, *tile_width_ptr);
+                A_FP = WeightMatrix::mult_matrix(A_FB, A_FP);
             }
         }
 
         // last row of the weight matrix is the coefficients for tail elements
-        s.complete_result_weight = WeightMatrix::matrix_last_row(A_FP);
-
-        cerr << s.complete_tail_weight << endl << s.complete_result_weight << "=======" << endl;
-
+        s.complete_result_weight = WeightMatrix::transpose(A_FP);
+        cerr << s.complete_result_weight << endl;
 
         split_info.push_back(s);
     }

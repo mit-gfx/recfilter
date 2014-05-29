@@ -23,10 +23,8 @@ int main(int argc, char **argv) {
     int fx = 2;
 
     Image<float> W(4,2);
-    W(0,0) = 0.700f; W(0,1) = 0.500f;
-    W(1,0) = 0.500f; W(1,1) = 0.500f;
-//    W(2,0) = 0*0.250f; W(2,1) = 0*0.125f;
-//    W(3,0) = 0*0.125f; W(3,1) = 0*0.0625f;
+    W(0,0) = 1.000f; W(0,1) = 0.000f;
+    W(1,0) = 1.000f; W(1,1) = 0.000f;
 
     Func I("Input");
     Func S("S");
@@ -36,18 +34,14 @@ int main(int argc, char **argv) {
 
     RDom rx(0, image.width(),"rx");
     RDom ry(0, image.width(),"ry");
-    RDom rz(0, image.width(),"rz");
-    RDom rw(0, image.width(),"rw");
 
     Expr iw = image.width()-1;
 
     I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
-    S(x, y) = I(x,y);
-    S(iw-rx,y) += select(rx>0, W(0,0)*S(min(iw,iw-rx+1),y), 0.0f) + select(rx>1, W(0,1)*S(min(iw,iw-rx+2),y), 0.0f);
+    S(x, y)     = I(x,y);
+    S(rx,y)    += select(rx>0, W(0,0)*S(max(0,rx-1),y), 0.0f)     + select(rx>1, W(0,1)*S(max(0,rx-2),y), 0.0f);
     S(iw-ry,y) += select(ry>0, W(1,0)*S(min(iw,iw-ry+1),y), 0.0f) + select(ry>1, W(1,1)*S(min(iw,iw-ry+2),y), 0.0f);
-    S(iw-rz,y) += select(rz>0, W(2,0)*S(min(iw,iw-rz+1),y), 0.0f) + select(rz>1, W(2,1)*S(min(iw,iw-rz+2),y), 0.0f);
-    S(iw-rw,y) += select(rw>0, W(3,0)*S(min(iw,iw-rw+1),y), 0.0f) + select(rw>1, W(3,1)*S(min(iw,iw-rw+2),y), 0.0f);
 
     // ----------------------------------------------------------------------------------------------
 
@@ -56,16 +50,14 @@ int main(int argc, char **argv) {
 
     RDom rxi(0, tile, "rxi");
     RDom ryi(0, tile, "ryi");
-    RDom rzi(0, tile, "rzi");
-    RDom rwi(0, tile, "rwi");
 
-    split(S,W,Internal::vec(  0,  0,  0,  0),
-              Internal::vec(  x,  x,  x,  x),
-              Internal::vec( xi, xi, xi, xi),
-              Internal::vec( xo, xo, xo, xo),
-              Internal::vec( rx, ry, rz, rw),
-              Internal::vec(rxi,ryi,rzi,rwi),
-              Internal::vec( fx, fx, fx, fx)
+    split(S,W,Internal::vec(  0,  0),
+              Internal::vec(  x,  x),
+              Internal::vec( xi, xi),
+              Internal::vec( xo, xo),
+              Internal::vec( rx, ry),
+              Internal::vec(rxi,ryi),
+              Internal::vec( fx, fx)
             );
 
 
@@ -74,7 +66,6 @@ int main(int argc, char **argv) {
     std::vector<Func> func_list;
     extract_func_calls(S, func_list);
     for (size_t i=0; i<func_list.size(); i++) {
-        cerr << func_list[i] << endl;
         func_list[i].compute_root();
     }
 
@@ -91,11 +82,11 @@ int main(int argc, char **argv) {
             ref(x,y) = random_image(x,y);
         }
     }
-    for (int y=height-1; y>=0; y--) {
-        for (int x=width-1; x>=0; x--) {
+    for (int y=0; y<height; y++) {
+        for (int x=0; x<width; x++) {
             ref(x,y) +=
-                (x<width-1 ? W(0,0)*ref(x+1,y) : 0.0f) +
-                (x<width-2 ? W(0,1)*ref(x+2,y) : 0.0f);
+                (x>0 ? W(0,0)*ref(x-1,y) : 0.0f) +
+                (x>1 ? W(0,1)*ref(x-2,y) : 0.0f);
         }
     }
     for (int y=height-1; y>=0; y--) {
@@ -103,20 +94,6 @@ int main(int argc, char **argv) {
             ref(x,y) +=
                 (x<width-1 ? W(1,0)*ref(x+1,y) : 0.0f) +
                 (x<width-2 ? W(1,1)*ref(x+2,y) : 0.0f);
-        }
-    }
-    for (int y=height-1; y>=0; y--) {
-        for (int x=width-1; x>=0; x--) {
-            ref(x,y) +=
-                (x<width-1 ? W(2,0)*ref(x+1,y) : 0.0f) +
-                (x<width-2 ? W(2,1)*ref(x+2,y) : 0.0f);
-        }
-    }
-    for (int y=height-1; y>=0; y--) {
-        for (int x=width-1; x>=0; x--) {
-            ref(x,y) +=
-                (x<width-1 ? W(3,0)*ref(x+1,y) : 0.0f) +
-                (x<width-2 ? W(3,1)*ref(x+2,y) : 0.0f);
         }
     }
 
