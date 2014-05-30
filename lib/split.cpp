@@ -1,5 +1,5 @@
 #include "split.h"
-#include "split_matrix_utils.h"
+#include "split_utils.h"
 
 #define SPLIT_HELPER_NAME '-'
 
@@ -12,197 +12,6 @@ using std::endl;
 using std::vector;
 using std::queue;
 using std::map;
-
-// -----------------------------------------------------------------------------
-
-struct SplitInfo {
-    bool scan_causal;
-    int scan_stage;
-    int filter_order;
-    int filter_dim;
-    int scan_id;
-
-    Var var;
-    Var inner_var;
-    Var outer_var;
-
-    RDom rdom;
-    RDom split_rdom;
-    RDom outer_rdom;
-    RDom inner_rdom;
-
-    Expr tile_width;
-    Expr image_width;
-    Expr num_tiles;
-
-    Image<float> complete_tail_weight;
-    Image<float> complete_result_weight;
-
-    Function intra_tile_scan;
-    Function incomplete_tail;
-    Function complete_tail;
-    Function dependencies;
-};
-
-// -----------------------------------------------------------------------------
-
-static bool check_causal_scan(Function f, RVar rx, size_t scan_id, size_t dimension) {
-    assert(scan_id < f.reductions().size());
-
-    ReductionDefinition reduction = f.reductions()[scan_id];
-    Expr               arg       = reduction.args[dimension];
-
-    // check if reduction arg increases on increasing the RVar
-    // causal scan if yes, else anticausal
-    Expr a = substitute(rx.name(), 0, arg);
-    Expr b = substitute(rx.name(), 1, arg);
-    Expr c = simplify(a<b);
-
-    if (equal(c, make_bool(true))) {
-        return true;
-    } else if (equal(c, make_bool(false))) {
-        return false;
-    } else {
-        cerr << "Could not deduce causal or anticausal scan for reduction definition "
-            << scan_id << " of " << f.name() << endl;
-        assert(false);
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-static void check_split_feasible(
-        Func& func,
-        vector<int>  dimension,
-        vector<Var>  var,
-        vector<Var>  inner_var,
-        vector<Var>  outer_var,
-        vector<RDom> rdom,
-        vector<RDom> inner_rdom,
-        vector<int>  order)
-{
-    size_t num_splits = var.size();
-
-    assert(num_splits == dimension.size()  && "Each split must have a mapped function dimension");
-    assert(num_splits == rdom.size()       && "Each split must have a mapped RDom");
-    assert(num_splits == inner_var.size()  && "Each split must have a mapped inner Var");
-    assert(num_splits == outer_var.size()  && "Each split must have a mapped outer Var");
-    assert(num_splits == inner_rdom.size() && "Each split must have a mapped inner RDom");
-    assert(num_splits == order.size()      && "Each split must have a mapped filter order");
-
-    Function F = func.function();
-
-    assert(F.has_pure_definition() &&  "Func to be split must be defined");
-    assert(!F.is_pure() && "Use Halide::Func::split for pure Funcs");
-
-
-    // check variables
-    for (int k=0; k<num_splits; k++) {
-        int dim = dimension[k];
-
-        // repeated scans in the same dimension must have the filter order and tile width
-        for (int i=0; i<k-1; i++) {
-            if (dimension[k]==dimension[i] && order[i]!=order[k]) {
-                cerr << "Different filter orders specified for two scans "
-                    << "in the same dimension" << endl;
-                assert(false);
-            }
-        }
-
-        // RDom to be split must be 1D, each reduction definition should be 1D reduction
-        if (rdom[k].dimensions() != 1) {
-            cerr << "RDom to split must be 1D, each reduction "
-                << "definition should use a unique be 1D RDom";
-            assert(false);
-        }
-
-        // given inner RDom must be 1D, intra tile scans are 1D as full scan is 1D
-        if (inner_rdom[k].dimensions() != 1) {
-            cerr << "Inner RDom must be 1D, as splitting a 1D reduction"
-                << "definition produces 1D intra-tile reductions";
-            assert(false);
-        }
-
-        // variable at given dimension must match the one to be split
-        if (F.args()[dim] != var[k].name()) {
-            cerr << "Variable at dimension " << dim << " must match the one "
-                << "specified for splitting"   << endl;
-            assert(false);
-        }
-
-        // RDom to be split must appear in exactly one reduction definition
-        size_t num_reductions_involving_rdom = 0;
-        for (size_t i=0; i<F.reductions().size(); i++) {
-            string rdom_name = rdom[k].x.name();
-            bool reduction_involves_rdom = false;
-            for (size_t j=0; j<F.reductions()[i].args.size(); j++) {
-                reduction_involves_rdom |= expr_depends_on_var(F.reductions()[i].args[j], rdom_name);
-            }
-            for (size_t j=0; j<F.reductions()[i].values.size(); j++) {
-                reduction_involves_rdom |= expr_depends_on_var(F.reductions()[i].values[j], rdom_name);
-            }
-            if (reduction_involves_rdom) {
-                num_reductions_involving_rdom++;
-            }
-        }
-        if (num_reductions_involving_rdom < 1) {
-            cerr << "RDom to be split must appear in one reduction definition, found in none";
-            assert(false);
-        }
-        if (num_reductions_involving_rdom > 1) {
-            cerr << "RDom to be split must appear in only one reduction definition, found in multiple";
-            assert(false);
-        }
-
-        // RDom to be split must not appear at any dimension other than the one specified
-        for (size_t i=0; i<F.reductions().size(); i++) {
-            string rdom_name = rdom[k].x.name();
-            bool reduction_involves_rdom = false;
-            for (size_t j=0; j<F.reductions()[i].args.size(); j++) {
-                if (j!=dim && expr_depends_on_var(F.reductions()[i].args[j], rdom_name)) {
-                    cerr << "RDom to be split must appear only at the specified dimensino, found in others";
-                    assert(false);
-                }
-            }
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-static bool check_for_pure_split(Function F, SplitInfo split_info) {
-    // check if the split is pure, i.e.
-    // - if the Function is pure, or
-    // - if the RDom to be split does not appear in any reduction definition
-
-    if (F.is_pure()) {
-        return true;
-    }
-
-    bool rdom_exists_in_reduction_def = false;
-    for (size_t i=0; i<F.reductions().size(); i++) {
-        string inner_rdom_name = split_info.split_rdom.x.name();
-        string outer_rdom_name = split_info.split_rdom.y.name();
-
-        for (size_t j=0; j<F.reductions()[i].args.size(); j++) {
-            bool a = expr_depends_on_var(F.reductions()[i].args[j], inner_rdom_name);
-            rdom_exists_in_reduction_def |= a;
-        }
-        for (size_t j=0; j<F.reductions()[i].values.size(); j++) {
-            bool a = expr_depends_on_var(F.reductions()[i].values[j], inner_rdom_name);
-            rdom_exists_in_reduction_def |= a;
-        }
-        for (size_t j=0; j<F.reductions()[i].args.size(); j++) {
-            bool a = expr_depends_on_var(F.reductions()[i].args[j], outer_rdom_name);
-            rdom_exists_in_reduction_def |= a;
-        }
-        for (size_t j=0; j<F.reductions()[i].values.size(); j++) {
-            bool a = expr_depends_on_var(F.reductions()[i].values[j], outer_rdom_name);
-            rdom_exists_in_reduction_def |= a;
-        }
-    }
-    return !rdom_exists_in_reduction_def;
-}
 
 // -----------------------------------------------------------------------------
 
@@ -777,7 +586,7 @@ void split(
 
         if (split_id < 0) {
             cerr << "Could not find a split for scan " << i << endl;
-            cerr << endl;
+            assert(false);
         }
 
         SplitInfo s;
@@ -805,21 +614,23 @@ void split(
             assert(false);
         }
 
-        Image<float> A_FP = WeightMatrix::A_FP(filter_weights, s.scan_id, *tile_width_ptr);
-        s.complete_tail_weight = WeightMatrix::transpose(A_FP);
+        Image<float> A_FP = weight_matrix_A_FP(filter_weights,
+                s.scan_id, *tile_width_ptr);
+        s.complete_tail_weight = weight_matrix_transpose(A_FP);
 
         // check if there was another scan in the same image dimension
         // accummulate weight coefficients because of all such scans
         for (int j=split_info.size()-1; j>=0; j--) {
             if (s.filter_dim == split_info[j].filter_dim) {
-                Image<float> A_FB = WeightMatrix::A_FB(filter_weights,
+                Image<float> A_FB = weight_matrix_A_FB(filter_weights,
                         split_info[j].scan_id, *tile_width_ptr);
-                A_FP = WeightMatrix::mult_matrix(A_FB, A_FP);
+                cerr << A_FB << endl;
+                A_FP = weight_matrix_mult(A_FB, A_FP);
             }
         }
 
         // last row of the weight matrix is the coefficients for tail elements
-        s.complete_result_weight = WeightMatrix::transpose(A_FP);
+        s.complete_result_weight = weight_matrix_transpose(A_FP);
         cerr << s.complete_tail_weight << endl;
         cerr << s.complete_result_weight << endl;
 
@@ -848,6 +659,11 @@ void split(
         }
     }
 
+    // change the order of applying splits - group splits in same dimension together
+    split_info = group_scans_by_dimension(F, split_info);
+
+    // change the order of the scans - group similar scan stages together
+    split_info = group_scans_by_stage(F, split_info);
 
     // create a function whose dimensions are split without
     // affecting computation

@@ -1,39 +1,11 @@
-#ifndef _SPLITLIB_WEIGHT_MATRICES_H_
-#define _SPLITLIB_WEIGHT_MATRICES_H_
-
-#include <Halide.h>
+#include "split_utils.h"
 
 using namespace Halide;
 
 
-namespace WeightMatrix {
-
-Image<float> mult_matrix(Image<float> A, Image<float> B) {
-    assert(A.width() == B.height());
-
-    int num_rows = A.height();
-    int num_cols = B.width();
-    int num_common = A.width();
-
-    Image<float> C(num_cols, num_rows);
-
-    for (int i=0; i<C.width(); i++) {
-        for (int j=0; j<C.height(); j++) {
-            C(i,j) = 0.0f;
-        }
-    }
-    for (int i=0; i<C.height(); i++) {
-        for (int j=0; j<C.width(); j++) {
-            for (int k=0; k<num_common; k++) {
-                C(j,i) += A(k,i) * B(j,k);
-            }
-        }
-    }
-    return C;
-}
-
-
-Image<float> A_FB(Image<float> filter_weights, int scan_id, int tile_width) {
+Image<float> weight_matrix_A_FB(Image<float> filter_weights,
+        int scan_id, int tile_width)
+{
     int filter_order = filter_weights.height();
 
     vector<float> weights(filter_order);
@@ -62,7 +34,9 @@ Image<float> A_FB(Image<float> filter_weights, int scan_id, int tile_width) {
     return C;
 }
 
-Image<float> A_FP(Image<float> filter_weights, int scan_id, int tile_width) {
+Image<float> weight_matrix_A_FP(Image<float> filter_weights,
+        int scan_id, int tile_width)
+{
     int filter_order = filter_weights.height();
 
     vector<float> weights(filter_order);
@@ -92,7 +66,7 @@ Image<float> A_FP(Image<float> filter_weights, int scan_id, int tile_width) {
     return C;
 }
 
-Image<float> transpose(Image<float> A) {
+Image<float> weight_matrix_transpose(Image<float> A) {
     Image<float> B(A.height(),A.width());
     for (int y=0; y<B.height(); y++) {
         for (int x=0; x<B.width(); x++) {
@@ -102,6 +76,26 @@ Image<float> transpose(Image<float> A) {
     return B;
 }
 
-}
+Image<float> weight_matrix_mult(Image<float> A, Image<float> B) {
+    assert(A.width() == B.height());
 
-#endif // _SPLITLIB_WEIGHT_MATRICES_H_
+    int num_rows = A.height();
+    int num_cols = B.width();
+    int num_common = A.width();
+
+    Image<float> C(num_cols, num_rows);
+
+    for (int i=0; i<C.width(); i++) {
+        for (int j=0; j<C.height(); j++) {
+            C(i,j) = 0.0f;
+        }
+    }
+    for (int i=0; i<C.height(); i++) {
+        for (int j=0; j<C.width(); j++) {
+            for (int k=0; k<num_common; k++) {
+                C(j,i) += A(k,i) * B(j,k);
+            }
+        }
+    }
+    return C;
+}
