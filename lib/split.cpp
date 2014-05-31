@@ -67,7 +67,9 @@ static Function split_function_dimensions(Function F, vector<SplitInfo> split_in
                 }
             }
             if (scan_stage < 0) {
-                cerr << "Split operation not defined for all scans" << endl;
+                cerr << "Scan stage not found for reduction definition " << i << ", "
+                    << "most probably because splits have not been specified "
+                    << "for all reduction definitions" << endl;
                 assert(false);
             }
 
@@ -590,21 +592,21 @@ void split(
         }
 
         SplitInfo s;
-        s.scan_id       = i;
-        s.scan_causal   = true;            // default, change it in next section
-        s.scan_stage    = 0;               // default, change it in next section
-        s.filter_order  = order[split_id];
-        s.filter_dim    = dimension[split_id];
-        s.var           = var[split_id];
-        s.rdom          = rdom[split_id];
-        s.inner_var     = inner_var[split_id];
-        s.outer_var     = outer_var[split_id];
-        s.inner_rdom    = inner_rdom[split_id];
-        s.outer_rdom    = outer_rdom[split_id];
-        s.split_rdom    = split_rdom[split_id];
-        s.image_width   = image_width[split_id];
-        s.tile_width    = tile_width[split_id];
-        s.num_tiles     = num_tiles[split_id];
+        s.scan_id      = i;
+        s.scan_stage   = 0;               // default, change it in next section
+        s.filter_order = order[split_id];
+        s.filter_dim   = dimension[split_id];
+        s.var          = var[split_id];
+        s.rdom         = rdom[split_id];
+        s.inner_var    = inner_var[split_id];
+        s.outer_var    = outer_var[split_id];
+        s.inner_rdom   = inner_rdom[split_id];
+        s.outer_rdom   = outer_rdom[split_id];
+        s.split_rdom   = split_rdom[split_id];
+        s.image_width  = image_width[split_id];
+        s.tile_width   = tile_width[split_id];
+        s.num_tiles    = num_tiles[split_id];
+        s.scan_causal  = check_causal_scan(F, s.rdom.x, s.scan_id, s.filter_dim);
 
         // construct the matrix of weight coefficients for completing tails
         const int* tile_width_ptr = as_const_int(s.tile_width);
@@ -614,56 +616,41 @@ void split(
             assert(false);
         }
 
+
         Image<float> A_FP = weight_matrix_A_FP(filter_weights,
                 s.scan_id, *tile_width_ptr);
         s.complete_tail_weight = weight_matrix_transpose(A_FP);
 
         // check if there was another scan in the same image dimension
         // accummulate weight coefficients because of all such scans
+        bool prev_scan_causal = s.scan_causal;
         for (int j=split_info.size()-1; j>=0; j--) {
             if (s.filter_dim == split_info[j].filter_dim) {
                 Image<float> A_FB = weight_matrix_A_FB(filter_weights,
                         split_info[j].scan_id, *tile_width_ptr);
-                cerr << A_FB << endl;
-                A_FP = weight_matrix_mult(A_FB, A_FP);
+                if (s.scan_causal != split_info[j].scan_causal) {
+                    Image<float> AI = weight_matrix_antidiagonal(A_FP.height());
+                    A_FP = weight_matrix_mult(AI,A_FP);
+                    A_FP = weight_matrix_mult(A_FB, A_FP);
+                    A_FP = weight_matrix_mult(AI,A_FP);
+                } else {
+                    A_FP = weight_matrix_mult(A_FB, A_FP);
+                }
+                prev_scan_causal = split_info[j].scan_causal;
             }
         }
 
         // last row of the weight matrix is the coefficients for tail elements
         s.complete_result_weight = weight_matrix_transpose(A_FP);
-        cerr << s.complete_tail_weight << endl;
-        cerr << s.complete_result_weight << endl;
+        cerr << "Tail Wt " << s.rdom.x << " " << s.scan_causal << endl << s.complete_tail_weight << endl;
+        cerr << "Result Wt " << s.rdom.x <<" " << s.scan_causal <<endl << s.complete_result_weight << endl;
 
         split_info.push_back(s);
     }
 
-
-    // go to all dimensions, find all scans in that dimension and assign scan stages
-    // all causal scans in same dimension must be computed in different stages so that
-    // they don't stomp on each other's tails; same for anticausal scans
-    for (int d=0; d<F.args().size(); d++) {
-        int num_causal_scans = 0;
-        int num_anticausal_scans = 0;
-        for (int i=split_info.size()-1; i>=0; i--) {    // reverse traversal because first
-            if (split_info[i].filter_dim == d) {        // scan will appear last in split_info list
-                if (check_causal_scan(F, split_info[i].rdom.x, split_info[i].scan_id, d)) {
-                    split_info[i].scan_causal = true;
-                    split_info[i].scan_stage = num_causal_scans;
-                    num_causal_scans++;
-                } else {
-                    split_info[i].scan_causal = false;
-                    split_info[i].scan_stage = num_anticausal_scans;
-                    num_anticausal_scans++;
-                }
-            }
-        }
-    }
-
-    // change the order of applying splits - group splits in same dimension together
+    // group splits in same dimension together
+    // change the order of splits accordingly
     split_info = group_scans_by_dimension(F, split_info);
-
-    // change the order of the scans - group similar scan stages together
-    split_info = group_scans_by_stage(F, split_info);
 
     // create a function whose dimensions are split without
     // affecting computation

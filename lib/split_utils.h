@@ -81,6 +81,8 @@ Halide::Image<float> weight_matrix_mult(
         Halide::Image<float> A,
         Halide::Image<float> B);
 
+Halide::Image<float> weight_matrix_antidiagonal(int size);
+
 // -----------------------------------------------------------------------------
 
 std::vector<SplitInfo> group_scans_by_dimension(

@@ -99,3 +99,14 @@ Image<float> weight_matrix_mult(Image<float> A, Image<float> B) {
     }
     return C;
 }
+
+Image<float> weight_matrix_antidiagonal(int size) {
+    Image<float> C(size, size);
+
+    for (int i=0; i<C.width(); i++) {
+        for (int j=0; j<C.height(); j++) {
+            C(i,j) = (i==size-1-j ? 1.0f : 0.0f);
+        }
+    }
+    return C;
+}
