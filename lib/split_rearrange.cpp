@@ -114,7 +114,7 @@ vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> split_i
     }
 
     // assign scan stages to each scan: increment scan stage if a scan
-    // is preceeded by a scan in same dimension and same causaily
+    // is preceeded by a scan in same dimension
     for (int i=0; i<new_split_info.size(); i++) {
         int curr = new_split_info.size()-1-i;
         int prev = curr+1;
@@ -128,7 +128,13 @@ vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> split_i
             int  prev_dimension  = new_split_info[prev].filter_dim;
             int  prev_scan_stage = new_split_info[prev].scan_stage;
 
-            if (dimension==prev_dimension && scan_causal==prev_scan_causal) {
+            //if (dimension==prev_dimension && scan_causal==prev_scan_causal) {
+            //    new_split_info[curr].scan_stage = prev_scan_stage+1;
+            //} else {
+            //    new_split_info[curr].scan_stage = prev_scan_stage;
+            //}
+
+            if (dimension == prev_dimension) {
                 new_split_info[curr].scan_stage = prev_scan_stage+1;
             } else {
                 new_split_info[curr].scan_stage = prev_scan_stage;

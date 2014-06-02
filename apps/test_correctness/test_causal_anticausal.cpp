@@ -9,7 +9,7 @@ using std::cerr;
 using std::endl;
 
 int main(int argc, char **argv) {
-    int width  = 16;
+    int width  = 20;
     int height = 1;
     int tile   = 4;
 
@@ -20,12 +20,11 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    int fx = 1;
+    int fx = 2;
 
-    Image<float> W(3,2);
-    W(0,0) = 1.300f; W(0,1) = 0.000f;
-    W(1,0) = 1.500f; W(1,1) = 0.000f;
-    W(2,0) = 0.000f; W(2,1) = 0.000f;
+    Image<float> W(2,2);
+    W(0,0) = 0.500f; W(0,1) = 0.250f;
+    W(1,0) = 0.500f; W(1,1) = 0.250f;
 
     Func I("Input");
     Func S("S");
@@ -35,7 +34,6 @@ int main(int argc, char **argv) {
 
     RDom rx(0, image.width(),"rx");
     RDom ry(0, image.width(),"ry");
-    RDom rz(0, image.width(),"rz");
 
     Expr iw = image.width()-1;
 
@@ -44,7 +42,6 @@ int main(int argc, char **argv) {
     S(x, y)     = I(x,y);
     S(rx,y)    += select(rx>0, W(0,0)*S(max(0,rx-1),y), 0.0f)     + select(rx>1, W(0,1)*S(max(0,rx-2),y), 0.0f);
     S(iw-ry,y) += select(ry>0, W(1,0)*S(min(iw,iw-ry+1),y), 0.0f) + select(ry>1, W(1,1)*S(min(iw,iw-ry+2),y), 0.0f);
-    S(iw-rz,y) += select(rz>0, W(2,0)*S(min(iw,iw-rz+1),y), 0.0f) + select(rz>1, W(2,1)*S(min(iw,iw-rz+2),y), 0.0f);
 
     // ----------------------------------------------------------------------------------------------
 
@@ -53,17 +50,15 @@ int main(int argc, char **argv) {
 
     RDom rxi(0, tile, "rxi");
     RDom ryi(0, tile, "ryi");
-    RDom rzi(0, tile, "rzi");
 
-    split(S,W,Internal::vec(  0,  0,  0),
-              Internal::vec(  x,  x,  x),
-              Internal::vec( xi, xi, xi),
-              Internal::vec( xo, xo, xo),
-              Internal::vec( rx, ry, rz),
-              Internal::vec(rxi,ryi,rzi),
-              Internal::vec( fx, fx, fx)
+    split(S,W,Internal::vec(  0,  0),
+              Internal::vec(  x,  x),
+              Internal::vec( xi, xi),
+              Internal::vec( xo, xo),
+              Internal::vec( rx, ry),
+              Internal::vec(rxi,ryi),
+              Internal::vec( fx, fx)
             );
-
 
     // ----------------------------------------------------------------------------------------------
 
@@ -98,13 +93,6 @@ int main(int argc, char **argv) {
             ref(x,y) +=
                 (x<width-1 ? W(1,0)*ref(x+1,y) : 0.0f) +
                 (x<width-2 ? W(1,1)*ref(x+2,y) : 0.0f);
-        }
-    }
-    for (int y=height-1; y>=0; y--) {
-        for (int x=width-1; x>=0; x--) {
-            ref(x,y) +=
-                (x<width-1 ? W(2,0)*ref(x+1,y) : 0.0f) +
-                (x<width-2 ? W(2,1)*ref(x+2,y) : 0.0f);
         }
     }
 
