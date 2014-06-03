@@ -7,32 +7,32 @@
 #include <Halide.h>
 
 struct SplitInfo {
-    bool scan_causal;
-    int scan_stage;
     int filter_order;
     int filter_dim;
-    int scan_id;
-
-    Halide::Var var;
-    Halide::Var inner_var;
-    Halide::Var outer_var;
-
-    Halide::RDom rdom;
-    Halide::RDom split_rdom;
-    Halide::RDom outer_rdom;
-    Halide::RDom inner_rdom;
+    int num_splits;
 
     Halide::Expr tile_width;
     Halide::Expr image_width;
     Halide::Expr num_tiles;
 
-    Halide::Image<float> complete_tail_weight;
-    Halide::Image<float> complete_result_weight;
+    Halide::Var var;
+    Halide::Var inner_var;
+    Halide::Var outer_var;
 
+    Halide::Image<float> filter_weights;
     Halide::Internal::Function intra_tile_scan;
-    Halide::Internal::Function incomplete_tail;
-    Halide::Internal::Function complete_tail;
-    Halide::Internal::Function dependencies;
+
+    vector<bool> scan_causal;
+    vector<int> scan_stage;
+    vector<int> scan_id;
+
+    vector<Halide::RDom> rdom;
+    vector<Halide::RDom> split_rdom;
+    vector<Halide::RDom> outer_rdom;
+    vector<Halide::RDom> inner_rdom;
+
+    vector<Halide::Image<float> > complete_tail_weight;
+    vector<Halide::Image<float> > complete_result_weight;
 };
 
 

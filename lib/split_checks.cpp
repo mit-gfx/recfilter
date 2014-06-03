@@ -135,19 +135,19 @@ void check_split_feasible(
 
 // -----------------------------------------------------------------------------
 
+/// Check if the split is pure, i.e.
+/// - if the Function is pure, or
+/// - if the RDom to be split does not appear in the corresponding
+/// reduction definition
 bool check_for_pure_split(Function F, SplitInfo split_info) {
-    // check if the split is pure, i.e.
-    // - if the Function is pure, or
-    // - if the RDom to be split does not appear in any reduction definition
+    bool is_pure_split = F.is_pure();
 
-    if (F.is_pure()) {
-        return true;
-    }
+    for (int k=0; k<split_info.num_splits; k++) {
+        int i = split_info.scan_id[k];
+        string inner_rdom_name = split_info.split_rdom[k].x.name();
+        string outer_rdom_name = split_info.split_rdom[k].y.name();
 
-    bool rdom_exists_in_reduction_def = false;
-    for (int i=0; i<F.reductions().size(); i++) {
-        string inner_rdom_name = split_info.split_rdom.x.name();
-        string outer_rdom_name = split_info.split_rdom.y.name();
+        bool rdom_exists_in_reduction_def = false;
 
         for (int j=0; j<F.reductions()[i].args.size(); j++) {
             bool a = expr_depends_on_var(F.reductions()[i].args[j], inner_rdom_name);
@@ -165,6 +165,9 @@ bool check_for_pure_split(Function F, SplitInfo split_info) {
             bool a = expr_depends_on_var(F.reductions()[i].values[j], outer_rdom_name);
             rdom_exists_in_reduction_def |= a;
         }
+
+        is_pure_split |= !rdom_exists_in_reduction_def;
     }
-    return !rdom_exists_in_reduction_def;
+
+    return is_pure_split;
 }
