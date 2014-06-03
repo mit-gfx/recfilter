@@ -10,7 +10,7 @@ SPLITLIB_LIB=$(SPLITLIB_DIR)/libSplit.a
 
 HALIDE_LIB=$(HALIDE_DIR)/bin/libHalide.a
 
-TESTS=$(BIN_DIR)/test_repeated_causal $(BIN_DIR)/test_repeated_anticausal $(BIN_DIR)/test_causal_anticausal $(BIN_DIR)/test_causal_xy
+TESTS=$(BIN_DIR)/test_repeated_causal $(BIN_DIR)/test_repeated_anticausal $(BIN_DIR)/test_causal_anticausal $(BIN_DIR)/test_causal_xy $(BIN_DIR)/test_test
 
 all: $(TESTS)
 
@@ -29,6 +29,10 @@ $(BIN_DIR)/test_causal_anticausal: test_causal_anticausal.cpp $(SPLITLIB_INC) $(
 $(BIN_DIR)/test_causal_xy: test_causal_xy.cpp $(SPLITLIB_INC) $(HALIDE_LIB) $(SPLITLIB_LIB)
 	@$(MKDIR) $(BIN_DIR)
 	$(CXX) test_causal_xy.cpp -fno-rtti -I$(SPLITLIB_DIR) -I$(HALIDE_DIR)/include/ -lz -lpthread -ldl -g -Wall $(HALIDE_LIB) $(SPLITLIB_LIB) -o $(BIN_DIR)/test_causal_xy
+
+$(BIN_DIR)/test_test: test_test.cpp $(SPLITLIB_INC) $(HALIDE_LIB) $(SPLITLIB_LIB)
+	@$(MKDIR) $(BIN_DIR)
+	$(CXX) test_test.cpp -fno-rtti -I$(SPLITLIB_DIR) -I$(HALIDE_DIR)/include/ -lz -lpthread -ldl -g -Wall $(HALIDE_LIB) $(SPLITLIB_LIB) -o $(BIN_DIR)/test_test
 
 $(SPLITLIB_LIB): $(SPLITLIB_INC)
 	make -C $(SPLITLIB_DIR)

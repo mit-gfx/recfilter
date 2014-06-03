@@ -64,32 +64,12 @@ bool check_for_pure_split(
 
 // Weight matrix computation
 
-Halide::Image<float> weight_matrix_A_FB(
-        Halide::Image<float> filter_weights,
-        int scan_id,
-        int tile_width);
-
-Halide::Image<float> weight_matrix_A_FP(
-        Halide::Image<float> filter_weights,
-        int scan_id,
-        int tile_width);
-
-Halide::Image<float> weight_matrix_transpose(
-        Halide::Image<float> A);
-
-Halide::Image<float> weight_matrix_mult(
-        Halide::Image<float> A,
-        Halide::Image<float> B);
-
-Halide::Image<float> weight_matrix_antidiagonal(int size);
+Halide::Image<float> tail_weights(SplitInfo s, int split_id1);
+Halide::Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2);
 
 // -----------------------------------------------------------------------------
 
 std::vector<SplitInfo> group_scans_by_dimension(
-        Halide::Internal::Function F,
-        vector<SplitInfo> split_info);
-
-std::vector<SplitInfo> group_scans_by_stage(
         Halide::Internal::Function F,
         vector<SplitInfo> split_info);
 

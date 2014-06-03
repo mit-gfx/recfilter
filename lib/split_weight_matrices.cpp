@@ -2,8 +2,7 @@
 
 using namespace Halide;
 
-
-Image<float> weight_matrix_A_FB(Image<float> filter_weights,
+static Image<float> matrix_A_FB(Image<float> filter_weights,
         int scan_id, int tile_width)
 {
     int filter_order = filter_weights.height();
@@ -34,7 +33,7 @@ Image<float> weight_matrix_A_FB(Image<float> filter_weights,
     return C;
 }
 
-Image<float> weight_matrix_A_FP(Image<float> filter_weights,
+static Image<float> matrix_A_FP(Image<float> filter_weights,
         int scan_id, int tile_width)
 {
     int filter_order = filter_weights.height();
@@ -55,7 +54,7 @@ Image<float> weight_matrix_A_FP(Image<float> filter_weights,
     for (int y=0; y<tile_width; y++) {
         for (int x=0; x<filter_order; x++) {
             if (y<filter_order) {
-               C(x,y) = (x+y<filter_order ? weights[x+y] : 0.0f);
+                C(x,y) = (x+y<filter_order ? weights[x+y] : 0.0f);
             }
             for (int j=0; y-j-1>=0 && j<filter_order; j++) {
                 C(x,y) += C(x,y-j-1) * weights[j];
@@ -66,7 +65,7 @@ Image<float> weight_matrix_A_FP(Image<float> filter_weights,
     return C;
 }
 
-Image<float> weight_matrix_transpose(Image<float> A) {
+static Image<float> matrix_transpose(Image<float> A) {
     Image<float> B(A.height(),A.width());
     for (int y=0; y<B.height(); y++) {
         for (int x=0; x<B.width(); x++) {
@@ -76,7 +75,7 @@ Image<float> weight_matrix_transpose(Image<float> A) {
     return B;
 }
 
-Image<float> weight_matrix_mult(Image<float> A, Image<float> B) {
+static Image<float> matrix_mult(Image<float> A, Image<float> B) {
     assert(A.width() == B.height());
 
     int num_rows = A.height();
@@ -100,7 +99,7 @@ Image<float> weight_matrix_mult(Image<float> A, Image<float> B) {
     return C;
 }
 
-Image<float> weight_matrix_antidiagonal(int size) {
+static Image<float> matrix_antidiagonal(int size) {
     Image<float> C(size, size);
 
     for (int i=0; i<C.width(); i++) {
@@ -109,4 +108,53 @@ Image<float> weight_matrix_antidiagonal(int size) {
         }
     }
     return C;
+}
+
+
+/** Weight coefficients (tail_size x tile_width) for
+ * applying scan's corresponding to split indices split_id1 to
+ * split_id2 in the SplitInfo struct.
+ * It is meaningful to apply subsequent scans on the tail of any scan
+ * as it undergoes other scans only if they happen after the first
+ * scan. The SpliInfo object stores the scans in reverse order, hence indices
+ * into the SplitInfo object split_id1 and split_id2 must be decreasing
+ */
+Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2) {
+    assert(split_id1 >= split_id2);
+
+    const int* tile_width_ptr = as_const_int(s.tile_width);
+    assert(tile_width_ptr &&
+            "Could not convert tile width expression to integer");
+
+    int  tile_width  = *tile_width_ptr;
+    int  scan_id     = s.scan_id[split_id1];
+    bool scan_causal = s.scan_causal[split_id1];
+
+    Image<float> A_FP = matrix_A_FP(s.filter_weights, scan_id, tile_width);
+
+    // accummulate weight coefficients because of all subsequent scans
+    // traversal is backwards because SplitInfo contains scans in the
+    // reverse order
+    for (int j=split_id1-1; j>=split_id2; j--) {
+        Image<float> A_FB = matrix_A_FB(s.filter_weights,
+                s.scan_id[j], tile_width);
+
+        if (scan_causal != s.scan_causal[j]) {
+            Image<float> AI = matrix_antidiagonal(A_FP.height());
+            A_FP = matrix_mult(AI  , A_FP);
+            A_FP = matrix_mult(A_FB, A_FP);
+            A_FP = matrix_mult(AI  , A_FP);
+        } else {
+            A_FP = matrix_mult(A_FB, A_FP);
+        }
+    }
+
+    return matrix_transpose(A_FP);
+}
+
+/** Weight coefficients (tail_size x tile_width) for
+ * applying scan's corresponding to split indices split_id1
+ */
+Image<float> tail_weights(SplitInfo s, int split_id1) {
+    return tail_weights(s, split_id1, split_id1);
 }

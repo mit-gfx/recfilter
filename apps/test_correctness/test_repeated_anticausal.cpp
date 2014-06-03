@@ -25,8 +25,8 @@ int main(int argc, char **argv) {
     Image<float> W(4,2);
     W(0,0) = 0.700f; W(0,1) = 0.500f;
     W(1,0) = 0.500f; W(1,1) = 0.500f;
-//    W(2,0) = 0*0.250f; W(2,1) = 0*0.125f;
-//    W(3,0) = 0*0.125f; W(3,1) = 0*0.0625f;
+    W(2,0) = 0.250f; W(2,1) = 0.125f;
+    W(3,0) = 0.125f; W(3,1) = 0.0625f;
 
     Func I("Input");
     Func S("S");
@@ -51,8 +51,8 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Var xi("xi"), yi("yi");
-    Var xo("xo"), yo("yo");
+    Var xi("xi");
+    Var xo("xo");
 
     RDom rxi(0, tile, "rxi");
     RDom ryi(0, tile, "ryi");
@@ -74,7 +74,6 @@ int main(int argc, char **argv) {
     std::vector<Func> func_list;
     extract_func_calls(S, func_list);
     for (size_t i=0; i<func_list.size(); i++) {
-        cerr << func_list[i] << endl;
         func_list[i].compute_root();
     }
 

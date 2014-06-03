@@ -12,13 +12,14 @@
 
 // ----------------------------------------------------------------------------
 
-#define SCAN_STAGE_ARG        "ScanStage"
-#define INTRA_TILE_RESULT     "Intra"
-#define INTRA_TILE_TAIL_TERM  "Tail"
-#define INTER_TILE_TAIL_SUM   "CTail"
-#define INTER_TILE_DEPENDENCY "Deps"
-#define RECOMPUTE_COPY        "Recomp"
-#define DELIMITER             '-'
+#define SCAN_STAGE_ARG         "ScanStage"
+#define INTRA_TILE_RESULT      "Intra"
+#define INTRA_TILE_TAIL_TERM   "Tail"
+#define INTER_TILE_TAIL_SUM    "CTail"
+#define COMPLETE_TAIL_RESIDUAL "TDeps"
+#define FINAL_RESULT_RESIDUAL  "Deps"
+#define RECOMPUTE_COPY         "Recomp"
+#define DELIMITER              '-'
 
 // ----------------------------------------------------------------------------
 

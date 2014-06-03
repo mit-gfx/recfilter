@@ -11,7 +11,7 @@ using std::endl;
 int main(int argc, char **argv) {
     int width  = 20;
     int height = 1;
-    int tile   = 5;
+    int tile   = 4;
 
     Image<float> random_image = generate_random_image<float>(width,height);
 
@@ -23,10 +23,10 @@ int main(int argc, char **argv) {
     int fx = 3;
 
     Image<float> W(4,3);
-    W(0,0) = 1.0f; W(0,1) = 0.25f; W(0,2) = 0.125f;
-    W(1,0) = 1.0f; W(1,1) = 0.25f; W(1,2) = 0.125f;
-//    W(2,0) = 1.0f; W(2,1) = 0.25f; W(2,2) = 0.125f;
-//    W(3,0) = 1.0f; W(3,1) = 0.25f; W(3,2) = 0.125f;
+    W(0,0) = 1.00f; W(0,1) = 0.250f; W(0,2) = 0.0625f;
+    W(1,0) = 0.75f; W(1,1) = 0.500f; W(1,2) = 0.0625f;
+    W(2,0) = 0.50f; W(2,1) = 0.250f; W(2,2) = 0.0625f;
+    W(3,0) = 0.25f; W(3,1) = 0.125f; W(3,2) = 0.0625f;
 
     Func I("Input");
     Func S("S");
@@ -64,8 +64,8 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Var xi("xi"), yi("yi");
-    Var xo("xo"), yo("yo");
+    Var xi("xi");
+    Var xo("xo");
 
     RDom rxi(0, tile, "rxi");
     RDom ryi(0, tile, "ryi");

@@ -386,7 +386,9 @@ void float_dependencies_to_root(Func F) {
     vector<Function> dependency_func_list;
     for (int i=0; i<func_list.size(); i++) {
         Function f = func_list[i].function();
-        if (f.name().find(INTER_TILE_DEPENDENCY) != string::npos) {
+        if (f.name().find(COMPLETE_TAIL_RESIDUAL)!=string::npos ||
+            f.name().find(FINAL_RESULT_RESIDUAL )!=string::npos)
+        {
             dependency_func_list.push_back(f);
             func_list.erase(func_list.begin()+i);
             i--;
