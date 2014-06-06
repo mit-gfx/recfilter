@@ -649,6 +649,8 @@ static void add_residual_to_final_result(
     F.define(args, values);
 }
 
+// -----------------------------------------------------------------------------
+
 static void create_recursive_split(Function F, SplitInfo &split_info) {
     string x = split_info.var.name();
 
@@ -817,6 +819,17 @@ void split(
         if (split_info[i].num_splits == 0) {
             split_info.erase(split_info.begin()+i);
             i--;
+        }
+    }
+
+    // splits in each dimension have scan stages from 0 to max_scan_stage
+    // change the stages number so that stages from second dimension
+    // start after stages from first dimension
+    for (int i=0, next_scan_stage=0; i<split_info.size(); i++) {
+        int scan_stage_offset = next_scan_stage;
+        for (int j=0; j<split_info[i].num_splits; j++) {
+            split_info[i].scan_stage[j] += scan_stage_offset;
+            next_scan_stage = std::max(split_info[i].scan_stage[j], next_scan_stage);
         }
     }
 
