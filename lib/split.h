@@ -152,6 +152,12 @@ Halide::Expr insert_arg_to_func_call(
         Halide::Expr original           /// original expression
         );
 
+/// Remove a calling argument from all calls to a particular Function
+Halide::Expr remove_arg_from_func_call(
+        std::string func_name,          /// name of Function
+        size_t pos,                     /// calling arg index within list to be removed
+        Halide::Expr original           /// original expression
+        );
 
 /// Mathematically add an expression to all calls to a particular
 /// Function; the expression to be added is selected from a list of

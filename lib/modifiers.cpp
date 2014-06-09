@@ -301,6 +301,46 @@ public:
 
 // -----------------------------------------------------------------------------
 
+// Remove argument from Func call
+class RemoveArgFromFunctionCall : public IRMutator {
+private:
+    using IRMutator::visit;
+    void visit(const Call *op) {
+        vector<Expr> new_args(op->args.size());
+        bool changed = false;
+
+        // Mutate the args
+        for (size_t i=0; i<op->args.size(); i++) {
+            Expr old_arg = op->args[i];
+            Expr new_arg = mutate(old_arg);
+            if (!new_arg.same_as(old_arg)) changed = true;
+            new_args[i] = new_arg;
+        }
+
+        if (op->call_type==Call::Halide && op->name==func_name) {
+            assert(arg_pos < new_args.size());
+            new_args.erase(new_args.begin()+arg_pos);
+            changed = true;
+        }
+
+        if (changed) {
+            expr = Call::make(op->type, op->name, new_args, op->call_type,
+                    op->func, op->value_index, op->image, op->param);
+        } else {
+            expr = op;
+        }
+    }
+
+    string func_name;
+    size_t arg_pos;
+
+public:
+    RemoveArgFromFunctionCall(string f, size_t p) :
+        func_name(f), arg_pos(p) {}
+};
+
+// -----------------------------------------------------------------------------
+
 // Substitute in Func call
 class SubstituteInFunctionCall : public IRMutator {
 private:
@@ -504,6 +544,11 @@ Expr augment_func_call(string func_name, vector<string> func_args, vector<Expr> 
 
 Expr insert_arg_to_func_call(string func_name, size_t pos, Expr arg, Expr original) {
     InsertArgToFunctionCall s(func_name, pos, arg);
+    return s.mutate(original);
+}
+
+Expr remove_arg_from_func_call(string func_name, size_t pos, Expr original) {
+    RemoveArgFromFunctionCall s(func_name, pos);
     return s.mutate(original);
 }
 

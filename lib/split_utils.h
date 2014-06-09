@@ -19,20 +19,17 @@ struct SplitInfo {
     Halide::Var inner_var;
     Halide::Var outer_var;
 
-    Halide::Image<float> filter_weights;
-    Halide::Internal::Function intra_tile_scan;
-
     vector<bool> scan_causal;
     vector<int> scan_stage;
     vector<int> scan_id;
 
     vector<Halide::RDom> rdom;
-    vector<Halide::RDom> split_rdom;
+//    vector<Halide::RDom> split_rdom;
     vector<Halide::RDom> outer_rdom;
     vector<Halide::RDom> inner_rdom;
 
-    vector<Halide::Image<float> > complete_tail_weight;
-    vector<Halide::Image<float> > complete_result_weight;
+    Halide::Image<float> filter_weights;
+    Halide::Internal::Function intra_tile_scan;
 };
 
 
@@ -47,7 +44,7 @@ bool check_causal_scan(
         int dimension);
 
 void check_split_feasible(
-        Halide::Func& func,
+        Halide::Func func,
         vector<int>  dimension,
         vector<Halide::Var>  var,
         vector<Halide::Var>  inner_var,
@@ -55,10 +52,6 @@ void check_split_feasible(
         vector<Halide::RDom> rdom,
         vector<Halide::RDom> inner_rdom,
         vector<int>  order);
-
-bool check_for_pure_split(
-        Halide::Internal::Function F,
-        SplitInfo split_info);
 
 // -----------------------------------------------------------------------------
 

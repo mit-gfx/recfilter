@@ -37,7 +37,7 @@ bool check_causal_scan(Function f, RVar rx, int scan_id, int dimension) {
 // -----------------------------------------------------------------------------
 
 void check_split_feasible(
-        Func& func,
+        Func         func,
         vector<int>  dimension,
         vector<Var>  var,
         vector<Var>  inner_var,
@@ -46,6 +46,12 @@ void check_split_feasible(
         vector<RDom> inner_rdom,
         vector<int>  order)
 {
+
+    if (!func.is_reduction()) {
+        cerr << "Use Halide::Func::split() to split pure Func "  << func.name() << endl;
+        assert(false);
+    }
+
     int num_splits = var.size();
 
     assert(num_splits == dimension.size()  && "Each split must have a mapped function dimension");
@@ -95,18 +101,34 @@ void check_split_feasible(
             assert(false);
         }
 
+        // RDom to be split must not appear at any dimension other than the one specified
+        for (int i=0; i<F.reductions().size(); i++) {
+            string rdom_name = rdom[k].x.name();
+            bool reduction_involves_rdom = false;
+            for (int j=0; j<F.reductions()[i].args.size(); j++) {
+                bool arg_contains_rdom = expr_depends_on_var(F.reductions()[i].args[j], rdom_name);
+                if (j!=dim && arg_contains_rdom) {
+                    cerr << "RDom " << rdom_name  << " to be split must appear only at the "
+                         << "specified dimension " << dim << ", found in others" << endl;
+                    assert(false);
+                }
+            }
+        }
+
         // RDom to be split must appear in exactly one reduction definition
         int num_reductions_involving_rdom = 0;
         for (int i=0; i<F.reductions().size(); i++) {
             string rdom_name = rdom[k].x.name();
             bool reduction_involves_rdom = false;
-            for (int j=0; j<F.reductions()[i].args.size(); j++) {
-                reduction_involves_rdom |= expr_depends_on_var(F.reductions()[i].args[j], rdom_name);
-            }
             for (int j=0; j<F.reductions()[i].values.size(); j++) {
                 reduction_involves_rdom |= expr_depends_on_var(F.reductions()[i].values[j], rdom_name);
             }
             if (reduction_involves_rdom) {
+                if (!expr_depends_on_var(F.reductions()[i].args[dim], rdom_name)) {
+                    cerr << "RDom " << rdom_name  << " to be split does not appear at the "
+                        << "specified dimension " << dim << endl;
+                    assert(false);
+                }
                 num_reductions_involving_rdom++;
             }
         }
@@ -118,56 +140,5 @@ void check_split_feasible(
             cerr << "RDom to be split must appear in only one reduction definition, found in multiple";
             assert(false);
         }
-
-        // RDom to be split must not appear at any dimension other than the one specified
-        for (int i=0; i<F.reductions().size(); i++) {
-            string rdom_name = rdom[k].x.name();
-            bool reduction_involves_rdom = false;
-            for (int j=0; j<F.reductions()[i].args.size(); j++) {
-                if (j!=dim && expr_depends_on_var(F.reductions()[i].args[j], rdom_name)) {
-                    cerr << "RDom to be split must appear only at the specified dimensino, found in others";
-                    assert(false);
-                }
-            }
-        }
     }
-}
-
-// -----------------------------------------------------------------------------
-
-/// Check if the split is pure, i.e.
-/// - if the Function is pure, or
-/// - if the RDom to be split does not appear in the corresponding
-/// reduction definition
-bool check_for_pure_split(Function F, SplitInfo split_info) {
-    bool is_pure_split = F.is_pure();
-
-    for (int k=0; k<split_info.num_splits; k++) {
-        int i = split_info.scan_id[k];
-        string inner_rdom_name = split_info.split_rdom[k].x.name();
-        string outer_rdom_name = split_info.split_rdom[k].y.name();
-
-        bool rdom_exists_in_reduction_def = false;
-
-        for (int j=0; j<F.reductions()[i].args.size(); j++) {
-            bool a = expr_depends_on_var(F.reductions()[i].args[j], inner_rdom_name);
-            rdom_exists_in_reduction_def |= a;
-        }
-        for (int j=0; j<F.reductions()[i].values.size(); j++) {
-            bool a = expr_depends_on_var(F.reductions()[i].values[j], inner_rdom_name);
-            rdom_exists_in_reduction_def |= a;
-        }
-        for (int j=0; j<F.reductions()[i].args.size(); j++) {
-            bool a = expr_depends_on_var(F.reductions()[i].args[j], outer_rdom_name);
-            rdom_exists_in_reduction_def |= a;
-        }
-        for (int j=0; j<F.reductions()[i].values.size(); j++) {
-            bool a = expr_depends_on_var(F.reductions()[i].values[j], outer_rdom_name);
-            rdom_exists_in_reduction_def |= a;
-        }
-
-        is_pure_split |= !rdom_exists_in_reduction_def;
-    }
-
-    return is_pure_split;
 }
