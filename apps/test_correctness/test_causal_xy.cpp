@@ -9,8 +9,8 @@ using std::cerr;
 using std::endl;
 
 int main(int argc, char **argv) {
-    int width  = 12;
-    int height = 12;
+    int width  = 16;
+    int height = 16;
     int tile   = 4;
 
     Image<float> random_image = generate_random_image<float>(width,height);
@@ -24,10 +24,14 @@ int main(int argc, char **argv) {
     int fy = 3;
 
     Image<float> W(4,3);
-    W(0,0) = 1.0f; W(0,1) = 0.25f; W(0,2) = 0.125f;
-    W(1,0) = 0.0f; //W(1,1) = 0.25f; W(1,2) = 0.125f;
-    W(2,0) = 1.0f; W(2,1) = 0.25f; W(2,2) = 0.125f;
-    W(3,0) = 0.0f; //W(3,1) = 0.25f; W(3,2) = 0.125f;
+    //W(0,0) = 0.5f; W(0,1) = 0.50f; W(0,2) = 0.125f;
+    //W(1,0) = 0.5f; W(1,1) = 0.25f; W(1,2) = 0.125f;
+    //W(2,0) = 0.5f; W(2,1) = 0.125f; W(2,2) = 0.0625f;
+    //W(3,0) = 0.5f; W(3,1) = 0.125f; W(3,2) = 0.03125f;
+    W(0,0) = 1.0f; //W(0,1) = 0.50f; W(0,2) = 0.125f;
+    W(1,0) = 1.0f; //W(1,1) = 0.25f; W(1,2) = 0.125f;
+    W(2,0) = 1.0f; //W(2,1) = 0.125f; W(2,2) = 0.0625f;
+    W(3,0) = 1.0f; //W(3,1) = 0.125f; W(3,2) = 0.03125f;
 
     Func I("Input");
     Func S("S");
@@ -89,17 +93,29 @@ int main(int argc, char **argv) {
     for (size_t i=0; i<func_list.size(); i++) {
         func_list[i].compute_root();
         cerr << func_list[i] << endl;
+    }
 
-        if (func_list[i].name().find("-TDeps_x") != string::npos) {
+    for (size_t i=0; i<func_list.size(); i++) {
+        func_list[i].compute_root();
+        cerr << func_list[i] << endl;
+
+        //if (func_list[i].name().find("-Deps_x") != string::npos) {
+        //    Func f;
+        //    f(x,y) = func_list[i](x%tile,x/tile,y%tile,y/tile);
+        //    Image<float> a = f.realize(width, height);
+        //    cerr << a << endl;
+        //}
+
+        if (func_list[i].name().find("Tail_x") != string::npos) {
             Func f;
             f(x,y) = func_list[i](0, x,y%tile,y/tile);
             Image<float> a = f.realize(width/tile, height);
             cerr << a << endl;
         }
-        if (func_list[i].name().find("Tail_x") != string::npos) {
+        if (func_list[i].name().find("Tail_y") != string::npos) {
             Func f;
-            f(x,y) = func_list[i](0, x,y%tile,y/tile);
-            Image<float> a = f.realize(width/tile, height);
+            f(x,y) = func_list[i](x%tile,x/tile,0,y);
+            Image<float> a = f.realize(width, height/tile);
             cerr << a << endl;
         }
     }
