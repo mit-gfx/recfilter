@@ -353,13 +353,11 @@ static vector<Function> create_complete_tail_term(
                     if (split_info.scan_causal[k]) {
                         args.push_back(rxo.z);
                         call_args_curr_tile.push_back(rxo.z);
-                        call_args_prev_tile.push_back(
-                                max(simplify(rxo.z-1), 0));
+                        call_args_prev_tile.push_back(rxo.z-1);
                     } else {
                         args.push_back(num_tiles-1-rxo.z);
                         call_args_curr_tile.push_back(num_tiles-1-rxo.z);
-                        call_args_prev_tile.push_back(
-                                min(simplify(num_tiles-rxo.z), simplify(num_tiles-1)));
+                        call_args_prev_tile.push_back(num_tiles-rxo.z);
                     }
                 } else if (arg == xi.name()) {
                     // replace xi by rxo.y as tail element index in args and current tile term
@@ -377,10 +375,9 @@ static vector<Function> create_complete_tail_term(
 
             // multiply each tail element with its weight before adding
             for (int i=0; i<F_tail[k].outputs(); i++) {
-                values.push_back(
-                        Call::make(function, call_args_curr_tile, i) +
-                        select(rxo.z>0, weight(simplify(tile-rxo.y-1), rxo.x) *
-                            Call::make(function, call_args_prev_tile, i), 0));
+                values.push_back(Call::make(function, call_args_curr_tile, i) +
+                        weight(simplify(tile-rxo.y-1), rxo.x) *
+                        Call::make(function, call_args_prev_tile, i));
             }
 
             function.define_reduction(args, values);
@@ -681,9 +678,9 @@ static void add_prev_dimension_residual_to_tails(
                     string arg = F_tail_prev_scanned.args()[i];
                     if (arg == yo.name()) {
                         if (split_info_prev.scan_causal[k]) {
-                            call_args.push_back(max(simplify(yo-1),0));
+                            call_args.push_back(yo-1);
                         } else {
-                            call_args.push_back(min(simplify(yo+1), simplify(num_tiles_prev-1)));
+                            call_args.push_back(yo+1);
                         }
                     } else if (arg == yi.name()) {
                         call_args.push_back(o);
