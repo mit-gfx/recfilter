@@ -12,17 +12,6 @@
 
 // ----------------------------------------------------------------------------
 
-#define SCAN_STAGE_ARG         "ScanStage"
-#define INTRA_TILE_RESULT      "Intra"
-#define INTRA_TILE_TAIL_TERM   "Tail"
-#define INTER_TILE_TAIL_SUM    "CTail"
-#define COMPLETE_TAIL_RESIDUAL "TDeps"
-#define FINAL_RESULT_RESIDUAL  "Deps"
-#define RECOMPUTE_COPY         "Recomp"
-#define DELIMITER              '-'
-
-// ----------------------------------------------------------------------------
-
 // Printing Utils
 
 struct CheckResult {
@@ -145,7 +134,7 @@ Halide::Expr substitute_in_func_call(
 
 
 /// Add a calling argument to all calls to a particular Function
-Halide::Expr insert_arg_to_func_call(
+Halide::Expr insert_arg_in_func_call(
         std::string func_name,          /// name of Function
         size_t pos,                     /// position to add calling arg within list
         Halide::Expr arg,               /// calling argument to add

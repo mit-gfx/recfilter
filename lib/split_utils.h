@@ -24,12 +24,10 @@ struct SplitInfo {
     vector<int> scan_id;
 
     vector<Halide::RDom> rdom;
-//    vector<Halide::RDom> split_rdom;
     vector<Halide::RDom> outer_rdom;
     vector<Halide::RDom> inner_rdom;
 
     Halide::Image<float> filter_weights;
-    Halide::Internal::Function intra_tile_scan;
 };
 
 
@@ -62,9 +60,17 @@ Halide::Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2);
 
 // -----------------------------------------------------------------------------
 
+// Rearrangements for intra tile computation
+
 std::vector<SplitInfo> group_scans_by_dimension(
         Halide::Internal::Function F,
         vector<SplitInfo> split_info);
+
+void fix_intra_tile_scan_stages(Halide::Internal::Function F_intra);
+
+void add_intra_tile_scan_stages(
+        Halide::Internal::Function F_intra,
+        std::vector<SplitInfo> split_info);
 
 // -----------------------------------------------------------------------------
 

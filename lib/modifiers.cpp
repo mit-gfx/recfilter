@@ -120,13 +120,17 @@ private:
             }
         }
 
-        if (op->call_type==Call::Halide && op->func.has_pure_definition()) {
-            extract_func_calls(Func(op->func), func_list); // recursively extract all calls
+        if (op->call_type==Call::Halide &&
+                op->func.has_pure_definition() &&
+                op->name != curr_func_name)
+        {
+            extract_func_calls(Func(op->func), func_list);
         }
     }
+    string curr_func_name;
 public:
     vector<Func> func_list;
-    ExtractFuncCalls(void) {}
+    ExtractFuncCalls(string func_name) : curr_func_name(func_name) {}
 };
 
 // -----------------------------------------------------------------------------
@@ -542,7 +546,7 @@ Expr augment_func_call(string func_name, vector<string> func_args, vector<Expr> 
     return s.mutate(original);
 }
 
-Expr insert_arg_to_func_call(string func_name, size_t pos, Expr arg, Expr original) {
+Expr insert_arg_in_func_call(string func_name, size_t pos, Expr arg, Expr original) {
     InsertArgToFunctionCall s(func_name, pos, arg);
     return s.mutate(original);
 }
@@ -601,15 +605,28 @@ vector<string> extract_params_in_expr(Expr expr) {
 }
 
 void extract_func_calls(Func func, vector<Func>& func_list) {
-    ExtractFuncCalls extract;
-    for (int i=0; i<func.outputs(); i++) {
-        if (func.name().find("NO_REVEAL") == string::npos) {
-            Expr expr = func.values()[i];
-            expr.accept(&extract);
-            func_list.push_back(func);
-            func_list.insert(func_list.end(),
-                    extract.func_list.begin(), extract.func_list.end());
+    ExtractFuncCalls extract(func.name());
+
+    vector<Expr> expr;
+
+    Function function = func.function();
+    for (int i=0; i<function.outputs(); i++) {
+        expr.push_back(function.values()[i]);
+    }
+    for (int i=0; i<function.reductions().size(); i++) {
+        for (int j=0; j<function.reductions()[i].args.size(); j++) {
+            expr.push_back(function.reductions()[i].args[j]);
         }
+        for (int j=0; j<function.reductions()[i].values.size(); j++) {
+            expr.push_back(function.reductions()[i].values[j]);
+        }
+    }
+
+    for (int i=0; i<expr.size(); i++) {
+        expr[i].accept(&extract);
+        func_list.push_back(func);
+        func_list.insert(func_list.end(),
+                extract.func_list.begin(), extract.func_list.end());
     }
 
     // remove duplicates

@@ -1,4 +1,5 @@
 #include "split.h"
+#include "split_macros.h"
 
 using namespace Halide;
 using namespace Halide::Internal;
@@ -8,7 +9,6 @@ using std::cerr;
 using std::endl;
 using std::vector;
 using std::map;
-
 
 // -----------------------------------------------------------------------------
 
