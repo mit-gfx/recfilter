@@ -127,8 +127,6 @@ int main(int argc, char **argv) {
     inline_function(S, "S--Intra_y-Intra_x");
     inline_function(S, "S--Intra_y");
 
-    recompute(S, "S", "S--Intra_y-Intra_x-Intra_y-Intra_x");
-
     // ----------------------------------------------------------------------------------------------
 
     vector<Func> func_list;

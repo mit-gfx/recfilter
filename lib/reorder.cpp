@@ -351,6 +351,9 @@ void inline_function(Func F, Func A) {
         for (int k=0; k<reductions.size(); k++) {
             vector<Expr> reduction_args   = reductions[k].args;
             vector<Expr> reduction_values = reductions[k].values;
+            for (int u=0; u<reduction_args.size(); u++) {
+                reduction_args[u] = inline_func_calls(f, reduction_args[u]);
+            }
             for (int u=0; u<reduction_values.size(); u++) {
                 reduction_values[u] = inline_func_calls(f, reduction_values[u]);
             }
@@ -651,71 +654,5 @@ void expand_multiple_reductions(Func S) {
                 F.define_reduction(Fsub[k].reductions()[0].args, Fsub[k].reductions()[0].values);
             }
         }
-    }
-}
-
-// ----------------------------------------------------------------------------
-
-void recompute(Halide::Func S, std::string caller, std::string func_name) {
-    Function A;
-    Function B;
-
-    vector<Func> func_list;
-    extract_func_calls(S, func_list);
-
-    for (int i=0; i<func_list.size(); i++) {
-        if (caller == func_list[i].name())
-            A = func_list[i].function();
-        if (func_name == func_list[i].name())
-            B = func_list[i].function();
-    }
-
-    if (!A.has_pure_definition()) {
-        cerr << func_name << "not found while trying to create a copy of "
-            << func_name << " for its calls in " << caller << endl;
-        assert(false);
-    }
-    if (!B.has_pure_definition()) {
-        cerr << caller << "not found while trying to create a copy of "
-            << func_name << " for its calls in " << caller << endl;
-        assert(false);
-    }
-
-    // create a new function as an extact duplicate of B, replacing recursive
-    // calls to B in reduction defs by calls to the new function
-    Function B_copy(B.name() + DELIMITER + RECOMPUTE_COPY);
-    B_copy.define(B.args(), B.values());
-    for (int i=0; i<B.reductions().size(); i++) {
-        vector<Expr> args   = B.reductions()[i].args;
-        vector<Expr> values = B.reductions()[i].values;
-        for (int j=0; j<args.size(); j++) {
-            args[j] = substitute_func_call(B.name(), B_copy, args[j]);
-        }
-        for (int j=0; j<values.size(); j++) {
-            values[j] = substitute_func_call(B.name(), B_copy, values[j]);
-        }
-        B_copy.define_reduction(args, values);
-    }
-
-    // replace all calls to B by the new B_copy in A
-    vector<string> pure_args = A.args();
-    vector<Expr> pure_values = A.values();
-    vector<ReductionDefinition> reductions = A.reductions();
-    for (int i=0; i<pure_values.size(); i++) {
-        pure_values[i] = substitute_func_call(B.name(), B_copy, pure_values[i]);
-    }
-    A.clear_all_definitions();
-    A.define(pure_args, pure_values);
-
-    for (int i=0; i<reductions.size(); i++) {
-        for (int j=0; j<reductions[i].args.size(); j++) {
-            reductions[i].args[j] = substitute_func_call(B.name(),
-                    B_copy, reductions[i].args[j]);
-        }
-        for (int j=0; j<reductions[i].values.size(); j++) {
-            reductions[i].values[j] = substitute_func_call(B.name(),
-                    B_copy, reductions[i].values[j]);
-        }
-        A.define_reduction(reductions[i].args, reductions[i].values);
     }
 }

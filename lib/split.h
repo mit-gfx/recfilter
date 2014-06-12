@@ -75,8 +75,6 @@ void swap_variables(Halide::Func F,
 
 void expand_multiple_reductions(Halide::Func S);
 
-void recompute(Halide::Func S, std::string caller, std::string func);
-
 void merge(Halide::Func S,
         std::string func_a,
         std::string func_b,

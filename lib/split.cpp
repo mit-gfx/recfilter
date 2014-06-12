@@ -717,13 +717,12 @@ static void add_all_residuals_to_final_result(
 
     assert(split_info.size() == F_deps.size());
 
-    // each F_deps represents the residuals from that dimension
-    // add this residual to the first scan in next dimension
-
-    // define a function that computes the above
+    // define a function as a copy of the function F
     Function F_sub(F.name() + DELIMITER + PRE_FINAL_TERM);
     F_sub.define(pure_args, pure_values);
 
+    // each F_deps represents the residuals from one dimension
+    // add this residual to the first scan in next dimension
     for (int i=0; i<F_deps.size()-1; i++) {
         int first_scan_next_dim = split_info[i+1].scan_id[ split_info[i+1].num_splits-1 ];
         vector<Expr> call_args = reductions[first_scan_next_dim].args;
@@ -732,6 +731,7 @@ static void add_all_residuals_to_final_result(
         }
     }
 
+    // replace calls to F by F_sub in the reduction def of F_sub
     for (int i=0; i<reductions.size(); i++) {
         vector<Expr> values;
         for (int j=0; j<reductions[i].values.size(); j++) {
@@ -741,8 +741,8 @@ static void add_all_residuals_to_final_result(
         F_sub.define_reduction(reductions[i].args, values);
     }
 
-    // add the residual of the last dimension and above computed function to
-    // get the final result
+    // add the residual of the last dimension and above computed
+    // function to get the final result
     vector<Expr> final_call_args;
     vector<Expr> final_pure_values;
     for (int i=0; i<pure_args.size(); i++) {
@@ -755,8 +755,6 @@ static void add_all_residuals_to_final_result(
 
     F.clear_all_definitions();
     F.define(pure_args, final_pure_values);
-
-    cerr << F << F_sub << endl;
 }
 
 // -----------------------------------------------------------------------------
@@ -996,4 +994,6 @@ void split(
     }
 
     func = Func(F);
+
+    inline_function(func, F_final.name());
 }

@@ -66,7 +66,6 @@ int main(int argc, char **argv) {
     inline_function(S, "S--Deps_y");
     swap_variables (S, "S--Intra_y-Tail_x", xi, yi);
     merge(S, "S--Intra_y-Tail_x", "S--Tail_y", "S--Tail");
-    recompute(S, "S", "S--Intra_y-Intra_x");
 
     // ----------------------------------------------------------------------------------------------
 
