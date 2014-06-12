@@ -658,15 +658,20 @@ static void add_prev_dimension_residual_to_tails(
                 for (int i=0; i<F_tail_prev_scanned.args().size(); i++) {
                     string arg = F_tail_prev_scanned.args()[i];
                     if (arg == yo.name()) {
+                        // if the scan in prev dimension was causal, then accumulate
+                        // the tail of prev tile in that dimension, else next tile
                         if (split_info_prev.scan_causal[k]) {
                             call_args.push_back(yo-1);
                         } else {
                             call_args.push_back(yo+1);
                         }
-                    } else if (arg == yi.name()) {
+                    }
+                    else if (arg == yi.name()) {
                         call_args.push_back(o);
                     } else if (arg == xi.name()) {
-                        if (split_info_prev.scan_causal[k]) {
+                        // if current scan is causal then accumulate the last
+                        // elements of prev dimension tail
+                        if (split_info.scan_causal[j]) {
                             call_args.push_back(tile-1-xi);
                         } else {
                             call_args.push_back(xi);
@@ -676,6 +681,8 @@ static void add_prev_dimension_residual_to_tails(
                     }
                 }
 
+                // if the scan in prev dimension was causal, then accumulate
+                // the tail of prev tile in that dimension, else next tile
                 for (int i=0; i<pure_values.size(); i++) {
                     Expr val;
                     if (split_info_prev.scan_causal[k]) {
