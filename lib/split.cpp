@@ -611,9 +611,9 @@ static void add_prev_dimension_residual_to_tails(
             }
             F_tail_prev_scanned.define(F_tail_prev[k].args(), prev_values);
 
-            // apply scans in current dimension the tail from prev dimension
-            int first_scan_in_this_dimension = split_info.scan_id[split_info.num_splits-1];
-            int last_scan_in_this_dimension  = split_info.scan_id[j];
+            // apply all scans between the prev dimension and current dimension
+            int first_scan = split_info_prev.scan_id[0]+1;
+            int last_scan  = split_info.scan_id[j];
             int scan_stage_var_index = -1;
             for (int i=0; i<F_intra.args().size(); i++) {
                 if (F_intra.args()[i] == SCAN_STAGE_ARG) {
@@ -621,7 +621,7 @@ static void add_prev_dimension_residual_to_tails(
                 }
             }
 
-            for (int i=first_scan_in_this_dimension; i<=last_scan_in_this_dimension; i++) {
+            for (int i=first_scan; i<=last_scan; i++) {
                 // do not add the scan if its scan stage is less than scan stage of scan in
                 // current dimension
                 const int  prev_scan_stage = split_info_prev.scan_stage[k];
@@ -793,11 +793,11 @@ static vector<Function> create_recursive_split(
         // result from all previous scans
         add_residual_to_tails(F_ctail, F_tdeps, split_info[i]);
 
-        // add the residuals from split up scans in previous dimensions
-        // to this scan
-        if (i>0) {
+        // add the residuals from split up scans in all previous
+        // dimensions to this scan
+        for (int j=0; j<i; j++) {
             add_prev_dimension_residual_to_tails(F_intra, F_ctail,
-                    F_ctail_list[i-1], split_info[i], split_info[i-1]);
+                    F_ctail_list[j], split_info[i], split_info[j]);
         }
 
         F_tail_list .push_back(F_tail);

@@ -6,23 +6,27 @@ std::ostream &operator<<(std::ostream &s, CheckResult v) {
 
     assert(ref.width() == out.width());
     assert(ref.height() == out.height());
+    assert(ref.channels() == out.channels());
 
     int width = ref.width();
     int height = ref.height();
+    int channels = ref.channels();
 
-    Halide::Image<float> diff(width, height);
+    Halide::Image<float> diff(width, height, channels);
 
     float diff_sum = 0.0f;
     float max_val  = 0.0f;
 
-    for (int y=0; y<height; y++) {
-        for (int x=0; x<width; x++) {
-            diff(x,y) = float(ref(x,y)) - float(out(x,y));
-            diff_sum += std::abs(diff(x,y) * diff(x,y));
-            max_val = std::max(ref(x,y), max_val);
+    for (int z=0; z<channels; z++) {
+        for (int y=0; y<height; y++) {
+            for (int x=0; x<width; x++) {
+                diff(x,y,z) = float(ref(x,y,z)) - float(out(x,y,z));
+                diff_sum += std::abs(diff(x,y,z) * diff(x,y,z));
+                max_val = std::max(ref(x,y,z), max_val);
+            }
         }
     }
-    float mse  = diff_sum/float(width*height);
+    float mse  = diff_sum/float(width*height*channels);
 
     s << "Mean sq error = " << mse << "\n\n";
 
@@ -39,20 +43,23 @@ std::ostream &operator<<(std::ostream &s, CheckResultVerbose v) {
 
     int width = ref.width();
     int height = ref.height();
+    int channels = ref.channels();
 
-    Halide::Image<float> diff(width, height);
+    Halide::Image<float> diff(width, height, channels);
 
     float diff_sum = 0.0f;
     float max_val  = 0.0f;
 
-    for (int y=0; y<height; y++) {
-        for (int x=0; x<width; x++) {
-            diff(x,y) = float(ref(x,y)) - float(out(x,y));
-            diff_sum += std::abs(diff(x,y) * diff(x,y));
-            max_val = std::max(ref(x,y), max_val);
+    for (int z=0; z<channels; z++) {
+        for (int y=0; y<height; y++) {
+            for (int x=0; x<width; x++) {
+                diff(x,y,z) = float(ref(x,y,z)) - float(out(x,y,z));
+                diff_sum += std::abs(diff(x,y,z) * diff(x,y,z));
+                max_val = std::max(ref(x,y,z), max_val);
+            }
         }
     }
-    float mse  = diff_sum/float(width*height);
+    float mse  = diff_sum/float(width*height*channels);
 
     s << "Reference" << "\n" << ref << "\n";
     s << "Halide output" << "\n" << out << "\n";
@@ -117,6 +124,3 @@ std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f) {
     }
     return s;
 }
-
-
-

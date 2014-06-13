@@ -350,7 +350,7 @@ std::ostream &operator<<(std::ostream &s, Halide::Image<T> image) {
                 }
                 s << "\n";
             }
-            s << "\n\n";
+            s << "--\n";
         }
     }
 
@@ -363,9 +363,9 @@ std::ostream &operator<<(std::ostream &s, Halide::Image<T> image) {
                     }
                     s << "\n";
                 }
-                s << "\n\n";
+                s << "--\n";
             }
-            s << "\n\n";
+            s << "--\n";
         }
     }
     return s;
