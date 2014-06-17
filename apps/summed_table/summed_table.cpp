@@ -60,12 +60,10 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    float_dependencies_to_root(S);
-    inline_function(S, "S--Intra_y-Deps_x");
-    inline_function(S, "S--Intra_y");
-    inline_function(S, "S--Deps_y");
-    swap_variables (S, "S--Intra_y-Tail_x", xi, yi);
-    merge(S, "S--Intra_y-Tail_x", "S--Tail_y", "S--Tail");
+    inline_function(S, "S-Intra-Deps_x");
+    inline_function(S, "S-Intra-Deps_y");
+    swap_variables (S, "S-Intra-Tail_y_1", xi, yi);
+    merge(S, "S-Intra-Tail_x_0", "S-Intra-Tail_y_1", "S-Tail");
 
     // ----------------------------------------------------------------------------------------------
 
@@ -78,41 +76,39 @@ int main(int argc, char **argv) {
         functions[func_list[i].name()] = func_list[i];
     }
 
-    Func S_intra0= functions["S--Intra_y-Intra_x"];
-    Func S_tails = functions["S--Tail"];
-    Func S_intra = functions["S--Intra_y-Intra_x-Recomp"];
-    Func S_ctaily= functions["S--CTail_y"];
-    Func S_ctailx= functions["S--Intra_y-CTail_x"];
+    Func S_intra  = functions["S-Intra"];
+    Func S_tails  = functions["S-Tail"];
+    Func S_final  = functions["S-Final-Sub"];
+    Func S_ctailx = functions["S-Intra-CTail_x_0"];
+    Func S_ctaily = functions["S-Intra-CTail_y_1"];
+    Func S_ctailxy= functions["S-Intra-CTail_x_0-y-1"];
 
-    assert(S_intra0.defined());
-    assert(S_tails.defined());
-    assert(S_intra.defined());
-    assert(S_ctailx.defined());
-    assert(S_ctaily.defined());
+    assert(S_intra  .defined());
+    assert(S_tails  .defined());
+    assert(S_final  .defined());
+    assert(S_ctailx .defined());
+    assert(S_ctaily .defined());
+    assert(S_ctailxy.defined());
 
     Target target = get_jit_target_from_environment();
     if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
         Var t("t");
+        Var xs("ScanStage");
 
-        S_intra0.compute_at(S_tails, Var("blockidx"));
-        //S_intra0.split(yi,t,yi, MAX_THREAD/WARP_SIZE).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).gpu_blocks(xo,yo);
-        S_intra0.reorder_storage(xi,yi,xo,yo);
-        S_intra0.reorder(xi,yi,xo,yo).gpu_threads(yi);
-        S_intra0.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
-        S_intra0.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
+        //S_intra.compute_at(S_tails, Var("__block_id_x"));
+        S_intra.compute_root();
+        S_intra.split(yi,t,yi, MAX_THREAD/tile_width).reorder(xs,t,xi,yi,xo,yo);//.gpu_threads(xi,yi).gpu_blocks(xo,yo);
+        S_intra.update(0).reorder(rxi.x,yi,xo,yo);//.gpu_threads(yi).gpu_blocks(xo,yo);
+        S_intra.update(1).reorder(ryi.x,xi,xo,yo);//.gpu_threads(xi).gpu_blocks(xo,yo);
 
         S_tails.compute_root();
         S_tails.reorder_storage(yi,xi,xo,yo);
-        //S_tails.split(yi,t,yi, MAX_THREAD/WARP_SIZE).reorder(t,xi,yi,xo,yo);
-        S_tails.reorder(xi,yi,xo,yo);
-        S_tails.gpu_blocks(xo,yo).gpu_threads(xi);
-
-        S_ctaily.compute_root();
-        S_ctaily.reorder_storage(xi,xo,yi,yo);
-        S_ctaily.split(xo,xo,t,MAX_THREAD/tile_width);
-        S_ctaily.reorder(yo,yi,xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
-        S_ctaily.update().split(xo,xo,t,MAX_THREAD/tile_width);
-        S_ctaily.update().reorder(xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
+#if 0
+        S_tails.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi);
+#else
+        S_tails.reorder(xi,yi,xo,yo).gpu_threads(yi);
+#endif
+        S_tails.gpu_blocks(xo,yo);
 
         S_ctailx.compute_root();
         S_ctailx.reorder_storage(yi,yo,xi,xo);
@@ -121,22 +117,36 @@ int main(int argc, char **argv) {
         S_ctailx.update().split(yo,yo,t,MAX_THREAD/tile_width);
         S_ctailx.update().reorder(yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
 
-        S_intra.compute_at(S, Var("blockidx"));
-        S_intra.reorder_storage(xi,yi,xo,yo);
-        //S_intra.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi);
-        S_intra.reorder(xi,yi,xo,yo).gpu_threads(yi);
-        S_intra.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
-        S_intra.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
+        S_ctailxy.compute_at(S_ctaily, Var("__block_id_x"));
+        S_ctailxy.reorder(yo,yi,xi,xo).gpu_threads(xi);
+        S_ctailxy.update().reorder(yo,ryi.x,xi,xo).gpu_threads(xi);
+
+        S_ctaily.compute_root();
+        S_ctaily.reorder_storage(xi,xo,yi,yo);
+        S_ctaily.split(xo,xo,t,MAX_THREAD/tile_width);
+        S_ctaily.reorder(yo,yi,xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
+        S_ctaily.update().split(xo,xo,t,MAX_THREAD/tile_width);
+        S_ctaily.update().reorder(xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
+
+        S_final.compute_at(S, Var("__block_id_x"));
+        S_final.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi);
+        S_final.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
+        S_final.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
 
         S.compute_root();
         S.split(x, xo,xi, tile_width).split(y, yo,yi, tile_width);
-        //S.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
-        S.reorder(yi, xi, xo, yo);
-        S.gpu_blocks(xo,yo).gpu_threads(xi);
+        S.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
+        S.gpu_blocks(xo,yo).gpu_threads(xi,yi);
         S.bound(x, 0, image.width()).bound(y, 0, image.height());
     }
     else {
-        cerr << "Warning: No CPU scheduling" << endl;
+        S_intra.compute_root();
+        S_tails.compute_root();
+        S_ctailx.compute_root();
+        S_ctailxy.compute_root();
+        S_ctaily.compute_root();
+        S_final.compute_root();
+        S.compute_root();
     }
 
     // ----------------------------------------------------------------------------------------------
@@ -180,7 +190,7 @@ int main(int argc, char **argv) {
             }
         }
 
-        cerr << CheckResult(ref,hl_out) << endl;
+        cerr << CheckResultVerbose(ref,hl_out) << endl;
     }
 
     return 0;

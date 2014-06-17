@@ -3,7 +3,7 @@
 
 #include "../../lib/split.h"
 
-#include "ls_hist_defs.h"
+#include "../gaussian_weights.h"
 
 #define MAX_THREAD 192
 
@@ -13,6 +13,30 @@ using std::vector;
 using std::string;
 using std::cerr;
 using std::endl;
+
+#define NUM_BINS       (15)
+#define BIN_WIDTH      (1.0f/float(NUM_BINS))
+#define BIN_CENTER(i)  (BIN_WIDTH*(float(i)+0.5f))
+#define GAUSS_SIGMA    (BIN_WIDTH)
+
+std::pair<float, Image<float> > gaussian_weights(float sigma, int order) {
+    Image<float> W(4,3);
+    float b0, a1, a2;
+    if (order == 1) {
+        weights1(sigma, b0, a1);
+        W(0,0) = a1;
+        W(1,0) = a1;
+        W(2,0) = a1;
+        W(3,0) = a1;
+    } else {
+        weights2(sigma, b0, a1, a2);
+        W(0,0) = a1; W(0,1) = a2;
+        W(1,0) = a1; W(1,1) = a2;
+        W(2,0) = a1; W(2,1) = a2;
+        W(3,0) = a1; W(3,1) = a2;
+    }
+    return std::pair(b0, W);
+}
 
 
 int main(int argc, char **argv) {
@@ -27,194 +51,127 @@ int main(int argc, char **argv) {
 
     Image<float> random_image = generate_random_image<float>(width,height);
 
+    // pass the image through the lookup tables
+    vector<ImageParam> hist_image
+    for (int i=0; i<NUM_BINS; i++) {
+        float mu = BIN_CENTER(i);
+        float sigma = GAUSS_SIGMA;
+        Image image_bin_i(image.width(), image.height());
+        for (int x=0; x<image.width(); x++) {
+            for (int y=0; y<image.height(); y++) {
+                float c = random_image(x,y);
+                image_bin_i(x,y) = gaussIntegral(c, mu, sigma);
+            }
+        }
+
+        ImageParam h_image(type_of<float>(),2);
+        h_image.set(image_bin_i);
+        hist_image.push_back(h_image);
+    }
+
     ImageParam image(type_of<float>(), 2);
     image.set(random_image);
 
     // ----------------------------------------------------------------------------------------------
 
-    int box_x = width/BOX_FILTER_FACTOR;        // radius of histogram filter
-    int box_y = height/BOX_FILTER_FACTOR;
+    Var x("x"), y("y");
 
-    Var x("x"), y("y"), b("b");
+    // recursive filter wieghts for Gaussian convolution
+    int order = 2;
 
-    // input image
-    Func I("Input");
-    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
+    float b0       = gaussian_weights(sigma, order).first;
+    Image<float> W = gaussian_weights(sigma, order).second;
 
-
-    // Lookup table for converting pixel value into smooth histogram
-    Func L("Lookup_table");
-    vector<Expr> hist_tuple;
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER0) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER1) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER2) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER3) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER4) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER5) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER6) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER7) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER8) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER9) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER10) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER11) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER12) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER13) );
-    hist_tuple.push_back( SMOOTH_HIST(I(x,y)-BIN_CENTER14) );
-    L(x,y) = hist_tuple;
-
-
-    // ----------------------------------------------------------------------------------------------
-
-    RDom rx(1, image.width()-1, "rx");
-    RDom ry(1, image.height()-1,"ry");
-
-    // summed area table for computing local histogram
-    Func S("S");
-    S(x, y, b) = L(x,y)[b];
-    S(rx,y, b) = S(rx,y, b) + S(rx-1,y, b);
-    S(x,ry, b) = S(x,ry, b) + S(x,ry-1, b);
-
-    // histogram computation
-    Func H("Hist");             // histogram
-    H(x, y, b) = S(min(x+box_x,image.width()-1), min(y+box_y,image.height()-1),b)
-           + select(x-box_x-1<0 || y-box_y-1<0, 0, S(max(x-box_x-1,0), max(y-box_y-1,0),b))
-           - select(y-box_y-1<0, 0, S(min(x+box_x,image.width()-1), max(y-box_y-1,0),b))
-           - select(x-box_x-1<0, 0, S(max(x-box_x-1,0), min(y+box_y,image.height()-1),b));
-
-    // spatial smoothing of histogram
-    Func G("Gaussian");
-
-
-    // ----------------------------------------------------------------------------------------------
+    RDom rx(0, image.width(),"rx");
+    RDom ry(0, image.width(),"ry");
+    RDom rz(0, image.height(),"rz");
+    RDom rw(0, image.height(),"rw");
 
     Var xi("xi"), yi("yi");
     Var xo("xo"), yo("yo");
 
-    RDom rxi(1, tile_width-1, "rxi");
-    RDom ryi(1, tile_width-1, "ryi");
+    RDom rxi(0, tile, "rxi");
+    RDom ryi(0, tile, "ryi");
+    RDom rzi(0, tile, "rzi");
+    RDom rwi(0, tile, "rwi");
 
-    split(S,Internal::vec(0,1),
-            Internal::vec(x,y),
-            Internal::vec(xi,yi),
-            Internal::vec(xo,yo),
-            Internal::vec(rx,ry),
-            Internal::vec(rxi,ryi));
+    // bounds
+    Expr iw = image.width()-1;
+    Expr ih = image.height()-1;
 
-    // ----------------------------------------------------------------------------------------------
+    vector<Func> Gaussians;
 
-    float_dependencies_to_root(S);
-    inline_function(S, "S--Intra_y-Deps_x");
-    inline_function(S, "S--Intra_y");
-    inline_function(S, "S--Deps_y");
-    swap_variables (S, "S--Intra_y-Tail_x", xi, yi);
-    merge(S, "S--Intra_y-Tail_x", "S--Tail_y", "S--Tail");
-    inline_function(H, "L");
-    inline_function(H, "S");
+    for (int i=0; i<NUM_BINS; i++) {
+        string name = Internal::int_to_string(i);
+        Func G("G" + name);
+        Func L("L" + name);
 
-    // ----------------------------------------------------------------------------------------------
+        // pass image through historgam lookup table
+        L(x,y) = select((x<0 || y<0 || x>iw || y>ih), 0.0f,
+                hist_image[i](clamp(x,0,iw),clamp(y,0,ih)));
 
-    vector<Func> func_list;
-    extract_func_calls(S, func_list);
+        // Gaussian convolution - 2D causal-anticausal filter
+        // feed forward coeff multiplied with input to Gaussian filter
+        G(x, y) = b0 * I(x,y);
+        G(rx,y) = G(rx,y)
+            + select(rx>0, W(0,0)*G(max(0,rx-1),y), 0.0f)
+            + select(rx>1, W(0,1)*G(max(0,rx-2),y), 0.0f);
+        G(iw-ry,y) = G(iw-ry,y)
+            + select(ry>0, W(1,0)*G(min(iw,iw-ry+1),y), 0.0f)
+            + select(ry>1, W(1,1)*G(min(iw,iw-ry+2),y), 0.0f);
+        G(x,rz) = G(x,rz)
+            + select(rz>0, W(2,0)*G(x,max(0,rz-1)), 0.0f)
+            + select(rz>1, W(2,1)*G(x,max(0,rz-2)), 0.0f);
+        G(x,ih-rw) = G(x,ih-rw)
+            + select(rw>0, W(3,0)*G(x,min(ih,ih-rw+1)), 0.0f)
+            + select(rw>1, W(3,1)*G(x,min(ih,ih-rw+2)), 0.0f);
 
-    map<string,Func> functions;
-    for (size_t i=0; i<func_list.size(); i++) {
-        cerr << func_list[i] << endl;
-        functions[func_list[i].name()] = func_list[i];
-    }
+        split(G,W,
+                Internal::vec(  0,  0,  1,  1),
+                Internal::vec(  x,  x,  y,  y),
+                Internal::vec( xi, xi, yi, yi),
+                Internal::vec( xo, xo, yo, yo),
+                Internal::vec( rx, ry, rz, rw),
+                Internal::vec(rxi,ryi,rzi,rwi),
+                Internal::vec( fx, fx, fy, fy));
 
-    Func S_intra0= functions["S--Intra_y-Intra_x"];
-    Func S_tails = functions["S--Tail"];
-    Func S_intra = functions["S--Intra_y-Intra_x-Recomp"];
-    Func S_ctaily= functions["S--CTail_y"];
-    Func S_ctailx= functions["S--Intra_y-CTail_x"];
+        vector<Func> func_list;
+        extract_func_calls(G, func_list);
 
-    Target target = get_jit_target_from_environment();
-    if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
-        Var t("t");
-
-        S_intra0.compute_at(S_tails, Var("blockidx"));
-        //S_intra0.split(yi,t,yi, MAX_THREAD/WARP_SIZE).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).gpu_blocks(xo,yo);
-        S_intra0.reorder_storage(xi,yi,xo,yo);
-        S_intra0.reorder(xi,yi,xo,yo).gpu_threads(yi);
-        S_intra0.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
-        S_intra0.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
-
-        S_tails.compute_root();
-        S_tails.reorder_storage(yi,xi,xo,yo);
-        //S_tails.split(yi,t,yi, MAX_THREAD/WARP_SIZE).reorder(t,xi,yi,xo,yo);
-        S_tails.reorder(xi,yi,xo,yo);
-        S_tails.gpu_blocks(xo,yo).gpu_threads(xi);
-
-        S_ctaily.compute_root();
-        S_ctaily.reorder_storage(xi,xo,yi,yo);
-        S_ctaily.split(xo,xo,t,MAX_THREAD/tile_width);
-        S_ctaily.reorder(yo,yi,xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
-        S_ctaily.update().split(xo,xo,t,MAX_THREAD/tile_width);
-        S_ctaily.update().reorder(xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
-
-        S_ctailx.compute_root();
-        S_ctailx.reorder_storage(yi,yo,xi,xo);
-        S_ctailx.split(yo,yo,t,MAX_THREAD/tile_width);
-        S_ctailx.reorder(xo,xi,yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
-        S_ctailx.update().split(yo,yo,t,MAX_THREAD/tile_width);
-        S_ctailx.update().reorder(yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
-
-        S_intra.compute_at(H, Var("blockidx"));
-        S_intra.reorder_storage(xi,yi,xo,yo);
-        //S_intra.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi);
-        S_intra.reorder(xi,yi,xo,yo).gpu_threads(yi);
-        S_intra.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
-        S_intra.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
-
-        H.compute_root();
-        H.split(x, xo,xi, tile_width).split(y, yo,yi, tile_width);
-        //H.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
-        H.reorder(yi, xi, xo, yo);
-        H.gpu_blocks(xo,yo).gpu_threads(xi);
-        H.bound(x, 0, image.width()).bound(y, 0, image.height());
-    }
-    else {
-        cerr << "Warning: No CPU scheduling" << endl;
-    }
-
-    // ----------------------------------------------------------------------------------------------
-
-    cerr << "\nJIT compilation ... " << endl;
-    B.compile_jit();
-
-    Buffer hl_out_buff(type_of<int>(), width,height);
-    {
-        Timer t("Running ... ");
-        for (int k=0; k<iterations; k++) {
-            B.realize(hl_out_buff);
-            if (k < iterations-1) {
-                hl_out_buff.free_dev_buffer();
-            }
+        map<string,Func> functions;
+        for (size_t i=0; i<func_list.size(); i++) {
+            cerr << func_list[i] << endl;
+            func_list[i].compute_root();
+            functions[func_list[i].name()] = func_list[i];
         }
+
+        // add to the overall list
+        Gaussians.push_back(G);
+
+        // realize it now just to check
+        Target target = get_jit_target_from_environment();
+        if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
+        }
+
+        cerr << "\nJIT compilation ... " << endl;
+        G.compile_jit();
+
+        Buffer hl_out_buff(type_of<int>(), width,height);
+        {
+            Timer t("Running ... ");
+            G.realize(hl_out_buff);
+            hl_out_buff.free_dev_buffer();
+        }
+        hl_out_buff.copy_to_host();
+        hl_out_buff.free_dev_buffer();
     }
-    hl_out_buff.copy_to_host();
-    hl_out_buff.free_dev_buffer();
+
 
     // ----------------------------------------------------------------------------------------------
 
     if (!nocheck) {
         cerr << "\nChecking difference ... " << endl;
         Image<float> hl_out(hl_out_buff);
-        Image<float> ref(width,height);
-
-        for (int y=0; y<height; y++) {
-            for (int x=0; x<width; x++) {
-                ref(x,y) = 0;
-                for (int v=y-box_y; v<=y+box_y; v++) {
-                    for (int u=x-box_x; u<=x+box_x; u++) {
-                        if (v>=0 && u>=0 && v<height && u<width)
-                            ref(x,y) += random_image(u,v);
-                    }
-                }
-            }
-        }
-
-        cerr << CheckResult(ref,hl_out) << endl;
     }
 
     return 0;
