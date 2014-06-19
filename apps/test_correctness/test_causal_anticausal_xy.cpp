@@ -29,7 +29,6 @@ int main(int argc, char **argv) {
     W(2,0) = 0.5f; W(2,1) = 0.125f; W(2,2) = 0.0625f;
     W(3,0) = 0.5f; W(3,1) = 0.125f; W(3,2) = 0.03125f;
 
-    Func I("Input");
     Func S("S");
 
     Var x("x");
@@ -40,12 +39,11 @@ int main(int argc, char **argv) {
     RDom rz(0, image.height(),"rz");
     RDom rw(0, image.height(),"rw");
 
-    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-
     Expr iw = image.width()-1;
     Expr ih = image.height()-1;
 
-    S(x, y) = I(x,y);
+    S(x, y) = image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1));
+
     S(rx,y) = S(rx,y)
         + select(rx>0, W(0,0)*S(max(0,rx-1),y), 0.0f)
         + select(rx>1, W(0,1)*S(max(0,rx-2),y), 0.0f)

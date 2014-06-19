@@ -33,7 +33,6 @@ int main(int argc, char **argv) {
     W(4,0) = 0.5f; W(4,1) = 0.250f;
     W(5,0) = 0.5f; W(5,1) = 0.0625f;
 
-    Func I("Input");
     Func S("S");
 
     Var x("x");
@@ -47,14 +46,11 @@ int main(int argc, char **argv) {
     RDom rza(0, image.channels(),"rza");
     RDom rzb(0, image.channels(),"rzb");
 
-    I(x,y,z) = select((x<0 || y<0 || z<0 || x>image.width()-1 || y>image.height()-1 || z>image.channels()-1), 0,
-            image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1), clamp(z,0,image.channels()-1)));
-
     Expr iw = image.width()-1;
     Expr ih = image.height()-1;
     Expr ic = image.channels()-1;
 
-    S(x,y,z) = I(x,y,z);
+    S(x,y,z) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1), clamp(z,0,image.channels()-1));
 
     S(rxa,y,z) = S(rxa,y,z)
         + select(rxa>0, W(0,0)*S(max(0,rxa-1),y,z), 0.0f)

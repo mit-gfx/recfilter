@@ -33,7 +33,6 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Func I("Input");
     Func S("S");
 
     Var x("x");
@@ -44,9 +43,7 @@ int main(int argc, char **argv) {
     RDom rz(0, image.width(), "rz");
     RDom rw(0, image.height(),"rw");
 
-    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-
-    S(x, y) = I(x,y);
+    S(x, y) = image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1));
     S(rx,y) = S(rx,y) + select(rx>0, S(max(0,rx-1),y), 0);
     S(x,ry) = S(x,ry) + select(ry>0, S(x,max(0,ry-1)), 0);
     S(rz,y) = S(rz,y) + select(rz>0, S(max(0,rz-1),y), 0);

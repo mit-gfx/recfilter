@@ -28,7 +28,6 @@ int main(int argc, char **argv) {
     W(2,0) = 0.500f; W(2,1) = 0.250f; W(2,1) = 0.06250f;
     W(3,0) = 0.500f; W(3,1) = 0.250f; W(3,1) = 0.06250f;
 
-    Func I("Input");
     Func S("S");
 
     Var x("x");
@@ -41,9 +40,7 @@ int main(int argc, char **argv) {
 
     Expr iw = image.width()-1;
 
-    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-
-    S(x, y)     = I(x,y);
+    S(x, y)     = image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1));
     S(rx,y)    += select(rx>0, W(0,0)*S(max(0,rx-1),y), 0.0f)     + select(rx>1, W(0,1)*S(max(0,rx-2),y), 0.0f)     + select(rx>2, W(0,2)*S(max(0,rx-3),y), 0.0f);
     S(iw-ry,y) += select(ry>0, W(1,0)*S(min(iw,iw-ry+1),y), 0.0f) + select(ry>1, W(1,1)*S(min(iw,iw-ry+2),y), 0.0f) + select(ry>2, W(1,2)*S(min(iw,iw-ry+3),y), 0.0f);
     S(rz,y)    += select(rz>0, W(2,0)*S(max(0,rz-1),y), 0.0f)     + select(rz>1, W(2,1)*S(max(0,rz-2),y), 0.0f)     + select(rz>2, W(2,2)*S(max(0,rz-3),y), 0.0f);
