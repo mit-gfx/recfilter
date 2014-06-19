@@ -724,6 +724,26 @@ static void add_all_residuals_to_final_result(
 
     assert(split_info.size() == F_deps.size());
 
+    // feed forward coeff is the multiplication of feedfwd coeff
+    // of all scans in this dimension
+    Expr one = make_one(F.output_types()[0]);
+    vector<Expr> feedfwd_coeff(split_info.size(), one);
+    for (int i=0; i<split_info.size(); i++) {
+        for (int j=0; j<split_info[i].num_splits; j++) {
+            int scan_id = split_info[i].scan_id[j];
+            Var xo = split_info[i].outer_var;
+            Expr num_tiles = split_info[i].num_tiles;
+            if (split_info[i].scan_causal[j]) {
+                Expr a = select(xo>0, split_info[i].feedfwd_coeff(scan_id), one);
+                feedfwd_coeff[i] *= a;
+            } else {
+                Expr a = select(xo<num_tiles-1, split_info[i].feedfwd_coeff(scan_id), one);
+                feedfwd_coeff[i] *= a;
+            }
+            feedfwd_coeff[i] = one;
+        }
+    }
+
     // define a function as a copy of the function F
     Function F_sub(F.name() + DELIMITER + PRE_FINAL_TERM);
     F_sub.define(pure_args, pure_values);
@@ -733,7 +753,9 @@ static void add_all_residuals_to_final_result(
     for (int i=0; i<F_deps.size()-1; i++) {
         int first_scan_next_dim = split_info[i+1].scan_id[ split_info[i+1].num_splits-1 ];
         vector<Expr> call_args = reductions[first_scan_next_dim].args;
+
         for (int j=0; j<reductions[first_scan_next_dim].values.size(); j++) {
+            reductions[first_scan_next_dim].values[j] *= feedfwd_coeff[i];
             reductions[first_scan_next_dim].values[j] += Call::make(F_deps[i], call_args, j);
         }
     }
@@ -756,8 +778,9 @@ static void add_all_residuals_to_final_result(
         final_call_args.push_back(Var(pure_args[i]));
     }
     for (int i=0; i<F.outputs(); i++) {
-        Expr val = Call::make(F_sub, final_call_args, i) +
-                Call::make(F_deps[F_deps.size()-1], final_call_args, i);
+        Expr fwd = feedfwd_coeff[ feedfwd_coeff.size()-1 ];
+        Expr val  = fwd * Call::make(F_sub, final_call_args, i) +
+            Call::make(F_deps[ F_deps.size()-1 ], final_call_args, i);
         final_pure_values.push_back(val);
     }
 
@@ -775,6 +798,10 @@ static vector<Function> create_recursive_split(
     vector< vector<Function> > F_ctail_list;
     vector< vector<Function> > F_tdeps_list;
     vector< Function         > F_deps_list;
+
+    /// TODO: this order of Function generation requires that F_ctail are
+    /// redefined after they are called in F_tdeps, change the order of
+    /// Function generation to fix this.
 
     for (int i=0; i<split_info.size(); i++) {
         string x = split_info[i].var.name();

@@ -240,16 +240,17 @@ std::vector<std::string> extract_params_in_expr(Halide::Expr expr);
 std::vector<std::string> extract_vars_or_rvars_in_expr(Halide::Expr expr);
 // @}
 
-/// Extract all the params referenced in a Expr
-
-/// Extract the list of dependencies of a Function -
-/// Functions called in the pure and reduction definitions
-/// of the given Function as well as its dependecies -
-/// returns the complete dependency graph of the function.
+/// Extract the list of dependencies of a Function
+// {@
 void extract_func_calls(
         Halide::Func func,                  /// Function to be analyzed
         std::vector<Halide::Func>& f_list   /// list returned as output
         );
+void extract_func_calls(
+        Halide::Func func,
+        std::map<std::string, Halide::Func>& f_list
+        );
+// @}
 
 // ----------------------------------------------------------------------------
 

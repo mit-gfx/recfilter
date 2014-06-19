@@ -7,6 +7,7 @@ using std::string;
 using std::vector;
 using std::set;
 using std::map;
+using std::make_pair;
 
 template<typename T>
 void mutate_binary_operator(IRMutator *mutator, const T *op, Expr *expr) {
@@ -96,41 +97,6 @@ public:
     vector<string> var_or_rvar_list;
     vector<string> param_list;
     ExtractVarsInExpr(void) {}
-};
-
-// -----------------------------------------------------------------------------
-
-// Extract all function calls in an Expr
-class ExtractFuncCalls : public IRVisitor {
-private:
-    using IRVisitor::visit;
-    void visit(const Call *op) {
-        for (size_t i=0; i<op->args.size(); i++) {
-            op->args[i].accept(this);
-        }
-
-        // Consider extern call args
-        Function f = op->func;
-        if (op->call_type==Call::Halide && f.has_extern_definition()) {
-            for (size_t i=0; i<f.extern_arguments().size(); i++) {
-                ExternFuncArgument arg = f.extern_arguments()[i];
-                if (arg.is_expr()) {
-                    arg.expr.accept(this);
-                }
-            }
-        }
-
-        if (op->call_type==Call::Halide &&
-                op->func.has_pure_definition() &&
-                op->name != curr_func_name)
-        {
-            extract_func_calls(Func(op->func), func_list);
-        }
-    }
-    string curr_func_name;
-public:
-    vector<Func> func_list;
-    ExtractFuncCalls(string func_name) : curr_func_name(func_name) {}
 };
 
 // -----------------------------------------------------------------------------
@@ -660,39 +626,21 @@ vector<string> extract_params_in_expr(Expr expr) {
 }
 
 void extract_func_calls(Func func, vector<Func>& func_list) {
-    ExtractFuncCalls extract(func.name());
-
-    vector<Expr> expr;
-
-    Function function = func.function();
-    for (int i=0; i<function.outputs(); i++) {
-        expr.push_back(function.values()[i]);
+    map<string, Function> func_map = find_transitive_calls(func.function());
+    map<string, Function>::iterator f_it  = func_map.begin();
+    map<string, Function>::iterator f_end = func_map.end();
+    while (f_it != f_end) {
+        func_list.push_back(Func(f_it->second));
+        f_it++;
     }
-    for (int i=0; i<function.reductions().size(); i++) {
-        for (int j=0; j<function.reductions()[i].args.size(); j++) {
-            expr.push_back(function.reductions()[i].args[j]);
-        }
-        for (int j=0; j<function.reductions()[i].values.size(); j++) {
-            expr.push_back(function.reductions()[i].values[j]);
-        }
-    }
+}
 
-    for (int i=0; i<expr.size(); i++) {
-        expr[i].accept(&extract);
-        func_list.push_back(func);
-        func_list.insert(func_list.end(),
-                extract.func_list.begin(), extract.func_list.end());
-    }
-
-    // remove duplicates
-    set<string> func_names;
-    for (size_t i=0; i<func_list.size(); i++) {
-        string name = func_list[i].name();
-        if (func_names.find(name) == func_names.end()) {
-            func_names.insert(name);
-        } else {
-            func_list.erase(func_list.begin()+i);
-            i--;
-        }
+void extract_func_calls(Func func, map<string, Func>& func_list) {
+    map<string, Function> func_map = find_transitive_calls(func.function());
+    map<string, Function>::iterator f_it  = func_map.begin();
+    map<string, Function>::iterator f_end = func_map.end();
+    while (f_it != f_end) {
+        func_list.insert(make_pair(f_it->first, Func(f_it->second)));
+        f_it++;
     }
 }
