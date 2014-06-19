@@ -345,6 +345,98 @@ public:
 
 // -----------------------------------------------------------------------------
 
+// Substitute a calling arg in feed forward recursive calls
+// to a Func; feedforward calls are those where all args in the
+// Function call are identical to args in Function definition
+class SubstituteArgInFeedforwardFuncCall : public IRMutator {
+private:
+    using IRMutator::visit;
+    void visit(const Call *op) {
+        vector<Expr> new_args(op->args.size());
+        bool changed = false;
+
+        // Mutate the args
+        for (size_t i=0; i<op->args.size(); i++) {
+            Expr old_arg = op->args[i];
+            Expr new_arg = mutate(old_arg);
+            if (!new_arg.same_as(old_arg)) changed = true;
+            new_args[i] = new_arg;
+        }
+
+        if (op->call_type==Call::Halide && op->name==func_name) {
+            assert(pos < new_args.size());
+            bool feedforward = true;
+            for (size_t i=0; i<new_args.size(); i++) {
+                feedforward &= equal(new_args[i], def_args[i]);
+            }
+            if (feedforward) {
+                new_args[pos] = new_arg;
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            expr = Call::make(op->type, op->name, new_args, op->call_type,
+                    op->func, op->value_index, op->image, op->param);
+        } else {
+            expr = op;
+        }
+    }
+
+    string func_name;
+    vector<Expr> def_args;
+    size_t pos;
+    Expr   new_arg;
+
+public:
+    SubstituteArgInFeedforwardFuncCall(string f, vector<Expr> d, size_t p, Expr a) :
+        func_name(f), def_args(d), pos(p), new_arg(a) {}
+};
+
+// -----------------------------------------------------------------------------
+
+// Swap two calling args in Func call
+class SwapCallArgsInFunctionCall : public IRMutator {
+private:
+    using IRMutator::visit;
+    void visit(const Call *op) {
+        vector<Expr> new_args(op->args.size());
+        bool changed = false;
+
+        // Mutate the args
+        for (size_t i=0; i<op->args.size(); i++) {
+            Expr old_arg = op->args[i];
+            Expr new_arg = mutate(old_arg);
+            if (!new_arg.same_as(old_arg)) changed = true;
+            new_args[i] = new_arg;
+        }
+
+        if (op->call_type==Call::Halide && op->name==func_name) {
+            Expr temp    = new_args[va];
+            new_args[va] = new_args[vb];
+            new_args[vb] = temp;
+            changed = true;
+        }
+
+        if (changed) {
+            expr = Call::make(op->type, op->name, new_args, op->call_type,
+                    op->func, op->value_index, op->image, op->param);
+        } else {
+            expr = op;
+        }
+    }
+
+    string func_name;
+    size_t va;
+    size_t vb;
+
+public:
+    SwapCallArgsInFunctionCall(string f, size_t a, size_t b) :
+        func_name(f), va(a), vb(b) {}
+};
+
+// -----------------------------------------------------------------------------
+
 // Substitute in Func call
 class SubstituteInFunctionCall : public IRMutator {
 private:
@@ -416,48 +508,6 @@ private:
 public:
     IncrementValueIndexInFunctionCall(string f, int i) :
         func_name(f), increment(i) {}
-};
-
-// -----------------------------------------------------------------------------
-
-// Swap two calling args in Func call
-class SwapCallArgsInFunctionCall : public IRMutator {
-private:
-    using IRMutator::visit;
-    void visit(const Call *op) {
-        vector<Expr> new_args(op->args.size());
-        bool changed = false;
-
-        // Mutate the args
-        for (size_t i=0; i<op->args.size(); i++) {
-            Expr old_arg = op->args[i];
-            Expr new_arg = mutate(old_arg);
-            if (!new_arg.same_as(old_arg)) changed = true;
-            new_args[i] = new_arg;
-        }
-
-        if (op->call_type==Call::Halide && op->name==func_name) {
-            Expr temp    = new_args[va];
-            new_args[va] = new_args[vb];
-            new_args[vb] = temp;
-            changed = true;
-        }
-
-        if (changed) {
-            expr = Call::make(op->type, op->name, new_args, op->call_type,
-                    op->func, op->value_index, op->image, op->param);
-        } else {
-            expr = op;
-        }
-    }
-
-    string func_name;
-    int va;
-    int vb;
-
-public:
-    SwapCallArgsInFunctionCall(string f, int a, int b) :
-        func_name(f), va(a), vb(b) {}
 };
 
 // -----------------------------------------------------------------------------
@@ -556,6 +606,16 @@ Expr remove_arg_from_func_call(string func_name, size_t pos, Expr original) {
     return s.mutate(original);
 }
 
+Expr swap_args_in_func_call(string func_name, size_t a, size_t b, Expr original) {
+    SwapCallArgsInFunctionCall s(func_name, a, b);
+    return s.mutate(original);
+}
+
+Expr substitute_arg_in_feedforward_func_call(string func_name, vector<Expr> def_args, size_t pos, Expr new_arg, Expr original) {
+    SubstituteArgInFeedforwardFuncCall s(func_name, def_args, pos, new_arg);
+    return s.mutate(remove_lets(original));
+}
+
 Expr substitute_in_func_call(string func_name, string var, Expr replace, Expr original) {
     SubstituteInFunctionCall s(func_name, var, replace);
     return s.mutate(original);
@@ -580,11 +640,6 @@ Expr swap_vars_in_expr(string a, string b, Expr original) {
     return value;
 }
 
-
-Expr swap_callargs_in_func_call(string func_name, int a, int b, Expr original) {
-    SwapCallArgsInFunctionCall s(func_name, a, b);
-    return s.mutate(original);
-}
 
 vector<string> extract_vars_or_rvars_in_expr(Expr expr) {
     ExtractVarsInExpr extract;

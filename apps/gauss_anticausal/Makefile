@@ -1,12 +1,10 @@
-APP_NAME=gauss_anticausal
-
 CXX=g++
 MKDIR=mkdir -p
 RM=rm -rf
 
-BUILD_DIR=_build
 BIN_DIR=../bin
-EXE=$(BIN_DIR)/$(APP_NAME)
+
+EXE=$(BIN_DIR)/gauss_anticausal_direct $(BIN_DIR)/gauss_anticausal_cascaded
 
 SPLITLIB_DIR=../../lib/
 SPLITLIB_INC=$(SPLITLIB_DIR)/split.h
@@ -20,17 +18,16 @@ INC := $(wildcard *.h)
 
 all: $(EXE)
 
-$(BUILD_DIR)/%.o: %.cpp $(INC) $(SPLITLIB_INC)
-	@$(MKDIR) $(BUILD_DIR)
-	$(CXX) -c $< -o $@ -fno-rtti -I$(SPLITLIB_DIR) -I$(HALIDE_DIR)/include/
-
-$(EXE): $(OBJ) $(SPLITLIB_LIB) $(HALIDE_LIB)
+$(BIN_DIR)/gauss_anticausal_direct: gauss_anticausal_direct.cpp $(SPLITLIB_INC) $(HALIDE_LIB) $(SPLITLIB_LIB)
 	@$(MKDIR) $(BIN_DIR)
-	$(CXX) -lz -lpthread -ldl -g -Wall $(OBJ) $(HALIDE_LIB) $(SPLITLIB_LIB) -o $(EXE)
+	$(CXX) gauss_anticausal_direct.cpp -fno-rtti -I$(SPLITLIB_DIR) -I$(HALIDE_DIR)/include/ -lz -lpthread -ldl -g -Wall $(HALIDE_LIB) $(SPLITLIB_LIB) -o $(BIN_DIR)/gauss_anticausal_direct
+
+$(BIN_DIR)/gauss_anticausal_cascaded: gauss_anticausal_cascaded.cpp $(SPLITLIB_INC) $(HALIDE_LIB) $(SPLITLIB_LIB)
+	@$(MKDIR) $(BIN_DIR)
+	$(CXX) gauss_anticausal_cascaded.cpp -fno-rtti -I$(SPLITLIB_DIR) -I$(HALIDE_DIR)/include/ -lz -lpthread -ldl -g -Wall $(HALIDE_LIB) $(SPLITLIB_LIB) -o $(BIN_DIR)/gauss_anticausal_cascaded
 
 $(SPLITLIB_LIB): $(SPLITLIB_INC)
 	make -C $(SPLITLIB_DIR)
 
 clean:
-	$(RM) $(BUILD_DIR)
 	$(RM) $(EXE)

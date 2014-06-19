@@ -251,7 +251,7 @@ static vector<Function> create_intra_tail_term(
             } else if (arg == xi.name()) {
                 pure_args.push_back(xi.name());
                 if (split_info.scan_causal[k]) {
-                    call_args.push_back(tile-xi-1);
+                    call_args.push_back(simplify(tile-xi-1));
                 } else {
                     call_args.push_back(xi);
                 }
@@ -334,8 +334,8 @@ static vector<Function> create_complete_tail_term(
                         call_args_curr_tile.push_back(rxo.z);
                         call_args_prev_tile.push_back(rxo.z-1);
                     } else {
-                        args.push_back(num_tiles-1-rxo.z);
-                        call_args_curr_tile.push_back(num_tiles-1-rxo.z);
+                        args.push_back(simplify(num_tiles-1-rxo.z));
+                        call_args_curr_tile.push_back(simplify(num_tiles-1-rxo.z));
                         call_args_prev_tile.push_back(num_tiles-rxo.z);
                     }
                 } else if (arg == xi.name()) {
@@ -354,16 +354,16 @@ static vector<Function> create_complete_tail_term(
 
             // multiply each tail element with its weight before adding
             for (int i=0; i<F_tail[k].outputs(); i++) {
-                values.push_back(Call::make(function, call_args_curr_tile, i) +
+                Expr val = Call::make(function, call_args_curr_tile, i) +
                         weight(simplify(tile-rxo.y-1), rxo.x) *
-                        Call::make(function, call_args_prev_tile, i));
+                        Call::make(function, call_args_prev_tile, i);
+                values.push_back(val);
             }
 
             function.define_reduction(args, values);
         }
         F_ctail.push_back(function);
     }
-
 
     assert(F_ctail.size() == split_info.num_splits);
 
@@ -415,9 +415,9 @@ static vector<Function> create_tail_residual_term(
                     if (xo.name() == arg) {
                         // prev or next tile as per causality
                         if (split_info.scan_causal[j]) {
-                            call_args.push_back(max(simplify(xo-1),0));
+                            call_args.push_back(max(xo-1,0));
                         } else {
-                            call_args.push_back(min(simplify(xo+1), simplify(num_tiles-1)));
+                            call_args.push_back(min(xo+1, simplify(num_tiles-1)));
                         }
                     } else if (arg == xi.name()) {
                         call_args.push_back(k);
@@ -433,8 +433,8 @@ static vector<Function> create_tail_residual_term(
                                 weight(xi,k) * Call::make(F_ctail[j], call_args, i),
                                 make_zero(type));
                     } else {
-                        val = select(xo<num_tiles-1,
-                                weight(tile-1-xi,k) * Call::make(F_ctail[j], call_args, i),
+                        val = select(xo<num_tiles-1, weight(simplify(tile-1-xi),k) *
+                                Call::make(F_ctail[j], call_args, i),
                                 make_zero(type));
                     }
                     values[i] = simplify(values[i] + val);
@@ -491,9 +491,9 @@ static Function create_final_residual_term(
                 string arg = F_ctail[j].args()[i];
                 if (xo.name() == arg) {
                     if (split_info.scan_causal[j]) {
-                        call_args.push_back(max(simplify(xo-1),0));  // prev tile
+                        call_args.push_back(max(xo-1,0));  // prev tile
                     } else {
-                        call_args.push_back(min(simplify(xo+1), simplify(num_tiles-1)));
+                        call_args.push_back(min(xo+1, simplify(num_tiles-1)));
                     }
                 } else if (arg == xi.name()) {
                     call_args.push_back(k);
@@ -510,7 +510,7 @@ static Function create_final_residual_term(
                             make_zero(type));
                 } else {
                     val = select(xo<num_tiles-1,
-                            weight(tile-1-xi,k) * Call::make(F_ctail[j], call_args, i),
+                            weight(simplify(tile-1-xi),k) * Call::make(F_ctail[j], call_args, i),
                             make_zero(type));
                 }
                 values[i] = simplify(values[i] + val);
@@ -543,7 +543,7 @@ static void add_residual_to_tails(
             string arg = F_tail[j].args()[i];
             if (arg == xi.name()) {
                 if (split_info.scan_causal[j]) {
-                    call_args.push_back(tile-xi-1);
+                    call_args.push_back(simplify(tile-xi-1));
                 } else {
                     call_args.push_back(xi);
                 }
@@ -672,7 +672,7 @@ static void add_prev_dimension_residual_to_tails(
                         // if current scan is causal then accumulate the last
                         // elements of prev dimension tail
                         if (split_info.scan_causal[j]) {
-                            call_args.push_back(tile-1-xi);
+                            call_args.push_back(simplify(tile-1-xi));
                         } else {
                             call_args.push_back(xi);
                         }
@@ -691,7 +691,7 @@ static void add_prev_dimension_residual_to_tails(
                                 make_zero(F_tail_prev_scanned.output_types()[i]));
                     } else {
                         val = select(yo<num_tiles_prev-1,
-                                weight(tile-1-yi,o) * Call::make(F_tail_prev_scanned, call_args, i),
+                                weight(simplify(tile-1-yi),o) * Call::make(F_tail_prev_scanned, call_args, i),
                                 make_zero(F_tail_prev_scanned.output_types()[i]));
                     }
                     pure_values[i] += val;
@@ -756,8 +756,9 @@ static void add_all_residuals_to_final_result(
         final_call_args.push_back(Var(pure_args[i]));
     }
     for (int i=0; i<F.outputs(); i++) {
-        final_pure_values.push_back(Call::make(F_sub, final_call_args, i) +
-                Call::make(F_deps[F_deps.size()-1], final_call_args, i));
+        Expr val = Call::make(F_sub, final_call_args, i) +
+                Call::make(F_deps[F_deps.size()-1], final_call_args, i);
+        final_pure_values.push_back(val);
     }
 
     F.clear_all_definitions();
@@ -821,21 +822,43 @@ void split(
         vector<RDom> inner_rdom)
 {
     vector<int> order(dimension.size(), 1);         // default first order
-
-    Image<float> weights(dimension.size(), 1);      // default filter weight = 1
-    for (int i=0; i<weights.width(); i++) {
-        for (int j=0; j<weights.height(); j++) {
-            weights(i,j) = 1.0f;
+    Image<float> feedfwd_coeff(dimension.size(), 1);  // default filter weight = 1
+    Image<float> feedback_coeff(dimension.size(),1);  // default filter weight = 1
+    for (int i=0; i<feedback_coeff.width(); i++) {
+        for (int j=0; j<feedback_coeff.height(); j++) {
+            feedfwd_coeff(i,j)  = 1.0f;
+            feedback_coeff(i,j) = 1.0f;
         }
     }
-
-    split(func, weights, dimension, var, inner_var, outer_var,
+    split(func, feedfwd_coeff, feedback_coeff, dimension, var, inner_var, outer_var,
             rdom, inner_rdom, order);
 }
 
 void split(
         Func& func,
-        Image<float> filter_weights,
+        Image<float> feedback_coeff,
+        vector<int>  dimension,
+        vector<Var>  var,
+        vector<Var>  inner_var,
+        vector<Var>  outer_var,
+        vector<RDom> rdom,
+        vector<RDom> inner_rdom,
+        vector<int>  order)
+{
+    Image<float> feedfwd_coeff(dimension.size(), 1);
+    for (int i=0; i<feedfwd_coeff.width(); i++) {
+        for (int j=0; j<feedfwd_coeff.height(); j++) {
+            feedfwd_coeff(i,j)  = 1.0f;
+        }
+    }
+    split(func, feedfwd_coeff, feedback_coeff, dimension, var, inner_var, outer_var,
+            rdom, inner_rdom, order);
+}
+
+void split(
+        Func& func,
+        Image<float> feedfwd_coeff,
+        Image<float> feedback_coeff,
         vector<int>  dimension,
         vector<Var>  var,
         vector<Var>  inner_var,
@@ -920,7 +943,8 @@ void split(
         s.image_width  = image_width[index];
         s.tile_width   = tile_width[index];
         s.num_tiles    = num_tiles[index];
-        s.filter_weights = filter_weights;
+        s.feedfwd_coeff  = feedfwd_coeff;
+        s.feedback_coeff = feedback_coeff;
 
         s.scan_id    .push_back(i);
         s.scan_stage .push_back(0);
@@ -994,7 +1018,8 @@ void split(
             }
         }
         for (int i=0; i<F.outputs(); i++) {
-            values.push_back(Call::make(F_final, call_args, i));
+            Expr val = Call::make(F_final, call_args, i);
+            values.push_back(val);
         }
         F.clear_all_definitions();
         F.define(args, values);

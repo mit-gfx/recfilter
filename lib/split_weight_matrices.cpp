@@ -2,14 +2,18 @@
 
 using namespace Halide;
 
-static Image<float> matrix_A_FB(Image<float> filter_weights,
+static Image<float> matrix_A_FB(
+        Image<float> feedfwd_coeff,
+        Image<float> feedback_coeff,
         int scan_id, int tile_width)
 {
-    int filter_order = filter_weights.height();
+    int filter_order = feedback_coeff.height();
 
-    vector<float> weights(filter_order);
+    float feedfwd = feedfwd_coeff(scan_id);
+
+    vector<float> feedback(filter_order);
     for (int i=0; i<filter_order; i++) {
-        weights[i] = filter_weights(scan_id, i);
+        feedback[i] = feedback_coeff(scan_id, i);
     }
 
     Image<float> C(tile_width, tile_width);
@@ -17,7 +21,7 @@ static Image<float> matrix_A_FB(Image<float> filter_weights,
     // initialize as identity matrix
     for (int x=0; x<tile_width; x++) {
         for (int y=0; y<tile_width; y++) {
-            C(x,y) = (x==y ? 1.0f : 0.0f);
+            C(x,y) = (x==y ? feedfwd : 0.0f);
         }
     }
 
@@ -25,7 +29,7 @@ static Image<float> matrix_A_FB(Image<float> filter_weights,
     for (int y=0; y<tile_width; y++) {
         for (int x=0; x<tile_width; x++) {
             for (int j=0; y-j-1>=0 && j<filter_order; j++) {
-                C(x,y) += C(x,y-j-1) * weights[j];
+                C(x,y) += C(x,y-j-1) * feedback[j];
             }
         }
     }
@@ -33,14 +37,15 @@ static Image<float> matrix_A_FB(Image<float> filter_weights,
     return C;
 }
 
-static Image<float> matrix_A_FP(Image<float> filter_weights,
+static Image<float> matrix_A_FP(
+        Image<float> feedback_coeff,
         int scan_id, int tile_width)
 {
-    int filter_order = filter_weights.height();
+    int filter_order = feedback_coeff.height();
 
     vector<float> weights(filter_order);
     for (int i=0; i<filter_order; i++) {
-        weights[i] = filter_weights(scan_id, i);
+        weights[i] = feedback_coeff(scan_id, i);
     }
 
     Image<float> C(filter_order, tile_width);
@@ -130,14 +135,14 @@ Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2) {
     int  scan_id     = s.scan_id[split_id1];
     bool scan_causal = s.scan_causal[split_id1];
 
-    Image<float> A_FP = matrix_A_FP(s.filter_weights, scan_id, tile_width);
+    Image<float> A_FP = matrix_A_FP(s.feedback_coeff, scan_id, tile_width);
 
     // accummulate weight coefficients because of all subsequent scans
     // traversal is backwards because SplitInfo contains scans in the
     // reverse order
     for (int j=split_id1-1; j>=split_id2; j--) {
-        Image<float> A_FB = matrix_A_FB(s.filter_weights,
-                s.scan_id[j], tile_width);
+        Image<float> A_FB = matrix_A_FB(s.feedfwd_coeff,
+                s.feedback_coeff, s.scan_id[j], tile_width);
 
         if (scan_causal != s.scan_causal[j]) {
             Image<float> AI = matrix_antidiagonal(A_FP.height());

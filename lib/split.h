@@ -44,7 +44,19 @@ std::ostream &operator<<(std::ostream &s, CheckResultVerbose v);
 
 void split(
         Halide::Func& F,
-        Halide::Image<float> filter_weights,
+        Halide::Image<float>      feedfwd_coeff,
+        Halide::Image<float>      feedback_coeff,
+        std::vector<int>          dimensions,
+        std::vector<Halide::Var>  vars,
+        std::vector<Halide::Var>  inner_vars,
+        std::vector<Halide::Var>  outer_vars,
+        std::vector<Halide::RDom> rdoms,
+        std::vector<Halide::RDom> inner_rdoms,
+        std::vector<int> orders);
+
+void split(
+        Halide::Func& F,
+        Halide::Image<float>      feedback_coeff,
         std::vector<int>          dimensions,
         std::vector<Halide::Var>  vars,
         std::vector<Halide::Var>  inner_vars,
@@ -130,7 +142,6 @@ Halide::Expr substitute_in_func_call(
         Halide::Expr original           /// original expression
         );
 
-
 /// Add a calling argument to all calls to a particular Function
 Halide::Expr insert_arg_in_func_call(
         std::string func_name,          /// name of Function
@@ -144,6 +155,25 @@ Halide::Expr remove_arg_from_func_call(
         std::string func_name,          /// name of Function
         size_t pos,                     /// calling arg index within list to be removed
         Halide::Expr original           /// original expression
+        );
+
+/// Swap two calling arguments of given function in the expression
+Halide::Expr swap_args_in_func_call(
+        string func_name,       /// name of function to modify
+        size_t va_idx,          /// index of first calling arg
+        size_t vb_idx,          /// index of second calling arg
+        Halide::Expr original   /// original expression
+        );
+
+/// Substitute a calling arg in feed forward recursive calls
+/// to a Func; feedforward calls are those where all args in the
+/// Function call are identical to args in Function definition
+Halide::Expr substitute_arg_in_feedforward_func_call(
+        std::string func_name,              /// name of function to modify
+        std::vector<Halide::Expr> def_arg,  /// args in Function defintion
+        size_t pos,                         /// index of calling arg to be replaced
+        Halide::Expr new_arg,               /// new calling arg
+        Halide::Expr original               /// original expression
         );
 
 /// Mathematically add an expression to all calls to a particular
@@ -196,14 +226,6 @@ Halide::Expr inline_func_calls(
         Halide::Expr original               /// original expression
         );
 
-/// Swaps two calling arguments of given function in the expression
-Halide::Expr swap_callargs_in_func_call(
-        string func_name,       /// name of function to modify
-        int va_idx,             ///.index of first calling arg
-        int vb_idx,             /// index of second calling arg
-        Halide::Expr original   /// original expression
-        );
-
 /// Swaps two variables in an expression
 Halide::Expr swap_vars_in_expr(
         string a,               /// first variable name for swapping
@@ -212,9 +234,11 @@ Halide::Expr swap_vars_in_expr(
         );
 
 /// Extract vars referenced in a Expr
+// {@
 std::vector<std::string> extract_rvars_in_expr(Halide::Expr expr);
 std::vector<std::string> extract_params_in_expr(Halide::Expr expr);
 std::vector<std::string> extract_vars_or_rvars_in_expr(Halide::Expr expr);
+// @}
 
 /// Extract all the params referenced in a Expr
 

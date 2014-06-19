@@ -568,7 +568,7 @@ void swap_variables(Func S, string func_name, Var a, Var b) {
             vector<ReductionDefinition> reductions = f.reductions();
             for (int i=0; i<pure_values.size(); i++) {
                 if (expr_depends_on_func(pure_values[i], F.name())) {
-                    pure_values[i] = swap_callargs_in_func_call(
+                    pure_values[i] = swap_args_in_func_call(
                             F.name(), va_idx, vb_idx, pure_values[i]);
                     modified = true;
                 }
@@ -576,7 +576,7 @@ void swap_variables(Func S, string func_name, Var a, Var b) {
             for (int k=0; k<reductions.size(); k++) {
                 for (int u=0; u<reductions[k].values.size(); u++) {
                     if (expr_depends_on_func(reductions[k].values[u], F.name())) {
-                        reductions[k].values[u] = swap_callargs_in_func_call(
+                        reductions[k].values[u] = swap_args_in_func_call(
                                 F.name(), va_idx, vb_idx, reductions[k].values[u]);
                         modified = true;
                     }

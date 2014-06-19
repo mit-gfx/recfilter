@@ -121,15 +121,9 @@ void fix_intra_tile_scan_stages(Function F_intra) {
                 Expr curr_scan_stage = reductions[i]  .args[scan_stage_var_index];
                 Expr prev_scan_stage = reductions[i-1].args[scan_stage_var_index];
                 if (!equal(prev_scan_stage, curr_scan_stage)) {
-                    vector<Expr> call_args;
-                    for (int k=0; k<reductions[i].args.size(); k++) {
-                        if (equal(reductions[i].args[k], curr_scan_stage)) {
-                            call_args.push_back(prev_scan_stage);
-                        } else {
-                            call_args.push_back(reductions[i].args[k]);
-                        }
-                    }
-                    value = Call::make(F_intra, call_args, j) + value;
+                    value = substitute_arg_in_feedforward_func_call(
+                            F_intra.name(), reductions[i].args,
+                            scan_stage_var_index, prev_scan_stage, value);
                 }
             }
             reductions[i].values[j] = value;
@@ -137,5 +131,3 @@ void fix_intra_tile_scan_stages(Function F_intra) {
         F_intra.define_reduction(reductions[i].args, reductions[i].values);
     }
 }
-
-

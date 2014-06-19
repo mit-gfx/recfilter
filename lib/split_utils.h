@@ -27,7 +27,8 @@ struct SplitInfo {
     vector<Halide::RDom> outer_rdom;
     vector<Halide::RDom> inner_rdom;
 
-    Halide::Image<float> filter_weights;
+    Halide::Image<float> feedfwd_coeff;
+    Halide::Image<float> feedback_coeff;
 };
 
 
