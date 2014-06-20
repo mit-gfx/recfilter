@@ -361,6 +361,71 @@ public:
 
 // -----------------------------------------------------------------------------
 
+// Remove all min/max clamping in an expression
+class RemoveMinMax : public IRMutator {
+private:
+    using IRMutator::visit;
+    void visit(const Max *op) { expr = (is_const(op->a) ? op->b : op->a); }
+    void visit(const Min *op) { expr = (is_const(op->a) ? op->b : op->a); }
+public:
+    RemoveMinMax(void) {}
+};
+
+// -----------------------------------------------------------------------------
+
+// Apply zero boundary condition on all tiles except tiles that touch image
+// borders; this pads tiles by zeros if the intra tile index is out of range -
+// - less than zero or greater than tile width.
+// Usually, if the feedforward coeff is 1.0 zero padding is required for in
+// the Function definition itself - which automatically pads all tiles by zeros.
+// But in Gaussian filtering feedforward coeff is not 1.0; so Function definition
+// cannot pad the image by zeros; in such case it is important to forcibly pad
+// all inner tiles by zeros.
+class ApplyZeroBoundaryInFuncCall : public IRMutator {
+private:
+    using IRMutator::visit;
+    void visit(const Call *op) {
+        bool change = false;
+        Expr condition;
+
+        if (op->call_type==Call::Halide && op->name==func_name) {
+            assert(dim < op->args.size());
+            Expr call_arg = op->args[dim];
+
+            // remove any clamping
+            RemoveMinMax r;
+            call_arg = r.mutate(simplify(call_arg));
+
+            // not a feedback coeff if calling arg is same as defintion arg
+            // check more than 0 for causal, less than width for anticausal
+            if (!equal(call_arg, def_arg)) {
+                bool causal = is_zero(boundary);
+                condition = border_tile_condition ||
+                    (causal ? call_arg>=0 : call_arg<boundary);
+                change = true;
+            }
+        }
+
+        if (change) {
+            expr = select(condition, op, make_zero(op->type));
+        } else {
+            expr = op;
+        }
+    }
+
+    string func_name;
+    size_t dim;
+    Expr   def_arg;
+    Expr   boundary;
+    Expr   border_tile_condition;
+
+public:
+    ApplyZeroBoundaryInFuncCall(string f, size_t d, Expr a, Expr b, Expr c) :
+        func_name(f), dim(d), def_arg(a), boundary(b), border_tile_condition(c) {}
+};
+
+// -----------------------------------------------------------------------------
+
 // Swap two calling args in Func call
 class SwapCallArgsInFunctionCall : public IRMutator {
 private:
@@ -579,6 +644,11 @@ Expr swap_args_in_func_call(string func_name, size_t a, size_t b, Expr original)
 
 Expr substitute_arg_in_feedforward_func_call(string func_name, vector<Expr> def_args, size_t pos, Expr new_arg, Expr original) {
     SubstituteArgInFeedforwardFuncCall s(func_name, def_args, pos, new_arg);
+    return s.mutate(remove_lets(original));
+}
+
+Expr apply_zero_boundary_in_func_call(string func_name, size_t dim, Expr arg, Expr boundary, Expr cond, Expr original) {
+    ApplyZeroBoundaryInFuncCall s(func_name, dim, arg, boundary, cond);
     return s.mutate(remove_lets(original));
 }
 

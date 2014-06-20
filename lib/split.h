@@ -170,10 +170,27 @@ Halide::Expr swap_args_in_func_call(
 /// Function call are identical to args in Function definition
 Halide::Expr substitute_arg_in_feedforward_func_call(
         std::string func_name,              /// name of function to modify
-        std::vector<Halide::Expr> def_arg,  /// args in Function defintion
+        std::vector<Halide::Expr> def_arg,  /// args in Function definition
         size_t pos,                         /// index of calling arg to be replaced
         Halide::Expr new_arg,               /// new calling arg
         Halide::Expr original               /// original expression
+        );
+
+/// Apply zero boundary condition on all tiles except tiles that touch image
+/// borders; this pads tiles by zeros if the intra tile index is out of range -
+/// - less than zero or greater than tile width.
+/// Usually, if the feedforward coeff is 1.0 zero padding is required for in
+/// the Function definition itself - which automatically pads all tiles by zeros.
+/// But in Gaussian filtering feedforward coeff is not 1.0; so Function definition
+/// cannot pad the image by zeros; in such case it is important to forcibly pad
+/// all inner tiles by zeros.
+Halide::Expr apply_zero_boundary_in_func_call(
+        std::string func_name,      /// name of function to modify
+        size_t dim,                 /// dimension containing the RVar
+        Halide::Expr def_arg,       /// args in Function definition
+        Halide::Expr boundary,      /// tile width
+        Halide::Expr cond,          /// condition to check tiles touching borders
+        Halide::Expr original       /// original expression
         );
 
 /// Mathematically add an expression to all calls to a particular

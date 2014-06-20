@@ -163,7 +163,6 @@ gaussian_weights(float sigma, int order, int num_scans) {
     return std::make_pair<Halide::Image<float>, Halide::Image<float> >(B, W);
 }
 
-// @ {
 //Expr gaussian(Expr x, float mu, float sigma) {
 //    Expr xx = Internal::Cast::make(type_of<float>(),x);
 //    Expr y = (xx - mu) / sigma;
@@ -189,4 +188,7 @@ float gaussDerivative(float x, float mu, float sigma) {
 float gaussIntegral(float x, float mu, float sigma) {
     return (0.5f * ( 1.0f + erf((x-mu) / (sigma * 1.41421356237f)) ));
 }
-// @}
+
+int gaussian_box_filter(int k, float sigma) {
+    return std::ceil(std::sqrt((12.0f*sigma*sigma)/float(k)+1));
+}

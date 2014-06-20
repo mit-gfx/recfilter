@@ -97,9 +97,9 @@ int main(int argc, char **argv) {
 
         G2(x, y) = G1_result(x,y);
 
-        G2(rx,y) = B(0)*G2(rx,y)
-            + W(0,0)*G2(max(0,rx-1),y)
-            + W(0,1)*G2(max(0,rx-2),y);
+//        G2(rx,y) = B(0)*G2(rx,y)
+//            + W(0,0)*G2(max(0,rx-1),y)
+//            + W(0,1)*G2(max(0,rx-2),y);
 
 //        G2(iw-ry,y) = B(1)*G2(iw-ry,y)
 //            + W(1,0)*G2(min(iw,iw-ry+1),y)
@@ -109,19 +109,19 @@ int main(int argc, char **argv) {
 //            + W(2,0)*G2(x,max(0,rz-1))
 //            + W(2,1)*G2(x,max(0,rz-2));
 //
-//        G2(x,ih-rw) = B(3)*G2(x,ih-rw)
-//            + W(3,0)*G2(x,min(ih,ih-rw+1))
-//            + W(3,1)*G2(x,min(ih,ih-rw+2));
+        G2(x,ih-rw) = B(3)*G2(x,ih-rw)
+            + W(3,0)*G2(x,min(ih,ih-rw+1))
+            + W(3,1)*G2(x,min(ih,ih-rw+2));
 
         G2_result(x,y) = G2(x,y);
 
         split(G2,B,W,
-                Internal::vec(  0),
-                Internal::vec(  x),
-                Internal::vec( xi),
-                Internal::vec( xo),
-                Internal::vec( rx),
-                Internal::vec(rxi),
+                Internal::vec(  1),
+                Internal::vec(  y),
+                Internal::vec( yi),
+                Internal::vec( yo),
+                Internal::vec( rw),
+                Internal::vec(rwi),
                 Internal::vec(order));
 
 //        split(G2,B,W,
@@ -151,13 +151,6 @@ int main(int argc, char **argv) {
         cerr << func_list[i] << endl;
         func_list[i].compute_root();
         functions[func_list[i].name()] = func_list[i];
-        if (func_list[i].name() == "G2-Final-Sub") {
-            Func f;
-            f(x,y) = func_list[i](x/tile, x%tile, y);
-            Image<float> a = f.realize(width, height);
-            cerr << a << endl;
-        }
-
     }
 
     // ----------------------------------------------------------------------------------------------

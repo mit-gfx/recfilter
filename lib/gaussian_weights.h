@@ -35,4 +35,16 @@ std::pair<Halide::Image<float>, Halide::Image<float> > gaussian_weights(
         int num_scans  /// Number of scans in the recursive filter
         );
 
+/**
+ * @brief Compute the size of a box filter that approximates a Gaussian
+ *
+ * Source: "Efficient Gaussian filtering using cascaded prefix sums"
+ * Robinson ICIP 2012
+ *
+ * @param[in] k number of repeated applications of box filter
+ * @param[in] sigma Standard deviation of the Gaussian
+ * @return box filter width
+ */
+int gaussian_box_filter(int k, float sigma);
+
 #endif // _GAUSSIAN_WEIGHTS_H_

@@ -40,53 +40,20 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
         }
     }
 
-    //Var xs(SCAN_STAGE_ARG);
-
     vector<string> pure_args = F.args();
     vector<Expr>   pure_values = F.values();
     vector<ReductionDefinition> reductions = F.reductions();
 
     // create the split function and add the scan stage arg
     {
-        //int scan_stage_var_index = pure_args.size();
-
-        // add the scan stage arg to pure args
-        //pure_args.push_back(xs.name());
-
-        // set pure values to zero for all scan stages other than 0
-        //for (int i=0; i<pure_values.size(); i++) {
-        //    pure_values[i] = select(xs==0, pure_values[i], 0);
-        //}
         F_intra.define(pure_args, pure_values);
 
+        // replace calls to original Func by split Func
+        // add scan stage value as arg to reduction args and recursive calls
         for (int i=0; i<reductions.size(); i++) {
-            // find the actual scan stage for this reduction
-            //int scan_stage = -1;
-            //for (int j=0; j<split_info.size(); j++) {
-            //    for (int k=0; k<split_info[j].num_splits; k++) {
-            //        if (split_info[j].scan_id[k] == i) {
-            //            scan_stage = split_info[j].scan_stage[k];
-            //        }
-            //    }
-            //}
-            //if (scan_stage < 0) {
-            //    cerr << "Scan stage not found for reduction definition " << i << ", "
-            //        << "most probably because splits have not been specified "
-            //        << "for all reduction definitions" << endl;
-            //    assert(false);
-            //}
-
-            //// add scan stage value as arg to reductions, so that each
-            //// reduction computes at its own stage
-            //reductions[i].args.push_back(scan_stage);
-
-            // replace calls to original Func by split Func
-            // add scan stage value as arg to reduction args and recursive calls
             for (int j=0; j<reductions[i].values.size(); j++) {
                 Expr value = reductions[i].values[j];
                 value = substitute_func_call(F.name(), F_intra, value);
-            //  value = insert_arg_in_func_call(F_intra.name(),
-            //        scan_stage_var_index, scan_stage, value);
                 reductions[i].values[j] = value;
             }
             F_intra.define_reduction(reductions[i].args, reductions[i].values);
@@ -174,7 +141,8 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
             Expr rxo = var_to_outer_expr[rx];
             string image_width = expr_params[0];
 
-            // reduction definition args: replace rx by rxi,rxo and image_width by tile_width (for anticausal filter)
+            // reduction definition args: replace rx by rxi,rxo and
+            // image_width by tile_width (for anticausal filter)
             reductions[i].args[var_index] = substitute(rx, rxi, reductions[i].args[var_index]);
             reductions[i].args[var_index] = substitute(image_width, tile_width, reductions[i].args[var_index]);
             reductions[i].args.insert(reductions[i].args.begin()+var_index+1, rxo);
@@ -197,6 +165,46 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
     }
 
     return F_intra;
+}
+
+// -----------------------------------------------------------------------------
+
+static void apply_zero_boundary_on_inner_tiles(Function F_intra, vector<SplitInfo> split_info) {
+    vector<string> pure_args = F_intra.args();
+    vector<Expr>   pure_values = F_intra.values();
+    vector<ReductionDefinition> reductions = F_intra.reductions();
+
+    // go to each scan that is split and apply the inner tile condition on
+    // all feedback terms
+    for (int i=0; i<split_info.size(); i++) {
+        int dim        = split_info[i].filter_dim;
+        Var xo         = split_info[i].outer_var;
+        Expr num_tiles = split_info[i].num_tiles;
+        Expr tile_width= split_info[i].tile_width;
+
+        for (int j=0; j<split_info[i].num_splits; j++) {
+            bool causal = split_info[i].scan_causal[j];
+            int scan_id = split_info[i].scan_id[j];
+            Expr arg    = reductions[scan_id].args[dim];
+
+            Expr boundary = (causal ? 0 : tile_width);
+            Expr inner_tile_condition = (causal ? (xo==0) : (xo==num_tiles-1));
+
+            for (int k=0; k<reductions[scan_id].values.size(); k++) {
+                Expr val = reductions[scan_id].values[k];
+                val = apply_zero_boundary_in_func_call(F_intra.name(),
+                        dim, arg, boundary, inner_tile_condition, val);
+                reductions[scan_id].values[k] = val;
+            }
+        }
+    }
+
+    // redefine the function if boundary conditions are applied
+    F_intra.clear_all_definitions();
+    F_intra.define(pure_args, pure_values);
+    for (int i=0; i<reductions.size(); i++) {
+        F_intra.define_reduction(reductions[i].args, reductions[i].values);
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -1007,8 +1015,19 @@ void split(
         }
     }
 
+    // are all feed fwd coeff equal to 1.0
+    bool feedfwd_coeff_equal_one = true;
+    for (int i=0; i<feedfwd_coeff.width(); i++) {
+        feedfwd_coeff_equal_one &= (feedfwd_coeff(i) == 1.0f);
+    }
+
     // compute the intra tile result
     Function F_intra = create_intra_tile_term(F, split_info);
+
+    // apply zero boundary on inner tiles if feed forward coeffs are not 1
+    if (!feedfwd_coeff_equal_one) {
+        apply_zero_boundary_on_inner_tiles(F_intra, split_info);
+    }
 
     // create a function will hold the final result,
     // just a copy of the intra tile computation for now
