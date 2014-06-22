@@ -112,21 +112,27 @@ void fix_intra_tile_scan_stages(Function F_intra) {
         }
     }
 
-    // transfer data from one stage of computation to another
-    // since each stage computes in its own buffer
+    // add extra update steps to transfer data from one scan stage to another
     for (int i=0; i<reductions.size(); i++) {
-        for (int j=0; j<reductions[i].values.size(); j++) {
-            Expr value = reductions[i].values[j];
-            if (i>0) {
-                Expr curr_scan_stage = reductions[i]  .args[scan_stage_var_index];
-                Expr prev_scan_stage = reductions[i-1].args[scan_stage_var_index];
-                if (!equal(prev_scan_stage, curr_scan_stage)) {
-                    value = substitute_arg_in_feedforward_func_call(
-                            F_intra.name(), reductions[i].args,
-                            scan_stage_var_index, prev_scan_stage, value);
+        if (i>0) {
+            // scan stage of previous and current scan
+            Expr curr_scan_stage = reductions[i]  .args[scan_stage_var_index];
+            Expr prev_scan_stage = reductions[i-1].args[scan_stage_var_index];
+
+            // LHS and RHS differ only by scan stage value
+            vector<Expr> args      = reductions[i].args;
+            vector<Expr> call_args = reductions[i].args;
+            call_args[scan_stage_var_index] = prev_scan_stage;
+
+            // add the extra scan stage in between if consecutive scans
+            // have different stages
+            if (!equal(prev_scan_stage, curr_scan_stage)) {
+                vector<Expr> values;
+                for (int j=0; j<reductions[i].values.size(); j++) {
+                    values.push_back(Call::make(F_intra, call_args, j));
                 }
+                F_intra.define_reduction(args, values);
             }
-            reductions[i].values[j] = value;
         }
         F_intra.define_reduction(reductions[i].args, reductions[i].values);
     }

@@ -177,7 +177,6 @@ static void apply_zero_boundary_on_inner_tiles(Function F_intra, vector<SplitInf
     // go to each scan that is split and apply the inner tile condition on
     // all feedback terms
     for (int i=0; i<split_info.size(); i++) {
-        int dim        = split_info[i].filter_dim;
         Var xo         = split_info[i].outer_var;
         Expr num_tiles = split_info[i].num_tiles;
         Expr tile_width= split_info[i].tile_width;
@@ -185,10 +184,20 @@ static void apply_zero_boundary_on_inner_tiles(Function F_intra, vector<SplitInf
         for (int j=0; j<split_info[i].num_splits; j++) {
             bool causal = split_info[i].scan_causal[j];
             int scan_id = split_info[i].scan_id[j];
-            Expr arg    = reductions[scan_id].args[dim];
 
             Expr boundary = (causal ? 0 : tile_width);
             Expr inner_tile_condition = (causal ? (xo==0) : (xo==num_tiles-1));
+
+            int dim = -1;
+            Expr arg;
+            RDom rxi = split_info[i].inner_rdom[j];
+            for (int k=0; k<reductions[scan_id].args.size(); k++) {
+                if (expr_depends_on_var(reductions[scan_id].args[k], rxi.x.name())) {
+                    dim = k;
+                    arg = reductions[scan_id].args[k];
+                }
+            }
+            assert(dim >= 0);
 
             for (int k=0; k<reductions[scan_id].values.size(); k++) {
                 Expr val = reductions[scan_id].values[k];
@@ -460,7 +469,7 @@ static vector<Function> create_tail_residual_term(
 
 // -----------------------------------------------------------------------------
 
-static Function create_final_residual_term(
+static vector<Function> create_final_residual_term(
         vector<Function> F_ctail,
         SplitInfo split_info,
         string func_name)
@@ -474,22 +483,26 @@ static Function create_final_residual_term(
     assert(split_info.num_splits == F_ctail.size());
 
     // accumulate all completed tails
-    Function function(func_name);
-
-    int num_args    = F_ctail[0].args().size();
-    int num_outputs = F_ctail[0].outputs();
-    Type type       = F_ctail[0].output_types()[0];
-
-    // args are same as completed tail terms
-    vector<string> args = F_ctail[0].args();
-    vector<Expr> values(num_outputs, make_zero(type));
+    vector<Function> F_deps;
 
     // accumulate contribution from each completed tail
     for (int j=0; j<split_info.num_splits; j++) {
+        Function function(func_name + "_" + int_to_string(split_info.scan_id[j]));
+
+        int num_args    = F_ctail[j].args().size();
+        int num_outputs = F_ctail[j].outputs();
+        Type type       = F_ctail[j].output_types()[0];
+
+        // args are same as completed tail terms
+        vector<string> args = F_ctail[j].args();
+        vector<Expr> values(num_outputs, make_zero(type));
 
         // weight matrix for accumulating completed tail elements
         // of scan after applying all subsequent scans
-        Image<float> weight = tail_weights(split_info, j, 0);
+        Image<float> weight = tail_weights(split_info, j);
+
+        cerr << split_info.scan_id[j] << endl;
+        cerr << weight << endl;
 
         // size of tail is equal to filter order, accumulate all
         // elements of the tail
@@ -524,10 +537,12 @@ static Function create_final_residual_term(
                 values[i] = simplify(values[i] + val);
             }
         }
-    }
-    function.define(args, values);
+        function.define(args, values);
 
-    return function;
+        F_deps.push_back(function);
+    }
+
+    return F_deps;
 }
 
 // -----------------------------------------------------------------------------
@@ -723,7 +738,7 @@ static void add_prev_dimension_residual_to_tails(
 
 static void add_all_residuals_to_final_result(
         Function F,
-        vector<Function>  F_deps,
+        vector< vector<Function> >  F_deps,
         vector<SplitInfo> split_info)
 {
     vector<string> pure_args   = F.args();
@@ -732,25 +747,25 @@ static void add_all_residuals_to_final_result(
 
     assert(split_info.size() == F_deps.size());
 
-    // feed forward coeff is the multiplication of feedfwd coeff
-    // of all scans in this dimension
-    Expr one = make_one(F.output_types()[0]);
-    vector<Expr> feedfwd_coeff(split_info.size(), one);
-    for (int i=0; i<split_info.size(); i++) {
-        for (int j=0; j<split_info[i].num_splits; j++) {
-            int scan_id = split_info[i].scan_id[j];
-            Var xo = split_info[i].outer_var;
-            Expr num_tiles = split_info[i].num_tiles;
-            if (split_info[i].scan_causal[j]) {
-                Expr a = select(xo>0, split_info[i].feedfwd_coeff(scan_id), one);
-                feedfwd_coeff[i] *= a;
-            } else {
-                Expr a = select(xo<num_tiles-1, split_info[i].feedfwd_coeff(scan_id), one);
-                feedfwd_coeff[i] *= a;
-            }
-            feedfwd_coeff[i] = one;
-        }
-    }
+    //// feed forward coeff is the multiplication of feedfwd coeff
+    //// of all scans in this dimension
+    //Expr one = make_one(F.output_types()[0]);
+    //Expr two = Cast::make(F.output_types()[0],2);
+    //vector<Expr> feedfwd_coeff(split_info.size(), one);
+    //for (int i=0; i<split_info.size(); i++) {
+    //    for (int j=0; j<split_info[i].num_splits; j++) {
+    //        int scan_id = split_info[i].scan_id[j];
+    //        Var xo = split_info[i].outer_var;
+    //        Expr num_tiles = split_info[i].num_tiles;
+    //        if (split_info[i].scan_causal[j]) {
+    //            Expr a = select(xo==0, two, one)*split_info[i].feedfwd_coeff(scan_id);
+    //            feedfwd_coeff[i] *= a;
+    //        } else {
+    //            Expr a = select(xo==num_tiles-1, two, one)*split_info[i].feedfwd_coeff(scan_id);
+    //            feedfwd_coeff[i] *= a;
+    //        }
+    //    }
+    //}
 
     // define a function as a copy of the function F
     Function F_sub(F.name() + DELIMITER + PRE_FINAL_TERM);
@@ -758,13 +773,21 @@ static void add_all_residuals_to_final_result(
 
     // each F_deps represents the residuals from one dimension
     // add this residual to the first scan in next dimension
-    for (int i=0; i<F_deps.size()-1; i++) {
-        int first_scan_next_dim = split_info[i+1].scan_id[ split_info[i+1].num_splits-1 ];
-        vector<Expr> call_args = reductions[first_scan_next_dim].args;
-
-        for (int j=0; j<reductions[first_scan_next_dim].values.size(); j++) {
-            reductions[first_scan_next_dim].values[j] *= feedfwd_coeff[i];
-            reductions[first_scan_next_dim].values[j] += Call::make(F_deps[i], call_args, j);
+    Function F_deps_last;
+    for (int i=0; i<F_deps.size(); i++) {
+        for (int j=0; j<F_deps[i].size(); j++) {
+            int curr_scan = split_info[i].scan_id[j];
+            int next_scan = curr_scan+1;
+            if (next_scan < reductions.size()) {
+                vector<Expr> call_args = reductions[next_scan].args;
+                for (int k=0; k<reductions[next_scan].values.size(); k++) {
+                    Expr fwd = split_info[i].feedfwd_coeff(next_scan);
+                    reductions[next_scan].values[k] += fwd*Call::make(F_deps[i][j], call_args, k);
+                }
+            } else {
+                // add this to the final result of all the scans
+                F_deps_last = F_deps[i][j];
+            }
         }
     }
 
@@ -778,7 +801,7 @@ static void add_all_residuals_to_final_result(
         F_sub.define_reduction(reductions[i].args, values);
     }
 
-    // add the residual of the last dimension and above computed
+    // add the residual of the last scan and above computed
     // function to get the final result
     vector<Expr> final_call_args;
     vector<Expr> final_pure_values;
@@ -786,9 +809,8 @@ static void add_all_residuals_to_final_result(
         final_call_args.push_back(Var(pure_args[i]));
     }
     for (int i=0; i<F.outputs(); i++) {
-        Expr fwd = feedfwd_coeff[ feedfwd_coeff.size()-1 ];
-        Expr val  = fwd * Call::make(F_sub, final_call_args, i) +
-            Call::make(F_deps[ F_deps.size()-1 ], final_call_args, i);
+        Expr val  = Call::make(F_sub, final_call_args, i) +
+            Call::make(F_deps_last, final_call_args, i);
         final_pure_values.push_back(val);
     }
 
@@ -798,14 +820,14 @@ static void add_all_residuals_to_final_result(
 
 // -----------------------------------------------------------------------------
 
-static vector<Function> create_recursive_split(
+static vector< vector<Function> > create_recursive_split(
         Function F_intra,
         vector<SplitInfo> &split_info)
 {
     vector< vector<Function> > F_tail_list;
     vector< vector<Function> > F_ctail_list;
     vector< vector<Function> > F_tdeps_list;
-    vector< Function         > F_deps_list;
+    vector< vector<Function> > F_deps_list;
 
     /// TODO: this order of Function generation requires that F_ctail are
     /// redefined after they are called in F_tdeps, change the order of
@@ -822,7 +844,7 @@ static vector<Function> create_recursive_split(
         vector<Function> F_tail  = create_intra_tail_term    (F_intra, split_info[i], s0);
         vector<Function> F_ctail = create_complete_tail_term (F_tail,  split_info[i], s1);
         vector<Function> F_tdeps = create_tail_residual_term (F_ctail, split_info[i], s2);
-        Function         F_deps  = create_final_residual_term(F_ctail, split_info[i], s3);
+        vector<Function> F_deps  = create_final_residual_term(F_ctail, split_info[i], s3);
 
         // add the dependency from each scan to the tail of the next scan
         // this ensures that the tail of each scan includes the complete
@@ -1039,7 +1061,7 @@ void split(
     add_intra_tile_scan_stages(F_intra, split_info);
 
     // compute the residuals from splits in each dimension
-    vector<Function> F_deps = create_recursive_split(F_intra, split_info);
+    vector< vector<Function> > F_deps = create_recursive_split(F_intra, split_info);
 
     // transfer results between scan stages in intra tile computation
     fix_intra_tile_scan_stages(F_intra);

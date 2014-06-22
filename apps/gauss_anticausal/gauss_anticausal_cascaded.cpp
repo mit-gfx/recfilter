@@ -68,6 +68,11 @@ int main(int argc, char **argv) {
         Image<float> B  = gaussian_weights(sigma, order, num_scans).first;
         Image<float> W  = gaussian_weights(sigma, order, num_scans).second;
 
+//        B(0)=2;W(0,0)=1;
+        B(1)=1;W(1,0)=0;
+//        B(2)=2;W(2,0)=1;
+        B(3)=1;W(3,0)=0;
+
         G1(x, y)    = image(clamp(x,0,iw), clamp(y,0,ih));
         G1(rx,y)    = B(0)*G1(rx,y)    + W(0,0)*G1(max(0,rx-1),y);
         G1(iw-ry,y) = B(1)*G1(iw-ry,y) + W(1,0)*G1(min(iw,iw-ry+1),y);
@@ -76,14 +81,14 @@ int main(int argc, char **argv) {
 
         G1_result(x,y) = G1(x,y);
 
-//        split(G1,B,W,
-//                Internal::vec(  0,  0,  1,  1),
-//                Internal::vec(  x,  x,  y,  y),
-//                Internal::vec( xi, xi, yi, yi),
-//                Internal::vec( xo, xo, yo, yo),
-//                Internal::vec( rx, ry, rz, rw),
-//                Internal::vec(rxi,ryi,rzi,rwi),
-//                Internal::vec(order,order,order,order));
+        split(G1,B,W,
+                Internal::vec(  0,  0,  1,  1),
+                Internal::vec(  x,  x,  y,  y),
+                Internal::vec( xi, xi, yi, yi),
+                Internal::vec( xo, xo, yo, yo),
+                Internal::vec( rx, ry, rz, rw),
+                Internal::vec(rxi,ryi,rzi,rwi),
+                Internal::vec(order,order,order,order));
 
 //        inline_function(G1_result, "G1");
     }
@@ -97,32 +102,23 @@ int main(int argc, char **argv) {
 
         G2(x, y) = G1_result(x,y);
 
-//        G2(rx,y) = B(0)*G2(rx,y)
-//            + W(0,0)*G2(max(0,rx-1),y)
-//            + W(0,1)*G2(max(0,rx-2),y);
+        G2(rx,y) = B(0)*G2(rx,y)
+            + W(0,0)*G2(max(0,rx-1),y)
+            + W(0,1)*G2(max(0,rx-2),y);
 
-//        G2(iw-ry,y) = B(1)*G2(iw-ry,y)
-//            + W(1,0)*G2(min(iw,iw-ry+1),y)
-//            + W(1,1)*G2(min(iw,iw-ry+2),y);
-//
-//        G2(x,rz) = B(2)*G2(x,rz)
-//            + W(2,0)*G2(x,max(0,rz-1))
-//            + W(2,1)*G2(x,max(0,rz-2));
-//
+        G2(iw-ry,y) = B(1)*G2(iw-ry,y)
+            + W(1,0)*G2(min(iw,iw-ry+1),y)
+            + W(1,1)*G2(min(iw,iw-ry+2),y);
+
+        G2(x,rz) = B(2)*G2(x,rz)
+            + W(2,0)*G2(x,max(0,rz-1))
+            + W(2,1)*G2(x,max(0,rz-2));
+
         G2(x,ih-rw) = B(3)*G2(x,ih-rw)
             + W(3,0)*G2(x,min(ih,ih-rw+1))
             + W(3,1)*G2(x,min(ih,ih-rw+2));
 
         G2_result(x,y) = G2(x,y);
-
-        split(G2,B,W,
-                Internal::vec(  1),
-                Internal::vec(  y),
-                Internal::vec( yi),
-                Internal::vec( yo),
-                Internal::vec( rw),
-                Internal::vec(rwi),
-                Internal::vec(order));
 
 //        split(G2,B,W,
 //                Internal::vec(  0,  0,  1,  1),
@@ -136,7 +132,7 @@ int main(int argc, char **argv) {
 //        inline_function(G2_result, "G2");
     }
 
-    S(x,y) = G2_result(x,y);
+    S(x,y) = G1_result(x,y);
 
     // ----------------------------------------------------------------------------------------------
 
@@ -151,6 +147,37 @@ int main(int argc, char **argv) {
         cerr << func_list[i] << endl;
         func_list[i].compute_root();
         functions[func_list[i].name()] = func_list[i];
+
+        if (func_list[i].name() == "G1-Intra") {
+            Func f;
+            f(x,y,xo) = func_list[i](x%4, x/4, y%4, y/4, xo);
+            Image<float> a = f.realize(width, height, 2);
+            cerr << a << endl;
+        }
+        if (func_list[i].name().find("Tail_x") != string::npos) {
+            Func f;
+            f(x,y) = func_list[i](0, x, y%4, y/4);
+            Image<float> a = f.realize(width/tile, height);
+            cerr << a << endl;
+        }
+        if (func_list[i].name().find("Tail_y") != string::npos) {
+            Func f;
+            f(x,y) = func_list[i](x%4, x/4, 0, y);
+            Image<float> a = f.realize(width, height/tile);
+            cerr << a << endl;
+        }
+        if (func_list[i].name().find("Deps") != string::npos) {
+            Func f;
+            f(x,y) = func_list[i](x%4, x/4, y%4, y/4);
+            Image<float> a = f.realize(width, height);
+            cerr << a << endl;
+        }
+        if (func_list[i].name() == "G1-Final-Sub") {
+            Func f;
+            f(x,y) = func_list[i](x%4, x/4, y%4, y/4);
+            Image<float> a = f.realize(width, height);
+            cerr << a << endl;
+        }
     }
 
     // ----------------------------------------------------------------------------------------------

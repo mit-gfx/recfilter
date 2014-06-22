@@ -26,6 +26,8 @@ static Image<float> matrix_A_FB(
     }
 
     // update one row at a time from bottom to up
+    // special clamped boundary condition if feed
+    // forward coeff is not 1.0f
     for (int y=0; y<tile_width; y++) {
         for (int x=0; x<tile_width; x++) {
             for (int j=0; y-j-1>=0 && j<filter_order; j++) {
