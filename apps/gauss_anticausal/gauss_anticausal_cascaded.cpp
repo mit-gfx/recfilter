@@ -68,20 +68,17 @@ int main(int argc, char **argv) {
         Image<float> B  = gaussian_weights(sigma, order, num_scans).first;
         Image<float> W  = gaussian_weights(sigma, order, num_scans).second;
 
-        //B(0)=2;W(0,0)=1;
-        //B(1)=1;W(1,0)=0;
-        //B(2)=2;W(2,0)=1;
-        //B(3)=1;W(3,0)=0;
+        B(0)=2;W(0,0)=1;
+        B(1)=2;W(1,0)=1;
+        B(2)=1;W(2,0)=0;
+        B(3)=1;W(3,0)=0;
 
         G1(x, y) = image(clamp(x,0,iw), clamp(y,0,ih));
-        G1(rx,y) = B(0)*G1(rx,y) + W(0,0)*G1(max(0,rx-1),y);
-        G1(ry,y) = B(1)*G1(ry,y) + W(1,0)*G1(max(0,ry-1),y);
-        G1(x,rz) = B(2)*G1(x,rz) + W(2,0)*G1(x,max(0,rz-1));
-        G1(x,rw) = B(3)*G1(x,rw) + W(3,0)*G1(x,max(0,rw-1));
-        //G1(rx,y)    = B(0)*G1(rx,y)    + W(0,0)*G1(max(0,rx-1),y);
-        //G1(iw-ry,y) = B(1)*G1(iw-ry,y) + W(1,0)*G1(min(iw,iw-ry+1),y);
-        //G1(x,rz)    = B(2)*G1(x,rz)    + W(2,0)*G1(x,max(0,rz-1));
-        //G1(x,ih-rw) = B(3)*G1(x,ih-rw) + W(3,0)*G1(x,min(ih,ih-rw+1));
+
+        G1(rx,y)    = B(0)*G1(rx,y)    + W(0,0)*G1(max(0,rx-1),y);
+        G1(iw-ry,y) = B(1)*G1(iw-ry,y) + W(1,0)*G1(min(iw,iw-ry+1),y);
+        G1(x,rz)    = B(2)*G1(x,rz)    + W(2,0)*G1(x,max(0,rz-1));
+        G1(x,ih-rw) = B(3)*G1(x,ih-rw) + W(3,0)*G1(x,min(ih,ih-rw+1));
 
         G1_result(x,y) = G1(x,y);
 

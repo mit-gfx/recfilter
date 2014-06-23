@@ -7,6 +7,8 @@
 #include <Halide.h>
 
 struct SplitInfo {
+    bool clamp_border;
+
     int filter_order;
     int filter_dim;
     int num_splits;
