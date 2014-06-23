@@ -501,9 +501,6 @@ static vector<Function> create_final_residual_term(
         // of scan after applying all subsequent scans
         Image<float> weight = tail_weights(split_info, j);
 
-        cerr << split_info.scan_id[j] << endl;
-        cerr << weight << endl;
-
         // size of tail is equal to filter order, accumulate all
         // elements of the tail
         for (int k=0; k<order; k++) {
@@ -747,26 +744,6 @@ static void add_all_residuals_to_final_result(
 
     assert(split_info.size() == F_deps.size());
 
-    //// feed forward coeff is the multiplication of feedfwd coeff
-    //// of all scans in this dimension
-    //Expr one = make_one(F.output_types()[0]);
-    //Expr two = Cast::make(F.output_types()[0],2);
-    //vector<Expr> feedfwd_coeff(split_info.size(), one);
-    //for (int i=0; i<split_info.size(); i++) {
-    //    for (int j=0; j<split_info[i].num_splits; j++) {
-    //        int scan_id = split_info[i].scan_id[j];
-    //        Var xo = split_info[i].outer_var;
-    //        Expr num_tiles = split_info[i].num_tiles;
-    //        if (split_info[i].scan_causal[j]) {
-    //            Expr a = select(xo==0, two, one)*split_info[i].feedfwd_coeff(scan_id);
-    //            feedfwd_coeff[i] *= a;
-    //        } else {
-    //            Expr a = select(xo==num_tiles-1, two, one)*split_info[i].feedfwd_coeff(scan_id);
-    //            feedfwd_coeff[i] *= a;
-    //        }
-    //    }
-    //}
-
     // define a function as a copy of the function F
     Function F_sub(F.name() + DELIMITER + PRE_FINAL_TERM);
     F_sub.define(pure_args, pure_values);
@@ -775,14 +752,45 @@ static void add_all_residuals_to_final_result(
     // add this residual to the first scan in next dimension
     Function F_deps_last;
     for (int i=0; i<F_deps.size(); i++) {
+        Expr tile_width = split_info[i].tile_width;
+        Expr num_tiles  = split_info[i].num_tiles;
+
         for (int j=0; j<F_deps[i].size(); j++) {
-            int curr_scan = split_info[i].scan_id[j];
-            int next_scan = curr_scan+1;
+            int next_scan = split_info[i].scan_id[j]+1;
+
             if (next_scan < reductions.size()) {
                 vector<Expr> call_args = reductions[next_scan].args;
+
+                // multiply curr scan's residual to next scan after multiplying
+                // by next scan's feedforward coeff;
+                Expr fwd = split_info[i].feedfwd_coeff(next_scan);
+
+                // add 1 to the multuplicant if next scan is in same
+                // dimension and reverse causality or different dimension
+                if (j>0) {
+                    // next scan is either is in same dimension
+                    bool next_causal = split_info[i].scan_causal[j-1];
+                    RVar next_rxi    = split_info[i].inner_rdom[j-1];
+                    Var  next_xo     = split_info[i].outer_var;
+                    Expr cond        = (next_rxi==0);
+                    cond = cond && (next_causal ? (next_xo==0) : (next_xo==num_tiles-1));
+                    fwd = select(cond, simplify(fwd+1.0f), fwd);
+
+                } else {
+                    // or next scan is in next dimension
+                    int a = split_info[i+1].num_splits-1;
+                    bool next_causal = split_info[i+1].scan_causal[a];
+                    RVar next_rxi    = split_info[i+1].inner_rdom[a];
+                    Var  next_xo     = split_info[i+1].outer_var;
+                    Var  curr_xo     = split_info[i].outer_var;
+                    Expr cond        = (next_rxi==0);
+                    cond = cond && (next_causal ? (next_xo==0) : (next_xo==num_tiles-1));
+                    fwd = select(cond, 1.0f, fwd);
+                }
+
                 for (int k=0; k<reductions[next_scan].values.size(); k++) {
-                    Expr fwd = split_info[i].feedfwd_coeff(next_scan);
-                    reductions[next_scan].values[k] += fwd*Call::make(F_deps[i][j], call_args, k);
+                    reductions[next_scan].values[k] +=
+                        fwd * Call::make(F_deps[i][j], call_args, k);
                 }
             } else {
                 // add this to the final result of all the scans
