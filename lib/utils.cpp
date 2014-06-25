@@ -112,7 +112,7 @@ std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f) {
                 if (f.reductions()[j].domain.defined()) {
                     s << " with  ";
                     for (int k=0; k<f.reductions()[j].domain.domain().size(); k++) {
-                        string r = f.reductions()[j].domain.domain()[k].var;
+                        std::string r = f.reductions()[j].domain.domain()[k].var;
                         s << r << "("
                             << f.reductions()[j].domain.domain()[k].min   << ","
                             << f.reductions()[j].domain.domain()[k].extent<< ") ";

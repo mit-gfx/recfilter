@@ -96,16 +96,16 @@ void merge(Halide::Func S,
         std::string func_a,
         std::string func_b,
         std::string func_c,
-        string merged);
+        std::string merged);
 
 void merge(Halide::Func S,
         std::string func_a,
         std::string func_b,
         std::string func_c,
         std::string func_d,
-        string merged);
+        std::string merged);
 
-void merge(Halide::Func S, std::vector<std::string> funcs, string merged);
+void merge(Halide::Func S, std::vector<std::string> funcs, std::string merged);
 
 void merge_duplicates_with_substring(Halide::Func S, std::string pattern);
 
@@ -159,7 +159,7 @@ Halide::Expr remove_arg_from_func_call(
 
 /// Swap two calling arguments of given function in the expression
 Halide::Expr swap_args_in_func_call(
-        string func_name,       /// name of function to modify
+        std::string func_name,       /// name of function to modify
         size_t va_idx,          /// index of first calling arg
         size_t vb_idx,          /// index of second calling arg
         Halide::Expr original   /// original expression
@@ -245,9 +245,9 @@ Halide::Expr inline_func_calls(
 
 /// Swaps two variables in an expression
 Halide::Expr swap_vars_in_expr(
-        string a,               /// first variable name for swapping
-        string b,               /// second variable name for swapping
-        Halide::Expr original   /// original expression
+        std::string a,              /// first variable name for swapping
+        std::string b,              /// second variable name for swapping
+        Halide::Expr original       /// original expression
         );
 
 /// Extract vars referenced in a Expr
@@ -284,7 +284,7 @@ public:
     float weight;    // First order filter weight
     int  iterations; // profiling iterations
 
-    Arguments(string app_name, int argc, char** argv);
+    Arguments(std::string app_name, int argc, char** argv);
 };
 
 // ----------------------------------------------------------------------------
