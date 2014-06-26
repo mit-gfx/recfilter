@@ -21,10 +21,94 @@ static vector<Function> extract_called_functions(Function function) {
         func_list.push_back(f_it->second);
         f_it++;
     }
+    return func_list;
 }
 
 static vector<Function> extract_called_functions(Func f) {
     return extract_called_functions(f.function());
+}
+
+// -----------------------------------------------------------------------------
+
+static void inline_function(Function f, vector<Function> func_list) {
+    if (!f.is_pure()) {
+        cerr << "Function " << f.name() << " to be inlined must be pure" << endl;
+        assert(false);
+    }
+
+    // go to all other functions and inline calls to f
+    for (int j=0; j<func_list.size(); j++) {
+        Function g = func_list[j];
+
+        // check if g calls f
+        map<string,Function> called_funcs = find_direct_calls(g);
+        if (called_funcs.find(f.name()) == called_funcs.end()) {
+            continue;
+        }
+
+        vector<string> args   = g.args();
+        vector<Expr>   values = g.values();
+        vector<ReductionDefinition> reductions = g.reductions();
+
+        for (int k=0; k<values.size(); k++) {
+            values[k] = inline_function(values[k], f);
+        }
+        g.clear_all_definitions();
+        g.define(args, values);
+
+        for (int k=0; k<reductions.size(); k++) {
+            vector<Expr> reduction_args   = reductions[k].args;
+            vector<Expr> reduction_values = reductions[k].values;
+            for (int u=0; u<reduction_args.size(); u++) {
+                reduction_args[u] = inline_function(reduction_args[u], f);
+            }
+            for (int u=0; u<reduction_values.size(); u++) {
+                reduction_values[u] = inline_function(reduction_values[u], f);
+            }
+            g.define_reduction(reduction_args, reduction_values);
+        }
+    }
+}
+
+void inline_function(Func F, string func_name) {
+    if (F.name() == func_name) {
+        return;
+    }
+
+    bool found = false;
+    vector<Function> func_list = extract_called_functions(F);
+
+    std::cerr << func_list.size() << std::endl;
+
+    for (int i=0; !found && i<func_list.size(); i++) {
+    std::cerr << func_list[i].name() << std::endl;
+        if (func_name == func_list[i].name()) {
+            found = true;
+        }
+        if (F.name() == func_list[i].name()) {
+            func_list.erase(func_list.begin()+i);
+            i--;
+        }
+    }
+    if (found) {
+        inline_function(F.function(), func_list);
+    } else {
+        cerr << "Function " << func_name << " to be inlined not found" << endl;
+        assert(false);
+    }
+}
+
+void inline_functions_with_substring(Func F, string pattern) {
+    vector<Function> func_list = extract_called_functions(F);
+
+    // find all Funcs containing pattern in their name
+    for (int i=0; i<func_list.size(); i++) {
+        Function f = func_list[i];
+        if (f.is_pure() && f.name().find(pattern)!=string::npos) {
+            vector<Function> sub_func_list = extract_called_functions(f);
+            inline_function(f, sub_func_list);
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -217,8 +301,9 @@ static void merge(Func S, Function A, Function B, string merged_name) {
     }
 
     // inline A and B
-    inline_function(S, Func(A));
-    inline_function(S, Func(B));
+    vector<Function> func_list = extract_called_functions(S);
+    inline_function(A, func_list);
+    inline_function(B, func_list);
 }
 
 // -----------------------------------------------------------------------------
@@ -316,81 +401,6 @@ void merge_duplicates_with_substring(Func S, string pattern) {
 
 // -----------------------------------------------------------------------------
 
-void inline_function(Function F, Function A) {
-    inline_function(Func(F), Func(A));
-}
-
-void inline_function(Func F, string func_name) {
-    // extract all Function calls
-    bool found = false;
-    vector<Function> func_list = extract_called_functions(F);
-    for (int i=0; !found && i<func_list.size(); i++) {
-        if (func_name == func_list[i].name()) {
-            inline_function(F, func_list[i]);
-            found = true;
-        }
-    }
-    if (!found) {
-        cerr << "Function " << func_name << " to be inlined not found" << endl;
-        assert(false);
-    }
-}
-
-void inline_function(Func F, Func A) {
-    if (F.name() == A.name())
-        return;
-
-    vector<Function> func_list = extract_called_functions(F);
-
-    // function to be inlined must be pure
-    Function f = A.function();
-    assert(f.is_pure() && "Function to be inlined must be pure");
-
-    // go to all other functions and inline calls to f
-    for (int j=0; j<func_list.size(); j++) {
-        Function g = func_list[j];
-
-        vector<string> args   = g.args();
-        vector<Expr>   values = g.values();
-        vector<ReductionDefinition> reductions = g.reductions();
-
-        for (int k=0; k<values.size(); k++) {
-            values[k] = inline_func_calls(f, values[k]);
-        }
-        g.clear_all_definitions();
-        g.define(args, values);
-
-        for (int k=0; k<reductions.size(); k++) {
-            vector<Expr> reduction_args   = reductions[k].args;
-            vector<Expr> reduction_values = reductions[k].values;
-            for (int u=0; u<reduction_args.size(); u++) {
-                reduction_args[u] = inline_func_calls(f, reduction_args[u]);
-            }
-            for (int u=0; u<reduction_values.size(); u++) {
-                reduction_values[u] = inline_func_calls(f, reduction_values[u]);
-            }
-            g.define_reduction(reduction_args, reduction_values);
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-void inline_functions_with_substring(Func F, string pattern) {
-    vector<Function> func_list = extract_called_functions(F);
-
-    // find all Funcs containing pattern in their name
-    for (int i=0; i<func_list.size(); i++) {
-        if (func_list[i].is_pure() &&
-                func_list[i].name().find(pattern) != string::npos)
-        {
-            inline_function(F, func_list[i]);
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-
 void float_dependencies_to_root(Func F) {
     vector<Function> func_list = extract_called_functions(F);
 
@@ -399,7 +409,7 @@ void float_dependencies_to_root(Func F) {
     for (int i=0; i<func_list.size(); i++) {
         Function f = func_list[i];
         if (f.name().find(COMPLETE_TAIL_RESIDUAL)!=string::npos ||
-            f.name().find(FINAL_RESULT_RESIDUAL )!=string::npos)
+                f.name().find(FINAL_RESULT_RESIDUAL )!=string::npos)
         {
             dependency_func_list.push_back(f);
             func_list.erase(func_list.begin()+i);

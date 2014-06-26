@@ -111,8 +111,6 @@ void merge_duplicates_with_substring(Halide::Func S, std::string pattern);
 
 void inline_function(Halide::Func F, std::string func_name);
 
-void inline_function(Halide::Func F, Halide::Func A);
-
 void inline_functions_with_substring(Halide::Func F, std::string pattern);
 
 // ----------------------------------------------------------------------------
@@ -232,14 +230,6 @@ Halide::Expr remove_func_calls(
 Halide::Expr increment_value_index_in_func_call(
         std::string func_name,              /// name of Function
         int increment,                      /// increment to value_index, can be negative
-        Halide::Expr original               /// original expression
-        );
-
-
-/// Check if an expression has calls to a particular Function
-/// and inline the Function within the expression
-Halide::Expr inline_func_calls(
-        Halide::Internal::Function func,    /// Function to be inlined
         Halide::Expr original               /// original expression
         );
 
