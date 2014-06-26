@@ -5,7 +5,9 @@ using namespace Halide;
 static Image<float> matrix_A_FB(
         Image<float> feedfwd_coeff,
         Image<float> feedback_coeff,
-        int scan_id, int tile_width)
+        int scan_id,
+        int tile_width,
+        bool clamp_border)
 {
     int filter_order = feedback_coeff.height();
 
@@ -18,16 +20,14 @@ static Image<float> matrix_A_FB(
 
     Image<float> C(tile_width, tile_width);
 
-    // initialize as identity matrix
+    // initialize
     for (int x=0; x<tile_width; x++) {
         for (int y=0; y<tile_width; y++) {
-            C(x,y) = (x==y ? feedfwd : 0.0f);
+            C(x,y) = (x==y ? (x==0 && clamp_border ? 1.0f : feedfwd) : 0.0f);
         }
     }
 
     // update one row at a time from bottom to up
-    // special clamped boundary condition if feed
-    // forward coeff is not 1.0f
     for (int y=0; y<tile_width; y++) {
         for (int x=0; x<tile_width; x++) {
             for (int j=0; y-j-1>=0 && j<filter_order; j++) {
@@ -41,7 +41,8 @@ static Image<float> matrix_A_FB(
 
 static Image<float> matrix_A_FP(
         Image<float> feedback_coeff,
-        int scan_id, int tile_width)
+        int scan_id,
+        int tile_width)
 {
     int filter_order = feedback_coeff.height();
 
@@ -126,7 +127,7 @@ static Image<float> matrix_antidiagonal(int size) {
  * scan. The SpliInfo object stores the scans in reverse order, hence indices
  * into the SplitInfo object split_id1 and split_id2 must be decreasing
  */
-Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2) {
+Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2, bool clamp_border) {
     assert(split_id1 >= split_id2);
 
     const int* tile_width_ptr = as_const_int(s.tile_width);
@@ -143,15 +144,17 @@ Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2) {
     // traversal is backwards because SplitInfo contains scans in the
     // reverse order
     for (int j=split_id1-1; j>=split_id2; j--) {
-        Image<float> A_FB = matrix_A_FB(s.feedfwd_coeff,
-                s.feedback_coeff, s.scan_id[j], tile_width);
-
         if (scan_causal != s.scan_causal[j]) {
+            Image<float> A_FB = matrix_A_FB(s.feedfwd_coeff,
+                    s.feedback_coeff, s.scan_id[j], tile_width, clamp_border);
             Image<float> AI = matrix_antidiagonal(A_FP.height());
             A_FP = matrix_mult(AI  , A_FP);
             A_FP = matrix_mult(A_FB, A_FP);
             A_FP = matrix_mult(AI  , A_FP);
-        } else {
+        }
+        else {
+            Image<float> A_FB = matrix_A_FB(s.feedfwd_coeff,
+                    s.feedback_coeff, s.scan_id[j], tile_width, false);
             A_FP = matrix_mult(A_FB, A_FP);
         }
     }
@@ -162,6 +165,6 @@ Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2) {
 /** Weight coefficients (tail_size x tile_width) for
  * applying scan's corresponding to split indices split_id1
  */
-Image<float> tail_weights(SplitInfo s, int split_id1) {
-    return tail_weights(s, split_id1, split_id1);
+Image<float> tail_weights(SplitInfo s, int split_id1, bool clamp_border) {
+    return tail_weights(s, split_id1, split_id1, clamp_border);
 }

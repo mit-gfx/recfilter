@@ -419,11 +419,14 @@ static vector<Function> create_tail_residual_term(
         // the list F_ctail is in reverse order just as split_info struct
         for (int j=u+1; j<F_ctail.size(); j++) {
 
-            // weight matrix for accumulating completed tail elements
-            // from scan u to scan j
-            Image<float> weight = tail_weights(split_info, j, u);
+            // weight matrix for accumulating completed tail elements from scan u to scan j
+            Image<float> weight  = tail_weights(split_info, j, u);
 
-            // expressions for prev tile and checking for first tile for causal/anticausal scan
+            // weight matrix for accumulating completed tail elements from scan u to scan j
+            // for a tile that is clamped on all borders
+            Image<float> c_weight= tail_weights(split_info, j, u, split_info.clamp_border);
+
+            // expressions for prev tile and checking for first tile for causal/anticausal scan j
             Expr first_tile = (split_info.scan_causal[j] ? (xo==0) : (xo==num_tiles-1));
             Expr prev_tile  = (split_info.scan_causal[j] ? max(xo-1,0) : min(xo+1, simplify(num_tiles-1)));
 
@@ -444,8 +447,18 @@ static vector<Function> create_tail_residual_term(
 
                 for (int i=0; i<num_outputs; i++) {
                     Expr val = Call::make(F_ctail[j], call_args, i);
-                    Expr wt  = (split_info.scan_causal[j] ? weight(xi,k) : weight(simplify(tile-1-xi),k));
-                    values[i] = simplify(values[i] + select(first_tile, make_zero(type), wt*val));
+                    Expr wt  = (split_info.scan_causal[j] ? weight(xi,k) : weight(tile-1-xi,k));
+                    Expr cwt = (split_info.scan_causal[j] ? c_weight(xi,k): c_weight(tile-1-xi,k));
+
+                    // use weights for clamped image if border clamping is requested
+                    // change the weight for the first tile only, only this tile is affected
+                    // by clamping the image at all borders
+                    if (split_info.clamp_border && split_info.scan_causal[j]!=split_info.scan_causal[u]) {
+                        Expr first_tile_u = (split_info.scan_causal[u] ? (xo==0) : (xo==num_tiles-1));
+                        wt = select(first_tile_u, cwt, wt);
+                    }
+
+                    values[i] += select(first_tile, make_zero(type), wt*val);
                 }
             }
         }
@@ -660,7 +673,12 @@ static void add_prev_dimension_residual_to_tails(
 
             // weight matrix for accumulating completed tail elements
             // of scan after applying all subsequent scans
-            Image<float> weight = tail_weights(split_info_prev, k, 0);
+            Image<float> weight  = tail_weights(split_info_prev, k, 0);
+
+            // weight matrix for accumulating completed tail elements
+            // of scan after applying all subsequent scans
+            // for a tile that is clamped on all borders
+            Image<float> c_weight= tail_weights(split_info_prev, k, 0, split_info_prev.clamp_border);
 
             // size of tail is equal to filter order, accumulate all
             // elements of the tail
@@ -692,20 +710,23 @@ static void add_prev_dimension_residual_to_tails(
                     }
                 }
 
-                // if the scan in prev dimension was causal, then accumulate
-                // the tail of prev tile in that dimension, else next tile
+                // accumulate the tail of scan in the prev dimension
                 for (int i=0; i<pure_values.size(); i++) {
-                    Expr val;
-                    if (split_info_prev.scan_causal[k]) {
-                        val = select(yo>0,
-                                weight(yi,o) * Call::make(F_tail_prev_scanned, call_args, i),
-                                make_zero(F_tail_prev_scanned.output_types()[i]));
-                    } else {
-                        val = select(yo<num_tiles_prev-1,
-                                weight(simplify(tile-1-yi),o) * Call::make(F_tail_prev_scanned, call_args, i),
-                                make_zero(F_tail_prev_scanned.output_types()[i]));
+                    // expression for checking for first tile for causal/anticausal scan
+                    Expr first_tile = (split_info_prev.scan_causal[k] ? (yo==0) : (yo==num_tiles-1));
+                    Expr last_tile  = (split_info_prev.scan_causal[k] ? (yo==num_tiles-1) : (yo==0));
+                    Expr zero= make_zero(F_tail_prev_scanned.output_types()[i]);
+                    Expr val = Call::make(F_tail_prev_scanned, call_args, i);
+                    Expr wt  = (split_info_prev.scan_causal[k] ? weight(yi,o)  : weight(simplify(tile-1-yi),o));
+                    Expr cwt = (split_info_prev.scan_causal[k] ? c_weight(yi,o): c_weight(simplify(tile-1-yi),o));
+                    // use weights for clamped image if border clamping is requested
+                    // change the weight for the first tile only, only this tile is affected
+                    // by clamping the image at all borders
+                    if (split_info_prev.clamp_border) {
+                        wt = select(last_tile, cwt, wt);
                     }
-                    pure_values[i] += val;
+
+                    pure_values[i] += select(first_tile, zero, wt*val);
                 }
             }
         }
@@ -762,21 +783,20 @@ static void add_all_residuals_to_final_result(
                 // dimension and reverse causality or different dimension
                 if (split_info[i].clamp_border) {
                     if (j>0) {
-                        // next scan is either is in same dimension
+                        // next scan is either in same dimension
                         bool next_causal = split_info[i].scan_causal[j-1];
                         RVar next_rxi    = split_info[i].inner_rdom[j-1];
                         Var  next_xo     = split_info[i].outer_var;
                         Expr cond        = (next_rxi==0);
                         cond = cond && (next_causal ? (next_xo==0) : (next_xo==num_tiles-1));
-                        fwd = select(cond, simplify(fwd+1.0f), fwd);
+                        fwd = select(cond, 1.0f, fwd);
 
                     } else {
-                        // or next scan is in next dimension
+                        // or next scan in next dimension
                         int a = split_info[i+1].num_splits-1;
                         bool next_causal = split_info[i+1].scan_causal[a];
                         RVar next_rxi    = split_info[i+1].inner_rdom[a];
                         Var  next_xo     = split_info[i+1].outer_var;
-                        Var  curr_xo     = split_info[i].outer_var;
                         Expr cond        = (next_rxi==0);
                         cond = cond && (next_causal ? (next_xo==0) : (next_xo==num_tiles-1));
                         fwd = select(cond, 1.0f, fwd);

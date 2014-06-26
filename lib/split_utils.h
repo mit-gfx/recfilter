@@ -58,8 +58,8 @@ void check_split_feasible(
 
 // Weight matrix computation
 
-Halide::Image<float> tail_weights(SplitInfo s, int split_id1);
-Halide::Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2);
+Halide::Image<float> tail_weights(SplitInfo s, int s1, bool clamp_border=false);
+Halide::Image<float> tail_weights(SplitInfo s, int s1, int s2, bool clamp_border=false);
 
 // -----------------------------------------------------------------------------
 
