@@ -259,10 +259,6 @@ std::vector<std::string> extract_vars_or_rvars_in_expr(Halide::Expr expr);
 
 /// Extract the list of dependencies of a Function
 // {@
-void extract_func_calls(
-        Halide::Func func,                  /// Function to be analyzed
-        std::vector<Halide::Func>& f_list   /// list returned as output
-        );
 std::map<std::string, Halide::Func> extract_func_calls(Halide::Func func);
 // @}
 

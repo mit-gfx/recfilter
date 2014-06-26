@@ -12,6 +12,23 @@ using std::map;
 
 // -----------------------------------------------------------------------------
 
+static vector<Function> extract_called_functions(Function function) {
+    vector<Function> func_list;
+    map<string, Function> func_map = find_transitive_calls(function);
+    map<string, Function>::iterator f_it  = func_map.begin();
+    map<string, Function>::iterator f_end = func_map.end();
+    while (f_it != f_end) {
+        func_list.push_back(f_it->second);
+        f_it++;
+    }
+}
+
+static vector<Function> extract_called_functions(Func f) {
+    return extract_called_functions(f.function());
+}
+
+// -----------------------------------------------------------------------------
+
 static bool merge_feasible(Function A, Function B, string& error) {
     bool can_merge = true;
 
@@ -210,14 +227,13 @@ void merge(Func S, string func_a, string func_b, string merged_name) {
     Function FA;
     Function FB;
 
-    vector<Func> func_list;
-    extract_func_calls(S, func_list);
+    vector<Function> func_list = extract_called_functions(S);
 
     for (int i=0; i<func_list.size(); i++) {
         if (func_a == func_list[i].name())
-            FA = func_list[i].function();
+            FA = func_list[i];
         if (func_b == func_list[i].name())
-            FB = func_list[i].function();
+            FB = func_list[i];
     }
 
     if (!FA.has_pure_definition()) {
@@ -262,18 +278,17 @@ void merge(Func S, std::vector<std::string> funcs, string merged) {
 }
 
 void merge_duplicates_with_substring(Func S, string pattern) {
-    vector<Func> func_list;
-    extract_func_calls(S, func_list);
+    vector<Function> func_list = extract_called_functions(S);
 
     for (int i=0; i<func_list.size(); i++) {
         bool rebuild_func_list = false;
-        Function A = func_list[i].function();
+        Function A = func_list[i];
 
         if (A.name().find(pattern) == string::npos)
             continue;
 
         for (int j=0; !rebuild_func_list && j<func_list.size(); j++) {
-            Function B = func_list[j].function();
+            Function B = func_list[j];
 
             if (A.name() == B.name())
                 continue;
@@ -294,7 +309,7 @@ void merge_duplicates_with_substring(Func S, string pattern) {
         if (rebuild_func_list) {
             i = 0;
             func_list.clear();
-            extract_func_calls(S, func_list);
+            func_list = extract_called_functions(S);
         }
     }
 }
@@ -308,8 +323,7 @@ void inline_function(Function F, Function A) {
 void inline_function(Func F, string func_name) {
     // extract all Function calls
     bool found = false;
-    vector<Func> func_list;
-    extract_func_calls(F, func_list);
+    vector<Function> func_list = extract_called_functions(F);
     for (int i=0; !found && i<func_list.size(); i++) {
         if (func_name == func_list[i].name()) {
             inline_function(F, func_list[i]);
@@ -326,9 +340,7 @@ void inline_function(Func F, Func A) {
     if (F.name() == A.name())
         return;
 
-    // extract all Function calls
-    vector<Func> func_list;
-    extract_func_calls(F, func_list);
+    vector<Function> func_list = extract_called_functions(F);
 
     // function to be inlined must be pure
     Function f = A.function();
@@ -336,7 +348,7 @@ void inline_function(Func F, Func A) {
 
     // go to all other functions and inline calls to f
     for (int j=0; j<func_list.size(); j++) {
-        Function g = func_list[j].function();
+        Function g = func_list[j];
 
         vector<string> args   = g.args();
         vector<Expr>   values = g.values();
@@ -365,12 +377,11 @@ void inline_function(Func F, Func A) {
 // -----------------------------------------------------------------------------
 
 void inline_functions_with_substring(Func F, string pattern) {
-    vector<Func> func_list;
-    extract_func_calls(F, func_list);
+    vector<Function> func_list = extract_called_functions(F);
 
     // find all Funcs containing pattern in their name
     for (int i=0; i<func_list.size(); i++) {
-        if (!func_list[i].is_reduction() &&
+        if (func_list[i].is_pure() &&
                 func_list[i].name().find(pattern) != string::npos)
         {
             inline_function(F, func_list[i]);
@@ -381,14 +392,12 @@ void inline_functions_with_substring(Func F, string pattern) {
 // -----------------------------------------------------------------------------
 
 void float_dependencies_to_root(Func F) {
-    // extract all Function calls
-    vector<Func> func_list;
-    extract_func_calls(F, func_list);
+    vector<Function> func_list = extract_called_functions(F);
 
     // list of Functions which compute dependencies across tiles
     vector<Function> dependency_func_list;
     for (int i=0; i<func_list.size(); i++) {
-        Function f = func_list[i].function();
+        Function f = func_list[i];
         if (f.name().find(COMPLETE_TAIL_RESIDUAL)!=string::npos ||
             f.name().find(FINAL_RESULT_RESIDUAL )!=string::npos)
         {
@@ -412,7 +421,7 @@ void float_dependencies_to_root(Func F) {
             // f_dep calls can be extracted from f only if the call appears
             // in a pure definition, and not reduction defintions
             for (int i=0; i<func_list.size(); i++) {
-                Function f = func_list[i].function();
+                Function f = func_list[i];
 
                 // check if f calls f_dep in pure def
                 bool f_pure_calls_fdep = false;
@@ -440,7 +449,7 @@ void float_dependencies_to_root(Func F) {
                 // find all g that call f and append f_dep calls to their pure
                 // and reduction defs where f is called
                 for (int j=0; j<func_list.size(); j++) {
-                    Function g = func_list[j].function();
+                    Function g = func_list[j];
 
                     // check if g calls f
                     bool g_calls_f = false;
@@ -514,13 +523,12 @@ void float_dependencies_to_root(Func F) {
 void swap_variables(Func S, string func_name, Var a, Var b) {
     assert(!a.same_as(b) && "Variables to be swapped must be different");
 
-    vector<Func> func_list;
-    extract_func_calls(S, func_list);
+    vector<Function> func_list = extract_called_functions(S);
 
     Function F;
     for (int i=0; i<func_list.size(); i++) {
         if (func_name == func_list[i].name())
-            F = func_list[i].function();
+            F = func_list[i];
     }
 
     assert(F.has_pure_definition() && "Function to swap variables not found");
@@ -560,7 +568,7 @@ void swap_variables(Func S, string func_name, Var a, Var b) {
     for (int i=0; i<func_list.size(); i++) {
         if (func_name != func_list[i].name()) {
             bool modified = false;
-            Function f = func_list[i].function();
+            Function f = func_list[i];
 
             // change all RHS values of the function
             vector<string> pure_args = f.args();
@@ -598,11 +606,10 @@ void swap_variables(Func S, string func_name, Var a, Var b) {
 // ----------------------------------------------------------------------------
 
 void expand_multiple_reductions(Func S) {
-    vector<Func> func_list;
-    extract_func_calls(S, func_list);
+    vector<Function> func_list = extract_called_functions(S);
 
     for (int u=0; u<func_list.size(); u++) {
-        Function F = func_list[u].function();
+        Function F = func_list[u];
 
         // only process functions with multiple reduction defs
         if (F.reductions().size() < 2)

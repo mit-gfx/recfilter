@@ -81,11 +81,12 @@ int main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nGenerated Halide functions ... " << endl;
-    std::vector<Func> func_list;
-    extract_func_calls(S, func_list);
-    for (size_t i=0; i<func_list.size(); i++) {
-        func_list[i].compute_root();
-        cerr << func_list[i] << endl;
+    map<string,Func> functions = extract_func_calls(S);
+    map<string,Func>::iterator f    = functions.begin();
+    map<string,Func>::iterator fend = functions.end();
+    for (; f!=fend; f++) {
+        cerr << f->second << endl;
+        f->second.compute_root();
     }
 
     Image<float> hl_out = S.realize(width,height);

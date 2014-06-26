@@ -67,13 +67,12 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    vector<Func> func_list;
-    extract_func_calls(S, func_list);
-
-    map<string,Func> functions;
-    for (size_t i=0; i<func_list.size(); i++) {
-        cerr << func_list[i] << endl;
-        functions[func_list[i].name()] = func_list[i];
+    map<string,Func> functions = extract_func_calls(S);
+    map<string,Func>::iterator f    = functions.begin();
+    map<string,Func>::iterator fend = functions.end();
+    for (; f!=fend; f++) {
+        cerr << f->second << endl;
+        f->second.compute_root();
     }
 
     Func S_intra  = functions["S-Intra"];

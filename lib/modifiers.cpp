@@ -695,16 +695,6 @@ vector<string> extract_params_in_expr(Expr expr) {
     return extract.param_list;
 }
 
-void extract_func_calls(Func func, vector<Func>& func_list) {
-    map<string, Function> func_map = find_transitive_calls(func.function());
-    map<string, Function>::iterator f_it  = func_map.begin();
-    map<string, Function>::iterator f_end = func_map.end();
-    while (f_it != f_end) {
-        func_list.push_back(Func(f_it->second));
-        f_it++;
-    }
-}
-
 map<string, Func> extract_func_calls(Func func) {
     map<string, Func> func_list;
     map<string, Function> func_map = find_transitive_calls(func.function());
