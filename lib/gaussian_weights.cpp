@@ -124,18 +124,18 @@ static void weights2(const float& s, float& b0, float& a1, float& a2) {
  *  @param[out] a2 Feedback second-order coefficient
  *  @param[out] a3 Feedback third-order coefficient
  *
- *  Coefficients equivalent to apply a first order recursive filter followed
+ *  Coefficients equivalent to applying a first order recursive filter followed
  *  by second order filter
  */
-static void weights3(const float& s, float& b0, float& a1, float& a2, float a3) {
+static void weights3(const float& s, float& b0, float& a1, float& a2, float& a3) {
     float b10, b20;
     float a11, a21, a22;
     weights1(s, b10, a11);
     weights2(s, b20, a21, a22);
-    b0 = b10*b20;
     a1 = a11+a21;
     a2 = a11*a21 + a22;
     a3 = a11*a22;
+    b0 = b10*b20;
 }
 
 

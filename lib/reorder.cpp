@@ -12,7 +12,7 @@ using std::map;
 
 // -----------------------------------------------------------------------------
 
-static vector<Function> extract_called_functions(Function function) {
+static vector<Function> find_called_functions(Function function) {
     vector<Function> func_list;
     map<string, Function> func_map = find_transitive_calls(function);
     map<string, Function>::iterator f_it  = func_map.begin();
@@ -24,8 +24,8 @@ static vector<Function> extract_called_functions(Function function) {
     return func_list;
 }
 
-static vector<Function> extract_called_functions(Func f) {
-    return extract_called_functions(f.function());
+static vector<Function> find_called_functions(Func f) {
+    return find_called_functions(f.function());
 }
 
 // -----------------------------------------------------------------------------
@@ -76,12 +76,9 @@ void inline_function(Func F, string func_name) {
     }
 
     bool found = false;
-    vector<Function> func_list = extract_called_functions(F);
-
-    std::cerr << func_list.size() << std::endl;
+    vector<Function> func_list = find_called_functions(F);
 
     for (int i=0; !found && i<func_list.size(); i++) {
-    std::cerr << func_list[i].name() << std::endl;
         if (func_name == func_list[i].name()) {
             found = true;
         }
@@ -99,13 +96,13 @@ void inline_function(Func F, string func_name) {
 }
 
 void inline_functions_with_substring(Func F, string pattern) {
-    vector<Function> func_list = extract_called_functions(F);
+    vector<Function> func_list = find_called_functions(F);
 
     // find all Funcs containing pattern in their name
     for (int i=0; i<func_list.size(); i++) {
         Function f = func_list[i];
         if (f.is_pure() && f.name().find(pattern)!=string::npos) {
-            vector<Function> sub_func_list = extract_called_functions(f);
+            vector<Function> sub_func_list = find_called_functions(f);
             inline_function(f, sub_func_list);
         }
     }
@@ -301,7 +298,7 @@ static void merge(Func S, Function A, Function B, string merged_name) {
     }
 
     // inline A and B
-    vector<Function> func_list = extract_called_functions(S);
+    vector<Function> func_list = find_called_functions(S);
     inline_function(A, func_list);
     inline_function(B, func_list);
 }
@@ -312,7 +309,7 @@ void merge(Func S, string func_a, string func_b, string merged_name) {
     Function FA;
     Function FB;
 
-    vector<Function> func_list = extract_called_functions(S);
+    vector<Function> func_list = find_called_functions(S);
 
     for (int i=0; i<func_list.size(); i++) {
         if (func_a == func_list[i].name())
@@ -363,7 +360,7 @@ void merge(Func S, std::vector<std::string> funcs, string merged) {
 }
 
 void merge_duplicates_with_substring(Func S, string pattern) {
-    vector<Function> func_list = extract_called_functions(S);
+    vector<Function> func_list = find_called_functions(S);
 
     for (int i=0; i<func_list.size(); i++) {
         bool rebuild_func_list = false;
@@ -394,7 +391,7 @@ void merge_duplicates_with_substring(Func S, string pattern) {
         if (rebuild_func_list) {
             i = 0;
             func_list.clear();
-            func_list = extract_called_functions(S);
+            func_list = find_called_functions(S);
         }
     }
 }
@@ -402,7 +399,7 @@ void merge_duplicates_with_substring(Func S, string pattern) {
 // -----------------------------------------------------------------------------
 
 void float_dependencies_to_root(Func F) {
-    vector<Function> func_list = extract_called_functions(F);
+    vector<Function> func_list = find_called_functions(F);
 
     // list of Functions which compute dependencies across tiles
     vector<Function> dependency_func_list;
@@ -533,7 +530,7 @@ void float_dependencies_to_root(Func F) {
 void swap_variables(Func S, string func_name, Var a, Var b) {
     assert(!a.same_as(b) && "Variables to be swapped must be different");
 
-    vector<Function> func_list = extract_called_functions(S);
+    vector<Function> func_list = find_called_functions(S);
 
     Function F;
     for (int i=0; i<func_list.size(); i++) {
@@ -616,7 +613,7 @@ void swap_variables(Func S, string func_name, Var a, Var b) {
 // ----------------------------------------------------------------------------
 
 void expand_multiple_reductions(Func S) {
-    vector<Function> func_list = extract_called_functions(S);
+    vector<Function> func_list = find_called_functions(S);
 
     for (int u=0; u<func_list.size(); u++) {
         Function F = func_list[u];

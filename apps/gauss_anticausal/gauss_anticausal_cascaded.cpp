@@ -18,7 +18,6 @@ using std::endl;
 
 Image<float> reference_gaussian(Image<float> in, float sigma);
 
-
 int main(int argc, char **argv) {
     Arguments args("gauss_anticausal_cascaded", argc, argv);
 
