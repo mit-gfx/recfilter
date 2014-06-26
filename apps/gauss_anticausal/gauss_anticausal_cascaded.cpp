@@ -96,12 +96,6 @@ int main(int argc, char **argv) {
         Image<float> B  = gaussian_weights(sigma, order, num_scans).first;
         Image<float> W  = gaussian_weights(sigma, order, num_scans).second;
 
-
-        //B(0) = 1; W(0,0) = 0; W(0,1) = 0;
-        B(1) = 1; W(1,0) = 0; W(1,1) = 0;
-        //B(2) = 1; W(2,0) = 0; W(2,1) = 0;
-        B(3) = 1; W(3,0) = 0; W(3,1) = 0;
-
         G2(x, y) = G1_result(x,y);
 
         G2(rx,y) = B(0)*G2(rx,y)
@@ -138,45 +132,12 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    vector<Func> func_list;
-    extract_func_calls(S, func_list);
-
-    map<string,Func> functions;
-    for (size_t i=0; i<func_list.size(); i++) {
-        cerr << func_list[i] << endl;
-        func_list[i].compute_root();
-        functions[func_list[i].name()] = func_list[i];
-
-//        if (func_list[i].name() == "G1-Intra") {
-//            Func f;
-//            f(x,y,xo) = func_list[i](x%4, x/4, y%4, y/4, xo);
-//            Image<float> a = f.realize(width, height, 4);
-//            cerr << a << endl;
-//        }
-//        if (func_list[i].name().find("Tail_x") != string::npos) {
-//            Func f;
-//            f(x,y) = func_list[i](0, x, y%4, y/4);
-//            Image<float> a = f.realize(width/tile, height);
-//            cerr << a << endl;
-//        }
-//        if (func_list[i].name().find("Tail_y") != string::npos) {
-//            Func f;
-//            f(x,y) = func_list[i](x%4, x/4, 0, y);
-//            Image<float> a = f.realize(width, height/tile);
-//            cerr << a << endl;
-//        }
-//        if (func_list[i].name().find("Deps") != string::npos) {
-//            Func f;
-//            f(x,y) = func_list[i](x%4, x/4, y%4, y/4);
-//            Image<float> a = f.realize(width, height);
-//            cerr << a << endl;
-//        }
-//        if (func_list[i].name() == "G1-Final-Sub") {
-//            Func f;
-//            f(x,y) = func_list[i](x%4, x/4, y%4, y/4);
-//            Image<float> a = f.realize(width, height);
-//            cerr << a << endl;
-//        }
+    map<string,Func> functions = extract_func_calls(S);
+    map<string,Func>::iterator f    = functions.begin();
+    map<string,Func>::iterator fend = functions.end();
+    for (; f!=fend; f++) {
+        cerr << f->second << endl;
+        f->second.compute_root();
     }
 
     // ----------------------------------------------------------------------------------------------

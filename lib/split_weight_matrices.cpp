@@ -23,15 +23,21 @@ static Image<float> matrix_A_FB(
     // initialize
     for (int x=0; x<tile_width; x++) {
         for (int y=0; y<tile_width; y++) {
-            C(x,y) = (x==y ? (x==0 && clamp_border ? 1.0f : feedfwd) : 0.0f);
+            C(x,y) = (x==y ? feedfwd : 0.0f);
         }
     }
 
     // update one row at a time from bottom to up
     for (int y=0; y<tile_width; y++) {
         for (int x=0; x<tile_width; x++) {
-            for (int j=0; y-j-1>=0 && j<filter_order; j++) {
-                C(x,y) += C(x,y-j-1) * feedback[j];
+            for (int j=0; j<filter_order; j++) {
+                float a = 0.0f;
+                if (clamp_border) {
+                    a = (y-j-1>=0 ? C(x,y-j-1)*feedback[j] : (x==0 ? feedback[j] : 0.0f));
+                } else {
+                    a = (y-j-1>=0 ? C(x,y-j-1)*feedback[j] : 0.0f);
+                }
+                C(x,y) += a;
             }
         }
     }

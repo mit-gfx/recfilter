@@ -263,10 +263,7 @@ void extract_func_calls(
         Halide::Func func,                  /// Function to be analyzed
         std::vector<Halide::Func>& f_list   /// list returned as output
         );
-void extract_func_calls(
-        Halide::Func func,
-        std::map<std::string, Halide::Func>& f_list
-        );
+std::map<std::string, Halide::Func> extract_func_calls(Halide::Func func);
 // @}
 
 // ----------------------------------------------------------------------------
