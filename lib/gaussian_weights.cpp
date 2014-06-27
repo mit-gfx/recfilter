@@ -192,3 +192,25 @@ float gaussIntegral(float x, float mu, float sigma) {
 int gaussian_box_filter(int k, float sigma) {
     return std::ceil(std::sqrt((12.0f*sigma*sigma)/float(k)+1));
 }
+
+Halide::Image<float> reference_gaussian(Halide::Image<float> in, float sigma) {
+    int width = in.width();
+    int height= in.height();
+    Halide::Image<float> ref(width,height);
+    for (int y=0; y<height; y++) {
+        for (int x=0; x<width; x++) {
+            float a = 0.0f;
+            float w = 0.0f;
+            for (int j=0; j<height; j++) {
+                for (int i=0; i<width; i++) {
+                    float d = (x-i)*(x-i) + (y-j)*(y-j);
+                    float g = gaussian(std::sqrt(d), 0.0f, sigma);
+                    a += g * in(i,j);
+                    w += g;
+                }
+            }
+            ref(x,y) = a/w;
+        }
+    }
+    return ref;
+}

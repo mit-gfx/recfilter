@@ -10,7 +10,7 @@
  * @brief Compute the Gaussian, derivative of Gaussian and integral of Gaussian
  * @param[in] x Input (float or Halide::Expr)
  * @param[in] mu Mean of the Gaussian function
- * @param[in] sigma Standard deviation of the Gaussian
+ * @param[in] sigma Sigma support of the true Gaussian filter
  */
 // @ {
 //Expr gaussian(Expr x, float mu, float sigma);
@@ -42,9 +42,19 @@ std::pair<Halide::Image<float>, Halide::Image<float> > gaussian_weights(
  * Robinson ICIP 2012
  *
  * @param[in] k number of repeated applications of box filter
- * @param[in] sigma Standard deviation of the Gaussian
+ * @param[in] sigma Sigma support of the true Gaussian filter
  * @return box filter width
  */
 int gaussian_box_filter(int k, float sigma);
+
+
+/** @brief Apply Gaussian filter on an input image
+ *
+ * @param[in] in input single channel image
+ * @param[in] sigma Sigma support of the true Gaussian filter
+ * @return filtered image
+ */
+Halide::Image<float> reference_gaussian(Halide::Image<float> in, float sigma);
+
 
 #endif // _GAUSSIAN_WEIGHTS_H_
