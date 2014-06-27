@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
 
     bool nocheck = args.nocheck;
     int  width   = args.width;
-    int  height  = args.height;
+    int  height  = args.width;
     int  tile    = args.block;
 
     float sigma = 16.0f;
@@ -126,7 +126,6 @@ int main(int argc, char **argv) {
     {
         Timer t("Running ... ");
         S.realize(hl_out_buff);
-        hl_out_buff.free_dev_buffer();
     }
     hl_out_buff.copy_to_host();
     hl_out_buff.free_dev_buffer();
@@ -137,7 +136,7 @@ int main(int argc, char **argv) {
         cerr << "\nChecking difference ...\n" << endl;
         Image<float> hl_out(hl_out_buff);
         Image<float> ref = reference_gaussian(random_image, sigma);
-        cerr << "Difference with true Gaussian \n" << CheckResultVerbose(ref,hl_out) << endl;
+        cerr << "Difference with true Gaussian \n" << CheckResult(ref,hl_out) << endl;
     }
 
     return 0;

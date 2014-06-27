@@ -13,7 +13,6 @@ SPLITLIB_LIB=$(SPLITLIB_DIR)/libSplit.a
 HALIDE_LIB=$(HALIDE_DIR)/bin/libHalide.a
 
 SRC := $(wildcard *.cpp)
-OBJ := $(addprefix $(BUILD_DIR)/,$(notdir $(SRC:.cpp=.o)))
 INC := $(wildcard *.h)
 
 all: $(EXE)
