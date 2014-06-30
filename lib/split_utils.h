@@ -17,17 +17,17 @@ struct SplitInfo {
     Halide::Expr image_width;
     Halide::Expr num_tiles;
 
-    Halide::Var var;
-    Halide::Var inner_var;
-    Halide::Var outer_var;
+    Halide::Var  var;
+    Halide::Var  inner_var;
+    Halide::Var  outer_var;
 
     vector<bool> scan_causal;
-    vector<int> scan_stage;
-    vector<int> scan_id;
+    vector<int>  scan_id;
 
     vector<Halide::RDom> rdom;
     vector<Halide::RDom> outer_rdom;
     vector<Halide::RDom> inner_rdom;
+    vector<Halide::RDom> tail_rdom;
 
     Halide::Image<float> feedfwd_coeff;
     Halide::Image<float> feedback_coeff;
@@ -69,11 +69,9 @@ std::vector<SplitInfo> group_scans_by_dimension(
         Halide::Internal::Function F,
         vector<SplitInfo> split_info);
 
-void fix_intra_tile_scan_stages(Halide::Internal::Function F_intra);
-
-void add_intra_tile_scan_stages(
+void fix_intra_tile_scan_stages(
         Halide::Internal::Function F_intra,
-        std::vector<SplitInfo> split_info);
+        vector<SplitInfo> split_info);
 
 // -----------------------------------------------------------------------------
 

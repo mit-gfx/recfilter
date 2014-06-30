@@ -44,12 +44,11 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
     vector<Expr>   pure_values = F.values();
     vector<ReductionDefinition> reductions = F.reductions();
 
-    // create the split function and add the scan stage arg
+    // create the split function
     {
         F_intra.define(pure_args, pure_values);
 
         // replace calls to original Func by split Func
-        // add scan stage value as arg to reduction args and recursive calls
         for (int i=0; i<reductions.size(); i++) {
             for (int j=0; j<reductions[i].values.size(); j++) {
                 Expr value = reductions[i].values[j];
@@ -251,27 +250,19 @@ static vector<Function> create_intra_tail_term(
     for (int k=0; k<split_info.num_splits; k++) {
         Function function(func_name + "_" + int_to_string(split_info.scan_id[k]));
 
-        int scan_stage = split_info.scan_stage[k];
+        int scan_id = split_info.scan_id[k];
+        int order   = split_info.filter_order;
 
         vector<string> pure_args;
         vector<Expr> call_args;
         vector<Expr> pure_values;
 
-        // pure args same as F_intra except for scan stage arg
-        // args for calling F_intra
-        // - xi replaced by causal/anticausal tail indices
-        // - scan stage arg set to actual scan stage value
+        // pure args same as F_intra with xi replaced by tail indices
         for (int i=0; i<F_intra.args().size(); i++) {
             string arg = F_intra.args()[i];
-            if (arg == SCAN_STAGE_ARG) {
-                call_args.push_back(scan_stage);
-            } else if (arg == xi.name()) {
+            if (arg == xi.name()) {
                 pure_args.push_back(xi.name());
-                if (split_info.scan_causal[k]) {
-                    call_args.push_back(simplify(tile-xi-1));
-                } else {
-                    call_args.push_back(xi);
-                }
+                call_args.push_back(tile + order*k + xi);
             } else {
                 pure_args.push_back(arg);
                 call_args.push_back(Var(arg));
@@ -638,32 +629,15 @@ static void add_prev_dimension_residual_to_tails(
             // apply all scans between the prev dimension and current dimension
             int first_scan = split_info_prev.scan_id[0]+1;
             int last_scan  = split_info.scan_id[j];
-            int scan_stage_var_index = -1;
-            for (int i=0; i<F_intra.args().size(); i++) {
-                if (F_intra.args()[i] == SCAN_STAGE_ARG) {
-                    scan_stage_var_index = i;
-                }
-            }
 
             for (int i=first_scan; i<=last_scan; i++) {
-                // do not add the scan if its scan stage is less than scan stage of scan in
-                // current dimension
-                const int  prev_scan_stage = split_info_prev.scan_stage[k];
-                const int* scan_stage = as_const_int(
-                        F_intra.reductions()[i].args[scan_stage_var_index]);
-                assert(scan_stage && "Could not convert scan stage Expr to const int");
-                if (prev_scan_stage >= *scan_stage) {
-                    continue;
-                }
                 vector<Expr> args;
                 vector<Expr> values;
                 for (int u=0; u<F_intra.reductions()[i].args.size(); u++) {
                     args.push_back(F_intra.reductions()[i].args[u]);
                 }
-                args.erase(args.begin()+scan_stage_var_index);
                 for (int u=0; u<F_intra.reductions()[i].values.size(); u++) {
                     Expr val = F_intra.reductions()[i].values[u];
-                    val = remove_arg_from_func_call(F_intra.name(), scan_stage_var_index, val);
                     val = substitute_func_call(F_intra.name(), F_tail_prev_scanned, val);
                     values.push_back(val);
                 }
@@ -956,6 +930,7 @@ void split(
 
     vector<Expr> tile_width;
     vector<RDom> outer_rdom;
+    vector<RDom> tail_rdom;
     vector<Expr> image_width;
     vector<Expr> num_tiles;
 
@@ -987,6 +962,9 @@ void split(
                     0,order[i],
                     1, simplify(num_tiles[i]-1),
                     "r"+var[i].name()+"o"));
+
+        // tail_rdom.x: over all tail elems of current tile
+        tail_rdom.push_back(RDom(0,order[i], "r"+var[i].name()+"t"));
     }
 
     // list of structs with all the info about split in each dimension
@@ -1028,10 +1006,10 @@ void split(
         s.feedback_coeff = feedback_coeff;
 
         s.scan_id    .push_back(i);
-        s.scan_stage .push_back(0);
         s.rdom       .push_back(rdom[index]);
         s.inner_rdom .push_back(inner_rdom[index]);
         s.outer_rdom .push_back(outer_rdom[index]);
+        s.tail_rdom  .push_back(tail_rdom[index]);
         s.scan_causal.push_back(check_causal_scan(F, rdom[index], i, s.filter_dim));
         s.num_splits++;
 
@@ -1047,17 +1025,6 @@ void split(
         if (split_info[i].num_splits == 0) {
             split_info.erase(split_info.begin()+i);
             i--;
-        }
-    }
-
-    // splits in each dimension have scan stages from 0 to max_scan_stage
-    // change the stages number so that stages from second dimension
-    // start after stages from first dimension
-    for (int i=0, next_scan_stage=0; i<split_info.size(); i++) {
-        int scan_stage_offset = next_scan_stage;
-        for (int j=0; j<split_info[i].num_splits; j++) {
-            split_info[i].scan_stage[j] += scan_stage_offset;
-            next_scan_stage = std::max(split_info[i].scan_stage[j]+1, next_scan_stage);
         }
     }
 
@@ -1082,16 +1049,11 @@ void split(
     // just a copy of the intra tile computation for now
     Function F_final = create_copy(F_intra, F.name() + DELIMITER + FINAL_TERM);
 
-    // add scan stages to the intra tile computation
-    // this is necessary for computing tails
-    // not required for the final result
-    add_intra_tile_scan_stages(F_intra, split_info);
-
     // compute the residuals from splits in each dimension
     vector< vector<Function> > F_deps = create_recursive_split(F_intra, split_info);
 
-    // transfer results between scan stages in intra tile computation
-    fix_intra_tile_scan_stages(F_intra);
+    // transfer the tail of each scan to another buffer
+    fix_intra_tile_scan_stages(F_intra, split_info);
 
     // add all the residuals to the final term
     add_all_residuals_to_final_result(F_final, F_deps, split_info);
