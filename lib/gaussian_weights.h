@@ -38,8 +38,9 @@ std::pair<Halide::Image<float>, Halide::Image<float> > gaussian_weights(
 /**
  * @brief Compute the size of a box filter that approximates a Gaussian
  *
- * Source: "Efficient Gaussian filtering using cascaded prefix sums"
- * Robinson ICIP 2012
+ * Source: "Efficient Approximation of Gaussian Filters"
+ * Rau and McClellan, IEEE Trans. on Signal Processing 1997
+ * http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=554310
  *
  * @param[in] k number of repeated applications of box filter
  * @param[in] sigma Sigma support of the true Gaussian filter

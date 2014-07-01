@@ -1,5 +1,15 @@
 #include "gaussian_weights.h"
 
+/// Compute the factorial of an integer
+static int factorial(int k) {
+    assert(k>=0);
+    int r = 1;
+    for (int i=1; i<=k; i++) {
+        r *= i;
+    }
+    return r;
+}
+
 /**
  *  @brief Compute recursive filtering scaling factor
  *
@@ -190,7 +200,20 @@ float gaussIntegral(float x, float mu, float sigma) {
 }
 
 int gaussian_box_filter(int k, float sigma) {
-    return std::ceil(std::sqrt((12.0f*sigma*sigma)/float(k)+1));
+    float sum = 0.0f;
+    float alpha = 0.005f;
+    int sum_limit = int(std::floor((float(k)-1.0f)/2.0f));
+    for (int i=0; i<=sum_limit; i++) {
+        int f_k   = factorial(k);
+        int f_i   = factorial(i);
+        int f_k_i = factorial(k-i);
+        int f_k_1 = factorial(k-1);
+        float f   = float(f_k / (f_i*f_k_i));
+        float p   = std::pow(-1.0f,i)/float(f_k_1);
+        sum      += p * f * std::pow((float(k)/2.0f-i), k-1);
+    }
+    sum = std::sqrt(2.0f*M_PI) * (sum+alpha) * sigma;
+    return int(std::ceil(sum));
 }
 
 Halide::Image<float> reference_gaussian(Halide::Image<float> in, float sigma) {
