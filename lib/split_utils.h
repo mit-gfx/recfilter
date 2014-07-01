@@ -69,7 +69,7 @@ std::vector<SplitInfo> group_scans_by_dimension(
         Halide::Internal::Function F,
         vector<SplitInfo> split_info);
 
-void fix_intra_tile_scan_stages(
+void extract_tails_from_each_scan(
         Halide::Internal::Function F_intra,
         vector<SplitInfo> split_info);
 

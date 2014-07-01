@@ -1053,7 +1053,7 @@ void split(
     vector< vector<Function> > F_deps = create_recursive_split(F_intra, split_info);
 
     // transfer the tail of each scan to another buffer
-    fix_intra_tile_scan_stages(F_intra, split_info);
+    extract_tails_from_each_scan(F_intra, split_info);
 
     // add all the residuals to the final term
     add_all_residuals_to_final_result(F_final, F_deps, split_info);
