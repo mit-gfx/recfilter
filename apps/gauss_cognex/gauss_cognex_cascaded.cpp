@@ -24,8 +24,6 @@ int main(int argc, char **argv) {
     int  height = args.width;
     int  tile   = args.block;
 
-    float sigma = 16.0f;
-
     Image<float> random_image = generate_random_image<float>(width,height);
 
     ImageParam image(type_of<float>(), 2);
@@ -33,12 +31,23 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Var x("x");
-    Var y("y");
+    float sigma = 16.0f;
+    int   box   = gaussian_box_filter(3, sigma); // approx Gaussian with 3 box filters
+    float norm  = std::pow(box, 3*2);            // normalizing factor
 
+    // ----------------------------------------------------------------------------------------------
+    int order     = 2;
+    int num_scans = 2;
+
+    Image<float> W(num_scans,order);
+    W(0,0) = 2.0f; W(0,1) = -1.0f;
+    W(1,0) = 2.0f; W(1,1) = -1.0f;
+
+    Var x("x"),   y("y");
     Var xi("xi"), yi("yi");
     Var xo("xo"), yo("yo");
 
+    Func I("I");
     Func G ("G");
     Func S1("S1");
     Func S2("S2");
@@ -48,14 +57,33 @@ int main(int argc, char **argv) {
     RDom rxi(0, tile, "rxi");
     RDom ryi(0, tile, "ryi");
 
-    S1(x, y)  = image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1));
+    I(x,y) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1));
+
+    // convolve image with third derivative of three box filters
+    S1(x,y) =
+        (1.0f /norm) * I(x+0*box, y+0*box) +
+        (-3.0f/norm) * I(x+1*box, y+0*box) +
+        (3.0f /norm) * I(x+2*box, y+0*box) +
+        (-3.0f/norm) * I(x+0*box, y+1*box) +
+        (9.0f /norm) * I(x+1*box, y+1*box) +
+        (-9.0f/norm) * I(x+2*box, y+1*box) +
+        (3.0f /norm) * I(x+0*box, y+2*box) +
+        (-9.0f/norm) * I(x+1*box, y+2*box) +
+        (9.0f /norm) * I(x+2*box, y+2*box);
+
+    // integral using summed area table
     S1(rx,y) += select(rx>0, S1(max(0,rx-1),y), 0.0f);
     S1(x,ry) += select(ry>0, S1(x,max(0,ry-1)), 0.0f);
 
-    S2(x, y)  = S1(x,y);
-    S2(rx,y) += select(rx>0, S2(max(0,rx-1),y), 0.0f);
-    S2(x,ry) += select(ry>0, S2(x,max(0,ry-1)), 0.0f);
 
+    // double integral of previous result using second order filter
+    S2(x, y)  = S1(x,y);
+    S2(rx,y) += (select(rx>0, W(0,0)*S2(max(0,rx-1),y), 0.0f)
+             +   select(rx>1, W(0,1)*S2(max(0,rx-2),y), 0.0f));
+    S2(x,ry) += (select(ry>0, W(1,0)*S2(x,max(0,ry-1)), 0.0f)
+             +   select(ry>1, W(1,1)*S2(x,max(0,ry-2)), 0.0f));
+
+    // normalization factor: 3 box filters and 2 dimensions
     G(x,y) = S2(x,y);
 
     split(S1,
@@ -66,14 +94,16 @@ int main(int argc, char **argv) {
             Internal::vec( rx, ry),
             Internal::vec(rxi,ryi));
 
-    split(S2,
+    split(S2,W,
             Internal::vec(  0,  1),
             Internal::vec(  x,  y),
             Internal::vec( xi, yi),
             Internal::vec( xo, yo),
             Internal::vec( rx, ry),
-            Internal::vec(rxi,ryi));
+            Internal::vec(rxi,ryi),
+            Internal::vec(order,order));
 
+    inline_function(G, "I");
     inline_function(G, "S1");
     inline_function(G, "S2");
 
