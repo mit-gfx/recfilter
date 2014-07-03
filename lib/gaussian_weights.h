@@ -13,12 +13,13 @@
  * @param[in] sigma Sigma support of the true Gaussian filter
  */
 // @ {
-//Expr gaussian(Expr x, float mu, float sigma);
-//Expr gaussDerivative(Expr x, float mu, float sigma);
-//Expr gaussIntegral(float x, float mu, float sigma);
-float gaussian(float x, float mu, float sigma);
+float gaussian       (float x, float mu, float sigma);
 float gaussDerivative(float x, float mu, float sigma);
-float gaussIntegral(float x, float mu, float sigma);
+float gaussIntegral  (float x, float mu, float sigma);
+
+Halide::Expr gaussian       (Halide::Expr x, float mu, float sigma);
+Halide::Expr gaussDerivative(Halide::Expr x, float mu, float sigma);
+Halide::Expr gaussIntegral  (Halide::Expr x, float mu, float sigma);
 // @}
 
 

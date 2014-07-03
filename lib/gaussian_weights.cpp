@@ -1,5 +1,7 @@
 #include "gaussian_weights.h"
 
+using namespace Halide;
+
 /// Compute the factorial of an integer
 static int factorial(int k) {
     assert(k>=0);
@@ -149,10 +151,10 @@ static void weights3(const float& s, float& b0, float& a1, float& a2, float& a3)
 }
 
 
-std::pair<Halide::Image<float>, Halide::Image<float> >
+std::pair<Image<float>, Image<float> >
 gaussian_weights(float sigma, int order, int num_scans) {
-    Halide::Image<float> B(num_scans);
-    Halide::Image<float> W(num_scans,order);
+    Image<float> B(num_scans);
+    Image<float> W(num_scans,order);
 
     float b0 = 0.0f;
     vector<float> a(order, 0.0f);
@@ -170,23 +172,23 @@ gaussian_weights(float sigma, int order, int num_scans) {
         B(x) = b0;
     }
 
-    return std::make_pair<Halide::Image<float>, Halide::Image<float> >(B, W);
+    return std::make_pair<Image<float>, Image<float> >(B, W);
 }
 
-//Expr gaussian(Expr x, float mu, float sigma) {
-//    Expr xx = Internal::Cast::make(type_of<float>(),x);
-//    Expr y = (xx - mu) / sigma;
-//    return exp(-.5*y*y) / (sigma * 2.50662827463);
-//}
-//Expr gaussDerivative(Expr x, float mu, float sigma) {
-//    Expr xx = Internal::Cast::make(type_of<float>(),x);
-//    Expr y = (xx - mu) / sigma;
-//    return (mu - xx) * exp(-.5*y*y) / (sigma*sigma*sigma * 2.50662827463);
-//}
-//Expr gaussIntegral(float x, float mu, float sigma) {
-//    Expr xx = Internal::Cast::make(type_of<float>(),x);
-//    return .5 * ( 1 + erf((xx-mu) / (sigma * 1.41421356237)) );
-//}
+Expr gaussian(Expr x, float mu, float sigma) {
+    Expr xx = Internal::Cast::make(type_of<float>(),x);
+    Expr y = (xx - mu) / sigma;
+    return Halide::fast_exp(-0.5f*y*y) / (sigma * 2.50662827463f);
+}
+Expr gaussDerivative(Expr x, float mu, float sigma) {
+    Expr xx = Internal::Cast::make(type_of<float>(),x);
+    Expr y = (xx - mu) / sigma;
+    return (mu - xx) * Halide::fast_exp(-0.5f*y*y) / (sigma*sigma*sigma * 2.50662827463f);
+}
+Expr gaussIntegral(Expr x, float mu, float sigma) {
+    Expr xx = Internal::Cast::make(type_of<float>(),x);
+    return 0.5f * ( 1.0f + Halide::fast_erf((xx-mu) / (sigma * 1.41421356237f)) );
+}
 float gaussian(float x, float mu, float sigma) {
     float y = (x - mu) / sigma;
     return (std::exp(-0.5f*y*y) / (sigma * 2.50662827463f));
@@ -216,10 +218,10 @@ int gaussian_box_filter(int k, float sigma) {
     return int(std::ceil(sum));
 }
 
-Halide::Image<float> reference_gaussian(Halide::Image<float> in, float sigma) {
+Image<float> reference_gaussian(Image<float> in, float sigma) {
     int width = in.width();
     int height= in.height();
-    Halide::Image<float> ref(width,height);
+    Image<float> ref(width,height);
     for (int y=0; y<height; y++) {
         for (int x=0; x<width; x++) {
             float a = 0.0f;
