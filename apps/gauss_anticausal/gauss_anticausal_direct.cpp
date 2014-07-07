@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
                 Internal::vec( xo, xo, yo, yo),
                 Internal::vec( rx, ry, rz, rw),
                 Internal::vec(rxi,ryi,rzi,rwi),
-                Internal::vec(order,order,order,order));
+                Internal::vec(order,order,order,order), true);
 
         inline_function(S, "G");
     }

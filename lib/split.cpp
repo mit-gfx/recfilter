@@ -873,7 +873,8 @@ void split(
         vector<Var>  inner_var,
         vector<Var>  outer_var,
         vector<RDom> rdom,
-        vector<RDom> inner_rdom)
+        vector<RDom> inner_rdom,
+        bool clamp_borders)
 {
     vector<int> order(dimension.size(), 1);         // default first order
     Image<float> feedfwd_coeff(dimension.size(), 1);  // default filter weight = 1
@@ -885,7 +886,7 @@ void split(
         }
     }
     split(func, feedfwd_coeff, feedback_coeff, dimension, var, inner_var, outer_var,
-            rdom, inner_rdom, order);
+            rdom, inner_rdom, order, clamp_borders);
 }
 
 void split(
@@ -897,7 +898,8 @@ void split(
         vector<Var>  outer_var,
         vector<RDom> rdom,
         vector<RDom> inner_rdom,
-        vector<int>  order)
+        vector<int>  order,
+        bool clamp_borders)
 {
     Image<float> feedfwd_coeff(dimension.size(), 1);
     for (int i=0; i<feedfwd_coeff.width(); i++) {
@@ -906,7 +908,7 @@ void split(
         }
     }
     split(func, feedfwd_coeff, feedback_coeff, dimension, var, inner_var, outer_var,
-            rdom, inner_rdom, order);
+            rdom, inner_rdom, order, clamp_borders);
 }
 
 void split(
@@ -919,7 +921,8 @@ void split(
         vector<Var>  outer_var,
         vector<RDom> rdom,
         vector<RDom> inner_rdom,
-        vector<int>  order)
+        vector<int>  order,
+        bool clamp_borders)
 {
 
     check_split_feasible(func,dimension,var,inner_var,outer_var,rdom,inner_rdom,order);
@@ -1028,17 +1031,12 @@ void split(
         }
     }
 
-    // are all feed fwd coeff equal to 1.0
-    bool feedfwd_coeff_equal_one = true;
-    for (int i=0; i<feedfwd_coeff.width(); i++) {
-        feedfwd_coeff_equal_one &= (feedfwd_coeff(i) == 1.0f);
-    }
-
     // compute the intra tile result
     Function F_intra = create_intra_tile_term(F, split_info);
 
-    // apply zero boundary on inner tiles if feed forward coeffs are not 1
-    if (!feedfwd_coeff_equal_one) {
+    // apply clamped boundary on border tiles and zero boundary on
+    // inner tiles if explicit border clamping is requested
+    if (clamp_borders) {
         for (int j=0; j<split_info.size(); j++) {
             split_info[j].clamp_border = true;
         }

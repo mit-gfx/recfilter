@@ -61,17 +61,14 @@ int main(int argc, char **argv) {
     RDom ryi(0, tile_width, "ryi");
 
     split(S,Internal::vec(0,1),
-            Internal::vec(x,y), Internal::vec(xi,yi), Internal::vec(xo,yo),
-            Internal::vec(rx,ry), Internal::vec(rxi,ryi));
+            Internal::vec(x,y),
+            Internal::vec(xi,yi),
+            Internal::vec(xo,yo),
+            Internal::vec(rx,ry),
+            Internal::vec(rxi,ryi), true);
 
     // ----------------------------------------------------------------------------------------------
 
-    float_dependencies_to_root(S);
-    inline_function(S, "S--Intra_y-Deps_x");
-    inline_function(S, "S--Intra_y");
-    inline_function(S, "S--Deps_y");
-    swap_variables (S, "S--Intra_y-Tail_x", xi, yi);
-    merge(S, "S--Intra_y-Tail_x", "S--Tail_y", "S--Tail");
     inline_function(B, "S");
 
     // ----------------------------------------------------------------------------------------------
@@ -92,51 +89,6 @@ int main(int argc, char **argv) {
 
     Target target = get_jit_target_from_environment();
     if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
-        Var t("t");
-
-        S_intra0.compute_at(S_tails, Var("blockidx"));
-        //S_intra0.split(yi,t,yi, MAX_THREAD/WARP_SIZE).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).gpu_blocks(xo,yo);
-        S_intra0.reorder_storage(xi,yi,xo,yo);
-        S_intra0.reorder(xi,yi,xo,yo).gpu_threads(yi);
-        S_intra0.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
-        S_intra0.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
-
-        S_tails.compute_root();
-        S_tails.reorder_storage(yi,xi,xo,yo);
-        //S_tails.split(yi,t,yi, MAX_THREAD/WARP_SIZE).reorder(t,xi,yi,xo,yo);
-        S_tails.reorder(xi,yi,xo,yo);
-        S_tails.gpu_blocks(xo,yo).gpu_threads(xi);
-
-        S_ctaily.compute_root();
-        S_ctaily.reorder_storage(xi,xo,yi,yo);
-        S_ctaily.split(xo,xo,t,MAX_THREAD/tile_width);
-        S_ctaily.reorder(yo,yi,xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
-        S_ctaily.update().split(xo,xo,t,MAX_THREAD/tile_width);
-        S_ctaily.update().reorder(xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
-
-        S_ctailx.compute_root();
-        S_ctailx.reorder_storage(yi,yo,xi,xo);
-        S_ctailx.split(yo,yo,t,MAX_THREAD/tile_width);
-        S_ctailx.reorder(xo,xi,yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
-        S_ctailx.update().split(yo,yo,t,MAX_THREAD/tile_width);
-        S_ctailx.update().reorder(yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
-
-        S_intra.compute_at(B, Var("blockidx"));
-        S_intra.reorder_storage(xi,yi,xo,yo);
-        //S_intra.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi);
-        S_intra.reorder(xi,yi,xo,yo).gpu_threads(yi);
-        S_intra.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
-        S_intra.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
-
-        B.compute_root();
-        B.split(x, xo,xi, tile_width).split(y, yo,yi, tile_width);
-        //B.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
-        B.reorder(yi, xi, xo, yo);
-        B.gpu_blocks(xo,yo).gpu_threads(xi);
-        B.bound(x, 0, image.width()).bound(y, 0, image.height());
-    }
-    else {
-        cerr << "Warning: No CPU scheduling" << endl;
     }
 
     // ----------------------------------------------------------------------------------------------

@@ -52,7 +52,8 @@ void split(
         std::vector<Halide::Var>  outer_vars,
         std::vector<Halide::RDom> rdoms,
         std::vector<Halide::RDom> inner_rdoms,
-        std::vector<int> orders);
+        std::vector<int>          orders,
+        bool                      clamp_borders = false);
 
 void split(
         Halide::Func& F,
@@ -63,7 +64,8 @@ void split(
         std::vector<Halide::Var>  outer_vars,
         std::vector<Halide::RDom> rdoms,
         std::vector<Halide::RDom> inner_rdoms,
-        std::vector<int> orders);
+        std::vector<int>          orders,
+        bool                      clamp_borders = false);
 
 void split(
         Halide::Func& F,
@@ -72,7 +74,8 @@ void split(
         std::vector<Halide::Var>  inner_vars,
         std::vector<Halide::Var>  outer_vars,
         std::vector<Halide::RDom> rdoms,
-        std::vector<Halide::RDom> inner_rdoms);
+        std::vector<Halide::RDom> inner_rdoms,
+        bool                      clamp_borders = false);
 
 // ----------------------------------------------------------------------------
 
