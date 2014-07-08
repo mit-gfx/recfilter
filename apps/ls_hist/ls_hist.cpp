@@ -64,21 +64,22 @@ int main(int argc, char **argv) {
     }
 
     Func Median("Median");
-    Median(x,y) = 0.0f;
-
+    vector<Expr> median;
     for (int i=0; i<NUM_BINS-1; i++) {
         Expr target = Gauss[0](x,y) + 0.5f*(Gauss[NUM_BINS-1](x,y)-Gauss[0](x,y));
         Expr frac   = (target-Gauss[i](x,y))/(Gauss[i+1](x,y)-Gauss[i](x,y));
         Expr cond   = (Gauss[i](x,y)<target && Gauss[i+1](x,y)>=target);
         Expr value  = BIN_CENTER(i) + frac*BIN_WIDTH;
-        Median(x,y) = select(cond, value, Median(x,y));
+        if (i==0) {
+            median.push_back(value);
+        } else {
+            median.push_back(select(cond, value, median[i-1]));
+        }
     }
+    Median(x,y) = median[median.size()-1];
 
     Median.compute_root();
     Median.gpu_tile(x,y,WARP_SIZE,MAX_THREADS);
-    for (int i=0; i<NUM_BINS-1; i++) {
-//        Median.update(i).gpu_tile(x,y,WARP_SIZE,MAX_THREADS/WARP_SIZE);
-    }
 
     // ----------------------------------------------------------------------------------------------
 
