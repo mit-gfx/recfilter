@@ -68,15 +68,22 @@ int main(int argc, char **argv) {
 
     // convolve image with third derivative of three box filters
     S(x,y) =
-        (1.0f /norm) * I(x+0*box, y+0*box) +
-        (-3.0f/norm) * I(x+1*box, y+0*box) +
-        (3.0f /norm) * I(x+2*box, y+0*box) +
-        (-3.0f/norm) * I(x+0*box, y+1*box) +
-        (9.0f /norm) * I(x+1*box, y+1*box) +
-        (-9.0f/norm) * I(x+2*box, y+1*box) +
-        (3.0f /norm) * I(x+0*box, y+2*box) +
-        (-9.0f/norm) * I(x+1*box, y+2*box) +
-        (9.0f /norm) * I(x+2*box, y+2*box);
+            ( 1.0f * I(x+0*box,y+0*box) +
+             -3.0f * I(x+1*box,y+0*box) +
+              3.0f * I(x+2*box,y+0*box) +
+             -1.0f * I(x+3*box,y+0*box) +
+             -3.0f * I(x+0*box,y+1*box) +
+              9.0f * I(x+1*box,y+1*box) +
+             -9.0f * I(x+2*box,y+1*box) +
+              3.0f * I(x+3*box,y+1*box) +
+              3.0f * I(x+0*box,y+2*box) +
+             -9.0f * I(x+1*box,y+2*box) +
+              9.0f * I(x+2*box,y+2*box) +
+             -3.0f * I(x+3*box,y+2*box) +
+             -1.0f * I(x+0*box,y+3*box) +
+              3.0f * I(x+1*box,y+3*box) +
+             -3.0f * I(x+2*box,y+3*box) +
+              1.0f * I(x+3*box,y+3*box)) / norm;
 
     // triple integral by applying a first followed by second order filter
     S(rx,y) += (select(rx>0, W(0,0)*S(max(0,rx-1),y), 0.0f));
@@ -96,7 +103,7 @@ int main(int argc, char **argv) {
             Internal::vec( xo, xo, yo, yo),
             Internal::vec( rx, ry, rz, rw),
             Internal::vec(rxi,ryi,rzi,rwi),
-            Internal::vec(order,order,order,order));
+            Internal::vec(order,order,order,order), true);
 
     inline_function(G, "I");
     inline_function(G, "S");

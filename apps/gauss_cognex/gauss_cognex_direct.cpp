@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    float sigma = 16.0f;
+    float sigma = 4.0f;
     int   box   = gaussian_box_filter(3, sigma); // approx Gaussian with 3 box filters
     float norm  = std::pow(box, 3*2);            // normalizing factor
 
@@ -61,16 +61,24 @@ int main(int argc, char **argv) {
     I(x,y) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1));
 
     // convolve image with third derivative of three box filters
+    // boundary conditions at x=0 and y=0
     S(x,y) =
-        (1.0f /norm) * I(x+0*box, y+0*box) +
-        (-3.0f/norm) * I(x+1*box, y+0*box) +
-        (3.0f /norm) * I(x+2*box, y+0*box) +
-        (-3.0f/norm) * I(x+0*box, y+1*box) +
-        (9.0f /norm) * I(x+1*box, y+1*box) +
-        (-9.0f/norm) * I(x+2*box, y+1*box) +
-        (3.0f /norm) * I(x+0*box, y+2*box) +
-        (-9.0f/norm) * I(x+1*box, y+2*box) +
-        (9.0f /norm) * I(x+2*box, y+2*box);
+            ( 1.0f * I(x+0*box,y+0*box) +
+             -3.0f * I(x+1*box,y+0*box) +
+              3.0f * I(x+2*box,y+0*box) +
+             -1.0f * I(x+3*box,y+0*box) +
+             -3.0f * I(x+0*box,y+1*box) +
+              9.0f * I(x+1*box,y+1*box) +
+             -9.0f * I(x+2*box,y+1*box) +
+              3.0f * I(x+3*box,y+1*box) +
+              3.0f * I(x+0*box,y+2*box) +
+             -9.0f * I(x+1*box,y+2*box) +
+              9.0f * I(x+2*box,y+2*box) +
+             -3.0f * I(x+3*box,y+2*box) +
+             -1.0f * I(x+0*box,y+3*box) +
+              3.0f * I(x+1*box,y+3*box) +
+             -3.0f * I(x+2*box,y+3*box) +
+              1.0f * I(x+3*box,y+3*box)) / norm;
 
     // triple integral via third order filter
     S(rx,y) = S(rx,y) +
@@ -92,7 +100,7 @@ int main(int argc, char **argv) {
             Internal::vec( xo, yo),
             Internal::vec( rx, ry),
             Internal::vec(rxi,ryi),
-            Internal::vec(order,order));
+            Internal::vec(order,order), true);
 
     inline_function(G, "I");
     inline_function(G, "S");
