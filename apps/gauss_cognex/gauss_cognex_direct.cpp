@@ -61,7 +61,6 @@ int main(int argc, char **argv) {
     I(x,y) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1));
 
     // convolve image with third derivative of three box filters
-    // boundary conditions at x=0 and y=0
     S(x,y) =
             ( 1.0f * I(x+0*box,y+0*box) +
              -3.0f * I(x+1*box,y+0*box) +
