@@ -60,16 +60,22 @@ int main(int argc, char **argv) {
     I(x,y) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1));
 
     // convolve image with third derivative of three box filters
-    S1(x,y) =
-        (1.0f /norm) * I(x+0*box, y+0*box) +
-        (-3.0f/norm) * I(x+1*box, y+0*box) +
-        (3.0f /norm) * I(x+2*box, y+0*box) +
-        (-3.0f/norm) * I(x+0*box, y+1*box) +
-        (9.0f /norm) * I(x+1*box, y+1*box) +
-        (-9.0f/norm) * I(x+2*box, y+1*box) +
-        (3.0f /norm) * I(x+0*box, y+2*box) +
-        (-9.0f/norm) * I(x+1*box, y+2*box) +
-        (9.0f /norm) * I(x+2*box, y+2*box);
+    S(x,y) = (1.0f * I(x+0*box,y+0*box)
+             -3.0f * I(x+1*box,y+0*box)
+              3.0f * I(x+2*box,y+0*box)
+             -1.0f * I(x+3*box,y+0*box)
+             -3.0f * I(x+0*box,y+1*box)
+              9.0f * I(x+1*box,y+1*box)
+             -9.0f * I(x+2*box,y+1*box)
+              3.0f * I(x+3*box,y+1*box)
+              3.0f * I(x+0*box,y+2*box)
+             -9.0f * I(x+1*box,y+2*box)
+              9.0f * I(x+2*box,y+2*box)
+             -3.0f * I(x+3*box,y+2*box)
+             -1.0f * I(x+0*box,y+3*box)
+              3.0f * I(x+1*box,y+3*box)
+             -3.0f * I(x+2*box,y+3*box)
+              1.0f * I(x+3*box,y+3*box)) / norm;
 
     // integral using summed area table
     S1(rx,y) += select(rx>0, S1(max(0,rx-1),y), 0.0f);
@@ -92,7 +98,7 @@ int main(int argc, char **argv) {
             Internal::vec( xi, yi),
             Internal::vec( xo, yo),
             Internal::vec( rx, ry),
-            Internal::vec(rxi,ryi));
+            Internal::vec(rxi,ryi), true);
 
     split(S2,W,
             Internal::vec(  0,  1),
@@ -101,7 +107,7 @@ int main(int argc, char **argv) {
             Internal::vec( xo, yo),
             Internal::vec( rx, ry),
             Internal::vec(rxi,ryi),
-            Internal::vec(order,order));
+            Internal::vec(order,order), true);
 
     inline_function(G, "I");
     inline_function(G, "S1");
