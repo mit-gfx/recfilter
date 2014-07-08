@@ -49,14 +49,11 @@ int main(int argc, char **argv) {
     vector<Func> Gauss;
 
     for (int i=0; i<NUM_BINS; i++) {
-        float mu = BIN_CENTER(i);
-        float sigma = GAUSS_SIGMA;
-
         string name = Internal::int_to_string(i);
         Func L("L_" + name);
 
         // pass image through histogram lookup table
-        L(x,y) = gaussIntegral(image((clamp(x,0,iw),clamp(y,0,ih))), mu, HIST_SIGMA);
+        L(x,y) = gaussIntegral(image(clamp(x,0,iw),clamp(y,0,ih)), BIN_CENTER(i), HIST_SIGMA);
 
         // Gaussian filter using direct cognex blur
         Func G = gaussian_blur(L, GAUSS_SIGMA,
@@ -80,9 +77,8 @@ int main(int argc, char **argv) {
     Median.compute_root();
     Median.gpu_tile(x,y,WARP_SIZE,MAX_THREADS);
     for (int i=0; i<NUM_BINS-1; i++) {
-        Median.update(i).gpu_tile(x,y,WARP_SIZE,MAX_THREADS/WARP_SIZE);
+//        Median.update(i).gpu_tile(x,y,WARP_SIZE,MAX_THREADS/WARP_SIZE);
     }
-
 
     // ----------------------------------------------------------------------------------------------
 
@@ -91,7 +87,7 @@ int main(int argc, char **argv) {
     cerr << "\nJIT compilation ... " << endl;
     Median.compile_jit();
 
-    Buffer hl_out_buff(type_of<int>(), width,height);
+    Buffer hl_out_buff(type_of<float>(), width,height);
     {
         Timer t("Running ... ");
         Median.realize(hl_out_buff);
@@ -157,8 +153,6 @@ Func gaussian_blur(Func I, float sigma, Expr width, Expr height, int tile, strin
         select(ry>1, W(1,1)*S(x,max(0,ry-2)), 0.0f) +
         select(ry>2, W(1,2)*S(x,max(0,ry-3)), 0.0f);
 
-    inline_function(S, "I");
-
     //split(S,W,
     //        Internal::vec(  0,  1),
     //        Internal::vec(  x,  y),
@@ -167,6 +161,8 @@ Func gaussian_blur(Func I, float sigma, Expr width, Expr height, int tile, strin
     //        Internal::vec( rx, ry),
     //        Internal::vec(rxi,ryi),
     //        Internal::vec(order,order));
+    //
+    //inline_function(S, "I");
 
 
     // schedule
