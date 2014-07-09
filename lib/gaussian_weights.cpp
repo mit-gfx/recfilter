@@ -187,7 +187,7 @@ Expr gaussDerivative(Expr x, float mu, float sigma) {
 }
 Expr gaussIntegral(Expr x, float mu, float sigma) {
     Expr xx = Internal::Cast::make(type_of<float>(),x);
-    return 0.5f * ( 1.0f + Halide::fast_erf((xx-mu) / (sigma * 1.41421356237f)) );
+    return 0.5f * ( 1.0f + Halide::erf((xx-mu) / (sigma * 1.41421356237f)) );
 }
 float gaussian(float x, float mu, float sigma) {
     float y = (x - mu) / sigma;
