@@ -493,7 +493,7 @@ static vector<Function> create_final_residual_term(
         vector<Expr> values(num_outputs, make_zero(type));
 
         // weight matrix for accumulating completed tail elements
-        // of scan after applying all subsequent scans
+        // of scan after applying only current scan
         Image<float> weight = tail_weights(split_info, j);
 
         // size of tail is equal to filter order, accumulate all
