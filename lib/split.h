@@ -81,166 +81,197 @@ void split(
 
 // Reordering routines
 
-void float_dependencies_to_root(Halide::Func F);
+/** Cascade scans in different dimensions of a function, generates
+ *  a list of functions where each has multiple scans in only one
+ *  dimension
+ */
+vector<Halide::Func> cascade_dimensions(Halide::Func F);
 
-void swap_variables(Halide::Func F,
-        std::string func_name,
-        Halide::Var a,
-        Halide::Var b);
+/** Cascade all repeated scans in each dimension of a function, generates
+ *  a list of functions where each has one or no scans in each dimension;
+ *  each function may have scans in multiple dimensions
+ */
+vector<Halide::Func> cascade_repeated_scans(Halide::Func F);
 
-void expand_multiple_reductions(Halide::Func S);
+/** Inline all calls to a pure function */
+void inline_function(
+        Halide::Func F,         ///< root of the hierarchy to s
+        std::string func_name   ///< name of function to be inlined
+        );
 
-void merge(Halide::Func S,
-        std::string func_a,
-        std::string func_b,
-        std::string merged);
+/** Swap two dimensions of a Func, reorders the memory layout */
+void swap_variables(
+        Halide::Func F,     ///< base function of the
+        std::string func,   ///< name of function whose dimensions must be swapped
+        Halide::Var a,      ///< pure arg of first dimension to swap
+        Halide::Var b       ///< pure arg of second dimension to swap
+        );
 
-void merge(Halide::Func S,
-        std::string func_a,
-        std::string func_b,
-        std::string func_c,
-        std::string merged);
+/** Merge multiple functions into a single function with mutiple entries */
+void merge(
+        Halide::Func S,
+        std::string func_a, ///< name of first function to merge
+        std::string func_b, ///< name of second function to merge
+        std::string merged  ///< name of merged function
+        );
 
-void merge(Halide::Func S,
-        std::string func_a,
-        std::string func_b,
-        std::string func_c,
-        std::string func_d,
-        std::string merged);
+/** Merge multiple functions into a single function with mutiple entries */
+void merge(
+        Halide::Func S,
+        std::string func_a, ///< name of first function to merge
+        std::string func_b, ///< name of second function to merge
+        std::string func_c, ///< name of third function to merge
+        std::string merged  ///< name of merged function
+        );
 
-void merge(Halide::Func S, std::vector<std::string> funcs, std::string merged);
+/** Merge multiple functions into a single function with mutiple entries */
+void merge(
+        Halide::Func S,
+        std::string func_a, ///< name of first function to merge
+        std::string func_b, ///< name of second function to merge
+        std::string func_c, ///< name of third function to merge
+        std::string merged  ///< name of merged function
+        );
 
-void merge_duplicates_with_substring(Halide::Func S, std::string pattern);
-
-void inline_function(Halide::Func F, std::string func_name);
-
-void inline_functions_with_substring(Halide::Func F, std::string pattern);
+/** Merge multiple functions into a single function with mutiple entries */
+void merge(
+        Halide::Func S,
+        std::vector<std::string> funcs, ///< list of names of functions to merge
+        std::string merged              ///< name of merged function
+        );
 
 // ----------------------------------------------------------------------------
 
 // Modifier routines
 
-/// Check if a given expression depends upon a variable
+/** Check if a given expression depends upon a variable */
 bool expr_depends_on_var(
-        Halide::Expr expr,      /// expression to be checked
-        std::string var         /// variable name
+        Halide::Expr expr,      ///< expression to be checked
+        std::string var         ///< variable name
         );
 
 
-/// Check if a given expression contains calls to a Function
+/** Check if a given expression contains calls to a Function */
 bool expr_depends_on_func(
-        Halide::Expr expr,              /// expression to be checked
-        std::string func_name           /// name of Function
+        Halide::Expr expr,      ///< expression to be checked
+        std::string func_name   ///< name of Function
         );
 
 
-/// Substitute a variable in all calls to a particular Function
-/// in a given expression
+/** Substitute a variable in all calls to a particular Function
+ * in a given expression
+ */
 Halide::Expr substitute_in_func_call(
-        std::string func_name,          /// name of Function
-        std::string var,                /// variable to be substituted
-        Halide::Expr replace,           /// replacement expression
-        Halide::Expr original           /// original expression
+        std::string func_name,  ///< name of Function
+        std::string var,        ///< variable to be substituted
+        Halide::Expr replace,   ///< replacement expression
+        Halide::Expr original   ///< original expression
         );
 
-/// Add a calling argument to all calls to a particular Function
+/** Add a calling argument to all calls to a particular Function */
 Halide::Expr insert_arg_in_func_call(
-        std::string func_name,          /// name of Function
-        size_t pos,                     /// position to add calling arg within list
-        Halide::Expr arg,               /// calling argument to add
-        Halide::Expr original           /// original expression
+        std::string func_name,  ///< name of Function
+        size_t pos,             ///< position to add calling arg within list
+        Halide::Expr arg,       ///< calling argument to add
+        Halide::Expr original   ///< original expression
         );
 
-/// Remove a calling argument from all calls to a particular Function
+/** Remove a calling argument from all calls to a particular Function */
 Halide::Expr remove_arg_from_func_call(
-        std::string func_name,          /// name of Function
-        size_t pos,                     /// calling arg index within list to be removed
-        Halide::Expr original           /// original expression
+        std::string func_name,  ///< name of Function
+        size_t pos,             ///< calling arg index within list to be removed
+        Halide::Expr original   ///< original expression
         );
 
-/// Swap two calling arguments of given function in the expression
+/** Swap two calling arguments of given function in the expression */
 Halide::Expr swap_args_in_func_call(
-        std::string func_name,       /// name of function to modify
-        size_t va_idx,          /// index of first calling arg
-        size_t vb_idx,          /// index of second calling arg
-        Halide::Expr original   /// original expression
+        std::string func_name,  ///< name of function to modify
+        size_t va_idx,          ///< index of first calling arg
+        size_t vb_idx,          ///< index of second calling arg
+        Halide::Expr original   ///< original expression
         );
 
-/// Substitute a calling arg in feed forward recursive calls
-/// to a Func; feedforward calls are those where all args in the
-/// Function call are identical to args in Function definition
+/** Substitute a calling arg in feed forward recursive calls
+ * to a Func; feedforward calls are those where all args in the
+ * Function call are identical to args in Function definition
+ */
 Halide::Expr substitute_arg_in_feedforward_func_call(
-        std::string func_name,              /// name of function to modify
-        std::vector<Halide::Expr> def_arg,  /// args in Function definition
-        size_t pos,                         /// index of calling arg to be replaced
-        Halide::Expr new_arg,               /// new calling arg
-        Halide::Expr original               /// original expression
+        std::string func_name,              ///< name of function to modify
+        std::vector<Halide::Expr> def_arg,  ///< args in Function definition
+        size_t pos,                         ///< index of calling arg to be replaced
+        Halide::Expr new_arg,               ///< new calling arg
+        Halide::Expr original               ///< original expression
         );
 
-/// Apply zero boundary condition on all tiles except tiles that touch image
-/// borders; this pads tiles by zeros if the intra tile index is out of range -
-/// - less than zero or greater than tile width.
-/// Usually, if the feedforward coeff is 1.0 zero padding is required for in
-/// the Function definition itself - which automatically pads all tiles by zeros.
-/// But in Gaussian filtering feedforward coeff is not 1.0; so Function definition
-/// cannot pad the image by zeros; in such case it is important to forcibly pad
-/// all inner tiles by zeros.
+/** Apply zero boundary condition on all tiles except tiles that touch image
+ * borders; this pads tiles by zeros if the intra tile index is out of range -
+ * - less than zero or greater than tile width.
+ * Usually, if the feedforward coeff is 1.0 zero padding is required for in
+ * the Function definition itself - which automatically pads all tiles by zeros.
+ * But in Gaussian filtering feedforward coeff is not 1.0; so Function definition
+ * cannot pad the image by zeros; in such case it is important to forcibly pad
+ * all inner tiles by zeros.
+ */
 Halide::Expr apply_zero_boundary_in_func_call(
-        std::string func_name,      /// name of function to modify
-        size_t dim,                 /// dimension containing the RVar
-        Halide::Expr def_arg,       /// args in Function definition
-        Halide::Expr boundary,      /// tile width
-        Halide::Expr cond,          /// condition to check tiles touching borders
-        Halide::Expr original       /// original expression
+        std::string func_name,  ///< name of function to modify
+        size_t dim,             ///< dimension containing the RVar
+        Halide::Expr def_arg,   ///< args in Function definition
+        Halide::Expr boundary,  ///< tile width
+        Halide::Expr cond,      ///< condition to check tiles touching borders
+        Halide::Expr original   ///< original expression
         );
 
-/// Mathematically add an expression to all calls to a particular
-/// Function; the expression to be added is selected from a list of
-/// expressions depending upon the value index of the Function call;
-/// all occurances of arguments of the Function must be replaced by
-/// calling arguments in the selected expression before adding
+/** Mathematically add an expression to all calls to a particular
+ *  Function; the expression to be added is selected from a list of
+ *  expressions depending upon the value index of the Function call;
+ *  all occurances of arguments of the Function must be replaced by
+ * calling arguments in the selected expression before adding
+ */
 Halide::Expr augment_func_call(
-        std::string func_name,              /// name of Function
-        std::vector<std::string> func_args, /// arguments of Function
-        std::vector<Halide::Expr> extra,    /// list of expression to be mathematically added
-        Halide::Expr original               /// original expression
+        std::string func_name,              ///< name of Function
+        std::vector<std::string> func_args, ///< arguments of Function
+        std::vector<Halide::Expr> extra,    ///< list of exprs to be algebraically added
+        Halide::Expr original               ///< original expression
         );
 
 
-/// Substitute all calls to a particular Function by
-/// a new Function with the same calling arguments
+/** Substitute all calls to a particular Function by
+ * a new Function with the same calling arguments
+ */
 Halide::Expr substitute_func_call(
-        std::string func_name,              /// name of Function
-        Halide::Internal::Function replace, /// replacement Function
-        Halide::Expr original               /// original expression
+        std::string func_name,              ///< name of Function
+        Halide::Internal::Function replace, ///< replacement Function
+        Halide::Expr original               ///< original expression
         );
 
 
-/// Remove all calls to a particular Function or to all
-/// Functions except for a particular Function by identity
-/// as determined by a boolean flag argument, all calls
-/// to the Function are removed if flag is set
+/** Remove all calls to a particular Function or to all
+ * Functions except for a particular Function by identity
+ * as determined by a boolean flag argument, all calls
+ * to the Function are removed if flag is set
+ */
 Halide::Expr remove_func_calls(
-        std::string func_name,              /// name of Function
-        bool matching,                      /// remove calls matching or not matching
-        Halide::Expr original               /// original expression
+        std::string func_name,  ///< name of Function
+        bool matching,          ///< remove calls matching or not matching
+        Halide::Expr original   ///< original expression
         );
 
 
-/// Find all calls to a particular Function and increment
-/// the value_index (Halide::Internal::Call::value_index)
-/// of the call by a given offset
+/** Find all calls to a particular Function and increment
+ * the value_index (Halide::Internal::Call::value_index)
+ * of the call by a given offset
+ */
 Halide::Expr increment_value_index_in_func_call(
-        std::string func_name,              /// name of Function
-        int increment,                      /// increment to value_index, can be negative
-        Halide::Expr original               /// original expression
+        std::string func_name,  ///< name of Function
+        int increment,          ///< increment to value_index, can be negative
+        Halide::Expr original   ///< original expression
         );
 
-/// Swaps two variables in an expression
+/** Swaps two variables in an expression */
 Halide::Expr swap_vars_in_expr(
-        std::string a,              /// first variable name for swapping
-        std::string b,              /// second variable name for swapping
-        Halide::Expr original       /// original expression
+        std::string a,          ///< first variable name for swapping
+        std::string b,          ///< second variable name for swapping
+        Halide::Expr original   ///< original expression
         );
 
 /// Extract vars referenced in a Expr
@@ -257,20 +288,23 @@ std::map<std::string, Halide::Func> extract_func_calls(Halide::Func func);
 
 // ----------------------------------------------------------------------------
 
-// Command line args
-
+/**  Command line arg parser */
 class Arguments {
 public:
-    int width;       // image width
-    int height;      // image height
-    int block;       // block size
-    bool debug;      // display intermediate stages
-    bool verbose;    // display input, reference output, halide output, difference
-    bool nocheck;    // skip check Halide result against reference solution
-    float weight;    // First order filter weight
-    int  iterations; // profiling iterations
+    int width;       ///< image width
+    int height;      ///< image height
+    int block;       ///< block size
+    bool debug;      ///< display intermediate stages
+    bool verbose;    ///< display input, reference output, halide output, difference
+    bool nocheck;    ///< skip check Halide result against reference solution
+    float weight;    ///< First order filter weight
+    int  iterations; ///< profiling iterations
 
-    Arguments(std::string app_name, int argc, char** argv);
+    Arguments(
+            std::string app_name, ///< name of application
+            int argc,             ///< number of command line args
+            char** argv           ///< array of command line args
+            );
 };
 
 // ----------------------------------------------------------------------------
@@ -296,28 +330,23 @@ public:
  */
 class Timer {
 protected:
+    typedef long long t_time;   ///< data type for storing timestamps
+    std::string m_Name;         ///< name of timer, default = Timer
+    t_time m_TmStart;           ///< starting time stamp
 
-    /** Data type for storing timestamps. */
-    typedef long long t_time;
-
-    /** name of timer, default = [Timer]*/
-    std::string m_Name;
-
-    /** Starting time stamp */
-    t_time m_TmStart;
 
 public:
 
-    /** Start the timer. */
+    /** Start the timer */
     Timer(std::string name="Timer");
 
-    /** Stop the timer. */
+    /** Stop the timer */
     ~Timer(void);
 
     /** Start the timer by recording the initial time stamp */
     void start(void);
 
-    /** Stop the timer and print time elapsed. */
+    /** Stop the timer and print time elapsed */
     t_time stop(void);
 
     /** Get the total time elapsed in milliseconds */
@@ -336,6 +365,7 @@ public:
 #define MAX_ELEMENT 1
 #define PRINT_WIDTH 3
 
+/** Generate an image of a given size with random entries */
 template<typename T>
 Halide::Image<T> generate_random_image(size_t w, size_t h=1, size_t c=1, size_t d=1) {
     Halide::Image<T> image(w,h,c,d);
@@ -352,6 +382,7 @@ Halide::Image<T> generate_random_image(size_t w, size_t h=1, size_t c=1, size_t 
 }
 
 
+/** Print an image */
 template<typename T>
 std::ostream &operator<<(std::ostream &s, Halide::Image<T> image) {
     if (image.dimensions() == 1) {

@@ -28,6 +28,189 @@ static vector<Function> find_called_functions(Func f) {
     return find_called_functions(f.function());
 }
 
+static int get_scan_dimension(ReductionDefinition r) {
+    vector<int> scan_dim;
+
+    // return -1 if there is no RDom associated with the reduction
+    if (r.domain.defined()) {
+        vector<ReductionVariable> vars = r.domain.domain();
+        for (int i=0; i<vars.size(); i++) {
+            for (int j=0; j<r.args.size(); j++) {
+                if (expr_depends_on_var(r.args[j], vars[i].var)) {
+                    scan_dim.push_back(j);
+                }
+            }
+        }
+
+        // return the scan dimension if the scan is in a single
+        // dimension, else return -1
+        if (scan_dim.size() == 1) {
+            return scan_dim[0];
+        } else {
+            return -1;
+        }
+    } else {
+        return -1;
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+std::vector<Func> cascade_dimensions(Func& func) {
+    Function F = func.function();
+    int num_dimensions = F.args().size();
+
+    vector<Func> func_list;
+
+    // loop over all dimensions of the function
+    // and create a separate function for scans in each dimension
+    for (int i=0; i<num_dimensions; i++) {
+        Function f(F.name() + "_" + int_to_string(i));
+
+        if (i==0) { // pure def of first dimension uses the original pure def
+            f.define(F.args(), F.values());
+        }
+        else {  // pure defs of other dimension use previous dimension as pure def
+            vector<Expr> call_args;
+            vector<Expr> values;
+            for (int j=0; j<F.args().size(); j++) {
+                call_args.push_back(Var(F.args()[j]));
+            }
+            for (int j=0; j<F.values().size(); j++) {
+                values.push_back(Call::make(func_list[i-1].function(), call_args, j));
+            }
+            f.define(F.args(), values);
+        }
+
+        // add the function to the list of cascaded functions
+        func_list.push_back(Func(f));
+    }
+
+    // loop over all the redunction defs and add each to the function
+    // corresponding to the scan dimension
+    for (int j=0; j<F.reductions().size(); j++) {
+        int dim = get_scan_dimension(F.reductions()[j]);
+        if (dim<0) {
+            cerr << "Function cascading can be used if each reduction has exactly one reduction "
+                " variable in exactly one dimension" << endl;
+            assert(false);
+        }
+
+        Function f = func_list[dim].function();
+
+        // add the scan replacing all calls to original function with the new function
+        vector<Expr> values = F.reductions()[j].values;
+        for (int k=0; k<values.size(); k++) {
+            values[k] = substitute_func_call(F.name(), f, values[k]);
+        }
+        f.define_reduction(F.reductions()[j].args, values);
+    }
+
+    // change the original function to index into the last function in the list
+    {
+        F.clear_all_definitions();
+        Function f = func_list[func_list.size()-1].function();
+
+        vector<Expr> call_args;
+        vector<Expr> values;
+        for (int j=0; j<f.args().size(); j++) {
+            call_args.push_back(Var(f.args()[j]));
+        }
+        for (int j=0; j<f.values().size(); j++) {
+            values.push_back(Call::make(f, call_args, j));
+        }
+        F.define(f.args(), values);
+        func = Func(F);
+    }
+
+    return func_list;
+}
+
+std::vector<Func> cascade_repeated_scans(Func& func) {
+    Function F = func.function();
+
+    // there can be at most as many functions as reductions defs
+    vector<Func> func_list;
+    for (int i=0; i<F.reductions().size(); i++) {
+        Function f(F.name() + "_" + int_to_string(i));
+
+        if (i==0) { // pure def of first dimension uses the original pure def
+            f.define(F.args(), F.values());
+        }
+        else {  // pure defs of other dimension use previous dimension as pure def
+            vector<Expr> call_args;
+            vector<Expr> values;
+            for (int j=0; j<F.args().size(); j++) {
+                call_args.push_back(Var(F.args()[j]));
+            }
+            for (int j=0; j<F.values().size(); j++) {
+                values.push_back(Call::make(func_list[i-1].function(), call_args, j));
+            }
+            f.define(F.args(), values);
+        }
+
+        // add the function to the list of cascaded functions
+        func_list.push_back(Func(f));
+    }
+
+    // the index of the function which should get the next reduction
+    // definition in each dimension; the first reduction in each dimension
+    // can go to the first function
+    vector<int> func_id(F.args().size(), 0);
+
+    // loop over all the reduction defs and add each
+    // corresponding to the scan dimension
+    for (int j=0; j<F.reductions().size(); j++) {
+        int dim = get_scan_dimension(F.reductions()[j]);
+        if (dim<0) {
+            cerr << "Function cascading can be used if each reduction has exactly one reduction "
+                " variable in exactly one dimension" << endl;
+            assert(false);
+        }
+
+        // get the function to which this reduction def should be added
+        Function f = func_list[func_id[dim]].function();
+
+        // add the scan replacing all calls to original function with the new function
+        vector<Expr> values = F.reductions()[j].values;
+        for (int k=0; k<values.size(); k++) {
+            values[k] = substitute_func_call(F.name(), f, values[k]);
+        }
+        f.define_reduction(F.reductions()[j].args, values);
+
+        // next repeated scan in this dimension should be added to
+        // the next function
+        func_id[dim]++;
+    }
+
+    // remove the functions which do not have any reductions - redundant
+    for (int i=0; i<func_list.size(); i++) {
+        if (!func_list[i].is_reduction()) {
+            func_list.erase(func_list.begin() + i);
+            i--;
+        }
+    }
+
+    // change the original function to index into the last function in the list
+    {
+        F.clear_all_definitions();
+        Function f = func_list[func_list.size()-1].function();
+
+        vector<Expr> call_args;
+        vector<Expr> values;
+        for (int j=0; j<f.args().size(); j++) {
+            call_args.push_back(Var(f.args()[j]));
+        }
+        for (int j=0; j<f.values().size(); j++) {
+            values.push_back(Call::make(f, call_args, j));
+        }
+        F.define(f.args(), values);
+        func = Func(F);
+    }
+
+    return func_list;
+}
+
 // -----------------------------------------------------------------------------
 
 static void inline_function(Function f, vector<Function> func_list) {
@@ -92,19 +275,6 @@ void inline_function(Func F, string func_name) {
     } else {
         cerr << "Function " << func_name << " to be inlined not found" << endl;
         assert(false);
-    }
-}
-
-void inline_functions_with_substring(Func F, string pattern) {
-    vector<Function> func_list = find_called_functions(F);
-
-    // find all Funcs containing pattern in their name
-    for (int i=0; i<func_list.size(); i++) {
-        Function f = func_list[i];
-        if (f.is_pure() && f.name().find(pattern)!=string::npos) {
-            vector<Function> sub_func_list = find_called_functions(f);
-            inline_function(f, sub_func_list);
-        }
     }
 }
 
@@ -359,172 +529,6 @@ void merge(Func S, std::vector<std::string> funcs, string merged) {
     }
 }
 
-void merge_duplicates_with_substring(Func S, string pattern) {
-    vector<Function> func_list = find_called_functions(S);
-
-    for (int i=0; i<func_list.size(); i++) {
-        bool rebuild_func_list = false;
-        Function A = func_list[i];
-
-        if (A.name().find(pattern) == string::npos)
-            continue;
-
-        for (int j=0; !rebuild_func_list && j<func_list.size(); j++) {
-            Function B = func_list[j];
-
-            if (A.name() == B.name())
-                continue;
-
-            //cerr << "Testing for duplicates " << A.name() << " " << B.name() << endl;
-            if (check_duplicate(A, B)) {
-                string merged_name;
-                if (A.name().length() < B.name().length())
-                    merged_name = A.name();
-                else
-                    merged_name = B.name();
-
-                merge(S, A, B, merged_name);
-                rebuild_func_list = true;
-            }
-        }
-
-        if (rebuild_func_list) {
-            i = 0;
-            func_list.clear();
-            func_list = find_called_functions(S);
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-void float_dependencies_to_root(Func F) {
-    vector<Function> func_list = find_called_functions(F);
-
-    // list of Functions which compute dependencies across tiles
-    vector<Function> dependency_func_list;
-    for (int i=0; i<func_list.size(); i++) {
-        Function f = func_list[i];
-        if (f.name().find(COMPLETE_TAIL_RESIDUAL)!=string::npos ||
-                f.name().find(FINAL_RESULT_RESIDUAL )!=string::npos)
-        {
-            dependency_func_list.push_back(f);
-            func_list.erase(func_list.begin()+i);
-            i--;
-        }
-    }
-
-    // process all dependency functions
-    for (int i=0; i<dependency_func_list.size(); i++) {
-        Function f_dep = dependency_func_list[i];
-
-        // iterate until f_dep has floated to the root node
-        bool function_hierarchy_changed = true;
-
-        while (function_hierarchy_changed) {
-            function_hierarchy_changed = false;
-
-            // find a function that calls f_dep
-            // f_dep calls can be extracted from f only if the call appears
-            // in a pure definition, and not reduction defintions
-            for (int i=0; i<func_list.size(); i++) {
-                Function f = func_list[i];
-
-                // check if f calls f_dep in pure def
-                bool f_pure_calls_fdep = false;
-                for (int j=0; j<f.values().size(); j++) {
-                    f_pure_calls_fdep |= expr_depends_on_func(f.values()[j], f_dep.name());
-                }
-
-                // f is not pure, then f_dep cannot be pulled out of f
-                // f does not call f_dep, no mutation required
-                if (!f.is_pure() || !f_pure_calls_fdep)
-                    continue;
-
-                // extract all calls to f_dep from f, dont modify f already
-                // because f might be the root node. if there is a function
-                // g which calls f then f is not root and it is ok to modify it
-                vector<Expr> fdep_expr(f.values().size());
-                for (int k=0; k<f.values().size(); k++) {
-                    fdep_expr[k] = remove_func_calls(f_dep.name(),false,f.values()[k]);
-                }
-
-                // f needs to be modified only if some other function that called f
-                // is changed in the following for loop
-                bool modify_f = false;
-
-                // find all g that call f and append f_dep calls to their pure
-                // and reduction defs where f is called
-                for (int j=0; j<func_list.size(); j++) {
-                    Function g = func_list[j];
-
-                    // check if g calls f
-                    bool g_calls_f = false;
-                    for (int k=0; k<g.values().size(); k++) {
-                        g_calls_f |= expr_depends_on_func(g.values()[k], f.name());
-                    }
-                    for (int k=0; k<g.reductions().size(); k++) {
-                        ReductionDefinition gr = g.reductions()[k];
-                        for (int u=0; u<gr.values.size(); u++) {
-                            g_calls_f |= expr_depends_on_func(gr.values[u], f.name());
-                        }
-                    }
-
-                    // nothing to change if g does not call f
-                    // add call of fdep at every location where g calls f
-                    if (g_calls_f) {
-                        vector<string> pure_args = g.args();
-                        vector<Expr>   pure_vals = g.values();
-                        vector<ReductionDefinition> reductions = g.reductions();
-
-                        for (int k=0; k<pure_vals.size(); k++) {
-                            pure_vals[k] = augment_func_call(f.name(), f.args(),
-                                    fdep_expr, pure_vals[k]);
-                        }
-                        g.clear_all_definitions();
-                        g.define(pure_args, pure_vals);
-
-                        for (int k=0; k<reductions.size(); k++) {
-                            ReductionDefinition gr = reductions[k];
-                            vector<Expr> args   = gr.args;
-                            vector<Expr> values = gr.values;
-                            for (int u=0; u<gr.values.size(); u++) {
-                                gr.values[k] = augment_func_call(f.name(), f.args(),
-                                        fdep_expr, gr.values[k]);
-                            }
-                            g.define_reduction(args, values);
-                        }
-
-                        // since calls to f have been augmented with f_dep
-                        // it is now necessary to remove f_dep from def of f
-                        modify_f = true;
-                    }
-                }
-
-                // remove all f_dep from f because some g which called f has
-                // been modified
-                if (modify_f) {
-                    vector<string> pure_args = f.args();
-                    vector<Expr>   pure_vals = f.values();
-                    vector<ReductionDefinition> reductions = f.reductions();
-                    for (int k=0; k<pure_vals.size(); k++) {
-                        pure_vals[k] = remove_func_calls(f_dep.name(), true, pure_vals[k]);
-                    }
-                    f.clear_all_definitions();
-                    f.define(pure_args, pure_vals);
-
-                    // leave reduction defs untouched as they don't call f_dep
-                    for (int k=0; k<reductions.size(); k++) {
-                        ReductionDefinition gr = reductions[k];
-                        f.define_reduction(gr.args, gr.values);
-                    }
-                    function_hierarchy_changed = true;
-                }
-            }
-        }
-    }
-}
-
 // ----------------------------------------------------------------------------
 
 void swap_variables(Func S, string func_name, Var a, Var b) {
@@ -605,67 +609,6 @@ void swap_variables(Func S, string func_name, Var a, Var b) {
                     vector<Expr> reduction_values = reductions[k].values;
                     f.define_reduction(reduction_args, reduction_values);
                 }
-            }
-        }
-    }
-}
-
-// ----------------------------------------------------------------------------
-
-void expand_multiple_reductions(Func S) {
-    vector<Function> func_list = find_called_functions(S);
-
-    for (int u=0; u<func_list.size(); u++) {
-        Function F = func_list[u];
-
-        // only process functions with multiple reduction defs
-        if (F.reductions().size() < 2)
-            continue;
-
-        int num_reductions = F.reductions().size();
-
-        vector<Function> Fsub;
-
-        for (int k=0; k<num_reductions; k++) {
-            Function function(F.name() + DELIMITER + int_to_string(k));
-
-            // pure args same as pure args of original function
-            // pure val is call to function corresponding to previous
-            // reduction def
-            vector<string> pure_args;
-            vector<Expr>   call_args;
-            vector<Expr>   pure_values;
-            for (int i=0; i<F.args().size(); i++) {
-                pure_args.push_back(F.args()[i]);
-                call_args.push_back(Var(F.args()[i]));
-            }
-            for (int i=0; i<F.values().size(); i++) {
-                if (k==0) {
-                    pure_values.push_back(F.values()[i]);
-                } else {
-                    pure_values.push_back(Call::make(Fsub[k-1], call_args, i));
-                }
-            }
-            function.define(pure_args, pure_values);
-
-            // extract the reduction from the original function
-            // and replace all calls to original function by calls to
-            // current function
-            ReductionDefinition reduction = F.reductions()[k];
-            for (int i=0; i<reduction.values.size(); i++) {
-                if (k != num_reductions-1) {
-                    reduction.values[i] = substitute_func_call(F.name(),
-                            function, reduction.values[i]);
-                }
-            }
-            function.define_reduction(reduction.args, reduction.values);
-
-            Fsub.push_back(function);
-
-            if (k == num_reductions-1) {
-                F.clear_all_definitions();
-                F.define(Fsub[k].args(), Fsub[k].values());
-                F.define_reduction(Fsub[k].reductions()[0].args, Fsub[k].reductions()[0].values);
             }
         }
     }
