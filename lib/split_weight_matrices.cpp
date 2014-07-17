@@ -2,7 +2,7 @@
 
 using namespace Halide;
 
-static Image<float> matrix_A_FB(
+static Image<float> matrix_B(
         Image<float> feedfwd_coeff,
         Image<float> feedback_coeff,
         int scan_id,
@@ -45,7 +45,7 @@ static Image<float> matrix_A_FB(
     return C;
 }
 
-static Image<float> matrix_A_FP(
+static Image<float> matrix_R(
         Image<float> feedback_coeff,
         int scan_id,
         int tile_width)
@@ -144,28 +144,28 @@ Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2, bool clamp_
     int  scan_id     = s.scan_id[split_id1];
     bool scan_causal = s.scan_causal[split_id1];
 
-    Image<float> A_FP = matrix_A_FP(s.feedback_coeff, scan_id, tile_width);
+    Image<float> R = matrix_R(s.feedback_coeff, scan_id, tile_width);
 
     // accummulate weight coefficients because of all subsequent scans
     // traversal is backwards because SplitInfo contains scans in the
     // reverse order
     for (int j=split_id1-1; j>=split_id2; j--) {
         if (scan_causal != s.scan_causal[j]) {
-            Image<float> A_FB = matrix_A_FB(s.feedfwd_coeff,
+            Image<float> B = matrix_B(s.feedfwd_coeff,
                     s.feedback_coeff, s.scan_id[j], tile_width, clamp_border);
-            Image<float> AI = matrix_antidiagonal(A_FP.height());
-            A_FP = matrix_mult(AI  , A_FP);
-            A_FP = matrix_mult(A_FB, A_FP);
-            A_FP = matrix_mult(AI  , A_FP);
+            Image<float> AI = matrix_antidiagonal(R.height());
+            R = matrix_mult(AI  , R);
+            R = matrix_mult(B, R);
+            R = matrix_mult(AI  , R);
         }
         else {
-            Image<float> A_FB = matrix_A_FB(s.feedfwd_coeff,
+            Image<float> B = matrix_B(s.feedfwd_coeff,
                     s.feedback_coeff, s.scan_id[j], tile_width, false);
-            A_FP = matrix_mult(A_FB, A_FP);
+            R = matrix_mult(B, R);
         }
     }
 
-    return matrix_transpose(A_FP);
+    return matrix_transpose(R);
 }
 
 /** Weight coefficients (tail_size x tile_width) for
