@@ -153,10 +153,10 @@ Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2, bool clamp_
         if (scan_causal != s.scan_causal[j]) {
             Image<float> B = matrix_B(s.feedfwd_coeff,
                     s.feedback_coeff, s.scan_id[j], tile_width, clamp_border);
-            Image<float> AI = matrix_antidiagonal(R.height());
-            R = matrix_mult(AI  , R);
+            Image<float> I = matrix_antidiagonal(R.height());
+            R = matrix_mult(I, R);
             R = matrix_mult(B, R);
-            R = matrix_mult(AI  , R);
+            R = matrix_mult(I, R);
         }
         else {
             Image<float> B = matrix_B(s.feedfwd_coeff,
