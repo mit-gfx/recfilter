@@ -1,4 +1,5 @@
-#include "split.h"
+#include "recfilter.h"
+#include "split_utils.h"
 #include "split_macros.h"
 
 using namespace Halide;
@@ -253,7 +254,7 @@ static void inline_function(Function f, vector<Function> func_list) {
     }
 }
 
-void inline_function(Func F, string func_name) {
+void RecFilter::inline_func(Func F, string func_name) {
     if (F.name() == func_name) {
         return;
     }
@@ -360,7 +361,7 @@ static bool check_duplicate(Function A, Function B) {
     return duplicate;
 }
 
-static void merge(Func S, Function A, Function B, string merged_name) {
+static void merge_function(Func S, Function A, Function B, string merged_name) {
     string merge_error;
     if (!merge_feasible(A,B,merge_error)) {
         cerr << merge_error << std::endl;
@@ -475,7 +476,7 @@ static void merge(Func S, Function A, Function B, string merged_name) {
 
 // -----------------------------------------------------------------------------
 
-void merge(Func S, string func_a, string func_b, string merged_name) {
+void RecFilter::merge_func(Func S, string func_a, string func_b, string merged_name) {
     Function FA;
     Function FB;
 
@@ -497,24 +498,24 @@ void merge(Func S, string func_a, string func_b, string merged_name) {
         assert(false);
     }
 
-    merge(S, FA, FB, merged_name);
+    merge_function(S, FA, FB, merged_name);
 }
 
-void merge(Func S, string func_a, string func_b, string func_c, string merged_name) {
+void RecFilter::merge_func(Func S, string func_a, string func_b, string func_c, string merged_name) {
     string func_ab = "Merged_%d" + int_to_string(rand());
-    merge(S, func_a, func_b, func_ab);
-    merge(S, func_c, func_ab, merged_name);
+    merge_func(S, func_a, func_b, func_ab);
+    merge_func(S, func_c, func_ab, merged_name);
 }
 
-void merge(Func S, string func_a, string func_b, string func_c, string func_d, string merged_name) {
+void RecFilter::merge_func(Func S, string func_a, string func_b, string func_c, string func_d, string merged_name) {
     string func_ab = "Merged_%d" + int_to_string(rand());
     string func_cd = "Merged_%d" + int_to_string(rand());
-    merge(S, func_a, func_b, func_ab);
-    merge(S, func_c, func_d, func_cd);
-    merge(S, func_ab,func_cd,merged_name);
+    merge_func(S, func_a, func_b, func_ab);
+    merge_func(S, func_c, func_d, func_cd);
+    merge_func(S, func_ab,func_cd,merged_name);
 }
 
-void merge(Func S, std::vector<std::string> funcs, string merged) {
+void RecFilter::merge_func(Func S, std::vector<std::string> funcs, string merged) {
     assert(funcs.size() > 1);
     string func_prev_merge = funcs[0];
     string func_next_merge;
@@ -524,14 +525,14 @@ void merge(Func S, std::vector<std::string> funcs, string merged) {
         } else {
             func_next_merge = "Merged_%d" + int_to_string(rand());
         }
-        merge(S, funcs[i], func_prev_merge, func_next_merge);
+        merge_func(S, funcs[i], func_prev_merge, func_next_merge);
         func_prev_merge = func_next_merge;
     }
 }
 
 // ----------------------------------------------------------------------------
 
-void swap_variables(Func S, string func_name, Var a, Var b) {
+void RecFilter::swap_variables(Func S, string func_name, Var a, Var b) {
     assert(!a.same_as(b) && "Variables to be swapped must be different");
 
     vector<Function> func_list = find_called_functions(S);
