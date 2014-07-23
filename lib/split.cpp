@@ -13,6 +13,161 @@ using std::map;
 
 // -----------------------------------------------------------------------------
 
+static vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> split_info) {
+    vector<string> args = F.args();
+    vector<Expr>  values = F.values();
+    vector<ReductionDefinition> reductions = F.reductions();
+
+    // split info struct must contain info about each dimension
+    assert(split_info.size() == args.size());
+
+    vector<ReductionDefinition> new_reductions;
+    vector<SplitInfo>           new_split_info = split_info;
+
+    // use all scans with dimension 0 first, then 1 and so on
+    for (int i=0; i<split_info.size(); i++) {
+        for (int j=0; j<split_info[i].num_splits; j++) {
+            int curr = split_info[i].num_splits-1-j;
+            int scan = split_info[i].scan_id[curr];
+            new_reductions.push_back(reductions[scan]);
+            new_split_info[i].scan_id[curr] = new_reductions.size()-1;
+        }
+    }
+    assert(new_reductions.size() == reductions.size());
+
+    // reorder the reduction definitions as per the new order
+    F.clear_all_definitions();
+    F.define(args, values);
+    for (int i=0; i<new_reductions.size(); i++) {
+        F.define_reduction(new_reductions[i].args, new_reductions[i].values);
+    }
+
+    return new_split_info;
+}
+
+// -----------------------------------------------------------------------------
+
+static void extract_tails_from_each_scan(Function F_intra, vector<SplitInfo> split_info) {
+    vector<string> pure_args = F_intra.args();
+    vector<Expr> pure_values = F_intra.values();
+    vector<ReductionDefinition> reductions = F_intra.reductions();
+
+    // pure definitions remain unchanged
+    F_intra.clear_all_definitions();
+    F_intra.define(pure_args, pure_values);
+
+    // new reductions to be added for all the split reductions
+    map<int, std::pair< vector<Expr>, vector<Expr> > > new_reductions;
+
+    // create the new reduction definitions to extract the tail
+    // of each scan that is split
+    for (int i=0; i<split_info.size(); i++) {
+        int  dim   = -1;
+        int  order = split_info[i].filter_order;
+        Var  xi    = split_info[i].inner_var;
+        Expr tile  = split_info[i].tile_width;
+
+        // get the scan dimension
+        for (int j=0; j<F_intra.args().size(); j++) {
+            if (xi.name() == F_intra.args()[j]) {
+                dim = j;
+            }
+        }
+        assert(dim >= 0);
+
+        // new reduction to extract the tail of each split scan
+        for (int j=0; j<split_info[i].num_splits; j++) {
+            int  scan_id     = split_info[i].scan_id[j];
+            bool scan_causal = split_info[i].scan_causal[j];
+            RDom rxt         = split_info[i].tail_rdom[j];
+
+            vector<Expr> args      = reductions[scan_id].args;
+            vector<Expr> call_args = reductions[scan_id].args;
+            vector<Expr> values;
+
+            // store the tail in a buffer of width equal to order
+            // each scan's tail is stored at the end of the tile
+            args     [dim] = simplify(tile + order*j+ rxt);
+            call_args[dim] = simplify(scan_causal ? (tile-1-rxt) : rxt);
+
+            for (int k=0; k<reductions[scan_id].values.size(); k++) {
+                values.push_back(Call::make(F_intra, call_args, k));
+            }
+
+            new_reductions[scan_id] = std::make_pair(args, values);
+        }
+    }
+
+    for (int i=0; i<reductions.size(); i++) {
+
+        // RDom of the current reduction
+        ReductionDomain rcurrent = reductions[i].domain;
+        ReductionVariable rcurrent_var = rcurrent.domain()[0];
+
+        // find the dimension of the reduction
+        int split_dim = -1;
+        int split_id  = -1;
+        for (int j=0; split_dim<0 && j<split_info.size(); j++) {
+            for (int k=0; split_id<0 && k<split_info[j].num_splits; k++) {
+                if (rcurrent.same_as(split_info[j].inner_rdom[k].domain())) {
+                    split_dim = j;
+                    split_id  = k;
+                }
+            }
+        }
+        assert(split_dim>=0 && split_id>=0);
+
+        // create a new reduction domain with as many dimensions as the input
+        // and each dimension has the same min and extent as the individual
+        // inner vars for each split
+        vector<ReductionVariable> new_rvars;
+        for (int j=0; j<split_info.size(); j++) {
+            ReductionVariable rvar;
+            rvar.var = "r" + split_info[split_dim].inner_var.name() + "." + split_info[j].var.name();
+
+            if (j==split_dim) {
+                rvar.min    = split_info[j].inner_rdom[split_id].x.min();
+                rvar.extent = split_info[j].inner_rdom[split_id].x.extent();
+            } else {
+                rvar.min    = 0;
+                rvar.extent = split_info[j].tile_width;
+            }
+            new_rvars.push_back(rvar);
+        }
+        RDom new_r = RDom(ReductionDomain(new_rvars));
+
+        // replace all inner vars by reduction vars over the same domain
+        // to restrict the scans from operating over tail buffer
+        for (int j=0; j<split_info.size(); j++) {
+            string old_var = (j==split_dim ? rcurrent_var.var : split_info[j].inner_var.name());
+            RVar rvar = new_r[j];
+
+            for (int k=0; k<reductions[i].args.size(); k++) {
+                Expr a = reductions[i].args[k];
+                a = substitute(old_var, rvar, a);
+                reductions[i].args[k] = a;
+            }
+            for (int k=0; k<reductions[i].values.size(); k++) {
+                Expr a = reductions[i].values[k];
+                a = substitute(old_var, rvar, a);
+                reductions[i].values[k] = a;
+            }
+        }
+        F_intra.define_reduction(reductions[i].args, reductions[i].values);
+
+        // add extra update steps to copy tail of each scan to another buffer
+        // that is beyond the bounds of the intra tile RVars
+        if (new_reductions.find(i) != new_reductions.end()) {
+            vector<Expr> args   = new_reductions[i].first;
+            vector<Expr> values = new_reductions[i].second;
+            F_intra.define_reduction(args, values);
+        }
+    }
+}
+
+
+// -----------------------------------------------------------------------------
+
 static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info) {
     Function F_intra(F.name() + DELIMITER + INTRA_TILE_RESULT);
 
@@ -816,7 +971,7 @@ static void add_all_residuals_to_final_result(
 
 // -----------------------------------------------------------------------------
 
-vector< vector<Function> > split_scans(
+static vector< vector<Function> > split_scans(
         Function F_intra,
         vector<SplitInfo> &split_info)
 {
@@ -860,4 +1015,135 @@ vector< vector<Function> > split_scans(
         F_deps_list .push_back(F_deps);
     }
     return F_deps_list;
+}
+
+// -----------------------------------------------------------------------------
+
+void RecFilter::split(vector<Var> dims, vector<Expr> tile) {
+    assert(!dims.empty());
+
+    if (dims.size() != tile.size()) {
+        cerr << "Each split dimension must have a mapped tile width" << endl;
+        assert(false);
+    }
+
+    Function F = contents.ptr->recfilter.function();
+
+    for (int i=0; i<dims.size(); i++) {
+        int dimension = -1;
+        Expr tile_width = tile[i];
+
+        for (int j=0; j<F.args().size(); j++) {
+            if (F.args()[j] == dims[i].name()) {
+                dimension = j;
+            }
+        }
+        if (dimension == -1) {
+            cerr << "Variable " << dims[i] << " to be split is not one of the "
+                << "dimensions of the recursive filter " << F.name() << endl;
+            assert(false);
+        }
+
+        SplitInfo s = contents.ptr->split_info[dimension];
+
+        // set tile width and number of tiles
+        s.tile_width = tile_width;
+        s.num_tiles  = s.image_width / s.tile_width;
+
+        // set inner var and outer var
+        s.inner_var = Var(s.var.name() + "i");
+        s.outer_var = Var(s.var.name() + "o");
+
+        // set inner rdom, outer rdom and rdom to extract tails
+        for (int j=0; j<s.num_splits; j++) {
+            Expr   m = s.rdom[j].x.min();
+            Expr   e = s.rdom[j].x.extent();
+            string n = s.rdom[j].x.name();
+
+            s.inner_rdom.push_back(RDom(m/tile_width, e/tile_width, n+"i"));
+
+            // outer_rdom.x: over tail elems of prev tile to compute tail of current tile
+            // outer_rdom.y: over all tail elements of current tile
+            // outer_rdom.z: over all tiles
+            s.outer_rdom.push_back(RDom(
+                        0, s.filter_order,
+                        0, s.filter_order,
+                        simplify(m/tile_width+1), s.num_tiles-1,
+                        n+"o"));
+
+            // tail_rdom.x: over all tail elems of current tile
+            s.tail_rdom.push_back(RDom(0,s.filter_order, n+"t"));
+        }
+
+        contents.ptr->split_info[dimension] = s;
+    }
+
+    // group scans in same dimension together
+    // change the order of splits accordingly
+    contents.ptr->split_info = group_scans_by_dimension(F, contents.ptr->split_info);
+
+    // remove split_info structs for dimensions which are not split
+    for (int i=0; i<contents.ptr->split_info.size(); i++) {
+        if (contents.ptr->split_info[i].num_splits == 0) {
+            contents.ptr->split_info.erase(contents.ptr->split_info.begin()+i);
+            i--;
+        }
+    }
+
+    // compute the intra tile result
+    Function F_intra = create_intra_tile_term(F, contents.ptr->split_info);
+
+    // apply clamped boundary on border tiles and zero boundary on
+    // inner tiles if explicit border clamping is requested
+    // TODO
+    //{
+    //    for (int j=0; j<contents.ptr->split_info.size(); j++) {
+    //        contents.ptr->split_info[j].clamp_border = true;
+    //    }
+    //    apply_zero_boundary_on_inner_tiles(F_intra, contents.ptr->split_info);
+    //}
+
+    // create a function will hold the final result,
+    // just a copy of the intra tile computation for now
+    Function F_final = create_copy(F_intra, F.name() + DELIMITER + FINAL_TERM);
+
+    // compute the residuals from splits in each dimension
+    vector< vector<Function> > F_deps = split_scans(F_intra, contents.ptr->split_info);
+
+    // transfer the tail of each scan to another buffer
+    extract_tails_from_each_scan(F_intra, contents.ptr->split_info);
+
+    // add all the residuals to the final term
+    add_all_residuals_to_final_result(F_final, F_deps, contents.ptr->split_info);
+
+    // change the original function to index into the final term
+    {
+        vector<string> args = F.args();
+        vector<Expr> values;
+        vector<Expr> call_args;
+        for (int i=0; i<F_final.args().size(); i++) {
+            string arg = F_final.args()[i];
+            call_args.push_back(Var(arg));
+
+            for (int j=0; j<contents.ptr->split_info.size(); j++) {
+                Var var         = contents.ptr->split_info[j].var;
+                Var inner_var   = contents.ptr->split_info[j].inner_var;
+                Var outer_var   = contents.ptr->split_info[j].outer_var;
+                Expr tile_width = contents.ptr->split_info[j].tile_width;
+                if (arg == inner_var.name()) {
+                    call_args[i] = substitute(arg, var%tile_width, call_args[i]);
+                } else if (arg == outer_var.name()) {
+                    call_args[i] = substitute(arg, var/tile_width, call_args[i]);
+                }
+            }
+        }
+        for (int i=0; i<F.outputs(); i++) {
+            Expr val = Call::make(F_final, call_args, i);
+            values.push_back(val);
+        }
+        F.clear_all_definitions();
+        F.define(args, values);
+    }
+
+    contents.ptr->recfilter = Func(F);
 }

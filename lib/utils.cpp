@@ -1,5 +1,76 @@
 #include "recfilter_utils.h"
 
+using std::string;
+
+Arguments::Arguments(string app_name, int argc, char** argv) :
+    width  (256),
+    block  (32),
+    iterations(1),
+    nocheck(false)
+{
+    string desc = "\nUsage\n ./"+ app_name;
+    desc.append(string(
+                "[-width|-w w] [-tile|-block|-b|-t b] [-iter i] [-nocheck] [-help]\n\n"
+                "\twidth\t  width of input image [default = 256]\n"
+                "\ttile\t   tile width for splitting each dimension image [default = 32]\n"
+                "\tnocheck\t do not check against reference solution [default = false]\n"
+                "\titer\t  number of profiling iterations [default = 1]\n"
+                "\thelp\t  show help message\n"
+                )
+            );
+
+    try {
+        for (int i=1; i<argc; i++) {
+            string option = argv[i];
+
+            if (!option.compare("-help") || !option.compare("--help")) {
+                throw std::runtime_error("Showing help message");
+            }
+
+            else if (!option.compare("-nocheck") || !option.compare("--nocheck")) {
+                nocheck = true;
+            }
+
+            else if (!option.compare("-iter") || !option.compare("--iter")) {
+                if ((i+1) < argc)
+                    iterations = atoi(argv[++i]);
+                else
+                    throw std::runtime_error("-iterations requires a int value");
+            }
+
+            else if (!option.compare("-w") || !option.compare("--w") || !option.compare("-width") || !option.compare("--width")) {
+                if ((i+1) < argc) {
+                    width = atoi(argv[++i]);
+                }
+                else
+                    throw std::runtime_error("-width requires an integer value");
+            }
+
+            else if (!option.compare("-b") || !option.compare("--b") || !option.compare("-block") || !option.compare("--block") ||
+                     !option.compare("-t") || !option.compare("--t") || !option.compare("-tile") || !option.compare("--tile"))
+            {
+                if ((i+1) < argc)
+                    block = atoi(argv[++i]);
+                else
+                    throw std::runtime_error("-block requires an integer value");
+            }
+
+            else {
+                throw std::runtime_error("Bad command line option " + option);
+            }
+        }
+
+        if (width%block)
+            throw std::runtime_error("Width should be a multiple of block size");
+
+    } catch (std::runtime_error& e) {
+        std::cerr << std::endl << e.what() << std::endl << desc << std::endl;
+        exit(EXIT_FAILURE);
+    }
+}
+
+// -----------------------------------------------------------------------------
+
 std::ostream &operator<<(std::ostream &s, RecFilter::CheckResult v) {
     Halide::Image<float> ref = v.ref;
     Halide::Image<float> out = v.out;

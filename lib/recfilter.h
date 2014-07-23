@@ -10,43 +10,70 @@
 
 #include <Halide.h>
 
+/** Info required to split a particular dimension of the recursive filter */
 struct SplitInfo {
-    bool clamp_border;
+    bool clamp_border;      ///< should image border be clamped to non-zero entries
 
-    int filter_order;
-    int filter_dim;
-    int num_splits;
+    int filter_order;       ///< order of recursive filter in a given dimension
+    int filter_dim;         ///< dimension id
+    int num_splits;         ///< number of scans in the dimension that must be tiled
 
-    Halide::Expr tile_width;
-    Halide::Expr image_width;
-    Halide::Expr num_tiles;
+    Halide::Expr tile_width;    ///< width of each tile after splitting the dimension
+    Halide::Expr image_width;   ///< width of the image in this dimension
+    Halide::Expr num_tiles;     ///< number of tile in this dimension
 
-    Halide::Var  var;
-    Halide::Var  inner_var;
-    Halide::Var  outer_var;
+    Halide::Var  var;           ///< variable that represents this dimension
+    Halide::Var  inner_var;     ///< inner variable after splitting
+    Halide::Var  outer_var;     ///< outer variable or tile index after splitting
 
-    vector<bool> scan_causal;
-    vector<int>  scan_id;
+    vector<bool> scan_causal;   ///< causal or anticausal flag for each scan
+    vector<int>  scan_id;       ///< scan or reduction definition id of each scan
 
-    vector<Halide::RDom> rdom;
-    vector<Halide::RDom> outer_rdom;
-    vector<Halide::RDom> inner_rdom;
-    vector<Halide::RDom> tail_rdom;
+    vector<Halide::RDom> rdom;       ///< reduction domain of each scan
+    vector<Halide::RDom> outer_rdom; ///< outer reduction domain of each scan
+    vector<Halide::RDom> inner_rdom; ///< outer reduction domain of each scan
+    vector<Halide::RDom> tail_rdom;  ///< reduction domain to extract the tail of each scan
 
+    Halide::Image<float> feedfwd_coeff;  ///< copy of feedfwd coeff for the whole filter
+    Halide::Image<float> feedback_coeff; ///< copy of feedback coeff for the whole filter
+};
+
+// ----------------------------------------------------------------------------
+
+/** Data members of the recursive filter */
+struct RecFilterContents {
+    /** Smart pointer */
+    mutable Halide::Internal::RefCount ref_count;
+
+    /** Function that contains the definition of the filter  */
+    Halide::Func recfilter;
+
+    /** List of functions along with their names that the filter depends upon */
+    std::map<std::string, Halide::Internal::Function> func_map;
+
+    /** List of functions that the filter depends upon */
+    std::vector<Halide::Internal::Function> func_list;
+
+    /** Splitting info for each dimension of the filter */
+    std::vector<SplitInfo> split_info;
+
+    /** Matrix of feed forward coefficients, only one for each reduction definition  */
     Halide::Image<float> feedfwd_coeff;
+
+    /** Matrix of feed back coefficients, number of scans x max order
+     * order j-th feedback coefficient of i-th reduction defintion is
+     * feedback_ceff(i,j) */
     Halide::Image<float> feedback_coeff;
 };
 
 // ----------------------------------------------------------------------------
 
-struct RecFilterContents {
-    std::string name;
-    std::vector<SplitInfo> split_info;
-};
-
-// ----------------------------------------------------------------------------
-
 class RecFilter {
+private:
+
+    /** Data members of the recursive filter */
+    Halide::Internal::IntrusivePtr<RecFilterContents> contents;
+
 public:
     struct CheckResult {
         Halide::Image<float> ref, out;
@@ -64,29 +91,34 @@ public:
             ref(r), out(o) {}
     };
 
-private:
-    Halide::Internal::IntrusivePtr<RecFilterContents> contents;
-
 public:
-
     /** Construct an empty named recursive filter */
-    RecFilter(std::string n="");
+    RecFilter(std::string name = "RecFilter");
+
+    /** Reconstruct a recursive filter from its contents */
+    RecFilter(const Halide::Internal::IntrusivePtr<RecFilterContents> &c) : contents(c) {}
 
     /** Set the dimensions of the output of the recursive filter */
     void setArgs(
-            std::vector<Var> args,      ///< dimensions of the output domain
-            std::vector<Expr> width     ///< size of the dimension
+            std::vector<Halide::Var> args,      ///< dimensions of the output domain
+            std::vector<Halide::Expr> width     ///< size of the dimension
             );
 
     /** Add a pure definition to the recursive filter, can be Tuple.
      * All Vars in the pure definition should be args of the filter
-     * */
-    void define(Expr pure_def);
+     */
+    // {@
+    void define(Halide::Expr pure_def);
+    void define(Halide::Tuple pure_def);
+    // @}
 
     /** Add a scan to the recursive filter */
     void addScan(
-            bool causal                 ///< causal or anticausal scan
-            std::vector<float> feedback,///< feedback coeff
+            bool causal,                ///< causal or anticausal scan
+            Halide::Var x,              ///< dimension to a reduction
+            Halide::RDom rx,            ///< domain of the scan
+            float feedfwd,              ///< single feedforward coeff
+            std::vector<float> feedback ///< n feedback coeffs, where n is filter order
             );
 
     /** Return a Halide function that is required to compute the
@@ -97,8 +129,8 @@ public:
     /** Split a list of dimensions by a splitting factor
      * (defined in \file split.cpp) */
     void split(
-            std::vector<Var> dims,  ///< list of dimensions to split
-            std::vector<Expr> tile  ///< splitting factor in each dimension
+            std::vector<Halide::Var> dims,  ///< list of dimensions to split
+            std::vector<Halide::Expr> tile  ///< splitting factor in each dimension
             );
 
     /** Cascade scans in different dimensions of a function,

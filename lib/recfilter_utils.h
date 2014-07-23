@@ -5,43 +5,6 @@
 #include <stdexcept>
 #include <cstdio>
 
-#include "recfilter.h"
-
-// Printing Utils
-
-std::ostream &operator<<(std::ostream &s, Halide::Func f);
-
-std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f);
-
-std::ostream &operator<<(std::ostream &s, RecFilter::CheckResult v);
-
-std::ostream &operator<<(std::ostream &s, RecFilter::CheckResultVerbose v);
-
-// ----------------------------------------------------------------------------
-
-/** Command line arg parser */
-class Arguments {
-public:
-    int width;       ///< image width
-    int height;      ///< image height
-    int block;       ///< block size
-    bool debug;      ///< display intermediate stages
-    bool verbose;    ///< display input, reference output, halide output, difference
-    bool nocheck;    ///< skip check Halide result against reference solution
-    float weight;    ///< First order filter weight
-    int  iterations; ///< profiling iterations
-
-    Arguments(
-            std::string app_name, ///< name of application
-            int argc,             ///< number of command line args
-            char** argv           ///< array of command line args
-            );
-};
-
-// ----------------------------------------------------------------------------
-
-// Cross platform timer
-
 #ifndef WIN32
 # include <sys/time.h>
 # include <sys/stat.h>
@@ -53,7 +16,41 @@ public:
 # include <shlwapi.h>
 #endif
 
-/** Timer class.
+#include "recfilter.h"
+
+
+/** Print the function */
+// {@
+std::ostream &operator<<(std::ostream &s, Halide::Func f);
+std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f);
+// @}
+
+/** Print the difference beteen reference and Halide \result */
+// {@
+std::ostream &operator<<(std::ostream &s, RecFilter::CheckResult v);
+std::ostream &operator<<(std::ostream &s, RecFilter::CheckResultVerbose v);
+// @}
+
+// ----------------------------------------------------------------------------
+
+/** Command line arg parser */
+class Arguments {
+public:
+    int width;       ///< image width
+    int block;       ///< block size
+    int iterations;  ///< profiling iterations
+    bool nocheck;    ///< skip check Halide result against reference solution
+
+    Arguments(
+            std::string app_name, ///< name of application
+            int argc,             ///< number of command line args
+            char** argv           ///< array of command line args
+            );
+};
+
+// ----------------------------------------------------------------------------
+
+/** Cross platform timer.
  * Platform independent class to record time elapsed. The timer
  * starts counting automatically as soon as an object of this
  * class is allocated and prints the time elapsed as soon as the

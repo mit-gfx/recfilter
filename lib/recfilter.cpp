@@ -12,175 +12,146 @@ using std::queue;
 using std::map;
 
 RecFilter::RecFilter(string n) {
+    contents = new RecFilterContents;
+    contents.ptr->recfilter = Func(n);
 }
 
 void RecFilter::setArgs(vector<Var> args, vector<Expr> width) {
+    if (args.size() != width.size()) {
+        cerr << "Each dimension of recursive filter " << contents.ptr->recfilter.name()
+            << " must have a mapped width" << endl;
+        assert(false);
+    }
+
+    for (int i=0; i<args.size(); i++) {
+        SplitInfo s;
+        s.clamp_border = false;
+
+        s.var          = args[i];
+        s.image_width  = width[i];
+        s.filter_dim   = i;
+
+        // default values for now
+        s.num_splits   = 0;
+        s.filter_order = 0;
+        s.tile_width   = width[i];
+        s.num_tiles    = 1;
+
+        contents.ptr->split_info.push_back(s);
+    }
 }
 
 void RecFilter::define(Expr pure_def) {
+    vector<string> args;
+    for (int i=0; i<contents.ptr->split_info.size(); i++) {
+        args.push_back(contents.ptr->split_info[i].var.name());
+    }
+    contents.ptr->recfilter.function().define(args, vec(pure_def));
 }
 
-void RecFilter::addScan(bool causal, vector<float> feedback) {
+void RecFilter::define(Tuple pure_def) {
+    vector<string> args;
+    for (int i=0; i<contents.ptr->split_info.size(); i++) {
+        args.push_back(contents.ptr->split_info[i].var.name());
+    }
+    contents.ptr->recfilter.function().define(args, pure_def.as_vector());
 }
 
-Func RecFilter::func(std::string func_name) {
-}
+void RecFilter::addScan(bool causal, Var x, RDom rx, float feedfwd, vector<float> feedback) {
+    Function f = contents.ptr->recfilter.function();
 
-void RecFilter::split(vector<Var> dims, vector<Expr> tile) {
-    Function F = func.function();
+    if (f.has_pure_definition()) {
+        cerr << "Cannot add scans to recursive filter " << f.name()
+            << " before specifying a pure definition" << endl;
+        assert(false);
+    }
 
-    int num_splits = var.size();
+    if (rx.dimensions() != 1) {
+        cerr << "Each scan variable must be a 1D RDom" << endl;
+        assert(false);
+    }
 
-    vector<Expr> tile_width;
-    vector<RDom> outer_rdom;
-    vector<RDom> tail_rdom;
-    vector<Expr> image_width;
-    vector<Expr> num_tiles;
+    // image dimension for the scan
+    int dimension = -1;
+    Expr extent = rx.x.extent();
+    Expr width;
 
-    for (int i=0; i<num_splits; i++) {
-        // individual tile boundaries
-        Expr inner_rdom_extent = simplify(inner_rdom[i].x.extent());
+    for (int i=0; i<f.args().size(); i++) {
+        if (f.args()[i] == x.name()) {
+            dimension = i;
+            width = contents.ptr->split_info[i].image_width;
+        }
+    }
+    if (dimension == -1) {
+        cerr << "Variable " << x << " is not one of the dimensions of the "
+            << "recursive filter " << f.name() << endl;
+        assert(false);
+    }
 
-        tile_width .push_back(inner_rdom_extent);
-        image_width.push_back(rdom[i].x.extent());
-        num_tiles  .push_back(image_width[i]/tile_width[i]);
+    if (equal(width,extent)) {
+        cerr << "Extent of RDom must equal image width in the given dimension" << endl;
+        assert(false);
+    }
 
-        // tile width for splitting multiple scans in same dimension must be same
-        for (int j=0; j<i-1; j++) {
-            if (dimension[j] == dimension[i] && !equal(tile_width[i], tile_width[j])) {
-                cerr << "Different tile widths specified for splitting same dimension" << endl;
-                assert(false);
+    // create the LHS args, replace x by rx for causal and
+    // x by w-1-rx for anticausal
+    vector<Expr> args;
+    for (int i=0; i<f.args().size(); i++) {
+        if (i == dimension) {
+            if (causal) {
+                args.push_back(rx);
+            } else {
+                args.push_back(width-1-rx);
             }
-        }
-
-        // extent of reduction along dimensions to be split
-        assert(extract_params_in_expr(rdom[i].x.extent()).size()==1 &&
-                "RDom extent must have a single image parameter");
-
-        // outer_rdom.x: over tail elems of prev tile to compute tail of current tile
-        // outer_rdom.y: over all tail elements of current tile
-        // outer_rdom.z: over all tiles
-        outer_rdom.push_back(RDom(
-                    0,order[i],
-                    0,order[i],
-                    1, simplify(num_tiles[i]-1),
-                    "r"+var[i].name()+"o"));
-
-        // tail_rdom.x: over all tail elems of current tile
-        tail_rdom.push_back(RDom(0,order[i], "r"+var[i].name()+"t"));
-    }
-
-    // list of structs with all the info about split in each dimension
-    vector<SplitInfo> split_info(F.args().size());
-
-    // loop over all reduction definitions in reverse order and
-    // populate the split_info struct with info on splitting each reduction
-    for (int i=F.reductions().size()-1; i>=0; i--) {
-        assert(F.reductions()[i].domain.defined() &&
-                "Reduction definition has no reduction domain");
-
-        int index = -1;
-
-        // extract the RDom in the reduction definition and
-        // compare with the reduction domain to be split
-        for (int j=0; j<num_splits; j++) {
-            if (F.reductions()[i].domain.same_as(rdom[j].domain())) {
-                index = j;
-            }
-        }
-
-        if (index < 0) {
-            cerr << "Could not find a split for scan " << i << endl;
-            assert(false);
-        }
-
-        SplitInfo s = split_info[ dimension[index] ];
-
-        s.clamp_border = false;
-        s.filter_order = order[index];
-        s.filter_dim   = dimension[index];
-        s.var          = var[index];
-        s.inner_var    = inner_var[index];
-        s.outer_var    = outer_var[index];
-        s.image_width  = image_width[index];
-        s.tile_width   = tile_width[index];
-        s.num_tiles    = num_tiles[index];
-        s.feedfwd_coeff  = feedfwd_coeff;
-        s.feedback_coeff = feedback_coeff;
-
-        s.scan_id    .push_back(i);
-        s.rdom       .push_back(rdom[index]);
-        s.inner_rdom .push_back(inner_rdom[index]);
-        s.outer_rdom .push_back(outer_rdom[index]);
-        s.tail_rdom  .push_back(tail_rdom[index]);
-        s.scan_causal.push_back(check_causal_scan(F, rdom[index], i, s.filter_dim));
-        s.num_splits++;
-
-        split_info[ dimension[index] ] = s;
-    }
-
-    // group scans in same dimension together
-    // change the order of splits accordingly
-    split_info = group_scans_by_dimension(F, split_info);
-
-    // remove split_info structs for dimensions which are not split
-    for (int i=0; i<split_info.size(); i++) {
-        if (split_info[i].num_splits == 0) {
-            split_info.erase(split_info.begin()+i);
-            i--;
+        } else {
+            args.push_back(Var(f.args()[i]));
         }
     }
 
-    // compute the intra tile result
-    Function F_intra = create_intra_tile_term(F, split_info);
+    // RHS scan definition
+    vector<Expr> values(f.values().size());
 
-    // apply clamped boundary on border tiles and zero boundary on
-    // inner tiles if explicit border clamping is requested
-    if (clamp_borders) {
-        for (int j=0; j<split_info.size(); j++) {
-            split_info[j].clamp_border = true;
+    for (int i=0; i<values.size(); i++) {
+        Expr zero = make_zero(f.output_types()[i]);
+
+        if (feedfwd != 0.0f) {
+            values[i] = feedfwd * Call::make(f, args, i);
+        } else {
+            values[i] = zero;
         }
-        apply_zero_boundary_on_inner_tiles(F_intra, split_info);
-    }
 
-    // create a function will hold the final result,
-    // just a copy of the intra tile computation for now
-    Function F_final = create_copy(F_intra, F.name() + DELIMITER + FINAL_TERM);
-
-    // compute the residuals from splits in each dimension
-    vector< vector<Function> > F_deps = split_scans(F_intra, split_info);
-
-    // transfer the tail of each scan to another buffer
-    extract_tails_from_each_scan(F_intra, split_info);
-
-    // add all the residuals to the final term
-    add_all_residuals_to_final_result(F_final, F_deps, split_info);
-
-    // change the original function to index into the final term computed here
-    {
-        vector<string> args = F.args();
-        vector<Expr> values;
-        vector<Expr> call_args;
-        for (int i=0; i<F_final.args().size(); i++) {
-            string arg = F_final.args()[i];
-            call_args.push_back(Var(arg));
-            for (int j=0; j<var.size(); j++) {
-                if (arg == inner_var[j].name()) {
-                    call_args[i] = substitute(arg, var[j]%tile_width[j], call_args[i]);
-                } else if (arg == outer_var[j].name()) {
-                    call_args[i] = substitute(arg, var[j]/tile_width[j], call_args[i]);
+        for (int j=0; j<feedback.size(); j++) {
+            if (feedback[j] != 0.0f) {
+                vector<Expr> call_args = args;
+                if (causal) {
+                    call_args[dimension] = max(call_args[dimension]-j-1,0);
+                    values[i] += select(rx>j, feedback[j] * Call::make(f,call_args,i), zero);
+                } else {
+                    call_args[dimension] = min(call_args[dimension]+j+1,width-1);
+                    values[i] += select(rx>j, feedback[j] * Call::make(f,call_args,i), zero);
                 }
             }
         }
-        for (int i=0; i<F.outputs(); i++) {
-            Expr val = Call::make(F_final, call_args, i);
-            values.push_back(val);
-        }
-        F.clear_all_definitions();
-        F.define(args, values);
+        values[i] = simplify(values[i]);
     }
+    f.define_reduction(args, values);
 
-    func = Func(F);
+    // add details to the split info struct
+    SplitInfo s = contents.ptr->split_info[dimension];
+    s.rdom       .insert(s.rdom.begin(), rx);
+    s.scan_id    .insert(s.scan_id.begin(), f.reductions().size()-1);
+    s.scan_causal.insert(s.scan_causal.begin(), causal);
+    s.num_splits   = s.num_splits+1;
+    s.filter_order = std::max(s.filter_order, int(feedback.size()));
+    contents.ptr->split_info[dimension] = s;
+}
 
-    inline_function(func, F_final.name());
+Func RecFilter::func(string func_name) {
+    map<string,Function>::iterator f = contents.ptr->func_map.find(func_name);
+    if (f != contents.ptr->func_map.end()) {
+        return Func(f->second);
+    }
+    cerr << "Function " << func_name << " not found as a dependency of ";
+    cerr << "recursive filter " << contents.ptr->recfilter.name() << endl;
+    assert(false);
 }

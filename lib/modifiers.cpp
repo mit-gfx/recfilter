@@ -1,4 +1,4 @@
-#include "split.h"
+#include "split_utils.h"
 
 using namespace Halide;
 using namespace Halide::Internal;

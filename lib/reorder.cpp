@@ -1,6 +1,5 @@
 #include "recfilter.h"
 #include "split_utils.h"
-#include "split_macros.h"
 
 using namespace Halide;
 using namespace Halide::Internal;
@@ -13,22 +12,8 @@ using std::map;
 
 // -----------------------------------------------------------------------------
 
-static vector<Function> find_called_functions(Function function) {
-    vector<Function> func_list;
-    map<string, Function> func_map = find_transitive_calls(function);
-    map<string, Function>::iterator f_it  = func_map.begin();
-    map<string, Function>::iterator f_end = func_map.end();
-    while (f_it != f_end) {
-        func_list.push_back(f_it->second);
-        f_it++;
-    }
-    return func_list;
-}
-
-static vector<Function> find_called_functions(Func f) {
-    return find_called_functions(f.function());
-}
-
+/** Infer the dimension which contains the reduction variable in a given
+ * reduction definition */
 static int get_scan_dimension(ReductionDefinition r) {
     vector<int> scan_dim;
 
@@ -214,6 +199,10 @@ std::vector<Func> cascade_repeated_scans(Func& func) {
 
 // -----------------------------------------------------------------------------
 
+/** Inline a pure function in a list of other functions
+ * \param f function to be inlined
+ * \param func_list list of functions in which calls to first parameter must be inlined
+ */
 static void inline_function(Function f, vector<Function> func_list) {
     if (!f.is_pure()) {
         cerr << "Function " << f.name() << " to be inlined must be pure" << endl;
@@ -224,9 +213,9 @@ static void inline_function(Function f, vector<Function> func_list) {
     for (int j=0; j<func_list.size(); j++) {
         Function g = func_list[j];
 
-        // check if g calls f
+        // check if g not same as f and g calls f
         map<string,Function> called_funcs = find_direct_calls(g);
-        if (called_funcs.find(f.name()) == called_funcs.end()) {
+        if (g.name()==f.name() || called_funcs.find(f.name())==called_funcs.end()) {
             continue;
         }
 
@@ -251,31 +240,6 @@ static void inline_function(Function f, vector<Function> func_list) {
             }
             g.define_reduction(reduction_args, reduction_values);
         }
-    }
-}
-
-void RecFilter::inline_func(Func F, string func_name) {
-    if (F.name() == func_name) {
-        return;
-    }
-
-    bool found = false;
-    vector<Function> func_list = find_called_functions(F);
-
-    for (int i=0; !found && i<func_list.size(); i++) {
-        if (func_name == func_list[i].name()) {
-            found = true;
-        }
-        if (F.name() == func_list[i].name()) {
-            func_list.erase(func_list.begin()+i);
-            i--;
-        }
-    }
-    if (found) {
-        inline_function(F.function(), func_list);
-    } else {
-        cerr << "Function " << func_name << " to be inlined not found" << endl;
-        assert(false);
     }
 }
 
@@ -361,7 +325,19 @@ static bool check_duplicate(Function A, Function B) {
     return duplicate;
 }
 
-static void merge_function(Func S, Function A, Function B, string merged_name) {
+// -----------------------------------------------------------------------------
+
+/** Merge two functions to create a new function which contains the outputs
+ * of both the functions in a Tuple; and replace calls to the two original
+ * functions by the merged function in all calls in
+ */
+static void merge_function(
+        Function A,              ///< first function to be merged
+        Function B,              ///< second function to be merged
+        string merged_name,      ///< name of the merged function
+        vector<Function> func_list = vector<Function>() ///< list of functions where A and B must be replaced by the merged function
+        )
+{
     string merge_error;
     if (!merge_feasible(A,B,merge_error)) {
         cerr << merge_error << std::endl;
@@ -469,18 +445,40 @@ static void merge_function(Func S, Function A, Function B, string merged_name) {
     }
 
     // inline A and B
-    vector<Function> func_list = find_called_functions(S);
-    inline_function(A, func_list);
-    inline_function(B, func_list);
+    if (!func_list.empty()) {
+        inline_function(A, func_list);
+        inline_function(B, func_list);
+    }
 }
 
 // -----------------------------------------------------------------------------
 
-void RecFilter::merge_func(Func S, string func_a, string func_b, string merged_name) {
+void RecFilter::inline_func(string func_name) {
+    if (contents.ptr->recfilter.name() == func_name) {
+        return;
+    }
+
+    bool found = false;
+    vector<Function> func_list = contents.ptr->func_list;
+
+    for (int i=0; !found && i<func_list.size(); i++) {
+        if (func_name == func_list[i].name()) {
+            inline_function(func_list[i], func_list);
+            found = true;
+        }
+    }
+    if (!found) {
+        cerr << "Function " << func_name << " to be inlined not found" << endl;
+        assert(false);
+    }
+}
+
+
+void RecFilter::merge_func(string func_a, string func_b, string merged_name) {
     Function FA;
     Function FB;
 
-    vector<Function> func_list = find_called_functions(S);
+    vector<Function> func_list = contents.ptr->func_list;
 
     for (int i=0; i<func_list.size(); i++) {
         if (func_a == func_list[i].name())
@@ -498,24 +496,24 @@ void RecFilter::merge_func(Func S, string func_a, string func_b, string merged_n
         assert(false);
     }
 
-    merge_function(S, FA, FB, merged_name);
+    merge_function(FA, FB, merged_name);
 }
 
-void RecFilter::merge_func(Func S, string func_a, string func_b, string func_c, string merged_name) {
+void RecFilter::merge_func(string func_a, string func_b, string func_c, string merged_name) {
     string func_ab = "Merged_%d" + int_to_string(rand());
-    merge_func(S, func_a, func_b, func_ab);
-    merge_func(S, func_c, func_ab, merged_name);
+    merge_func(func_a, func_b, func_ab);
+    merge_func(func_c, func_ab, merged_name);
 }
 
-void RecFilter::merge_func(Func S, string func_a, string func_b, string func_c, string func_d, string merged_name) {
+void RecFilter::merge_func(string func_a, string func_b, string func_c, string func_d, string merged_name) {
     string func_ab = "Merged_%d" + int_to_string(rand());
     string func_cd = "Merged_%d" + int_to_string(rand());
-    merge_func(S, func_a, func_b, func_ab);
-    merge_func(S, func_c, func_d, func_cd);
-    merge_func(S, func_ab,func_cd,merged_name);
+    merge_func(func_a, func_b, func_ab);
+    merge_func(func_c, func_d, func_cd);
+    merge_func(func_ab,func_cd,merged_name);
 }
 
-void RecFilter::merge_func(Func S, std::vector<std::string> funcs, string merged) {
+void RecFilter::merge_func(std::vector<std::string> funcs, string merged) {
     assert(funcs.size() > 1);
     string func_prev_merge = funcs[0];
     string func_next_merge;
@@ -525,22 +523,21 @@ void RecFilter::merge_func(Func S, std::vector<std::string> funcs, string merged
         } else {
             func_next_merge = "Merged_%d" + int_to_string(rand());
         }
-        merge_func(S, funcs[i], func_prev_merge, func_next_merge);
+        merge_func(funcs[i], func_prev_merge, func_next_merge);
         func_prev_merge = func_next_merge;
     }
 }
 
-// ----------------------------------------------------------------------------
-
-void RecFilter::swap_variables(Func S, string func_name, Var a, Var b) {
+void RecFilter::swap_variables(string func_name, Var a, Var b) {
     assert(!a.same_as(b) && "Variables to be swapped must be different");
 
-    vector<Function> func_list = find_called_functions(S);
+    vector<Function> func_list = contents.ptr->func_list;
 
     Function F;
     for (int i=0; i<func_list.size(); i++) {
-        if (func_name == func_list[i].name())
+        if (func_name == func_list[i].name()) {
             F = func_list[i];
+        }
     }
 
     assert(F.has_pure_definition() && "Function to swap variables not found");

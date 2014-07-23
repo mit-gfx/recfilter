@@ -4,50 +4,23 @@
 #include "recfilter.h"
 
 
-// Splitting routines
-
-vector< vector<Function> > split_scans(
-        Function F_intra,
-        vector<SplitInfo> &split_info)
-
-// -----------------------------------------------------------------------------
-
-// Checks
-
-// bool check_causal_scan(
-//         Halide::Internal::Function f,
-//         Halide::RVar rx,
-//         int scan_id,
-//         int dimension);
-//
-// void check_split_feasible(
-//         Halide::Func func,
-//         vector<int>  dimension,
-//         vector<Halide::Var>  var,
-//         vector<Halide::Var>  inner_var,
-//         vector<Halide::Var>  outer_var,
-//         vector<Halide::RDom> rdom,
-//         vector<Halide::RDom> inner_rdom,
-//         vector<int>  order);
-
-// -----------------------------------------------------------------------------
-
 // Weight matrix computation
 
+/** Weight coefficients (tail_size x tile_width) for
+ * applying scans corresponding to split indices split_id1 to
+ * split_id2 in the SplitInfo struct (defined in coefficients.cpp).
+ * It is meaningful to apply subsequent scans on the tail of any scan
+ * as it undergoes other scans only if they happen after the first
+ * scan. The SpliInfo object stores the scans in reverse order, hence indices
+ * into the SplitInfo object split_id1 and split_id2 must be decreasing
+ */
 Halide::Image<float> tail_weights(SplitInfo s, int s1, bool clamp_border=false);
+
+/** Weight coefficients (tail_size x tile_width) for
+ * applying scan's corresponding to split indices split_id1
+ * (defined in coefficients.cpp)
+ */
 Halide::Image<float> tail_weights(SplitInfo s, int s1, int s2, bool clamp_border=false);
-
-// -----------------------------------------------------------------------------
-
-// Rearrangements for intra tile computation
-
-std::vector<SplitInfo> group_scans_by_dimension(
-        Halide::Internal::Function F,
-        vector<SplitInfo> split_info);
-
-void extract_tails_from_each_scan(
-        Halide::Internal::Function F_intra,
-        vector<SplitInfo> split_info);
 
 // -----------------------------------------------------------------------------
 
