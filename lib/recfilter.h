@@ -12,11 +12,11 @@
 
 /** Info required to split a particular dimension of the recursive filter */
 struct SplitInfo {
-    bool clamp_border;      ///< should image border be clamped to non-zero entries
+    bool clamp_border;          ///< should image border be clamped to non-zero entries
 
-    int filter_order;       ///< order of recursive filter in a given dimension
-    int filter_dim;         ///< dimension id
-    int num_splits;         ///< number of scans in the dimension that must be tiled
+    int filter_order;           ///< order of recursive filter in a given dimension
+    int filter_dim;             ///< dimension id
+    int num_splits;             ///< number of scans in the dimension that must be tiled
 
     Halide::Expr tile_width;    ///< width of each tile after splitting the dimension
     Halide::Expr image_width;   ///< width of the image in this dimension
@@ -29,13 +29,13 @@ struct SplitInfo {
     vector<bool> scan_causal;   ///< causal or anticausal flag for each scan
     vector<int>  scan_id;       ///< scan or reduction definition id of each scan
 
-    vector<Halide::RDom> rdom;       ///< reduction domain of each scan
-    vector<Halide::RDom> outer_rdom; ///< outer reduction domain of each scan
-    vector<Halide::RDom> inner_rdom; ///< outer reduction domain of each scan
-    vector<Halide::RDom> tail_rdom;  ///< reduction domain to extract the tail of each scan
+    vector<Halide::RDom> rdom;       ///< RDom reduction domain of each scan
+    vector<Halide::RDom> outer_rdom; ///< outer RDom of each scan
+    vector<Halide::RDom> inner_rdom; ///< inner RDom of each scan
+    vector<Halide::RDom> tail_rdom;  ///< RDom to extract the tail of each scan
 
-    Halide::Image<float> feedfwd_coeff;  ///< copy of feedfwd coeff for the whole filter
-    Halide::Image<float> feedback_coeff; ///< copy of feedback coeff for the whole filter
+    Halide::Image<float> feedfwd_coeff; ///< feedforward coeffs, only one for each scan
+    Halide::Image<float> feedback_coeff;///< feedback coeffs (num_scans x max_order) order j-th coeff of i-th scan is (i+1,j) */
 };
 
 // ----------------------------------------------------------------------------
@@ -56,14 +56,6 @@ struct RecFilterContents {
 
     /** Splitting info for each dimension of the filter */
     std::vector<SplitInfo> split_info;
-
-    /** Matrix of feed forward coefficients, only one for each reduction definition  */
-    Halide::Image<float> feedfwd_coeff;
-
-    /** Matrix of feed back coefficients, number of scans x max order
-     * order j-th feedback coefficient of i-th reduction defintion is
-     * feedback_ceff(i,j) */
-    Halide::Image<float> feedback_coeff;
 };
 
 // ----------------------------------------------------------------------------
@@ -99,10 +91,12 @@ public:
     RecFilter(const Halide::Internal::IntrusivePtr<RecFilterContents> &c) : contents(c) {}
 
     /** Set the dimensions of the output of the recursive filter */
-    void setArgs(
-            std::vector<Halide::Var> args,      ///< dimensions of the output domain
-            std::vector<Halide::Expr> width     ///< size of the dimension
-            );
+    // {@
+    void setArgs(Halide::Var x);
+    void setArgs(Halide::Var x, Halide::Var y);
+    void setArgs(Halide::Var x, Halide::Var y, Halide::Var z);
+    void setArgs(std::vector<Halide::Var> args);
+    // @}
 
     /** Add a pure definition to the recursive filter, can be Tuple.
      * All Vars in the pure definition should be args of the filter
@@ -121,10 +115,25 @@ public:
             std::vector<float> feedback ///< n feedback coeffs, where n is filter order
             );
 
-    /** Return a Halide function that is required to compute the
+    /** Convenience routines to add scan to recursive filter where by default causal = true,
+     * feed forward coeff = 1.0 and feed back coeff = { 1.0 } */
+    // {@
+    void addScan(Halide::Var x, Halide::RDom rx);
+    void addScan(Halide::Var x, Halide::RDom rx, std::vector<float> feedback);
+    void addScan(bool causal, Halide::Var x, Halide::RDom rx);
+    void addScan(bool causal, Halide::Var x, Halide::RDom rx, std::vector<float> feedback);
+    // @}
+
+    /** Return the recursive filter as a Halide function */
+    Halide::Func func(void);
+
+    /** Return a function that is required to compute the
      * recursive filter, raise error if no function by the given
      * name is required to compute the filter */
     Halide::Func func(std::string func_name);
+
+    /** Return all function required to compute the recursive filter */
+    std::map<std::string,Halide::Func> funcs(void);
 
     /** Split a list of dimensions by a splitting factor
      * (defined in \file split.cpp) */

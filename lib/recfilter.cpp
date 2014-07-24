@@ -1,9 +1,6 @@
 #include "recfilter.h"
 #include "recfilter_utils.h"
 
-using namespace Halide;
-using namespace Halide::Internal;
-
 using std::string;
 using std::cerr;
 using std::endl;
@@ -11,31 +8,50 @@ using std::vector;
 using std::queue;
 using std::map;
 
+namespace Halide {
+namespace Internal {
+template<>
+RefCount &ref_count<RecFilterContents>(const RecFilterContents *f) {
+    return f->ref_count;
+}
+template<>
+void destroy<RecFilterContents>(const RecFilterContents *f) {
+    delete f;
+}
+}
+}
+
+// -----------------------------------------------------------------------------
+
+using namespace Halide;
+using namespace Halide::Internal;
+
 RecFilter::RecFilter(string n) {
     contents = new RecFilterContents;
     contents.ptr->recfilter = Func(n);
 }
 
-void RecFilter::setArgs(vector<Var> args, vector<Expr> width) {
-    if (args.size() != width.size()) {
-        cerr << "Each dimension of recursive filter " << contents.ptr->recfilter.name()
-            << " must have a mapped width" << endl;
-        assert(false);
-    }
+void RecFilter::setArgs(Var x)              { setArgs(vec(x));      }
+void RecFilter::setArgs(Var x, Var y)       { setArgs(vec(x,y));    }
+void RecFilter::setArgs(Var x, Var y, Var z){ setArgs(vec(x,y,z));  }
 
+void RecFilter::setArgs(vector<Var> args) {
     for (int i=0; i<args.size(); i++) {
         SplitInfo s;
         s.clamp_border = false;
 
         s.var          = args[i];
-        s.image_width  = width[i];
         s.filter_dim   = i;
 
         // default values for now
         s.num_splits   = 0;
         s.filter_order = 0;
-        s.tile_width   = width[i];
-        s.num_tiles    = 1;
+        s.image_width  = 0;
+        s.tile_width   = 0;
+        s.num_tiles    = 0;
+
+        s.feedfwd_coeff = Image<float>(0);
+        s.feedback_coeff = Image<float>(0,0);
 
         contents.ptr->split_info.push_back(s);
     }
@@ -47,6 +63,15 @@ void RecFilter::define(Expr pure_def) {
         args.push_back(contents.ptr->split_info[i].var.name());
     }
     contents.ptr->recfilter.function().define(args, vec(pure_def));
+
+    // build the dependency graph of the recursive filter
+    contents.ptr->func_map = find_transitive_calls(contents.ptr->recfilter.function());
+    map<string,Function>::iterator f = contents.ptr->func_map.begin();
+    map<string,Function>::iterator fe= contents.ptr->func_map.end();
+    while (f != fe) {
+        contents.ptr->func_list.push_back(f->second);
+        f++;
+    }
 }
 
 void RecFilter::define(Tuple pure_def) {
@@ -55,12 +80,21 @@ void RecFilter::define(Tuple pure_def) {
         args.push_back(contents.ptr->split_info[i].var.name());
     }
     contents.ptr->recfilter.function().define(args, pure_def.as_vector());
+
+    // build the dependency graph of the recursive filter
+    contents.ptr->func_map = find_transitive_calls(contents.ptr->recfilter.function());
+    map<string,Function>::iterator f = contents.ptr->func_map.begin();
+    map<string,Function>::iterator fe= contents.ptr->func_map.end();
+    while (f != fe) {
+        contents.ptr->func_list.push_back(f->second);
+        f++;
+    }
 }
 
 void RecFilter::addScan(bool causal, Var x, RDom rx, float feedfwd, vector<float> feedback) {
     Function f = contents.ptr->recfilter.function();
 
-    if (f.has_pure_definition()) {
+    if (!f.has_pure_definition()) {
         cerr << "Cannot add scans to recursive filter " << f.name()
             << " before specifying a pure definition" << endl;
         assert(false);
@@ -73,13 +107,11 @@ void RecFilter::addScan(bool causal, Var x, RDom rx, float feedfwd, vector<float
 
     // image dimension for the scan
     int dimension = -1;
-    Expr extent = rx.x.extent();
-    Expr width;
+    Expr width = rx.x.extent();
 
     for (int i=0; i<f.args().size(); i++) {
         if (f.args()[i] == x.name()) {
             dimension = i;
-            width = contents.ptr->split_info[i].image_width;
         }
     }
     if (dimension == -1) {
@@ -88,8 +120,9 @@ void RecFilter::addScan(bool causal, Var x, RDom rx, float feedfwd, vector<float
         assert(false);
     }
 
-    if (equal(width,extent)) {
-        cerr << "Extent of RDom must equal image width in the given dimension" << endl;
+    if (contents.ptr->split_info[dimension].num_splits>0 &&
+            !equal(contents.ptr->split_info[dimension].image_width, width)) {
+        cerr << "Extent of RDoms of all scans in the same dimension must be same" << endl;
         assert(false);
     }
 
@@ -110,7 +143,6 @@ void RecFilter::addScan(bool causal, Var x, RDom rx, float feedfwd, vector<float
 
     // RHS scan definition
     vector<Expr> values(f.values().size());
-
     for (int i=0; i<values.size(); i++) {
         Expr zero = make_zero(f.output_types()[i]);
 
@@ -124,10 +156,10 @@ void RecFilter::addScan(bool causal, Var x, RDom rx, float feedfwd, vector<float
             if (feedback[j] != 0.0f) {
                 vector<Expr> call_args = args;
                 if (causal) {
-                    call_args[dimension] = max(call_args[dimension]-j-1,0);
+                    call_args[dimension] = max(call_args[dimension]-(j+1),0);
                     values[i] += select(rx>j, feedback[j] * Call::make(f,call_args,i), zero);
                 } else {
-                    call_args[dimension] = min(call_args[dimension]+j+1,width-1);
+                    call_args[dimension] = min(call_args[dimension]+(j+1),width-1);
                     values[i] += select(rx>j, feedback[j] * Call::make(f,call_args,i), zero);
                 }
             }
@@ -136,14 +168,65 @@ void RecFilter::addScan(bool causal, Var x, RDom rx, float feedfwd, vector<float
     }
     f.define_reduction(args, values);
 
+    int scan_order = feedback.size();
+
     // add details to the split info struct
     SplitInfo s = contents.ptr->split_info[dimension];
     s.rdom       .insert(s.rdom.begin(), rx);
     s.scan_id    .insert(s.scan_id.begin(), f.reductions().size()-1);
     s.scan_causal.insert(s.scan_causal.begin(), causal);
     s.num_splits   = s.num_splits+1;
-    s.filter_order = std::max(s.filter_order, int(feedback.size()));
+    s.image_width  = width;
+    s.filter_order = std::max(s.filter_order, scan_order);
     contents.ptr->split_info[dimension] = s;
+
+    // add the feedforward and feedback coefficients
+    int num_scans = s.feedback_coeff.width();
+    int max_order = s.feedback_coeff.height();
+    Image<float> feedfwd_coeff(num_scans+1);
+    Image<float> feedback_coeff(num_scans+1, std::max(max_order,scan_order));
+
+    // copy all the existing coeff to the new arrays
+    for (int j=0; j<num_scans; j++) {
+        feedfwd_coeff(j) = s.feedfwd_coeff(j);
+        for (int i=0; i<scan_order; i++) {
+            feedback_coeff(j,i) = s.feedback_coeff(j,i);
+        }
+    }
+
+    // add the coeff of the newly added scan as the last row of coeff
+    feedfwd_coeff(num_scans) = feedfwd;
+    for (int i=0; i<scan_order; i++) {
+        feedback_coeff(num_scans, i) = feedback[i];
+    }
+
+    // update the feedback and feedforward coeff matrices in all split info
+    // structs for all dimensions (even though updating other dimensions is
+    // redundant, but still performed for consistency)
+    for (int i=0; i<contents.ptr->split_info.size(); i++) {
+        contents.ptr->split_info[i].feedfwd_coeff  = feedfwd_coeff;
+        contents.ptr->split_info[i].feedback_coeff = feedback_coeff;
+    }
+}
+
+void RecFilter::addScan(Var x, RDom rx) {
+    addScan(true, x, rx, 1.0f, vec(1.0f));
+}
+
+void RecFilter::addScan(Var x, RDom rx, vector<float> feedback) {
+    addScan(true, x, rx, 1.0f, feedback);
+}
+
+void RecFilter::addScan(bool causal, Var x, RDom rx) {
+    addScan(causal, x, rx, 1.0f, vec(1.0f));
+}
+
+void RecFilter::addScan(bool causal, Var x, RDom rx, vector<float> feedback) {
+    addScan(causal, x, rx, 1.0f, feedback);
+}
+
+Func RecFilter::func(void) {
+    return contents.ptr->recfilter;
 }
 
 Func RecFilter::func(string func_name) {
@@ -154,4 +237,14 @@ Func RecFilter::func(string func_name) {
     cerr << "Function " << func_name << " not found as a dependency of ";
     cerr << "recursive filter " << contents.ptr->recfilter.name() << endl;
     assert(false);
+}
+
+map<string,Func> RecFilter::funcs(void) {
+    map<string,Func> func_map;
+    map<string,Function>::iterator f = contents.ptr->func_map.begin();
+    while (f != contents.ptr->func_map.end()) {
+        func_map[f->first] = Func(f->second);
+        f++;
+    }
+    return func_map;
 }
