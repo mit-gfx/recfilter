@@ -71,7 +71,7 @@ Arguments::Arguments(string app_name, int argc, char** argv) :
 
 // -----------------------------------------------------------------------------
 
-std::ostream &operator<<(std::ostream &s, RecFilter::CheckResult v) {
+std::ostream &operator<<(std::ostream &s, CheckResult v) {
     Halide::Image<float> ref = v.ref;
     Halide::Image<float> out = v.out;
 
@@ -99,7 +99,7 @@ std::ostream &operator<<(std::ostream &s, RecFilter::CheckResult v) {
     }
 }
 
-std::ostream &operator<<(std::ostream &s, RecFilter::CheckResultVerbose v) {
+std::ostream &operator<<(std::ostream &s, CheckResultVerbose v) {
     Halide::Image<float> ref = v.ref;
     Halide::Image<float> out = v.out;
 

@@ -60,6 +60,28 @@ struct RecFilterContents {
 
 // ----------------------------------------------------------------------------
 
+/** Compare ref and Halide solutions and print the mean square error */
+struct CheckResult {
+    Halide::Image<float> ref;   ///< reference solution
+    Halide::Image<float> out;   ///< Halide solution
+    CheckResult(
+            Halide::Image<float> r,
+            Halide::Image<float> o) :
+        ref(r), out(o) {}
+};
+
+/** Compare ref and Halide solutions and print the verbose difference */
+struct CheckResultVerbose {
+    Halide::Image<float> ref;   ///< reference solution
+    Halide::Image<float> out;   ///< Halide solution
+    CheckResultVerbose(
+            Halide::Image<float> r,
+            Halide::Image<float> o) :
+        ref(r), out(o) {}
+};
+
+// ----------------------------------------------------------------------------
+
 class RecFilter {
 private:
 
@@ -67,21 +89,10 @@ private:
     Halide::Internal::IntrusivePtr<RecFilterContents> contents;
 
 public:
-    struct CheckResult {
-        Halide::Image<float> ref, out;
-        CheckResult(
-                Halide::Image<float> r,
-                Halide::Image<float> o) :
-            ref(r), out(o) {}
-    };
 
-    struct CheckResultVerbose {
-        Halide::Image<float> ref, out;
-        CheckResultVerbose(
-                Halide::Image<float> r,
-                Halide::Image<float> o) :
-            ref(r), out(o) {}
-    };
+    /** Macros to indicate causal or anticausal scan */
+    typedef enum {CAUSAL, ANTICAUSAL} Causality;
+
 
 public:
     /** Construct an empty named recursive filter */
@@ -90,7 +101,9 @@ public:
     /** Reconstruct a recursive filter from its contents */
     RecFilter(const Halide::Internal::IntrusivePtr<RecFilterContents> &c) : contents(c) {}
 
-    /** Set the dimensions of the output of the recursive filter */
+    /**@name Recursive filter specification
+     * @brief Set the dimensions of the output of the recursive filter
+     */
     // {@
     void setArgs(Halide::Var x);
     void setArgs(Halide::Var x, Halide::Var y);
@@ -98,7 +111,8 @@ public:
     void setArgs(std::vector<Halide::Var> args);
     // @}
 
-    /** Add a pure definition to the recursive filter, can be Tuple.
+    /** @name Recursive filter definition
+     * @brief Add a pure definition to the recursive filter, can be Tuple
      * All Vars in the pure definition should be args of the filter
      */
     // {@
@@ -106,82 +120,97 @@ public:
     void define(Halide::Tuple pure_def);
     // @}
 
-    /** Add a scan to the recursive filter */
+    /** @name Routines to add scans to a recursive filter
+     *  @brief Add a scan to the recursive filter given parameters
+     *  defaults filter order = 1, feedforward/feedback coefficient = 1.0,
+     *  causalilty = CAUSAL
+     */
+    // {@
     void addScan(
-            bool causal,                ///< causal or anticausal scan
             Halide::Var x,              ///< dimension to a reduction
             Halide::RDom rx,            ///< domain of the scan
             float feedfwd,              ///< single feedforward coeff
-            std::vector<float> feedback ///< n feedback coeffs, where n is filter order
+            std::vector<float> feedback,///< n feedback coeffs, where n is filter order
+            Causality c = CAUSAL        ///< causal or anticausal scan
             );
-
-    /** Convenience routines to add scan to recursive filter where by default causal = true,
-     * feed forward coeff = 1.0 and feed back coeff = { 1.0 } */
-    // {@
-    void addScan(Halide::Var x, Halide::RDom rx);
-    void addScan(Halide::Var x, Halide::RDom rx, std::vector<float> feedback);
-    void addScan(bool causal, Halide::Var x, Halide::RDom rx);
-    void addScan(bool causal, Halide::Var x, Halide::RDom rx, std::vector<float> feedback);
+    void addScan(
+            Halide::Var x,              ///< dimension to a reduction
+            Halide::RDom rx,            ///< domain of the scan
+            Causality c = CAUSAL        ///< causal or anticausal scan
+            );
+    void addScan(
+            Halide::Var x,              ///< dimension to a reduction
+            Halide::RDom rx,            ///< domain of the scan
+            std::vector<float> feedback,///< n feedback coeffs, where n is filter order
+            Causality c = CAUSAL        ///< causal or anticausal scan
+            );
     // @}
 
-    /** Return the recursive filter as a Halide function */
+
+    /**@name Dependency graph of the recursive filter
+     * @brief Return only the final recursive filter as Halide function,
+     * or any function in required to compute the complete filter (searches
+     * the dependency graph by function name) or all the functions in the
+     * dependency graph
+     */
+    // {@
     Halide::Func func(void);
-
-    /** Return a function that is required to compute the
-     * recursive filter, raise error if no function by the given
-     * name is required to compute the filter */
     Halide::Func func(std::string func_name);
-
-    /** Return all function required to compute the recursive filter */
     std::map<std::string,Halide::Func> funcs(void);
+    // @}
 
-    /** Split a list of dimensions by a splitting factor
-     * (defined in \file split.cpp) */
-    void split(
-            std::vector<Halide::Var> dims,  ///< list of dimensions to split
-            std::vector<Halide::Expr> tile  ///< splitting factor in each dimension
-            );
 
-    /** Cascade scans in different dimensions of a function,
-     * (defined in \file reorder.cpp)
-     *
-     *
-     * */
+    /**@name Splitting routines
+     * @brief Split a list of dimensions by separate tiling factors
+     * (defined in split.cpp)
+     */
+    // {@
+    void split(Halide::Var x, Halide::Expr tx);
+    void split(Halide::Var x, Halide::Expr tx, Halide::Var y, Halide::Expr ty);
+    void split(std::map<std::string, Halide::Expr> dims);
+    // @}
+
+
+    /** @brief Cascade scans in different dimensions of a function,
+     * (defined in reorder.cpp)
+     */
     std::vector<RecFilter> cascade_scans(std::vector<std::vector<int> > scan);
 
-    /** Inline all calls to a pure function
-     * (defined in \file reorder.cpp) */
+
+    /** @brief Inline all calls to a pure function
+     * (defined in reorder.cpp)
+     */
     void inline_func(
             std::string func_name   ///< name of function to be inlined
             );
 
-    /** Swap two dimensions of a function, reorders the memory layout
-     * (defined in \file reorder.cpp) */
+
+    /** @brief Swap two dimensions of a function, reorders the memory layout
+     * (defined in reorder.cpp) */
     void swap_variables(
             std::string func,   ///< name of function whose dimensions must be swapped
             Halide::Var a,      ///< pure arg of first dimension to swap
             Halide::Var b       ///< pure arg of second dimension to swap
             );
 
-    /** Merge multiple functions into a single function with mutiple outputs
-     * (defined in \file reorder.cpp) */
+
+    /**@name Merging routines
+     * @brief Merge multiple functions into a single function with mutiple outputs
+     * The functions to be merged are searched in the dependency graph of functions
+     * required to compute the recursive filter (defined in reorder.cpp)
+     */
+    // {@
     void merge_func(
             std::string func_a, ///< name of first function to merge
             std::string func_b, ///< name of second function to merge
             std::string merged  ///< name of merged function
             );
-
-    /** Merge multiple functions into a single function with mutiple outputs
-     * (defined in \file reorder.cpp) */
     void merge_func(
             std::string func_a, ///< name of first function to merge
             std::string func_b, ///< name of second function to merge
             std::string func_c, ///< name of third function to merge
             std::string merged  ///< name of merged function
             );
-
-    /** Merge multiple functions into a single function with mutiple outputs
-     * (defined in \file reorder.cpp) */
     void merge_func(
             std::string func_a, ///< name of first function to merge
             std::string func_b, ///< name of second function to merge
@@ -189,13 +218,11 @@ public:
             std::string func_d, ///< name of fourth function to merge
             std::string merged  ///< name of merged function
             );
-
-    /** Merge multiple functions into a single function with mutiple outputs
-     * (defined in \file reorder.cpp) */
     void merge_func(
             std::vector<std::string> funcs, ///< list of names of functions to merge
             std::string merged              ///< name of merged function
             );
+    // @}
 };
 
 #endif // _RECURSIVE_FILTER_H_

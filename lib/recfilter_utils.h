@@ -19,16 +19,16 @@
 #include "recfilter.h"
 
 
-/** Print the function */
+/** @name Print the Halide function */
 // {@
 std::ostream &operator<<(std::ostream &s, Halide::Func f);
 std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f);
 // @}
 
-/** Print the difference beteen reference and Halide \result */
+/** @name Print the difference beteen reference and Halide result */
 // {@
-std::ostream &operator<<(std::ostream &s, RecFilter::CheckResult v);
-std::ostream &operator<<(std::ostream &s, RecFilter::CheckResultVerbose v);
+std::ostream &operator<<(std::ostream &s, CheckResult v);
+std::ostream &operator<<(std::ostream &s, CheckResultVerbose v);
 // @}
 
 // ----------------------------------------------------------------------------

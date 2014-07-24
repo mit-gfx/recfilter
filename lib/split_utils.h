@@ -6,7 +6,7 @@
 
 // Weight matrix computation
 
-/** Weight coefficients (tail_size x tile_width) for
+/** @brief Weight coefficients (tail_size x tile_width) for
  * applying scans corresponding to split indices split_id1 to
  * split_id2 in the SplitInfo struct (defined in coefficients.cpp).
  * It is meaningful to apply subsequent scans on the tail of any scan
@@ -16,7 +16,7 @@
  */
 Halide::Image<float> tail_weights(SplitInfo s, int s1, bool clamp_border=false);
 
-/** Weight coefficients (tail_size x tile_width) for
+/** @brief Weight coefficients (tail_size x tile_width) for
  * applying scan's corresponding to split indices split_id1
  * (defined in coefficients.cpp)
  */
@@ -26,24 +26,24 @@ Halide::Image<float> tail_weights(SplitInfo s, int s1, int s2, bool clamp_border
 
 // Modifier routines (defined in modifiers.cpp)
 
-/** Check if a given expression depends upon a variable
- *  (defined in \file modifiers.cpp) */
+/** @brief Check if a given expression depends upon a variable
+ *  (defined in modifiers.cpp) */
 bool expr_depends_on_var(
         Halide::Expr expr,      ///< expression to be checked
         std::string var         ///< variable name
         );
 
-/** Check if a given expression contains calls to a Function
- *  (defined in \file modifiers.cpp) */
+/** @brief Check if a given expression contains calls to a Function
+ *  (defined in modifiers.cpp) */
 bool expr_depends_on_func(
         Halide::Expr expr,      ///< expression to be checked
         std::string func_name   ///< name of Function
         );
 
 
-/** Substitute a variable in all calls to a particular Function
+/** @brief Substitute a variable in all calls to a particular Function
  * in a given expression
- *  (defined in \file modifiers.cpp)
+ *  (defined in modifiers.cpp)
  */
 Halide::Expr substitute_in_func_call(
         std::string func_name,  ///< name of Function
@@ -52,8 +52,8 @@ Halide::Expr substitute_in_func_call(
         Halide::Expr original   ///< original expression
         );
 
-/** Add a calling argument to all calls to a particular Function
- *  (defined in \file modifiers.cpp) */
+/** @brief Add a calling argument to all calls to a particular Function
+ *  (defined in modifiers.cpp) */
 Halide::Expr insert_arg_in_func_call(
         std::string func_name,  ///< name of Function
         size_t pos,             ///< position to add calling arg within list
@@ -61,16 +61,16 @@ Halide::Expr insert_arg_in_func_call(
         Halide::Expr original   ///< original expression
         );
 
-/** Remove a calling argument from all calls to a particular Function
- *  (defined in \file modifiers.cpp) */
+/** @brief Remove a calling argument from all calls to a particular Function
+ *  (defined in modifiers.cpp) */
 Halide::Expr remove_arg_from_func_call(
         std::string func_name,  ///< name of Function
         size_t pos,             ///< calling arg index within list to be removed
         Halide::Expr original   ///< original expression
         );
 
-/** Swap two calling arguments of given function in the expression
- *  (defined in \file modifiers.cpp) */
+/** @brief Swap two calling arguments of given function in the expression
+ *  (defined in modifiers.cpp) */
 Halide::Expr swap_args_in_func_call(
         std::string func_name,  ///< name of function to modify
         size_t va_idx,          ///< index of first calling arg
@@ -78,10 +78,10 @@ Halide::Expr swap_args_in_func_call(
         Halide::Expr original   ///< original expression
         );
 
-/** Substitute a calling arg in feed forward recursive calls
+/** @brief Substitute a calling arg in feed forward recursive calls
  * to a Func; feedforward calls are those where all args in the
  * Function call are identical to args in Function definition
- *  (defined in \file modifiers.cpp)
+ *  (defined in modifiers.cpp)
  */
 Halide::Expr substitute_arg_in_feedforward_func_call(
         std::string func_name,              ///< name of function to modify
@@ -91,9 +91,9 @@ Halide::Expr substitute_arg_in_feedforward_func_call(
         Halide::Expr original               ///< original expression
         );
 
-/** Apply zero boundary condition on all tiles except tiles that touch image
+/** @brief Apply zero boundary condition on all tiles except tiles that touch image
  * borders; this pads tiles by zeros if the intra tile index is out of range -
- * - less than zero or greater than tile width (defined in \file modifiers.cpp).
+ * - less than zero or greater than tile width (defined in modifiers.cpp).
  * Usually, if the feedforward coeff is 1.0 zero padding is required for in
  * the Function definition itself - which automatically pads all tiles by zeros.
  * But in Gaussian filtering feedforward coeff is not 1.0; so Function definition
@@ -109,12 +109,12 @@ Halide::Expr apply_zero_boundary_in_func_call(
         Halide::Expr original   ///< original expression
         );
 
-/** Mathematically add an expression to all calls to a particular
+/** @brief Mathematically add an expression to all calls to a particular
  *  Function; the expression to be added is selected from a list of
  *  expressions depending upon the value index of the Function call;
  *  all occurances of arguments of the Function must be replaced by
  * calling arguments in the selected expression before adding
- *  (defined in \file modifiers.cpp)
+ *  (defined in modifiers.cpp)
  */
 Halide::Expr augment_func_call(
         std::string func_name,              ///< name of Function
@@ -124,9 +124,9 @@ Halide::Expr augment_func_call(
         );
 
 
-/** Substitute all calls to a particular Function by
+/** @brief Substitute all calls to a particular Function by
  * a new Function with the same calling arguments
- *  (defined in \file modifiers.cpp)
+ *  (defined in modifiers.cpp)
  */
 Halide::Expr substitute_func_call(
         std::string func_name,              ///< name of Function
@@ -135,11 +135,11 @@ Halide::Expr substitute_func_call(
         );
 
 
-/** Remove all calls to a particular Function or to all
+/** @brief Remove all calls to a particular Function or to all
  * Functions except for a particular Function by identity
  * as determined by a boolean flag argument, all calls
  * to the Function are removed if flag is set
- *  (defined in \file modifiers.cpp)
+ *  (defined in modifiers.cpp)
  */
 Halide::Expr remove_func_calls(
         std::string func_name,  ///< name of Function
@@ -148,10 +148,10 @@ Halide::Expr remove_func_calls(
         );
 
 
-/** Find all calls to a particular Function and increment
+/** @brief Find all calls to a particular Function and increment
  * the value_index (Halide::Internal::Call::value_index)
  * of the call by a given offset
- *  (defined in \file modifiers.cpp)
+ *  (defined in modifiers.cpp)
  */
 Halide::Expr increment_value_index_in_func_call(
         std::string func_name,  ///< name of Function
@@ -159,26 +159,25 @@ Halide::Expr increment_value_index_in_func_call(
         Halide::Expr original   ///< original expression
         );
 
-/** Swaps two variables in an expression
- *  (defined in \file modifiers.cpp) */
+/** @brief Swaps two variables in an expression
+ *  (defined in modifiers.cpp) */
 Halide::Expr swap_vars_in_expr(
         std::string a,          ///< first variable name for swapping
         std::string b,          ///< second variable name for swapping
         Halide::Expr original   ///< original expression
         );
 
-/** Extract vars referenced in a Expr
- *  (defined in \file modifiers.cpp) */
+/**@name
+ * @brief Extract vars referenced in a Expr
+ *  (defined in modifiers.cpp) */
 // {@
 std::vector<std::string> extract_rvars_in_expr(Halide::Expr expr);
 std::vector<std::string> extract_params_in_expr(Halide::Expr expr);
 std::vector<std::string> extract_vars_or_rvars_in_expr(Halide::Expr expr);
 // @}
 
-/** Extract the list of dependencies of a Function
- *  (defined in \file modifiers.cpp) */
-// {@
+/** @brief Extract the list of dependencies of a Function
+ *  (defined in modifiers.cpp) */
 std::map<std::string, Halide::Func> extract_func_calls(Halide::Func func);
-// @}
 
 #endif // SPLIT_UTILS_H_

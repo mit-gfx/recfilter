@@ -63,15 +63,6 @@ void RecFilter::define(Expr pure_def) {
         args.push_back(contents.ptr->split_info[i].var.name());
     }
     contents.ptr->recfilter.function().define(args, vec(pure_def));
-
-    // build the dependency graph of the recursive filter
-    contents.ptr->func_map = find_transitive_calls(contents.ptr->recfilter.function());
-    map<string,Function>::iterator f = contents.ptr->func_map.begin();
-    map<string,Function>::iterator fe= contents.ptr->func_map.end();
-    while (f != fe) {
-        contents.ptr->func_list.push_back(f->second);
-        f++;
-    }
 }
 
 void RecFilter::define(Tuple pure_def) {
@@ -80,18 +71,15 @@ void RecFilter::define(Tuple pure_def) {
         args.push_back(contents.ptr->split_info[i].var.name());
     }
     contents.ptr->recfilter.function().define(args, pure_def.as_vector());
-
-    // build the dependency graph of the recursive filter
-    contents.ptr->func_map = find_transitive_calls(contents.ptr->recfilter.function());
-    map<string,Function>::iterator f = contents.ptr->func_map.begin();
-    map<string,Function>::iterator fe= contents.ptr->func_map.end();
-    while (f != fe) {
-        contents.ptr->func_list.push_back(f->second);
-        f++;
-    }
 }
 
-void RecFilter::addScan(bool causal, Var x, RDom rx, float feedfwd, vector<float> feedback) {
+void RecFilter::addScan(
+        Var x,
+        RDom rx,
+        float feedfwd,
+        vector<float> feedback,
+        Causality causality)
+{
     Function f = contents.ptr->recfilter.function();
 
     if (!f.has_pure_definition()) {
@@ -104,6 +92,9 @@ void RecFilter::addScan(bool causal, Var x, RDom rx, float feedfwd, vector<float
         cerr << "Each scan variable must be a 1D RDom" << endl;
         assert(false);
     }
+
+    // csausality
+    bool causal = (causality == CAUSAL);
 
     // image dimension for the scan
     int dimension = -1;
@@ -209,27 +200,30 @@ void RecFilter::addScan(bool causal, Var x, RDom rx, float feedfwd, vector<float
     }
 }
 
-void RecFilter::addScan(Var x, RDom rx) {
-    addScan(true, x, rx, 1.0f, vec(1.0f));
+void RecFilter::addScan(Var x, RDom rx, Causality causal) {
+    addScan(x, rx, 1.0f, vec(1.0f), causal);
 }
 
-void RecFilter::addScan(Var x, RDom rx, vector<float> feedback) {
-    addScan(true, x, rx, 1.0f, feedback);
+void RecFilter::addScan(Var x, RDom rx, vector<float> feedback, Causality causal) {
+    addScan(x, rx, 1.0f, feedback, causal);
 }
 
-void RecFilter::addScan(bool causal, Var x, RDom rx) {
-    addScan(causal, x, rx, 1.0f, vec(1.0f));
-}
-
-void RecFilter::addScan(bool causal, Var x, RDom rx, vector<float> feedback) {
-    addScan(causal, x, rx, 1.0f, feedback);
-}
 
 Func RecFilter::func(void) {
     return contents.ptr->recfilter;
 }
 
 Func RecFilter::func(string func_name) {
+    // build the dependency graph of the recursive filter
+    if (contents.ptr->func_map.empty() || contents.ptr->func_list.empty()) {
+        contents.ptr->func_map = find_transitive_calls(contents.ptr->recfilter.function());
+        map<string,Function>::iterator f = contents.ptr->func_map.begin();
+        while (f != contents.ptr->func_map.end()) {
+            contents.ptr->func_list.push_back(f->second);
+            f++;
+        }
+    }
+
     map<string,Function>::iterator f = contents.ptr->func_map.find(func_name);
     if (f != contents.ptr->func_map.end()) {
         return Func(f->second);
@@ -240,6 +234,16 @@ Func RecFilter::func(string func_name) {
 }
 
 map<string,Func> RecFilter::funcs(void) {
+    // build the dependency graph of the recursive filter
+    if (contents.ptr->func_map.empty() || contents.ptr->func_list.empty()) {
+        contents.ptr->func_map = find_transitive_calls(contents.ptr->recfilter.function());
+        map<string,Function>::iterator f = contents.ptr->func_map.begin();
+        while (f != contents.ptr->func_map.end()) {
+            contents.ptr->func_list.push_back(f->second);
+            f++;
+        }
+    }
+
     map<string,Func> func_map;
     map<string,Function>::iterator f = contents.ptr->func_map.begin();
     while (f != contents.ptr->func_map.end()) {

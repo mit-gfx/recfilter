@@ -1019,28 +1019,35 @@ static vector< vector<Function> > split_scans(
 
 // -----------------------------------------------------------------------------
 
-void RecFilter::split(vector<Var> dims, vector<Expr> tile) {
-    assert(!dims.empty());
-
-    if (dims.size() != tile.size()) {
-        cerr << "Each split dimension must have a mapped tile width" << endl;
-        assert(false);
-    }
-
+void RecFilter::split(map<string,Expr> dim_tile) {
     Function F = contents.ptr->recfilter.function();
 
-    for (int i=0; i<dims.size(); i++) {
+    // flush out any previous splitting info
+    for (int i=0; i<contents.ptr->split_info.size(); i++) {
+        contents.ptr->split_info[i].tile_width = Expr();
+        contents.ptr->split_info[i].num_tiles  = Expr();
+        contents.ptr->split_info[i].inner_var  = Var();
+        contents.ptr->split_info[i].outer_var  = Var();
+        contents.ptr->split_info[i].inner_rdom.clear();
+        contents.ptr->split_info[i].outer_rdom.clear();
+        contents.ptr->split_info[i].tail_rdom.clear();
+    }
+
+    // populate splitting info to all dimensions
+    for (map<string,Expr>::iterator it=dim_tile.begin(); it!=dim_tile.end(); it++) {
         int dimension = -1;
-        Expr tile_width = tile[i];
+
+        string  x = it->first;
+        Expr tile_width = it->second;
 
         for (int j=0; j<F.args().size(); j++) {
-            if (F.args()[j] == dims[i].name()) {
+            if (F.args()[j] == x) {
                 dimension = j;
             }
         }
         if (dimension == -1) {
-            cerr << "Variable " << dims[i] << " to be split is not one of the "
-                << "dimensions of the recursive filter " << F.name() << endl;
+            cerr << "Variable " << x << " does not correspond to any "
+                << "dimension of the recursive filter " << F.name() << endl;
             assert(false);
         }
 
@@ -1053,6 +1060,11 @@ void RecFilter::split(vector<Var> dims, vector<Expr> tile) {
         // set inner var and outer var
         s.inner_var = Var(s.var.name() + "i");
         s.outer_var = Var(s.var.name() + "o");
+
+        // remove any info of previous splitting operations
+        s.inner_rdom.clear();
+        s.outer_rdom.clear();
+        s.tail_rdom.clear();
 
         // set inner rdom, outer rdom and rdom to extract tails
         for (int j=0; j<s.num_splits; j++) {
@@ -1078,43 +1090,46 @@ void RecFilter::split(vector<Var> dims, vector<Expr> tile) {
         contents.ptr->split_info[dimension] = s;
     }
 
-    // group scans in same dimension together
-    // change the order of splits accordingly
+    // group scans in same dimension together and change the order of splits accordingly
     contents.ptr->split_info = group_scans_by_dimension(F, contents.ptr->split_info);
 
-    // remove split_info structs for dimensions which are not split
-    for (int i=0; i<contents.ptr->split_info.size(); i++) {
-        if (contents.ptr->split_info[i].num_splits == 0) {
-            contents.ptr->split_info.erase(contents.ptr->split_info.begin()+i);
-            i--;
+    // apply the actual splitting
+    Function F_final;
+    {
+        // create a copy of the split info structs retaining only the
+        // dimensions to be split
+        vector<SplitInfo> split_info_current;
+        for (int i=0; i<contents.ptr->split_info.size(); i++) {
+            if (contents.ptr->split_info[i].tile_width.defined()) {
+                split_info_current.push_back(contents.ptr->split_info[i]);
+            }
         }
+
+        // compute the intra tile result
+        Function F_intra = create_intra_tile_term(F, split_info_current);
+
+        // apply clamped boundary on border tiles and zero boundary on
+        // inner tiles if explicit border clamping is requested
+        // TODO
+        //{
+        //    for (int j=0; j<split_info_current.size(); j++) {
+        //        split_info_current[j].clamp_border = true;
+        //    }
+        //    apply_zero_boundary_on_inner_tiles(F_intra, split_info_current);
+        //}
+
+        // create a function will hold the final result, copy of the intra tile term
+        F_final = create_copy(F_intra, F.name() + DELIMITER + FINAL_TERM);
+
+        // compute the residuals from splits in each dimension
+        vector< vector<Function> > F_deps = split_scans(F_intra, split_info_current);
+
+        // transfer the tail of each scan to another buffer
+        extract_tails_from_each_scan(F_intra, split_info_current);
+
+        // add all the residuals to the final term
+        add_all_residuals_to_final_result(F_final, F_deps, split_info_current);
     }
-
-    // compute the intra tile result
-    Function F_intra = create_intra_tile_term(F, contents.ptr->split_info);
-
-    // apply clamped boundary on border tiles and zero boundary on
-    // inner tiles if explicit border clamping is requested
-    // TODO
-    //{
-    //    for (int j=0; j<contents.ptr->split_info.size(); j++) {
-    //        contents.ptr->split_info[j].clamp_border = true;
-    //    }
-    //    apply_zero_boundary_on_inner_tiles(F_intra, contents.ptr->split_info);
-    //}
-
-    // create a function will hold the final result,
-    // just a copy of the intra tile computation for now
-    Function F_final = create_copy(F_intra, F.name() + DELIMITER + FINAL_TERM);
-
-    // compute the residuals from splits in each dimension
-    vector< vector<Function> > F_deps = split_scans(F_intra, contents.ptr->split_info);
-
-    // transfer the tail of each scan to another buffer
-    extract_tails_from_each_scan(F_intra, contents.ptr->split_info);
-
-    // add all the residuals to the final term
-    add_all_residuals_to_final_result(F_final, F_deps, contents.ptr->split_info);
 
     // change the original function to index into the final term
     {
@@ -1146,4 +1161,21 @@ void RecFilter::split(vector<Var> dims, vector<Expr> tile) {
     }
 
     contents.ptr->recfilter = Func(F);
+
+    // clear the depenendency graph of recursive filter
+    contents.ptr->func_map.clear();
+    contents.ptr->func_list.clear();
+}
+
+void RecFilter::split(Var x, Expr tx) {
+    map<string,Expr> dim_tile;
+    dim_tile[x.name()] = tx;
+    split(dim_tile);
+}
+
+void RecFilter::split(Var x, Expr tx, Var y, Expr ty) {
+    map<string,Expr> dim_tile;
+    dim_tile[x.name()] = tx;
+    dim_tile[y.name()] = ty;
+    split(dim_tile);
 }
