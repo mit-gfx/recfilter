@@ -5,7 +5,6 @@ using std::string;
 using std::cerr;
 using std::endl;
 using std::vector;
-using std::queue;
 using std::map;
 
 namespace Halide {
@@ -57,6 +56,8 @@ void RecFilter::setArgs(vector<Var> args) {
     }
 }
 
+// -----------------------------------------------------------------------------
+
 void RecFilter::define(Expr pure_def) {
     vector<string> args;
     for (int i=0; i<contents.ptr->split_info.size(); i++) {
@@ -72,6 +73,8 @@ void RecFilter::define(Tuple pure_def) {
     }
     contents.ptr->recfilter.function().define(args, pure_def.as_vector());
 }
+
+// -----------------------------------------------------------------------------
 
 void RecFilter::addScan(
         Var x,
@@ -208,29 +211,25 @@ void RecFilter::addScan(Var x, RDom rx, vector<float> feedback, Causality causal
     addScan(x, rx, 1.0f, feedback, causal);
 }
 
+// -----------------------------------------------------------------------------
 
 Func RecFilter::func(void) {
     return contents.ptr->recfilter;
 }
 
 Func RecFilter::func(string func_name) {
-    // build the dependency graph of the recursive filter
     if (contents.ptr->func_map.empty() || contents.ptr->func_list.empty()) {
-        contents.ptr->func_map = find_transitive_calls(contents.ptr->recfilter.function());
-        map<string,Function>::iterator f = contents.ptr->func_map.begin();
-        while (f != contents.ptr->func_map.end()) {
-            contents.ptr->func_list.push_back(f->second);
-            f++;
-        }
+        funcs();    // just to rebuild the dependency graph
     }
 
     map<string,Function>::iterator f = contents.ptr->func_map.find(func_name);
     if (f != contents.ptr->func_map.end()) {
         return Func(f->second);
+    } else {
+        cerr << "Function " << func_name << " not found as a dependency of ";
+        cerr << "recursive filter " << contents.ptr->recfilter.name() << endl;
+        assert(false);
     }
-    cerr << "Function " << func_name << " not found as a dependency of ";
-    cerr << "recursive filter " << contents.ptr->recfilter.name() << endl;
-    assert(false);
 }
 
 map<string,Func> RecFilter::funcs(void) {

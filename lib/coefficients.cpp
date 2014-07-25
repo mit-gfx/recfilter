@@ -1,4 +1,5 @@
-#include "split_utils.h"
+#include "coefficients.h"
+#include "modifiers.h"
 
 using namespace Halide;
 

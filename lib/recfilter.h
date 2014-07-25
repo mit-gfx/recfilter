@@ -3,7 +3,6 @@
 
 #include <iomanip>
 #include <vector>
-#include <queue>
 #include <string>
 #include <stdexcept>
 #include <cstdio>
@@ -58,6 +57,8 @@ struct RecFilterContents {
     std::vector<SplitInfo> split_info;
 };
 
+}
+
 // ----------------------------------------------------------------------------
 
 /** Compare ref and Halide solutions and print the mean square error */
@@ -86,15 +87,13 @@ class RecFilter {
 private:
 
     /** Data members of the recursive filter */
-    Halide::Internal::IntrusivePtr<RecFilterContents> contents;
+    Halide::Internal::IntrusivePtr<Internal::RecFilterContents> contents;
 
 public:
 
     /** Macros to indicate causal or anticausal scan */
     typedef enum {CAUSAL, ANTICAUSAL} Causality;
 
-
-public:
     /** Construct an empty named recursive filter */
     RecFilter(std::string name = "RecFilter");
 
@@ -185,7 +184,7 @@ public:
             );
 
 
-    /** @brief Swap two dimensions of a function, reorders the memory layout
+    /** @brief Reorder memory layout by swapping two dimensions of a function
      * (defined in reorder.cpp) */
     void swap_variables(
             std::string func,   ///< name of function whose dimensions must be swapped
@@ -219,8 +218,8 @@ public:
             std::string merged  ///< name of merged function
             );
     void merge_func(
-            std::vector<std::string> funcs, ///< list of names of functions to merge
-            std::string merged              ///< name of merged function
+            std::vector<std::string> func, ///< list of names of functions to merge
+            std::string merged             ///< name of merged function
             );
     // @}
 };

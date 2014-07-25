@@ -1,5 +1,5 @@
 #include "recfilter.h"
-#include "split_utils.h"
+#include "modifiers.h"
 
 using namespace Halide;
 using namespace Halide::Internal;

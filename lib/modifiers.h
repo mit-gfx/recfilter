@@ -1,30 +1,7 @@
-#ifndef _SPLIT_UTILS_H_
-#define _SPLIT_UTILS_H_
+#ifndef _MODIFIERS_H_
+#define _MODIFIERS_H_
 
-#include "recfilter.h"
-
-
-// Weight matrix computation
-
-/** @brief Weight coefficients (tail_size x tile_width) for
- * applying scans corresponding to split indices split_id1 to
- * split_id2 in the SplitInfo struct (defined in coefficients.cpp).
- * It is meaningful to apply subsequent scans on the tail of any scan
- * as it undergoes other scans only if they happen after the first
- * scan. The SpliInfo object stores the scans in reverse order, hence indices
- * into the SplitInfo object split_id1 and split_id2 must be decreasing
- */
-Halide::Image<float> tail_weights(SplitInfo s, int s1, bool clamp_border=false);
-
-/** @brief Weight coefficients (tail_size x tile_width) for
- * applying scan's corresponding to split indices split_id1
- * (defined in coefficients.cpp)
- */
-Halide::Image<float> tail_weights(SplitInfo s, int s1, int s2, bool clamp_border=false);
-
-// -----------------------------------------------------------------------------
-
-// Modifier routines (defined in modifiers.cpp)
+#include <Halide.h>
 
 /** @brief Check if a given expression depends upon a variable
  *  (defined in modifiers.cpp) */
@@ -180,4 +157,4 @@ std::vector<std::string> extract_vars_or_rvars_in_expr(Halide::Expr expr);
  *  (defined in modifiers.cpp) */
 std::map<std::string, Halide::Func> extract_func_calls(Halide::Func func);
 
-#endif // SPLIT_UTILS_H_
+#endif // _MODIFIERS_H_

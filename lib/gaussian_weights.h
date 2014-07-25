@@ -6,8 +6,7 @@
 #include <iostream>
 #include <Halide.h>
 
-/**
- * @brief Compute the Gaussian, derivative of Gaussian and integral of Gaussian
+/**@name Compute the Gaussian, derivative of Gaussian and integral of Gaussian
  * @param[in] x Input (float or Halide::Expr)
  * @param[in] mu Mean of the Gaussian function
  * @param[in] sigma Sigma support of the true Gaussian filter
@@ -31,9 +30,9 @@ Halide::Expr gaussIntegral  (Halide::Expr x, float mu, float sigma);
  * causal y and anticausal y feedforward and feedback recursive filter weights
  */
 std::pair<Halide::Image<float>, Halide::Image<float> > gaussian_weights(
-        float sigma,   /// Gaussian sigma
-        int order,     /// Recursive filter order for approximating Gaussian
-        int num_scans  /// Number of scans in the recursive filter
+        float sigma,   ///< Gaussian sigma
+        int order,     ///< Recursive filter order for approximating Gaussian
+        int num_scans  ///< Number of scans in the recursive filter
         );
 
 /**

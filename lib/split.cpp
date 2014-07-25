@@ -1,5 +1,6 @@
-#include "split_macros.h"
-#include "split_utils.h"
+#include "recfilter.h"
+#include "coefficients.h"
+#include "modifiers.h"
 
 using namespace Halide;
 using namespace Halide::Internal;
@@ -8,8 +9,18 @@ using std::string;
 using std::cerr;
 using std::endl;
 using std::vector;
-using std::queue;
 using std::map;
+
+// -----------------------------------------------------------------------------
+
+#define INTRA_TILE_RESULT      "Intra"
+#define INTRA_TILE_TAIL_TERM   "Tail"
+#define INTER_TILE_TAIL_SUM    "CTail"
+#define COMPLETE_TAIL_RESIDUAL "TDeps"
+#define FINAL_RESULT_RESIDUAL  "Deps"
+#define FINAL_TERM             "Final"
+#define PRE_FINAL_TERM         "Sub"
+#define DELIMITER              '-'
 
 // -----------------------------------------------------------------------------
 
