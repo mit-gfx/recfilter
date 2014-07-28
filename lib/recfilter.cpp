@@ -96,6 +96,11 @@ void RecFilter::addScan(
         assert(false);
     }
 
+    if (!equal(rx.x.min(), make_zero(type_of<int>()))) {
+        cerr << "Scan variables must have 0 as lower limit" << endl;
+        assert(false);
+    }
+
     // csausality
     bool causal = (causality == CAUSAL);
 
@@ -114,9 +119,9 @@ void RecFilter::addScan(
         assert(false);
     }
 
-    if (contents.ptr->split_info[dimension].num_splits>0 &&
-            !equal(contents.ptr->split_info[dimension].image_width, width)) {
-        cerr << "Extent of RDoms of all scans in the same dimension must be same" << endl;
+    if (contents.ptr->split_info[dimension].rdom.defined() &&
+            !rx.same_as(contents.ptr->split_info[dimension].rdom)) {
+        cerr << "All scans in the same dimension must use the same RDom" << endl;
         assert(false);
     }
 
@@ -166,29 +171,27 @@ void RecFilter::addScan(
 
     // add details to the split info struct
     SplitInfo s = contents.ptr->split_info[dimension];
-    s.rdom       .insert(s.rdom.begin(), rx);
     s.scan_id    .insert(s.scan_id.begin(), f.reductions().size()-1);
     s.scan_causal.insert(s.scan_causal.begin(), causal);
+    s.rdom         = rx;
     s.num_splits   = s.num_splits+1;
     s.image_width  = width;
     s.filter_order = std::max(s.filter_order, scan_order);
     contents.ptr->split_info[dimension] = s;
 
-    // add the feedforward and feedback coefficients
+
+    // copy all the existing feedback/feedfwd coeff to the new arrays
+    // add the coeff of the newly added scan as the last row of coeff
     int num_scans = s.feedback_coeff.width();
     int max_order = s.feedback_coeff.height();
     Image<float> feedfwd_coeff(num_scans+1);
     Image<float> feedback_coeff(num_scans+1, std::max(max_order,scan_order));
-
-    // copy all the existing coeff to the new arrays
     for (int j=0; j<num_scans; j++) {
         feedfwd_coeff(j) = s.feedfwd_coeff(j);
         for (int i=0; i<scan_order; i++) {
             feedback_coeff(j,i) = s.feedback_coeff(j,i);
         }
     }
-
-    // add the coeff of the newly added scan as the last row of coeff
     feedfwd_coeff(num_scans) = feedfwd;
     for (int i=0; i<scan_order; i++) {
         feedback_coeff(num_scans, i) = feedback[i];

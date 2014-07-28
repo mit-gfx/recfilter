@@ -25,13 +25,13 @@ struct SplitInfo {
     Halide::Var  inner_var;     ///< inner variable after splitting
     Halide::Var  outer_var;     ///< outer variable or tile index after splitting
 
+    Halide::RDom rdom;          ///< RDom reduction domain of each scan
+    Halide::RDom inner_rdom;    ///< inner RDom of each scan
+    Halide::RDom outer_rdom;    ///< outer RDom of each scan
+    Halide::RDom tail_rdom;     ///< RDom to extract the tail of each scan
+
     vector<bool> scan_causal;   ///< causal or anticausal flag for each scan
     vector<int>  scan_id;       ///< scan or reduction definition id of each scan
-
-    vector<Halide::RDom> rdom;       ///< RDom reduction domain of each scan
-    vector<Halide::RDom> outer_rdom; ///< outer RDom of each scan
-    vector<Halide::RDom> inner_rdom; ///< inner RDom of each scan
-    vector<Halide::RDom> tail_rdom;  ///< RDom to extract the tail of each scan
 
     Halide::Image<float> feedfwd_coeff; ///< feedforward coeffs, only one for each scan
     Halide::Image<float> feedback_coeff;///< feedback coeffs (num_scans x max_order) order j-th coeff of i-th scan is (i+1,j) */
@@ -56,8 +56,6 @@ struct RecFilterContents {
     /** Splitting info for each dimension of the filter */
     std::vector<SplitInfo> split_info;
 };
-
-}
 
 // ----------------------------------------------------------------------------
 
@@ -87,7 +85,7 @@ class RecFilter {
 private:
 
     /** Data members of the recursive filter */
-    Halide::Internal::IntrusivePtr<Internal::RecFilterContents> contents;
+    Halide::Internal::IntrusivePtr<RecFilterContents> contents;
 
 public:
 
