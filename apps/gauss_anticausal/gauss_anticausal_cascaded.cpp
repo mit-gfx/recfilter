@@ -5,7 +5,7 @@
 #include <Halide.h>
 
 #include "../../lib/gaussian_weights.h"
-#include "../../lib/split.h"
+#include "../../lib/recfilter.h"
 
 #define MAX_THREAD 192
 
@@ -33,93 +33,36 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    // recursive filter weights for Gaussian convolution
+    float         B1 = gaussian_weights(sigma, 1).first;
+    float         B2 = gaussian_weights(sigma, 2).first;
+    vector<float> W1 = gaussian_weights(sigma, 1).second;
+    vector<float> W2 = gaussian_weights(sigma, 2).second;
+
+    Var x("x");
+    Var y("y");
+
     RDom rx(0, image.width(), "rx");
-    RDom ry(0, image.width(), "ry");
-    RDom rz(0, image.height(),"rz");
-    RDom rw(0, image.height(),"rw");
+    RDom ry(0, image.height(),"rw");
 
-    Var x ("x") , y ("y");
-    Var xi("xi"), yi("yi");
-    Var xo("xo"), yo("yo");
+    RecFilter filter;
+    filter.setArgs(x, y);
+    filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
+    filter.addScan(x, rx, B1, W1, RecFilter::CAUSAL);
+    filter.addScan(x, rx, B1, W1, RecFilter::ANTICAUSAL);
+    filter.addScan(y, ry, B1, W1, RecFilter::CAUSAL);
+    filter.addScan(y, ry, B1, W1, RecFilter::ANTICAUSAL);
+    filter.addScan(x, rx, B2, W2, RecFilter::CAUSAL);
+    filter.addScan(x, rx, B2, W2, RecFilter::ANTICAUSAL);
+    filter.addScan(y, ry, B2, W2, RecFilter::CAUSAL);
+    filter.addScan(y, ry, B2, W2, RecFilter::ANTICAUSAL);
 
-    RDom rxi(0, tile, "rxi");
-    RDom ryi(0, tile, "ryi");
-    RDom rzi(0, tile, "rzi");
-    RDom rwi(0, tile, "rwi");
+    // TODO: cascade the scans
 
-    // bounds
-    Expr iw = image.width()-1;
-    Expr ih = image.height()-1;
-
-    Func G1("G1");
-    Func G2("G2");
-    Func S("Result");
-
-    // First order filter
-    {
-        int order       = 1;
-        int num_scans   = 4;
-        Image<float> B  = gaussian_weights(sigma, order, num_scans).first;
-        Image<float> W  = gaussian_weights(sigma, order, num_scans).second;
-
-        G1(x, y) = image(clamp(x,0,iw), clamp(y,0,ih));
-
-        G1(rx,y)    = B(0)*G1(rx,y)    + W(0,0)*G1(max(0,rx-1),y);
-        G1(iw-ry,y) = B(1)*G1(iw-ry,y) + W(1,0)*G1(min(iw,iw-ry+1),y);
-        G1(x,rz)    = B(2)*G1(x,rz)    + W(2,0)*G1(x,max(0,rz-1));
-        G1(x,ih-rw) = B(3)*G1(x,ih-rw) + W(3,0)*G1(x,min(ih,ih-rw+1));
-
-        split(G1,B,W,
-                Internal::vec(  0,  0,  1,  1),
-                Internal::vec(  x,  x,  y,  y),
-                Internal::vec( xi, xi, yi, yi),
-                Internal::vec( xo, xo, yo, yo),
-                Internal::vec( rx, ry, rz, rw),
-                Internal::vec(rxi,ryi,rzi,rwi),
-                Internal::vec(order,order,order,order), true);
-    }
-
-    // Second order filter
-    {
-        int order       = 2;
-        int num_scans   = 4;
-        Image<float> B  = gaussian_weights(sigma, order, num_scans).first;
-        Image<float> W  = gaussian_weights(sigma, order, num_scans).second;
-
-        G2(x, y) = G1(x,y);
-
-        G2(rx,y) = B(0)*G2(rx,y)
-            + W(0,0)*G2(max(0,rx-1),y)
-            + W(0,1)*G2(max(0,rx-2),y);
-
-        G2(iw-ry,y) = B(1)*G2(iw-ry,y)
-            + W(1,0)*G2(min(iw,iw-ry+1),y)
-            + W(1,1)*G2(min(iw,iw-ry+2),y);
-
-        G2(x,rz) = B(2)*G2(x,rz)
-            + W(2,0)*G2(x,max(0,rz-1))
-            + W(2,1)*G2(x,max(0,rz-2));
-
-        G2(x,ih-rw) = B(3)*G2(x,ih-rw)
-            + W(3,0)*G2(x,min(ih,ih-rw+1))
-            + W(3,1)*G2(x,min(ih,ih-rw+2));
-
-        split(G2,B,W,
-                Internal::vec(  0,  0,  1,  1),
-                Internal::vec(  x,  x,  y,  y),
-                Internal::vec( xi, xi, yi, yi),
-                Internal::vec( xo, xo, yo, yo),
-                Internal::vec( rx, ry, rz, rw),
-                Internal::vec(rxi,ryi,rzi,rwi),
-                Internal::vec(order,order,order,order), true);
-    }
-
-    S(x,y) = G2(x,y);
+    filter.split(x, y, tile);
 
     // ----------------------------------------------------------------------------------------------
 
-    map<string,Func> functions = extract_func_calls(S);
+    map<string,Func> functions = filter.funcs();
     map<string,Func>::iterator f    = functions.begin();
     map<string,Func>::iterator fend = functions.end();
     for (; f!=fend; f++) {
@@ -136,12 +79,12 @@ int main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nJIT compilation ... " << endl;
-    S.compile_jit();
+    filter.func().compile_jit();
 
     Buffer hl_out_buff(type_of<float>(), width,height);
     {
         Timer t("Running ... ");
-        S.realize(hl_out_buff);
+        filter.func().realize(hl_out_buff);
     }
     hl_out_buff.copy_to_host();
     hl_out_buff.free_dev_buffer();

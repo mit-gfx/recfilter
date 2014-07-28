@@ -9,7 +9,7 @@ BIN_DIR=../bin
 EXE=$(BIN_DIR)/$(APP_NAME)
 
 SPLITLIB_DIR=../../lib/
-SPLITLIB_INC=$(SPLITLIB_DIR)/split.h
+SPLITLIB_INC=$(SPLITLIB_DIR)/recfilter.h
 SPLITLIB_LIB=$(SPLITLIB_DIR)/libSplit.a
 
 HALIDE_LIB=$(HALIDE_DIR)/bin/libHalide.a

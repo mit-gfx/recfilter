@@ -5,7 +5,7 @@
 #include <Halide.h>
 
 #include "../../lib/gaussian_weights.h"
-#include "../../lib/split.h"
+#include "../../lib/recfilter.h"
 
 #define MAX_THREAD 192
 
@@ -37,30 +37,27 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
     int order     = 2;
-    int num_scans = 2;
+    int num_scans = 4;
 
     Image<float> W(num_scans,order);
-    W(0,0) = 2.0f; W(0,1) = -1.0f;
+    W(0,0) = 1.0f; W(0,1) =  0.0f;
     W(1,0) = 2.0f; W(1,1) = -1.0f;
-
-    Var x("x"),   y("y");
-    Var xi("xi"), yi("yi");
-    Var xo("xo"), yo("yo");
+    W(2,0) = 1.0f; W(2,1) =  0.0f;
+    W(3,0) = 2.0f; W(3,1) = -1.0f;
 
     Func I("I");
-    Func G ("G");
-    Func S1("S1");
-    Func S2("S2");
+    Func S("S");
 
-    RDom rx (0, image.width(), "rx");
-    RDom ry (0, image.height(),"ry");
-    RDom rxi(0, tile, "rxi");
-    RDom ryi(0, tile, "ryi");
+    Var x("x");
+    Var y("y");
+
+    RDom rx(0, image.width(), "rx");
+    RDom ry(0, image.height(),"ry");
 
     I(x,y) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1));
 
     // convolve image with third derivative of three box filters
-    S1(x,y) =
+    S(x,y) =
             ( 1.0f * I(x+0*box,y+0*box) +
              -3.0f * I(x+1*box,y+0*box) +
               3.0f * I(x+2*box,y+0*box) +
@@ -78,45 +75,21 @@ int main(int argc, char **argv) {
              -3.0f * I(x+2*box,y+3*box) +
               1.0f * I(x+3*box,y+3*box)) / norm;
 
-    // integral using summed area table
-    S1(rx,y) += select(rx>0, S1(max(0,rx-1),y), 0.0f);
-    S1(x,ry) += select(ry>0, S1(x,max(0,ry-1)), 0.0f);
+    RecFilter filter;
+    filter.setArgs(x, y);
+    filter.define(Expr(S(x, y)));
+    filter.addScan(x, rx, Internal::vec(W(0,0), W(0,1)));
+    filter.addScan(x, rx, Internal::vec(W(1,0), W(1,1)));
+    filter.addScan(y, ry, Internal::vec(W(2,0), W(2,1)));
+    filter.addScan(y, ry, Internal::vec(W(3,0), W(3,1)));
 
+    // TODO: cascade the scans
 
-    // double integral of previous result using second order filter
-    S2(x, y)  = S1(x,y);
-    S2(rx,y) += (select(rx>0, W(0,0)*S2(max(0,rx-1),y), 0.0f)
-             +   select(rx>1, W(0,1)*S2(max(0,rx-2),y), 0.0f));
-    S2(x,ry) += (select(ry>0, W(1,0)*S2(x,max(0,ry-1)), 0.0f)
-             +   select(ry>1, W(1,1)*S2(x,max(0,ry-2)), 0.0f));
-
-    // normalization factor: 3 box filters and 2 dimensions
-    G(x,y) = S2(x,y);
-
-    split(S1,
-            Internal::vec(  0,  1),
-            Internal::vec(  x,  y),
-            Internal::vec( xi, yi),
-            Internal::vec( xo, yo),
-            Internal::vec( rx, ry),
-            Internal::vec(rxi,ryi), true);
-
-    split(S2,W,
-            Internal::vec(  0,  1),
-            Internal::vec(  x,  y),
-            Internal::vec( xi, yi),
-            Internal::vec( xo, yo),
-            Internal::vec( rx, ry),
-            Internal::vec(rxi,ryi),
-            Internal::vec(order,order), true);
-
-    inline_function(G, "I");
-    inline_function(G, "S1");
-    inline_function(G, "S2");
+    filter.split(x, y, tile);
 
     // ----------------------------------------------------------------------------------------------
 
-    map<string,Func> functions = extract_func_calls(G);
+    map<string,Func> functions = filter.funcs();
     map<string,Func>::iterator f    = functions.begin();
     map<string,Func>::iterator fend = functions.end();
     for (; f!=fend; f++) {
@@ -131,12 +104,12 @@ int main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nJIT compilation ... " << endl;
-    G.compile_jit();
+    filter.func().compile_jit();
 
     Buffer hl_out_buff(type_of<float>(), width,height);
     {
         Timer t("Running ... ");
-        G.realize(hl_out_buff);
+        filter.func().realize(hl_out_buff);
     }
     hl_out_buff.copy_to_host();
     hl_out_buff.free_dev_buffer();

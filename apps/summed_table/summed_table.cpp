@@ -1,7 +1,7 @@
 #include <iostream>
 #include <Halide.h>
 
-#include "../../lib/split.h"
+#include "../../lib/recfilter.h"
 
 #define MAX_THREAD 192
 
@@ -17,11 +17,10 @@ using std::endl;
 int main(int argc, char **argv) {
     Arguments args("summed_table", argc, argv);
 
-    bool  verbose = args.verbose;
     bool  nocheck = args.nocheck;
     int   width   = args.width;
-    int   height  = args.height;
-    int   tile_width = args.block;
+    int   height  = args.width;
+    int   tile    = args.block;
     int   iterations = args.iterations;
 
     Image<float> random_image = generate_random_image<float>(width,height);
@@ -31,43 +30,23 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Func I("Input");
-    Func S("S");
-
     Var x("x");
     Var y("y");
 
     RDom rx(0, image.width(), "rx");
     RDom ry(0, image.height(),"ry");
 
-    I(x,y) = select((x<0 || y<0 || x>image.width()-1 || y>image.height()-1), 0, image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
+    RecFilter filter;
+    filter.setArgs(x, y);
+    filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
+    filter.addScan(x, rx);
+    filter.addScan(y, ry);
 
-    S(x, y) = I(x,y);
-    S(rx,y) = S(rx,y) + select(rx>0, S(max(0,rx-1),y), 0);
-    S(x,ry) = S(x,ry) + select(ry>0, S(x,max(0,ry-1)), 0);
-
-    // ----------------------------------------------------------------------------------------------
-
-    Var xi("xi"), yi("yi");
-    Var xo("xo"), yo("yo");
-
-    RDom rxi(0, tile_width, "rxi");
-    RDom ryi(0, tile_width, "ryi");
-
-    split(S,Internal::vec(0,1),   Internal::vec(x,y),
-            Internal::vec(xi,yi), Internal::vec(xo,yo),
-            Internal::vec(rx,ry), Internal::vec(rxi,ryi));
+    filter.split(x, y, tile);
 
     // ----------------------------------------------------------------------------------------------
 
-    inline_function(S, "S-Intra-Deps_x");
-    inline_function(S, "S-Intra-Deps_y");
-    swap_variables (S, "S-Intra-Tail_y_1", xi, yi);
-    merge(S, "S-Intra-Tail_x_0", "S-Intra-Tail_y_1", "S-Tail");
-
-    // ----------------------------------------------------------------------------------------------
-
-    map<string,Func> functions = extract_func_calls(S);
+    map<string,Func> functions = filter.funcs();
     map<string,Func>::iterator f    = functions.begin();
     map<string,Func>::iterator fend = functions.end();
     for (; f!=fend; f++) {
@@ -75,89 +54,20 @@ int main(int argc, char **argv) {
         f->second.compute_root();
     }
 
-    Func S_intra  = functions["S-Intra"];
-    Func S_tails  = functions["S-Tail"];
-    Func S_final  = functions["S-Final-Sub"];
-    Func S_ctailx = functions["S-Intra-CTail_x_0"];
-    Func S_ctaily = functions["S-Intra-CTail_y_1"];
-    Func S_ctailxy= functions["S-Intra-CTail_x_0-y-1"];
-
-    assert(S_intra  .defined());
-    assert(S_tails  .defined());
-    assert(S_final  .defined());
-    assert(S_ctailx .defined());
-    assert(S_ctaily .defined());
-    assert(S_ctailxy.defined());
-
     Target target = get_jit_target_from_environment();
     if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
-        Var t("t");
-        Var xs("ScanStage");
-
-        //S_intra.compute_at(S_tails, Var("__block_id_x"));
-        S_intra.compute_root();
-        S_intra.split(yi,t,yi, MAX_THREAD/tile_width).reorder(xs,t,xi,yi,xo,yo);//.gpu_threads(xi,yi).gpu_blocks(xo,yo);
-        S_intra.update(0).reorder(rxi.x,yi,xo,yo);//.gpu_threads(yi).gpu_blocks(xo,yo);
-        S_intra.update(1).reorder(ryi.x,xi,xo,yo);//.gpu_threads(xi).gpu_blocks(xo,yo);
-
-        S_tails.compute_root();
-        S_tails.reorder_storage(yi,xi,xo,yo);
-#if 0
-        S_tails.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi);
-#else
-        S_tails.reorder(xi,yi,xo,yo).gpu_threads(yi);
-#endif
-        S_tails.gpu_blocks(xo,yo);
-
-        S_ctailx.compute_root();
-        S_ctailx.reorder_storage(yi,yo,xi,xo);
-        S_ctailx.split(yo,yo,t,MAX_THREAD/tile_width);
-        S_ctailx.reorder(xo,xi,yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
-        S_ctailx.update().split(yo,yo,t,MAX_THREAD/tile_width);
-        S_ctailx.update().reorder(yi,t,yo).gpu_blocks(yo).gpu_threads(yi,t);
-
-        S_ctailxy.compute_at(S_ctaily, Var("__block_id_x"));
-        S_ctailxy.reorder(yo,yi,xi,xo).gpu_threads(xi);
-        S_ctailxy.update().reorder(yo,ryi.x,xi,xo).gpu_threads(xi);
-
-        S_ctaily.compute_root();
-        S_ctaily.reorder_storage(xi,xo,yi,yo);
-        S_ctaily.split(xo,xo,t,MAX_THREAD/tile_width);
-        S_ctaily.reorder(yo,yi,xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
-        S_ctaily.update().split(xo,xo,t,MAX_THREAD/tile_width);
-        S_ctaily.update().reorder(xi,t,xo).gpu_blocks(xo).gpu_threads(xi,t);
-
-        S_final.compute_at(S, Var("__block_id_x"));
-        S_final.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi);
-        S_final.update(0).reorder(rxi.x,yi,xo,yo).gpu_threads(yi);
-        S_final.update(1).reorder(ryi.x,xi,xo,yo).gpu_threads(xi);
-
-        S.compute_root();
-        S.split(x, xo,xi, tile_width).split(y, yo,yi, tile_width);
-        S.split(yi,t,yi, MAX_THREAD/tile_width).reorder(t,xi,yi,xo,yo);
-        S.gpu_blocks(xo,yo).gpu_threads(xi,yi);
-        S.bound(x, 0, image.width()).bound(y, 0, image.height());
-    }
-    else {
-        S_intra.compute_root();
-        S_tails.compute_root();
-        S_ctailx.compute_root();
-        S_ctailxy.compute_root();
-        S_ctaily.compute_root();
-        S_final.compute_root();
-        S.compute_root();
     }
 
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nJIT compilation ... " << endl;
-    S.compile_jit();
+    filter.func().compile_jit();
 
     Buffer hl_out_buff(type_of<float>(), width,height);
     {
         Timer t("Running ... ");
         for (int k=0; k<iterations; k++) {
-            S.realize(hl_out_buff);
+            filter.func().realize(hl_out_buff);
             if (k < iterations-1) {
                 hl_out_buff.free_dev_buffer();
             }

@@ -1,11 +1,12 @@
 all:
 	make -C ../lib
-	make -C summed_table
+	make -C test_correctness -j8
 	make -C boxcar
-	make -C ls_hist
+	make -C summed_table
 	make -C gauss_anticausal -j8
 	make -C gauss_cognex -j8
-	make -C test_correctness -j8
+	make -C ls_hist
+
 
 clean:
 	make -C ../lib clean

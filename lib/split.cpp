@@ -1083,3 +1083,26 @@ void RecFilter::split(Var x, Expr tx, Var y, Expr ty) {
     dim_tile[y.name()] = ty;
     split(dim_tile);
 }
+
+void RecFilter::split(Var x, Var y, Expr t) {
+    map<string,Expr> dim_tile;
+    dim_tile[x.name()] = t;
+    dim_tile[y.name()] = t;
+    split(dim_tile);
+}
+
+void RecFilter::split(Var x, Var y, Var z, Expr t) {
+    map<string,Expr> dim_tile;
+    dim_tile[x.name()] = t;
+    dim_tile[y.name()] = t;
+    dim_tile[z.name()] = t;
+    split(dim_tile);
+}
+
+void RecFilter::split(vector<Var> vars, Expr t) {
+    map<string,Expr> dim_tile;
+    for (int i=0; i<vars.size(); i++) {
+        dim_tile[vars[i].name()] = t;
+    }
+    split(dim_tile);
+}

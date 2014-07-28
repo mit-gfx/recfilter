@@ -7,7 +7,7 @@ BIN_DIR=../bin
 EXE=$(BIN_DIR)/gauss_anticausal_direct $(BIN_DIR)/gauss_anticausal_cascaded
 
 SPLITLIB_DIR=../../lib/
-SPLITLIB_INC=$(SPLITLIB_DIR)/split.h
+SPLITLIB_INC=$(SPLITLIB_DIR)/recfilter.h
 SPLITLIB_LIB=$(SPLITLIB_DIR)/libSplit.a
 
 HALIDE_LIB=$(HALIDE_DIR)/bin/libHalide.a

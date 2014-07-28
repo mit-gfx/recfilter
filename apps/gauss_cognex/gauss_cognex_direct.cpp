@@ -5,7 +5,7 @@
 #include <Halide.h>
 
 #include "../../lib/gaussian_weights.h"
-#include "../../lib/split.h"
+#include "../../lib/recfilter.h"
 
 #define MAX_THREAD 192
 
@@ -46,17 +46,12 @@ int main(int argc, char **argv) {
 
     Func I("I");
     Func S("S");
-    Func G("G");
 
-    Var x ("x"),  y("y");
-    Var xi("xi"), yi("yi");
-    Var xo("xo"), yo("yo");
+    Var x("x");
+    Var y("y");
 
     RDom rx(0, image.width(), "rx");
     RDom ry(0, image.height(),"ry");
-
-    RDom rxi(0, tile, "rxi");
-    RDom ryi(0, tile, "ryi");
 
     I(x,y) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1));
 
@@ -79,34 +74,17 @@ int main(int argc, char **argv) {
              -3.0f * I(x+2*box,y+3*box) +
               1.0f * I(x+3*box,y+3*box)) / norm;
 
-    // triple integral via third order filter
-    S(rx,y) = S(rx,y) +
-        select(rx>0, W(0,0)*S(max(0,rx-1),y), 0.0f) +
-        select(rx>1, W(0,1)*S(max(0,rx-2),y), 0.0f) +
-        select(rx>2, W(0,2)*S(max(0,rx-3),y), 0.0f);
+    RecFilter filter;
+    filter.setArgs(x, y);
+    filter.define(Expr(S(x, y)));
+    filter.addScan(x, rx, Internal::vec(W(0,0), W(0,1), W(0,2)));
+    filter.addScan(y, ry, Internal::vec(W(1,0), W(1,1), W(1,2)));
 
-    S(x,ry) = S(x,ry) +
-        select(ry>0, W(1,0)*S(x,max(0,ry-1)), 0.0f) +
-        select(ry>1, W(1,1)*S(x,max(0,ry-2)), 0.0f) +
-        select(ry>2, W(1,2)*S(x,max(0,ry-3)), 0.0f);
-
-    G(x,y) = S(x,y);
-
-    split(S,W,
-            Internal::vec(  0,  1),
-            Internal::vec(  x,  y),
-            Internal::vec( xi, yi),
-            Internal::vec( xo, yo),
-            Internal::vec( rx, ry),
-            Internal::vec(rxi,ryi),
-            Internal::vec(order,order), true);
-
-    inline_function(G, "I");
-    inline_function(G, "S");
+    filter.split(x, y, tile);
 
     // ----------------------------------------------------------------------------------------------
 
-    map<string,Func> functions = extract_func_calls(S);
+    map<string,Func> functions = filter.funcs();
     map<string,Func>::iterator f    = functions.begin();
     map<string,Func>::iterator fend = functions.end();
     for (; f!=fend; f++) {
@@ -121,12 +99,12 @@ int main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nJIT compilation ... " << endl;
-    G.compile_jit();
+    filter.func().compile_jit();
 
     Buffer hl_out_buff(type_of<float>(), width,height);
     {
         Timer t("Running ... ");
-        G.realize(hl_out_buff);
+        filter.func().realize(hl_out_buff);
     }
     hl_out_buff.copy_to_host();
     hl_out_buff.free_dev_buffer();

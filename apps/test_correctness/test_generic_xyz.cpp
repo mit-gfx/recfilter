@@ -1,7 +1,7 @@
 #include <iostream>
 #include <Halide.h>
 
-#include "../../lib/split.h"
+#include "../../lib/recfilter.h"
 
 using namespace Halide;
 
@@ -21,10 +21,6 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    int fx = 2;
-    int fy = 2;
-    int fz = 2;
-
     Image<float> W(6,2);
     W(0,0) = 0.5f; W(0,1) = 0.25f;
     W(1,0) = 0.5f; W(1,1) = 0.125f;
@@ -33,74 +29,33 @@ int main(int argc, char **argv) {
     W(4,0) = 0.5f; W(4,1) = 0.250f;
     W(5,0) = 0.5f; W(5,1) = 0.0625f;
 
-    Func S("S");
-
     Var x("x");
     Var y("y");
     Var z("z");
 
-    RDom rxa(0, image.width(), "rxa");
-    RDom rxb(0, image.width(), "rxb");
-    RDom rya(0, image.height(),"rya");
-    RDom ryb(0, image.height(),"ryb");
-    RDom rza(0, image.channels(),"rza");
-    RDom rzb(0, image.channels(),"rzb");
+    RDom rx(0, image.width(), "rx");
+    RDom ry(0, image.height(),"ry");
+    RDom rz(0, image.channels(),"rz");
 
-    Expr iw = image.width()-1;
-    Expr ih = image.height()-1;
-    Expr ic = image.channels()-1;
+    RecFilter filter("S");
+    filter.setArgs(x, y);
+    filter.define(image(
+                clamp(x,0,image.width()-1),
+                clamp(y,0,image.height()-1),
+                clamp(z,0,image.channels()-1)));
+    filter.addScan(x, rx, Internal::vec(W(0,0), W(0,1)), RecFilter::CAUSAL);
+    filter.addScan(x, rx, Internal::vec(W(1,0), W(1,1)), RecFilter::ANTICAUSAL);
+    filter.addScan(y, ry, Internal::vec(W(2,0), W(2,1)), RecFilter::CAUSAL);
+    filter.addScan(y, ry, Internal::vec(W(3,0), W(3,1)), RecFilter::ANTICAUSAL);
+    filter.addScan(z, rz, Internal::vec(W(4,0), W(4,1)), RecFilter::CAUSAL);
+    filter.addScan(z, rz, Internal::vec(W(5,0), W(5,1)), RecFilter::ANTICAUSAL);
 
-    S(x,y,z) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1), clamp(z,0,image.channels()-1));
-
-    S(rxa,y,z) = S(rxa,y,z)
-        + select(rxa>0, W(0,0)*S(max(0,rxa-1),y,z), 0.0f)
-        + select(rxa>1, W(0,1)*S(max(0,rxa-2),y,z), 0.0f);
-
-    S(iw-rxb,y,z) = S(iw-rxb,y,z)
-        + select(rxb>0, W(1,0)*S(min(iw,iw-rxb+1),y,z), 0.0f)
-        + select(rxb>1, W(1,1)*S(min(iw,iw-rxb+2),y,z), 0.0f);
-
-    S(x,rya,z) = S(x,rya,z)
-        + select(rya>0, W(2,0)*S(x,max(0,rya-1),z), 0.0f)
-        + select(rya>1, W(2,1)*S(x,max(0,rya-2),z), 0.0f);
-
-    S(x,ih-ryb,z) = S(x,ih-ryb,z)
-        + select(ryb>0, W(3,0)*S(x,min(ih,ih-ryb+1),z), 0.0f)
-        + select(ryb>1, W(3,1)*S(x,min(ih,ih-ryb+2),z), 0.0f);
-
-    S(x,y,rza) = S(x,y,rza)
-        + select(rza>0, W(4,0)*S(x,y,max(0,rza-1)), 0.0f)
-        + select(rza>1, W(4,1)*S(x,y,max(0,rza-2)), 0.0f);
-
-    S(x,y,ic-rzb) = S(x,y,ic-rzb)
-        + select(rzb>0, W(5,0)*S(x,y,min(ic,ic-rzb+1)), 0.0f)
-        + select(rzb>1, W(5,1)*S(x,y,min(ic,ic-rzb+2)), 0.0f);
-
-    // ----------------------------------------------------------------------------------------------
-
-    Var xi("xi"), yi("yi"), zi("zi");
-    Var xo("xo"), yo("yo"), zo("zo");
-
-    RDom rxai(0, tile, "rxai");
-    RDom rxbi(0, tile, "rxbi");
-    RDom ryai(0, tile, "ryai");
-    RDom rybi(0, tile, "rybi");
-    RDom rzai(0, tile, "rzai");
-    RDom rzbi(0, tile, "rzbi");
-
-    split(S,W,Internal::vec(   0,   0,   1,   1,   2,   2),
-              Internal::vec(   x,   x,   y,   y,   z,   z),
-              Internal::vec(  xi,  xi,  yi,  yi,  zi,  zi),
-              Internal::vec(  xo,  xo,  yo,  yo,  zo,  zo),
-              Internal::vec( rxa, rxb, rya, ryb, rza, rzb),
-              Internal::vec(rxai,rxbi,ryai,rybi,rzai,rzbi),
-              Internal::vec(  fx,  fx,  fy,  fy,  fz,  fz)
-            );
+    filter.split(x, y, z, tile);
 
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nGenerated Halide functions ... " << endl;
-    map<string,Func> functions = extract_func_calls(S);
+    map<string,Func> functions = filter.funcs();
     map<string,Func>::iterator f    = functions.begin();
     map<string,Func>::iterator fend = functions.end();
     for (; f!=fend; f++) {
@@ -108,7 +63,7 @@ int main(int argc, char **argv) {
         f->second.compute_root();
     }
 
-    Image<float> hl_out = S.realize(width,height,channels);
+    Image<float> hl_out = filter.func().realize(width,height,channels);
 
     // ----------------------------------------------------------------------------------------------
 

@@ -151,11 +151,8 @@ static void weights3(const float& s, float& b0, float& a1, float& a2, float& a3)
 }
 
 
-std::pair<Image<float>, Image<float> >
-gaussian_weights(float sigma, int order, int num_scans) {
-    Image<float> B(num_scans);
-    Image<float> W(num_scans,order);
-
+std::pair<float, vector<float> >
+gaussian_weights(float sigma, int order) {
     float b0 = 0.0f;
     vector<float> a(order, 0.0f);
 
@@ -165,14 +162,7 @@ gaussian_weights(float sigma, int order, int num_scans) {
         default:weights3(sigma, b0, a[0], a[1], a[2]); break;
     }
 
-    for (int x=0; x<num_scans; x++) {
-        for (int j=0; j<order; j++) {
-            W(x,j) = -a[j];
-        }
-        B(x) = b0;
-    }
-
-    return std::make_pair<Image<float>, Image<float> >(B, W);
+    return std::make_pair<float, vector<float> >(b0, a);
 }
 
 Expr gaussian(Expr x, float mu, float sigma) {
