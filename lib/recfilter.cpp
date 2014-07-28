@@ -182,19 +182,19 @@ void RecFilter::addScan(
 
     // copy all the existing feedback/feedfwd coeff to the new arrays
     // add the coeff of the newly added scan as the last row of coeff
-    int num_scans = s.feedback_coeff.width();
+    int num_scans = f.reductions().size();
     int max_order = s.feedback_coeff.height();
-    Image<float> feedfwd_coeff(num_scans+1);
-    Image<float> feedback_coeff(num_scans+1, std::max(max_order,scan_order));
-    for (int j=0; j<num_scans; j++) {
+    Image<float> feedfwd_coeff(num_scans);
+    Image<float> feedback_coeff(num_scans, std::max(max_order,scan_order));
+    for (int j=0; j<num_scans-1; j++) {
         feedfwd_coeff(j) = s.feedfwd_coeff(j);
-        for (int i=0; i<scan_order; i++) {
+        for (int i=0; i<s.feedback_coeff.height(); i++) {
             feedback_coeff(j,i) = s.feedback_coeff(j,i);
         }
     }
-    feedfwd_coeff(num_scans) = feedfwd;
+    feedfwd_coeff(num_scans-1) = feedfwd;
     for (int i=0; i<scan_order; i++) {
-        feedback_coeff(num_scans, i) = feedback[i];
+        feedback_coeff(num_scans-1, i) = feedback[i];
     }
 
     // update the feedback and feedforward coeff matrices in all split info

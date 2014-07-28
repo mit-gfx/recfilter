@@ -123,9 +123,6 @@ static void extract_tails_from_each_scan(Function F_intra, vector<SplitInfo> spl
             F_intra.define_reduction(args, values);
         }
     }
-
-    cerr << F_intra;
-    exit(0);
 }
 
 
@@ -301,7 +298,7 @@ static vector<Function> create_intra_tail_term(
             string arg = F_intra.args()[i];
             if (arg == xi.name()) {
                 pure_args.push_back(xi.name());
-                call_args.push_back(tile + order*k + xi);
+                call_args.push_back(simplify(tile + order*k + xi));
             } else {
                 pure_args.push_back(arg);
                 call_args.push_back(Var(arg));
