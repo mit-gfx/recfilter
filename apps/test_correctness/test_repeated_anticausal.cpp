@@ -22,9 +22,9 @@ int main(int argc, char **argv) {
 
     Image<float> W(4,2);
     W(0,0) = 0.700f; W(0,1) = 0.500f;
-    W(1,0) = 0.500f; W(1,1) = 0.500f;
-    W(2,0) = 0.250f; W(2,1) = 0.125f;
-    W(3,0) = 0.125f; W(3,1) = 0.0625f;
+    //W(1,0) = 0.500f; W(1,1) = 0.500f;
+    //W(2,0) = 0.250f; W(2,1) = 0.125f;
+    //W(3,0) = 0.125f; W(3,1) = 0.0625f;
 
     Var x("x"), y("y");
     RDom rx(0, image.width(),"rx");
@@ -33,9 +33,9 @@ int main(int argc, char **argv) {
     filter.setArgs(x, y);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
     filter.addScan(x, rx, Internal::vec(W(0,0), W(0,1)), RecFilter::ANTICAUSAL);
-    filter.addScan(x, rx, Internal::vec(W(1,0), W(1,1)), RecFilter::ANTICAUSAL);
-    filter.addScan(x, rx, Internal::vec(W(2,0), W(2,1)), RecFilter::ANTICAUSAL);
-    filter.addScan(x, rx, Internal::vec(W(3,0), W(3,1)), RecFilter::ANTICAUSAL);
+    //filter.addScan(x, rx, Internal::vec(W(1,0), W(1,1)), RecFilter::ANTICAUSAL);
+    //filter.addScan(x, rx, Internal::vec(W(2,0), W(2,1)), RecFilter::ANTICAUSAL);
+    //filter.addScan(x, rx, Internal::vec(W(3,0), W(3,1)), RecFilter::ANTICAUSAL);
 
     filter.split(x, tile);
 

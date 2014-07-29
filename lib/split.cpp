@@ -165,6 +165,13 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
         int filter_dim   = split_info[i].filter_dim;
         int var_index    = -1;
 
+        vector<string> image_width_params = extract_params_in_expr(image_width);
+        if (image_width_params.size() != 1) {
+            cerr << "Image width expression must have only one parameter" << endl;
+            assert(false);
+        }
+        string image_width_str = image_width_params[0];
+
         // replace x by xi,xo in LHS pure args
         // replace x by tile*xo + xi in RHS values
         for (int j=0; j<pure_args.size(); j++) {
@@ -185,13 +192,17 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
             string rx_var = rx.x.name();
             RVar   rxi_var = rxi[filter_dim];
             for (int j=0; j<reductions[k].args.size(); j++) {
-                reductions[k].args[j] = substitute(rx_var, rxi_var, reductions[k].args[j]);
+                Expr a = reductions[k].args[j];
+                a = substitute(rx_var, rxi_var, a);
+                a = substitute(image_width_str, tile_width, a);
+                reductions[k].args[j] = a;
             }
             reductions[k].args.insert(reductions[k].args.begin()+var_index+1, xo);
             for (int j=0; j<reductions[k].values.size(); j++) {
                 Expr val = reductions[k].values[j];
                 val = substitute(rx_var, rxi_var, val);
                 val = substitute(x.name(), rxi_var, val);
+                val = substitute(image_width_str, tile_width, val);
                 val = insert_arg_in_func_call(F_intra.name(), var_index+1, xo, val);
                 reductions[k].values[j] = val;
             }
