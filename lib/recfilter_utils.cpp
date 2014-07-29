@@ -1,6 +1,13 @@
 #include "recfilter.h"
 
 using std::string;
+using std::vector;
+using std::cerr;
+using std::endl;
+using std::ostream;
+using std::runtime_error;
+
+using namespace Halide;
 
 Arguments::Arguments(string app_name, int argc, char** argv) :
     width  (256),
@@ -24,7 +31,7 @@ Arguments::Arguments(string app_name, int argc, char** argv) :
             string option = argv[i];
 
             if (!option.compare("-help") || !option.compare("--help")) {
-                throw std::runtime_error("Showing help message");
+                throw runtime_error("Showing help message");
             }
 
             else if (!option.compare("-nocheck") || !option.compare("--nocheck")) {
@@ -35,7 +42,7 @@ Arguments::Arguments(string app_name, int argc, char** argv) :
                 if ((i+1) < argc)
                     iterations = atoi(argv[++i]);
                 else
-                    throw std::runtime_error("-iterations requires a int value");
+                    throw runtime_error("-iterations requires a int value");
             }
 
             else if (!option.compare("-w") || !option.compare("--w") || !option.compare("-width") || !option.compare("--width")) {
@@ -43,7 +50,7 @@ Arguments::Arguments(string app_name, int argc, char** argv) :
                     width = atoi(argv[++i]);
                 }
                 else
-                    throw std::runtime_error("-width requires an integer value");
+                    throw runtime_error("-width requires an integer value");
             }
 
             else if (!option.compare("-b") || !option.compare("--b") || !option.compare("-block") || !option.compare("--block") ||
@@ -52,28 +59,28 @@ Arguments::Arguments(string app_name, int argc, char** argv) :
                 if ((i+1) < argc)
                     block = atoi(argv[++i]);
                 else
-                    throw std::runtime_error("-block requires an integer value");
+                    throw runtime_error("-block requires an integer value");
             }
 
             else {
-                throw std::runtime_error("Bad command line option " + option);
+                throw runtime_error("Bad command line option " + option);
             }
         }
 
         if (width%block)
-            throw std::runtime_error("Width should be a multiple of block size");
+            throw runtime_error("Width should be a multiple of block size");
 
-    } catch (std::runtime_error& e) {
-        std::cerr << std::endl << e.what() << std::endl << desc << std::endl;
+    } catch (runtime_error& e) {
+        cerr << endl << e.what() << endl << desc << endl;
         exit(EXIT_FAILURE);
     }
 }
 
 // -----------------------------------------------------------------------------
 
-std::ostream &operator<<(std::ostream &s, CheckResult v) {
-    Halide::Image<float> ref = v.ref;
-    Halide::Image<float> out = v.out;
+ostream &operator<<(ostream &s, CheckResult v) {
+    Image<float> ref = v.ref;
+    Image<float> out = v.out;
 
     assert(ref.width() == out.width());
     assert(ref.height() == out.height());
@@ -83,7 +90,7 @@ std::ostream &operator<<(std::ostream &s, CheckResult v) {
     int height = ref.height();
     int channels = ref.channels();
 
-    Halide::Image<float> diff(width, height, channels);
+    Image<float> diff(width, height, channels);
 
     float diff_sum = 0.0f;
     float max_val  = 0.0f;
@@ -92,16 +99,16 @@ std::ostream &operator<<(std::ostream &s, CheckResult v) {
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {
                 diff(x,y,z) = float(ref(x,y,z)) - float(out(x,y,z));
-                diff_sum += std::abs(diff(x,y,z) * diff(x,y,z));
+                diff_sum += abs(diff(x,y,z) * diff(x,y,z));
                 max_val = std::max(ref(x,y,z), max_val);
             }
         }
     }
 }
 
-std::ostream &operator<<(std::ostream &s, CheckResultVerbose v) {
-    Halide::Image<float> ref = v.ref;
-    Halide::Image<float> out = v.out;
+ostream &operator<<(ostream &s, CheckResultVerbose v) {
+    Image<float> ref = v.ref;
+    Image<float> out = v.out;
 
     assert(ref.width() == out.width());
     assert(ref.height() == out.height());
@@ -111,7 +118,7 @@ std::ostream &operator<<(std::ostream &s, CheckResultVerbose v) {
     int height = ref.height();
     int channels = ref.channels();
 
-    Halide::Image<float> diff(width, height, channels);
+    Image<float> diff(width, height, channels);
 
     float diff_sum = 0.0f;
     float max_val  = 0.0f;
@@ -120,7 +127,7 @@ std::ostream &operator<<(std::ostream &s, CheckResultVerbose v) {
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {
                 diff(x,y,z) = float(ref(x,y,z)) - float(out(x,y,z));
-                diff_sum += std::abs(diff(x,y,z) * diff(x,y,z));
+                diff_sum += abs(diff(x,y,z) * diff(x,y,z));
                 max_val = std::max(ref(x,y,z), max_val);
             }
         }
@@ -135,17 +142,28 @@ std::ostream &operator<<(std::ostream &s, CheckResultVerbose v) {
     return s;
 }
 
-std::ostream &operator<<(std::ostream &s, Halide::Func f) {
+ostream &operator<<(ostream &s, RecFilter r) {
+    map<string,Func> funcs = r.funcs();
+    map<string,Func>::iterator f  = funcs.begin();
+    map<string,Func>::iterator fe = funcs.end();
+    while (f != fe) {
+        s << f->second << endl;
+        f++;
+    }
+    return s;
+}
+
+ostream &operator<<(ostream &s, Func f) {
     s << f.function();
     return s;
 }
 
-std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f) {
+ostream &operator<<(ostream &s, Internal::Function f) {
     if (f.has_pure_definition()) {
-        std::vector<Halide::Expr> pure_value = f.values();
+        vector<Expr> pure_value = f.values();
         s << "Func " << f.name() << ";\n";
         for (int v=0; v<pure_value.size(); v++) {
-            std::vector<std::string> args = f.args();
+            vector<string> args = f.args();
             s << f.name() << "(";
             for (int i=0; i<args.size(); i++) {
                 s << args[i];
@@ -161,9 +179,9 @@ std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f) {
 
         // reduction definitions
         for (int j=0; j<f.reductions().size(); j++) {
-            std::vector<Halide::Expr> reduction_value = f.reductions()[j].values;
+            vector<Expr> reduction_value = f.reductions()[j].values;
             for (int v=0; v<reduction_value.size(); v++) {
-                std::vector<Halide::Expr> args = f.reductions()[j].args;
+                vector<Expr> args = f.reductions()[j].args;
                 s << f.name() << "(";
                 for (int i=0; i<args.size(); i++) {
                     s << args[i];
@@ -178,7 +196,7 @@ std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f) {
                 if (f.reductions()[j].domain.defined()) {
                     s << " with  ";
                     for (int k=0; k<f.reductions()[j].domain.domain().size(); k++) {
-                        std::string r = f.reductions()[j].domain.domain()[k].var;
+                        string r = f.reductions()[j].domain.domain()[k].var;
                         s << r << "("
                             << f.reductions()[j].domain.domain()[k].min   << ","
                             << f.reductions()[j].domain.domain()[k].extent<< ") ";
@@ -194,7 +212,7 @@ std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f) {
 // -----------------------------------------------------------------------------
 
 
-Timer::Timer(std::string name) {
+Timer::Timer(string name) {
     m_Name = name;
     start();
 }
@@ -213,8 +231,8 @@ Timer::t_time Timer::stop(void) {
     Timer::t_time m  = ((tm/(1000*60)) % 60);
     Timer::t_time s  = ((tm/1000)      % 60);
     Timer::t_time ms = tm % 1000;
-    std::cerr << m_Name.c_str() << ": " << h << "h " << m
-        << "m " << s << "s " << ms << "ms" << std::endl;
+    cerr << m_Name.c_str() << ": " << h << "h " << m
+        << "m " << s << "s " << ms << "ms" << endl;
     return tm;
 }
 

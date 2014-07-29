@@ -611,3 +611,154 @@ void RecFilter::swap_variables(string func_name, Var a, Var b) {
         }
     }
 }
+
+vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
+    // check that the order does not violate
+    {
+        map<int, bool> scan_causal;
+        map<int, bool> scan_dimension;
+        map<int, int>  scan_occurance;
+        vector<int> reordered_scans;
+        for (int i=0; i<scans.size(); i++) {
+            for (int j=0; j<scans[i].size(); j++) {
+                reordered_scans.push_back(scans[i][j]);
+            }
+        }
+        for (int i=0; i<contents.ptr->split_info.size(); i++) {
+            int scan_dim = contents.ptr->split_info[i].filter_dim;
+            for (int j=0; j<contents.ptr->split_info[i].num_splits; j++) {
+                int scan_id = contents.ptr->split_info[i].scan_id[j];
+                bool causal = contents.ptr->split_info[i].scan_causal[j];
+                scan_causal[scan_id] = causal;
+                scan_dimension[scan_id] = scan_dim;
+            }
+        }
+        // order is violated only if the relative order of two scans in
+        // same dimension and opposite causality changes
+        for (int u=0; u<reordered_scans.size(); u++) {
+            int scan_a = reordered_scans[u];
+            for (int v=u+1; v<reordered_scans.size(); v++) {
+                int scan_b = reordered_scans[v];
+                if (scan_dimension.find(scan_a) == scan_dimension.end()) {
+                    cerr << "Scan " << scan_a << " not found in recursive filter " << endl;
+                    assert(false);
+                }
+                if (scan_dimension.find(scan_b) == scan_dimension.end()) {
+                    cerr << "Scan " << scan_b << " not found in recursive filter " << endl;
+                    assert(false);
+                }
+                int dim_a  = scan_dimension[scan_a];
+                int dim_b  = scan_dimension[scan_b];
+                bool causal_a = scan_causal[scan_a];
+                bool causal_b = scan_causal[scan_b];
+                if (dim_a==dim_b && causal_a!=causal_b && scan_b<scan_a) {
+                    cerr << "Scans " << scan_a << " " << scan_b << " cannot"
+                        << " be reordered" << endl;
+                    assert(false);
+                }
+            }
+
+            // scan_a occurs once more in the list of args
+            scan_occurance[scan_a] += 1;
+        }
+
+        // check that each scan has occured exactly once
+        map<int,int>::iterator so = scan_occurance.begin();
+        for (; so!=scan_occurance.end(); so++) {
+            if (so->second == 0) {
+                cerr << "Scan " << so->first << " does not appear in the list "
+                    << "of scans for cascading" << endl;
+                assert(false);
+            }
+            if (so->second > 1) {
+                cerr << "Scan " << so->first << " appears multiple times in the list "
+                    << "of scans for cascading" << endl;
+                assert(false);
+            }
+        }
+    }
+
+    // create the cascaded recursive filters
+    vector<Var> args = func().args();
+
+    vector<RecFilter> recfilters;
+
+    for (int i=0; i<scans.size(); i++) {
+        RecFilter rf(func().name() + "_" + int_to_string(i));
+
+        // dimensions same as original filter
+        rf.setArgs(args);
+
+        // same pure def as original filter for the first
+        // subsequent filters call the result of prev recfilter
+        if (i == 0) {
+            rf.define(func().values());
+        } else {
+            vector<Expr> call_args;
+            vector<Expr> pure_values;
+            Function f_prev = recfilters[i-1].func().function();
+            for (int j=0; j<args.size(); j++) {
+                call_args.push_back(args[j]);
+            }
+            for (int j=0; j<f_prev.outputs(); j++) {
+                pure_values.push_back(Call::make(f_prev, call_args, j));
+            }
+            rf.define(pure_values);
+        }
+
+        // extract the scans from the filter and
+        // add them to the new filter
+        for (int j=0; j<scans[i].size(); j++) {
+            int scan_id = scans[i][j];
+
+            // find the split info struct that corresponds
+            // to this scan
+            int dim = -1;
+            int idx = -1;
+            for (int u=0; dim<0 && u<contents.ptr->split_info.size(); u++) {
+                for (int v=0; idx<0 && v<contents.ptr->split_info[u].num_splits; v++) {
+                    if (scan_id == contents.ptr->split_info[u].scan_id[v]) {
+                        dim = u;
+                        idx = v;
+                    }
+                }
+            }
+
+            if (dim<0 || idx<0) {
+                cerr << "Scan " << scan_id << " not found in recursive filter " << endl;
+                assert(false);
+            }
+
+            Var x           = contents.ptr->split_info[dim].var;
+            RDom rx         = contents.ptr->split_info[dim].rdom;
+            bool c          = contents.ptr->split_info[dim].scan_causal[idx];
+            int order       = contents.ptr->split_info[dim].filter_order;
+            float feedfwd   = contents.ptr->split_info[dim].feedfwd_coeff(scan_id);
+            vector<float> feedback;
+            for (int u=0; u<order; u++) {
+                feedback.push_back(contents.ptr->split_info[dim].
+                        feedback_coeff(scan_id,u));
+            }
+
+            rf.addScan(x, rx, feedfwd, feedback, (c ? CAUSAL : ANTICAUSAL));
+        }
+
+        recfilters.push_back(rf);
+    }
+
+    return recfilters;
+}
+
+RecFilter RecFilter::cascade(vector<int> a) {
+    vector<vector<int> > scans;
+    scans.push_back(a);
+    vector<RecFilter> filters = cascade(scans);
+    return filters[0];
+}
+
+vector<RecFilter> RecFilter::cascade(vector<int> a, vector<int> b) {
+    vector<vector<int> > scans;
+    scans.push_back(a);
+    scans.push_back(b);
+    return cascade(scans);
+};

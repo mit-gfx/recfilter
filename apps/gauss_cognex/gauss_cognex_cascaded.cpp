@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
              -3.0f * I(x+2*box,y+3*box) +
               1.0f * I(x+3*box,y+3*box)) / norm;
 
-    RecFilter filter;
+    RecFilter filter("Gauss");
     filter.setArgs(x, y);
     filter.define(Expr(S(x, y)));
     filter.addScan(x, rx, Internal::vec(W(0,0), W(0,1)));
@@ -83,19 +83,18 @@ int main(int argc, char **argv) {
     filter.addScan(y, ry, Internal::vec(W(2,0), W(2,1)));
     filter.addScan(y, ry, Internal::vec(W(3,0), W(3,1)));
 
-    // TODO: cascade the scans
+    // cascade the scans
+    vector<RecFilter> cascaded_filters = filter.cascade(
+            Internal::vec(0,1),
+            Internal::vec(2,3));
+    RecFilter filter1 = cascaded_filters[0];
+    RecFilter filter2 = cascaded_filters[1];
+    filter1.split(x, tile);
+    filter2.split(y, tile);
 
-    filter.split(x, y, tile);
+    cerr << filter2 << endl;
 
     // ----------------------------------------------------------------------------------------------
-
-    map<string,Func> functions = filter.funcs();
-    map<string,Func>::iterator f    = functions.begin();
-    map<string,Func>::iterator fend = functions.end();
-    for (; f!=fend; f++) {
-        cerr << f->second << endl;
-        f->second.compute_root();
-    }
 
     Target target = get_jit_target_from_environment();
     if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
@@ -104,12 +103,12 @@ int main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nJIT compilation ... " << endl;
-    filter.func().compile_jit();
+    filter2.func().compile_jit();
 
     Buffer hl_out_buff(type_of<float>(), width,height);
     {
         Timer t("Running ... ");
-        filter.func().realize(hl_out_buff);
+        filter2.func().realize(hl_out_buff);
     }
     hl_out_buff.copy_to_host();
     hl_out_buff.free_dev_buffer();

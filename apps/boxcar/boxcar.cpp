@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
     RDom rx(0, image.width(), "rx");
     RDom ry(0, image.height(),"ry");
 
-    RecFilter filter;
+    RecFilter filter("S");
     filter.setArgs(x, y);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
     filter.addScan(x, rx);
@@ -54,15 +54,9 @@ int main(int argc, char **argv) {
 
     filter.split(x, y, tile);
 
-    // ----------------------------------------------------------------------------------------------
+    cerr << filter << endl;
 
-    map<string,Func> functions = filter.funcs();
-    map<string,Func>::iterator f    = functions.begin();
-    map<string,Func>::iterator fend = functions.end();
-    for (; f!=fend; f++) {
-        cerr << f->second << endl;
-        f->second.compute_root();
-    }
+    // ----------------------------------------------------------------------------------------------
 
     Target target = get_jit_target_from_environment();
     if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {

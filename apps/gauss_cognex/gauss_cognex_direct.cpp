@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
              -3.0f * I(x+2*box,y+3*box) +
               1.0f * I(x+3*box,y+3*box)) / norm;
 
-    RecFilter filter;
+    RecFilter filter("Gauss");
     filter.setArgs(x, y);
     filter.define(Expr(S(x, y)));
     filter.addScan(x, rx, Internal::vec(W(0,0), W(0,1), W(0,2)));
@@ -82,15 +82,9 @@ int main(int argc, char **argv) {
 
     filter.split(x, y, tile);
 
-    // ----------------------------------------------------------------------------------------------
+    cerr << filter << endl;
 
-    map<string,Func> functions = filter.funcs();
-    map<string,Func>::iterator f    = functions.begin();
-    map<string,Func>::iterator fend = functions.end();
-    for (; f!=fend; f++) {
-        cerr << f->second << endl;
-        f->second.compute_root();
-    }
+    // ----------------------------------------------------------------------------------------------
 
     Target target = get_jit_target_from_environment();
     if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {

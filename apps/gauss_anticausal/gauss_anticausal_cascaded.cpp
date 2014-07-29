@@ -42,9 +42,9 @@ int main(int argc, char **argv) {
     Var y("y");
 
     RDom rx(0, image.width(), "rx");
-    RDom ry(0, image.height(),"rw");
+    RDom ry(0, image.height(),"ry");
 
-    RecFilter filter;
+    RecFilter filter("Gauss");
     filter.setArgs(x, y);
     filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
     filter.addScan(x, rx, B1, W1, RecFilter::CAUSAL);
@@ -56,19 +56,18 @@ int main(int argc, char **argv) {
     filter.addScan(y, ry, B2, W2, RecFilter::CAUSAL);
     filter.addScan(y, ry, B2, W2, RecFilter::ANTICAUSAL);
 
-    // TODO: cascade the scans
+    // cascade the scans
+    vector<RecFilter> cascaded_filters = filter.cascade(
+            Internal::vec(0,1,2,3),
+            Internal::vec(4,5,6,7));
 
-    filter.split(x, y, tile);
+    RecFilter filter1 = cascaded_filters[0];
+    RecFilter filter2 = cascaded_filters[1];
 
-    // ----------------------------------------------------------------------------------------------
+    filter1.split(x, y, tile);
+    filter2.split(x, y, tile);
 
-    map<string,Func> functions = filter.funcs();
-    map<string,Func>::iterator f    = functions.begin();
-    map<string,Func>::iterator fend = functions.end();
-    for (; f!=fend; f++) {
-        cerr << f->second << endl;
-        f->second.compute_root();
-    }
+    cerr << filter2 << endl;
 
     // ----------------------------------------------------------------------------------------------
 
@@ -79,12 +78,12 @@ int main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nJIT compilation ... " << endl;
-    filter.func().compile_jit();
+    filter2.func().compile_jit();
 
     Buffer hl_out_buff(type_of<float>(), width,height);
     {
         Timer t("Running ... ");
-        filter.func().realize(hl_out_buff);
+        filter2.func().realize(hl_out_buff);
     }
     hl_out_buff.copy_to_host();
     hl_out_buff.free_dev_buffer();

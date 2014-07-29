@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
     RDom rx(0, image.width(), "rx");
     RDom ry(0, image.height(),"ry");
 
-    RecFilter filter;
+    RecFilter filter("Gauss");
     filter.setArgs(x, y);
     filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
     filter.addScan(x, rx, B3, W3, RecFilter::CAUSAL);
@@ -52,15 +52,7 @@ int main(int argc, char **argv) {
 
     filter.split(x, y, tile);
 
-    // ----------------------------------------------------------------------------------------------
-
-    map<string,Func> functions = filter.funcs();
-    map<string,Func>::iterator f    = functions.begin();
-    map<string,Func>::iterator fend = functions.end();
-    for (; f!=fend; f++) {
-        cerr << f->second << endl;
-        f->second.compute_root();
-    }
+    cerr << filter << endl;
 
     // ----------------------------------------------------------------------------------------------
 

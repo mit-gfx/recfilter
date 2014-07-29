@@ -115,6 +115,7 @@ public:
     // {@
     void define(Halide::Expr  pure_def);
     void define(Halide::Tuple pure_def);
+    void define(std::vector<Halide::Expr> pure_def);
     // @}
 
     /** @name Routines to add scans to a recursive filter
@@ -171,10 +172,28 @@ public:
     // @}
 
 
-    /** @brief Cascade scans in different dimensions of a function,
-     * (defined in reorder.cpp)
+    /** @name Reorder scans in the filter or cascade them to produce multiple filters
+     *  @brief uses list of list of scans as argument, producing a list of
+     *  recursive filters each containing the respective list of scans
+     *  (defined in reorder.cpp)
+     *
+     *  Preconditions:
+     *  - list of list of scans spans all the scans of the original filter
+     *  - no scan is repeated in the list of list of scans
+     *  - the relative order of reverse causality scans in same dimension remains same
      */
-    std::vector<RecFilter> cascade_scans(std::vector<std::vector<int> > scan);
+    // {@
+    RecFilter cascade(
+            std::vector<int> a      ///< reordered list of scans of the filter
+            );
+    std::vector<RecFilter> cascade(
+            std::vector<int> a,     ///< list of scans for first filter
+            std::vector<int> b      ///< list of scans for second filter
+            );
+    std::vector<RecFilter> cascade(
+            std::vector<std::vector<int> > scan ///< list of scans for list of filters
+            );
+    // @}
 
 
     /** @brief Inline all calls to a pure function
@@ -241,14 +260,12 @@ public:
 #include "recfilter.h"
 
 
-/** @name Print the Halide function */
+/** @name Printing utils for recursive filter, Halide functions and
+ * difference between computed result and reference result  */
 // {@
+std::ostream &operator<<(std::ostream &s, RecFilter r);
 std::ostream &operator<<(std::ostream &s, Halide::Func f);
 std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f);
-// @}
-
-/** @name Print the difference beteen reference and Halide result */
-// {@
 std::ostream &operator<<(std::ostream &s, CheckResult v);
 std::ostream &operator<<(std::ostream &s, CheckResultVerbose v);
 // @}

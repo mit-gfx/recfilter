@@ -74,6 +74,14 @@ void RecFilter::define(Tuple pure_def) {
     contents.ptr->recfilter.function().define(args, pure_def.as_vector());
 }
 
+void RecFilter::define(vector<Expr> pure_def) {
+    vector<string> args;
+    for (int i=0; i<contents.ptr->split_info.size(); i++) {
+        args.push_back(contents.ptr->split_info[i].var.name());
+    }
+    contents.ptr->recfilter.function().define(args, pure_def);
+}
+
 // -----------------------------------------------------------------------------
 
 void RecFilter::addScan(
