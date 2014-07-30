@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
     RDom rz(0, image.channels(),"rz");
 
     RecFilter filter("S");
-    filter.setArgs(x, y);
+    filter.setArgs(x, y, z);
     filter.define(image(
                 clamp(x,0,image.width()-1),
                 clamp(y,0,image.height()-1),

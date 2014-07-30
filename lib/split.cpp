@@ -11,6 +11,8 @@ using std::cerr;
 using std::endl;
 using std::vector;
 using std::map;
+using std::pair;
+using std::make_pair;
 
 // -----------------------------------------------------------------------------
 
@@ -131,86 +133,126 @@ static void extract_tails_from_each_scan(Function F_intra, vector<SplitInfo> spl
 static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info) {
     Function F_intra(F.name() + DELIMITER + INTRA_TILE_RESULT);
 
-    vector<string> pure_args = F.args();
+    // manipulate the pure def
+    vector<string> pure_args   = F.args();
     vector<Expr>   pure_values = F.values();
-    vector<ReductionDefinition> reductions = F.reductions();
-
-    // create the intra tile function, replace calls to original
-    // function by the new intra tile function
-    {
-        F_intra.define(pure_args, pure_values);
-
-        // replace calls to original Func by split Func
-        for (int i=0; i<reductions.size(); i++) {
-            for (int j=0; j<reductions[i].values.size(); j++) {
-                Expr value = reductions[i].values[j];
-                value = substitute_func_call(F.name(), F_intra, value);
-                reductions[i].values[j] = value;
-            }
-            F_intra.define_reduction(reductions[i].args, reductions[i].values);
-        }
-    }
-
     for (int i=0; i<split_info.size(); i++) {
-        F_intra.clear_all_definitions();
-
-        Var x    = split_info[i].var;
-        Var xi   = split_info[i].inner_var;
-        Var xo   = split_info[i].outer_var;
-        RDom rx  = split_info[i].rdom;
-        RDom rxi = split_info[i].inner_rdom;
-        RDom rxo = split_info[i].outer_rdom;
+        Var x            = split_info[i].var;
+        Var xi           = split_info[i].inner_var;
+        Var xo           = split_info[i].outer_var;
+        RDom rx          = split_info[i].rdom;
+        RDom rxi         = split_info[i].inner_rdom;
         Expr tile_width  = split_info[i].tile_width;
         Expr image_width = split_info[i].image_width;
         int filter_dim   = split_info[i].filter_dim;
-        int var_index    = -1;
 
-        vector<string> image_width_params = extract_params_in_expr(image_width);
-        if (image_width_params.size() != 1) {
-            cerr << "Image width expression must have only one parameter" << endl;
-            assert(false);
-        }
-        string image_width_str = image_width_params[0];
-
-        // replace x by xi,xo in LHS pure args
-        // replace x by tile*xo + xi in RHS values
+        // replace x by xi in LHS pure args
+        // replace x by tile*xo+xi in RHS values
         for (int j=0; j<pure_args.size(); j++) {
             if (pure_args[j] == x.name()) {
                 pure_args[j] = xi.name();
-                var_index = j;
+                pure_args.insert(pure_args.begin()+j+1, xo.name());
             }
         }
-        assert(var_index >= 0);
-        pure_args.insert(pure_args.begin()+var_index+1, xo.name());
         for (int j=0; j<pure_values.size(); j++) {
-            pure_values[j] = substitute(x, tile_width*xo+xi, pure_values[j]);
+            pure_values[j] = substitute(x.name(), tile_width*xo+xi, pure_values[j]);
         }
+        F_intra.clear_all_definitions();
         F_intra.define(pure_args, pure_values);
+    }
 
-        // replace rx by rxi,xo
-        for (int k=0; k<reductions.size(); k++) {
-            string rx_var = rx.x.name();
-            RVar   rxi_var = rxi[filter_dim];
-            for (int j=0; j<reductions[k].args.size(); j++) {
-                Expr a = reductions[k].args[j];
-                a = substitute(rx_var, rxi_var, a);
-                a = substitute(image_width_str, tile_width, a);
-                reductions[k].args[j] = a;
-            }
-            reductions[k].args.insert(reductions[k].args.begin()+var_index+1, xo);
-            for (int j=0; j<reductions[k].values.size(); j++) {
-                Expr val = reductions[k].values[j];
-                val = substitute(rx_var, rxi_var, val);
-                val = substitute(x.name(), rxi_var, val);
-                val = substitute(image_width_str, tile_width, val);
-                val = insert_arg_in_func_call(F_intra.name(), var_index+1, xo, val);
-                reductions[k].values[j] = val;
-            }
-            F_intra.define_reduction(reductions[k].args, reductions[k].values);
+    // split info object and split id for each scan
+    vector< pair<int,int> > scan(F.reductions().size());
+    for (int i=0; i<split_info.size(); i++) {
+        for (int j=0; j<split_info[i].num_splits; j++) {
+            scan[ split_info[i].scan_id[j] ] = make_pair(i,j);
         }
     }
 
+    // create the scans from the split info object
+    vector<ReductionDefinition> reductions;
+    for (int i=0; i<scan.size(); i++) {
+        SplitInfo s = split_info[ scan[i].first ];
+
+        Var x            = s.var;
+        Var xi           = s.inner_var;
+        Var xo           = s.outer_var;
+        RDom rx          = s.rdom;
+        RDom rxi         = s.inner_rdom;
+        Expr tile_width  = s.tile_width;
+        Expr image_width = s.image_width;
+        int filter_dim   = s.filter_dim;
+        int filter_order = s.filter_order;
+        bool causal      = s.scan_causal[ scan[i].second ];
+        int  dimension   = -1;
+
+        float feedfwd = s.feedfwd_coeff(i);
+        vector<float> feedback(filter_order,0.0f);
+        for (int j=0; j<s.feedback_coeff.height(); j++) {
+            feedback[j] = s.feedback_coeff(i,j);
+        }
+
+        // reduction args
+        vector<Expr> args;
+        for (int j=0; j<F.args().size(); j++) {
+            string a = F.args()[j];
+            if (a == x.name()) {
+                if (causal) {
+                    args.push_back(rxi[filter_dim]);
+                } else {
+                    args.push_back(tile_width-1-rxi[filter_dim]);
+                }
+                dimension = args.size()-1;
+                args.push_back(xo);
+            }
+            else {
+                bool found = false;
+                for (int k=0; !found && k<split_info.size(); k++) {
+                    if (a == split_info[k].var.name()) {
+                        args.push_back(rxi[ split_info[k].filter_dim ]);
+                        if (!equal(split_info[k].tile_width, 1)) {
+                            args.push_back(split_info[k].outer_var);
+                        }
+                        found = true;
+                    }
+                }
+                if (!found) {
+                    args.push_back(Var(a));
+                }
+            }
+        }
+        assert(dimension >= 0);
+
+        // reduction values
+        vector<Expr> values(F_intra.outputs());
+        for (int j=0; j<values.size(); j++) {
+            Expr zero = make_zero(F_intra.output_types()[j]);
+
+            if (feedfwd != 0.0f) {
+                values[j] = feedfwd * Call::make(F_intra, args, j);
+            } else {
+                values[j] = zero;
+            }
+
+            for (int k=0; k<feedback.size(); k++) {
+                if (feedback[k] != 0.0f) {
+                    vector<Expr> call_args = args;
+                    if (causal) {
+                        call_args[dimension] = max(call_args[dimension]-(k+1),0);
+                        values[j] += select(rxi[filter_dim]>k, feedback[k] * Call::make(F_intra,call_args,j), zero);
+                    } else {
+                        call_args[dimension] = min(call_args[dimension]+(k+1),tile_width-1);
+                        values[j] += select(rxi[filter_dim]>k, feedback[k] * Call::make(F_intra,call_args,j), zero);
+                    }
+                }
+            }
+            values[j] = simplify(values[j]);
+        }
+        F_intra.define_reduction(args, values);
+    }
+
     return F_intra;
+
 }
 
 // -----------------------------------------------------------------------------
