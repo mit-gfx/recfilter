@@ -510,7 +510,7 @@ static vector<Function> create_tail_residual_term(
                         wt = select(first_tile_u, cwt, wt);
                     }
 
-                    values[i] += select(first_tile, FLOAT_ZERO, wt*val);
+                    values[i] += simplify(select(first_tile, FLOAT_ZERO, wt*val));
                 }
             }
         }
@@ -760,7 +760,7 @@ static void add_prev_dimension_residual_to_tails(
                     // by clamping the image at all borders
                     wt = select(last_tile, cwt, wt);
 
-                    pure_values[i] += select(first_tile, FLOAT_ZERO, wt*val);
+                    pure_values[i] += simplify(select(first_tile, FLOAT_ZERO, wt*val));
                 }
             }
         }
@@ -852,7 +852,8 @@ static void add_all_residuals_to_final_result(
     for (int i=0; i<reductions.size(); i++) {
         vector<Expr> values;
         for (int j=0; j<reductions[i].values.size(); j++) {
-            Expr val = substitute_func_call(F.name(), F_sub, reductions[i].values[j]);
+            Expr val = substitute_func_call(F.name(), F_sub,
+                    simplify(reductions[i].values[j]));
             values.push_back(val);
         }
         F_sub.define_reduction(reductions[i].args, values);
