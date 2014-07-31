@@ -111,7 +111,7 @@ static void extract_tails_from_each_scan(Function F_intra, vector<SplitInfo> spl
                 values.push_back(Call::make(F_intra, call_args, k));
             }
 
-            new_reductions[scan_id] = std::make_pair(args, values);
+            new_reductions[scan_id] = make_pair(args, values);
         }
     }
 
@@ -180,7 +180,10 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
         RDom rx          = s.rdom;
         RDom rxi         = s.inner_rdom;
         Expr tile_width  = s.tile_width;
+        Expr num_tiles   = s.num_tiles;
         Expr image_width = s.image_width;
+        Expr border_expr = s.border_expr[ scan[i].second ];
+
         int filter_dim   = s.filter_dim;
         int filter_order = s.filter_order;
         bool causal      = s.scan_causal[ scan[i].second ];
@@ -192,7 +195,8 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
             feedback[j] = s.feedback_coeff(i,j);
         }
 
-        // reduction args
+        // reduction args: replace rx the RVar of this dimension in rxi and xo
+        // replace all other pure args with their respective RVar in rxi
         vector<Expr> args;
         for (int j=0; j<F.args().size(); j++) {
             string a = F.args()[j];
@@ -223,26 +227,39 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
         }
         assert(dimension >= 0);
 
-        // reduction values
+        // border expression: replace all variables x in border_expr with xo*tile+rxi
+        for (int j=0; j<F.args().size(); j++) {
+            string a = F.args()[j];
+            bool found = false;
+            for (int k=0; !found && k<split_info.size(); k++) {
+                if (a == split_info[k].var.name()) {
+                    Var  temp_xo  = split_info[k].outer_var;
+                    RVar temp_rxi = rxi[ split_info[k].filter_dim ];
+                    Expr temp_tile= split_info[k].tile_width;
+                    border_expr = substitute(a, temp_tile*temp_xo+temp_rxi, border_expr);
+                    found = true;
+                }
+            }
+        }
+
+        // reduction values: create the intra tile scans with special
+        // borders for all tile on image boundary is border_expr as specified
+        // border for all internal tiles is zero
         vector<Expr> values(F_intra.outputs());
         for (int j=0; j<values.size(); j++) {
-            Expr zero = make_zero(F_intra.output_types()[j]);
-
-            if (feedfwd != 0.0f) {
-                values[j] = feedfwd * Call::make(F_intra, args, j);
-            } else {
-                values[j] = zero;
-            }
+            values[j] = feedfwd * Call::make(F_intra, args, j);
 
             for (int k=0; k<feedback.size(); k++) {
                 if (feedback[k] != 0.0f) {
                     vector<Expr> call_args = args;
                     if (causal) {
                         call_args[dimension] = max(call_args[dimension]-(k+1),0);
-                        values[j] += select(rxi[filter_dim]>k, feedback[k] * Call::make(F_intra,call_args,j), zero);
+                        values[j] += select(rxi[filter_dim]>k, feedback[k] * Call::make(F_intra,call_args,j),
+                                select(xo==0, border_expr, FLOAT_ZERO));
                     } else {
                         call_args[dimension] = min(call_args[dimension]+(k+1),tile_width-1);
-                        values[j] += select(rxi[filter_dim]>k, feedback[k] * Call::make(F_intra,call_args,j), zero);
+                        values[j] += select(rxi[filter_dim]>k, feedback[k] * Call::make(F_intra,call_args,j),
+                                select(xo==num_tiles-1, border_expr, FLOAT_ZERO));
                     }
                 }
             }
@@ -252,56 +269,6 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
     }
 
     return F_intra;
-
-}
-
-// -----------------------------------------------------------------------------
-
-static void apply_zero_boundary_on_inner_tiles(Function F_intra, vector<SplitInfo> split_info) {
-    vector<string> pure_args = F_intra.args();
-    vector<Expr>   pure_values = F_intra.values();
-    vector<ReductionDefinition> reductions = F_intra.reductions();
-
-    // go to each scan that is split and apply the inner tile condition on
-    // all feedback terms
-    for (int i=0; i<split_info.size(); i++) {
-        Var  xo         = split_info[i].outer_var;
-        RDom rxi        = split_info[i].inner_rdom;
-        Expr num_tiles  = split_info[i].num_tiles;
-        Expr tile_width = split_info[i].tile_width;
-
-        for (int j=0; j<split_info[i].num_splits; j++) {
-            bool causal = split_info[i].scan_causal[j];
-            int scan_id = split_info[i].scan_id[j];
-
-            Expr boundary = (causal ? 0 : tile_width);
-            Expr inner_tile_condition = (causal ? (xo==0) : (xo==num_tiles-1));
-
-            int dim = -1;
-            Expr arg;
-            for (int k=0; k<reductions[scan_id].args.size(); k++) {
-                if (expr_depends_on_var(reductions[scan_id].args[k], rxi.x.name())) {
-                    dim = k;
-                    arg = reductions[scan_id].args[k];
-                }
-            }
-            assert(dim >= 0);
-
-            for (int k=0; k<reductions[scan_id].values.size(); k++) {
-                Expr val = reductions[scan_id].values[k];
-                val = apply_zero_boundary_in_func_call(F_intra.name(),
-                        dim, arg, boundary, inner_tile_condition, val);
-                reductions[scan_id].values[k] = val;
-            }
-        }
-    }
-
-    // redefine the function if boundary conditions are applied
-    F_intra.clear_all_definitions();
-    F_intra.define(pure_args, pure_values);
-    for (int i=0; i<reductions.size(); i++) {
-        F_intra.define_reduction(reductions[i].args, reductions[i].values);
-    }
 }
 
 // -----------------------------------------------------------------------------
@@ -312,14 +279,18 @@ static Function create_copy(Function F, string func_name) {
     // same pure definition
     B.define(F.args(), F.values());
 
-    // replace all calls to intra tile term with the new term
+    // replace all calls to old function with the copy
     for (int i=0; i<F.reductions().size(); i++) {
         ReductionDefinition r = F.reductions()[i];
+        vector<Expr> args;
         vector<Expr> values;
+        for (int j=0; j<r.args.size(); j++) {
+            args.push_back(substitute_func_call(F.name(), B, r.args[j]));
+        }
         for (int j=0; j<r.values.size(); j++) {
             values.push_back(substitute_func_call(F.name(), B, r.values[j]));
         }
-        B.define_reduction(r.args, values);
+        B.define_reduction(args, values);
     }
     return B;
 }
@@ -482,7 +453,6 @@ static vector<Function> create_tail_residual_term(
 
     int num_args    = F_ctail[0].args().size();
     int num_outputs = F_ctail[0].outputs();
-    Type type       = F_ctail[0].output_types()[0];
 
     assert(split_info.num_splits == F_ctail.size());
 
@@ -493,7 +463,7 @@ static vector<Function> create_tail_residual_term(
 
         // args are same as completed tail terms
         vector<string> args = F_ctail[0].args();
-        vector<Expr> values(num_outputs, make_zero(type));
+        vector<Expr> values(num_outputs, FLOAT_ZERO);
 
         // accumulate the completed tails of all the preceedings scans
         // the list F_ctail is in reverse order just as split_info struct
@@ -504,7 +474,10 @@ static vector<Function> create_tail_residual_term(
 
             // weight matrix for accumulating completed tail elements from scan u to scan j
             // for a tile that is clamped on all borders
-            Image<float> c_weight= tail_weights(split_info, j, u, split_info.clamp_border);
+            Image<float> c_weight = weight;
+            if (!equal(split_info.border_expr[j], FLOAT_ZERO)) {
+                c_weight = tail_weights(split_info, j, u, true);
+            }
 
             // expressions for prev tile and checking for first tile for causal/anticausal scan j
             Expr first_tile = (split_info.scan_causal[j] ? (xo==0) : (xo==num_tiles-1));
@@ -530,15 +503,14 @@ static vector<Function> create_tail_residual_term(
                     Expr wt  = (split_info.scan_causal[j] ? weight(xi,k) : weight(tile-1-xi,k));
                     Expr cwt = (split_info.scan_causal[j] ? c_weight(xi,k): c_weight(tile-1-xi,k));
 
-                    // use weights for clamped image if border clamping is requested
-                    // change the weight for the first tile only, only this tile is affected
-                    // by clamping the image at all borders
-                    if (split_info.clamp_border && split_info.scan_causal[j]!=split_info.scan_causal[u]) {
+                    // change the weight for the first tile only, only this tile is
+                    // affected by clamping the image at all borders
+                    if (split_info.scan_causal[j]!=split_info.scan_causal[u]) {
                         Expr first_tile_u = (split_info.scan_causal[u] ? (xo==0) : (xo==num_tiles-1));
                         wt = select(first_tile_u, cwt, wt);
                     }
 
-                    values[i] += select(first_tile, make_zero(type), wt*val);
+                    values[i] += select(first_tile, FLOAT_ZERO, wt*val);
                 }
             }
         }
@@ -575,11 +547,10 @@ static vector<Function> create_final_residual_term(
 
         int num_args    = F_ctail[j].args().size();
         int num_outputs = F_ctail[j].outputs();
-        Type type       = F_ctail[j].output_types()[0];
 
         // args are same as completed tail terms
         vector<string> args = F_ctail[j].args();
-        vector<Expr> values(num_outputs, make_zero(type));
+        vector<Expr> values(num_outputs, FLOAT_ZERO);
 
         // weight matrix for accumulating completed tail elements
         // of scan after applying only current scan
@@ -609,11 +580,11 @@ static vector<Function> create_final_residual_term(
                 if (split_info.scan_causal[j]) {
                     val = select(xo>0,
                             weight(xi,k) * Call::make(F_ctail[j], call_args, i),
-                            make_zero(type));
+                            FLOAT_ZERO);
                 } else {
                     val = select(xo<num_tiles-1,
                             weight(simplify(tile-1-xi),k) * Call::make(F_ctail[j], call_args, i),
-                            make_zero(type));
+                            FLOAT_ZERO);
                 }
                 values[i] = simplify(values[i] + val);
             }
@@ -741,7 +712,10 @@ static void add_prev_dimension_residual_to_tails(
             // weight matrix for accumulating completed tail elements
             // of scan after applying all subsequent scans
             // for a tile that is clamped on all borders
-            Image<float> c_weight= tail_weights(split_info_prev, k, 0, split_info_prev.clamp_border);
+            Image<float> c_weight = weight;
+            if (!equal(split_info_prev.border_expr[k], FLOAT_ZERO)) {
+                c_weight= tail_weights(split_info_prev, k, 0, true);
+            }
 
             // size of tail is equal to filter order, accumulate all
             // elements of the tail
@@ -778,18 +752,15 @@ static void add_prev_dimension_residual_to_tails(
                     // expression for checking for first tile for causal/anticausal scan
                     Expr first_tile = (split_info_prev.scan_causal[k] ? (yo==0) : (yo==num_tiles-1));
                     Expr last_tile  = (split_info_prev.scan_causal[k] ? (yo==num_tiles-1) : (yo==0));
-                    Expr zero= make_zero(F_tail_prev_scanned.output_types()[i]);
                     Expr val = Call::make(F_tail_prev_scanned, call_args, i);
                     Expr wt  = (split_info_prev.scan_causal[k] ? weight(yi,o)  : weight(simplify(tile-1-yi),o));
                     Expr cwt = (split_info_prev.scan_causal[k] ? c_weight(yi,o): c_weight(simplify(tile-1-yi),o));
-                    // use weights for clamped image if border clamping is requested
+
                     // change the weight for the first tile only, only this tile is affected
                     // by clamping the image at all borders
-                    if (split_info_prev.clamp_border) {
-                        wt = select(last_tile, cwt, wt);
-                    }
+                    wt = select(last_tile, cwt, wt);
 
-                    pure_values[i] += select(first_tile, zero, wt*val);
+                    pure_values[i] += select(first_tile, FLOAT_ZERO, wt*val);
                 }
             }
         }
@@ -841,10 +812,10 @@ static void add_all_residuals_to_final_result(
                 // by next scan's feedforward coeff;
                 Expr fwd = split_info[i].feedfwd_coeff(next_scan);
 
-                // special case if the image is clamped on all borders
+                // special case if the image has non-zero border clamping
                 // add 1 to the multuplicant if next scan is in same
                 // dimension and reverse causality or different dimension
-                if (split_info[i].clamp_border) {
+                if (!equal(split_info[i].border_expr[j], FLOAT_ZERO)) {
                     if (j>0) {
                         // next scan is either in same dimension
                         bool next_causal = split_info[i].scan_causal[j-1];
@@ -852,7 +823,7 @@ static void add_all_residuals_to_final_result(
                         Var  next_xo     = split_info[i].outer_var;
                         Expr cond        = (next_rxi==0);
                         cond = cond && (next_causal ? (next_xo==0) : (next_xo==num_tiles-1));
-                        fwd = select(cond, 1.0f, fwd);
+                        fwd = select(cond, FLOAT_ONE, fwd);
 
                     } else {
                         // or next scan in next dimension
@@ -862,7 +833,7 @@ static void add_all_residuals_to_final_result(
                         Var  next_xo     = split_info[i+1].outer_var;
                         Expr cond        = (next_rxi==0);
                         cond = cond && (next_causal ? (next_xo==0) : (next_xo==num_tiles-1));
-                        fwd = select(cond, 1.0f, fwd);
+                        fwd = select(cond, FLOAT_ONE, fwd);
                     }
                 }
 
@@ -1064,16 +1035,6 @@ void RecFilter::split(map<string,Expr> dim_tile) {
 
         // compute the intra tile result
         Function F_intra = create_intra_tile_term(F, split_info_current);
-
-        // apply clamped boundary on border tiles and zero boundary on
-        // inner tiles if explicit border clamping is requested
-        // TODO
-        //{
-        //    for (int j=0; j<split_info_current.size(); j++) {
-        //        split_info_current[j].clamp_border = true;
-        //    }
-        //    apply_zero_boundary_on_inner_tiles(F_intra, split_info_current);
-        //}
 
         // create a function will hold the final result, copy of the intra tile term
         F_final = create_copy(F_intra, F.name() + DELIMITER + FINAL_TERM);

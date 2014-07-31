@@ -9,10 +9,21 @@
 
 #include <Halide.h>
 
+/** Symbolic integer zero  */
+#define INT_ZERO Halide::Internal::make_zero(Halide::type_of<int>())
+
+/** Symbolic floating point zero  */
+#define FLOAT_ZERO Halide::Internal::make_zero(Halide::type_of<float>())
+
+/** Symbolic integer one */
+#define INT_ONE  Halide::Internal::make_one(Halide::type_of<int>())
+
+/** Symbolic floating point one */
+#define FLOAT_ONE  Halide::Internal::make_one(Halide::type_of<float>())
+
+
 /** Info required to split a particular dimension of the recursive filter */
 struct SplitInfo {
-    bool clamp_border;          ///< should image border be clamped to non-zero entries
-
     int filter_order;           ///< order of recursive filter in a given dimension
     int filter_dim;             ///< dimension id
     int num_splits;             ///< number of scans in the dimension that must be tiled
@@ -32,6 +43,8 @@ struct SplitInfo {
 
     vector<bool> scan_causal;   ///< causal or anticausal flag for each scan
     vector<int>  scan_id;       ///< scan or reduction definition id of each scan
+
+    vector<Halide::Expr> border_expr;   ///< image border value (can't contain var or rdom)
 
     Halide::Image<float> feedfwd_coeff; ///< feedforward coeffs, only one for each scan
     Halide::Image<float> feedback_coeff;///< feedback coeffs (num_scans x max_order) order j-th coeff of i-th scan is (i+1,j) */
@@ -129,18 +142,21 @@ public:
             Halide::RDom rx,            ///< domain of the scan
             float feedfwd,              ///< single feedforward coeff
             std::vector<float> feedback,///< n feedback coeffs, where n is filter order
-            Causality c = CAUSAL        ///< causal or anticausal scan
+            Causality c=CAUSAL,         ///< causal or anticausal scan
+            Halide::Expr border_expr=FLOAT_ZERO ///< expr to use as image border (must not contain x or rx)
             );
     void addScan(
             Halide::Var x,              ///< dimension to a reduction
             Halide::RDom rx,            ///< domain of the scan
-            Causality c = CAUSAL        ///< causal or anticausal scan
+            Causality c=CAUSAL,         ///< causal or anticausal scan
+            Halide::Expr border_expr=FLOAT_ZERO ///< expr to use as image border (must not contain x or rx)
             );
     void addScan(
             Halide::Var x,              ///< dimension to a reduction
             Halide::RDom rx,            ///< domain of the scan
             std::vector<float> feedback,///< n feedback coeffs, where n is filter order
-            Causality c = CAUSAL        ///< causal or anticausal scan
+            Causality c=CAUSAL,         ///< causal or anticausal scan
+            Halide::Expr border_expr=FLOAT_ZERO ///< expr to use as image border (must not contain x or rx)
             );
     // @}
 

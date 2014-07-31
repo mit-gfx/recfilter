@@ -1,5 +1,6 @@
 #include "recfilter.h"
 #include "recfilter_utils.h"
+#include "modifiers.h"
 
 using std::string;
 using std::cerr;
@@ -37,8 +38,8 @@ void RecFilter::setArgs(Var x, Var y, Var z){ setArgs(vec(x,y,z));  }
 void RecFilter::setArgs(vector<Var> args) {
     for (int i=0; i<args.size(); i++) {
         SplitInfo s;
-        s.clamp_border = false;
 
+        // set the variable and filter dimension
         s.var          = args[i];
         s.filter_dim   = i;
 
@@ -89,7 +90,8 @@ void RecFilter::addScan(
         RDom rx,
         float feedfwd,
         vector<float> feedback,
-        Causality causality)
+        Causality causality,
+        Expr border_expr)
 {
     Function f = contents.ptr->recfilter.function();
 
@@ -104,9 +106,19 @@ void RecFilter::addScan(
         assert(false);
     }
 
-    if (!equal(rx.x.min(), make_zero(type_of<int>()))) {
+    if (!equal(rx.x.min(), INT_ZERO)) {
         cerr << "Scan variables must have 0 as lower limit" << endl;
         assert(false);
+    }
+
+    if (expr_depends_on_var(border_expr, x.name())) {
+        cerr << "Image border expression for scan along " << x.name()
+            << " must not depend upon " << x.name() << endl;
+    }
+
+    if (expr_depends_on_var(border_expr, rx.x.name())) {
+        cerr << "Image border expression for scan along " << rx.x.name()
+            << " must not depend upon " << rx.x.name() << endl;
     }
 
     // csausality
@@ -151,23 +163,19 @@ void RecFilter::addScan(
     // RHS scan definition
     vector<Expr> values(f.values().size());
     for (int i=0; i<values.size(); i++) {
-        Expr zero = make_zero(f.output_types()[i]);
-
-        if (feedfwd != 0.0f) {
-            values[i] = feedfwd * Call::make(f, args, i);
-        } else {
-            values[i] = zero;
-        }
+        values[i] = feedfwd * Call::make(f, args, i);
 
         for (int j=0; j<feedback.size(); j++) {
             if (feedback[j] != 0.0f) {
                 vector<Expr> call_args = args;
                 if (causal) {
                     call_args[dimension] = max(call_args[dimension]-(j+1),0);
-                    values[i] += select(rx>j, feedback[j] * Call::make(f,call_args,i), zero);
+                    values[i] += select(rx>j, feedback[j] * Call::make(f,call_args,i),
+                            border_expr);
                 } else {
                     call_args[dimension] = min(call_args[dimension]+(j+1),width-1);
-                    values[i] += select(rx>j, feedback[j] * Call::make(f,call_args,i), zero);
+                    values[i] += select(rx>j, feedback[j] * Call::make(f,call_args,i),
+                            border_expr);
                 }
             }
         }
@@ -181,6 +189,7 @@ void RecFilter::addScan(
     SplitInfo s = contents.ptr->split_info[dimension];
     s.scan_id    .insert(s.scan_id.begin(), f.reductions().size()-1);
     s.scan_causal.insert(s.scan_causal.begin(), causal);
+    s.border_expr.insert(s.border_expr.begin(), border_expr);
     s.rdom         = rx;
     s.num_splits   = s.num_splits+1;
     s.image_width  = width;
@@ -214,12 +223,12 @@ void RecFilter::addScan(
     }
 }
 
-void RecFilter::addScan(Var x, RDom rx, Causality causal) {
-    addScan(x, rx, 1.0f, vec(1.0f), causal);
+void RecFilter::addScan(Var x, RDom rx, Causality c, Expr b) {
+    addScan(x, rx, 1.0f, vec(1.0f), c, b);
 }
 
-void RecFilter::addScan(Var x, RDom rx, vector<float> feedback, Causality causal) {
-    addScan(x, rx, 1.0f, feedback, causal);
+void RecFilter::addScan(Var x, RDom rx, vector<float> fb, Causality c, Expr b) {
+    addScan(x, rx, 1.0f, fb, c, b);
 }
 
 // -----------------------------------------------------------------------------

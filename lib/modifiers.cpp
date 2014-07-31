@@ -543,63 +543,6 @@ public:
 
 // -----------------------------------------------------------------------------
 
-//// Replace all calls to a pure function by its actual value
-//class InlineAllFuncCalls : public IRMutator {
-//private:
-//    using IRMutator::visit;
-//    void visit(const Call *op) {
-//        if (op->call_type==Call::Halide && op->name==f.name()) {
-//            vector<Expr>   call_args = op->args;
-//            vector<string> args = f.args();
-//            vector<string> temp_args = f.args();
-//            Expr val = f.values()[op->value_index];
-//            for (size_t i=0; i<call_args.size(); i++) {  // mutate calling args
-//                call_args[i] = mutate(call_args[i]);     // of f
-//            }
-//
-//            // replace all args with a tagged version of arg
-//            for (size_t i=0; i<args.size(); i++) {
-//                temp_args[i] = args[i] + int_to_string(rand());
-//                val = simplify(substitute(args[i], Var(temp_args[i]), val));
-//            }
-//
-//            // replace all the 'tagged' args with calling args, this is avoid
-//            // situations when some arg is the same as some other calling arg
-//            for (size_t i=0; i<temp_args.size(); i++) {
-//                val = simplify(substitute(temp_args[i], call_args[i], val));
-//            }
-//            expr = val;
-//        }
-//        else {
-//            // standard mutation routine
-//            vector<Expr> new_args(op->args.size());
-//            bool changed = false;
-//
-//            // Mutate the args
-//            for (size_t i=0; i<op->args.size(); i++) {
-//                Expr old_arg = op->args[i];
-//                Expr new_arg = mutate(old_arg);
-//                if (!new_arg.same_as(old_arg)) changed = true;
-//                new_args[i] = new_arg;
-//            }
-//
-//            if (changed) {
-//                expr = Call::make(op->type, op->name, new_args, op->call_type,
-//                        op->func, op->value_index, op->image, op->param);
-//            } else {
-//                expr = op;
-//            }
-//        }
-//    }
-//
-//    Function f;
-//
-//public:
-//    InlineAllFuncCalls(Function func) : f(func) {}
-//};
-//
-//// -----------------------------------------------------------------------------
-
 bool expr_depends_on_var(Expr expr, string var) {
     ExprDependsOnVar depends(var);
     expr.accept(&depends);
