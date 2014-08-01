@@ -254,11 +254,11 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
                     vector<Expr> call_args = args;
                     if (causal) {
                         call_args[dimension] = max(call_args[dimension]-(k+1),0);
-                        values[j] += select(rxi[filter_dim]>k, feedback[k] * Call::make(F_intra,call_args,j),
+                        values[j] += feedback[k] * select(rxi[filter_dim]>k, Call::make(F_intra,call_args,j),
                                 select(xo==0, border_expr, FLOAT_ZERO));
                     } else {
                         call_args[dimension] = min(call_args[dimension]+(k+1),tile_width-1);
-                        values[j] += select(rxi[filter_dim]>k, feedback[k] * Call::make(F_intra,call_args,j),
+                        values[j] += feedback[k] * select(rxi[filter_dim]>k, Call::make(F_intra,call_args,j),
                                 select(xo==num_tiles-1, border_expr, FLOAT_ZERO));
                     }
                 }

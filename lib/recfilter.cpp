@@ -170,11 +170,11 @@ void RecFilter::addScan(
                 vector<Expr> call_args = args;
                 if (causal) {
                     call_args[dimension] = max(call_args[dimension]-(j+1),0);
-                    values[i] += select(rx>j, feedback[j] * Call::make(f,call_args,i),
+                    values[i] += feedback[j] * select(rx>j, Call::make(f,call_args,i),
                             border_expr);
                 } else {
                     call_args[dimension] = min(call_args[dimension]+(j+1),width-1);
-                    values[i] += select(rx>j, feedback[j] * Call::make(f,call_args,i),
+                    values[i] += feedback[j] * select(rx>j, Call::make(f,call_args,i),
                             border_expr);
                 }
             }

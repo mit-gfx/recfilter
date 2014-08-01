@@ -104,6 +104,11 @@ ostream &operator<<(ostream &s, CheckResult v) {
             }
         }
     }
+    float mse  = diff_sum/float(width*height*channels);
+
+    s << "Mean sq error = " << mse << "\n\n";
+
+    return s;
 }
 
 ostream &operator<<(ostream &s, CheckResultVerbose v) {

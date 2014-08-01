@@ -162,6 +162,10 @@ gaussian_weights(float sigma, int order) {
         default:weights3(sigma, b0, a[0], a[1], a[2]); break;
     }
 
+    for (int i=0; i<a.size(); i++) {
+        a[i] = -a[i];
+    }
+
     return std::make_pair<float, vector<float> >(b0, a);
 }
 
