@@ -15,7 +15,7 @@ using std::endl;
 
 
 int main(int argc, char **argv) {
-    Arguments args("boxcar", argc, argv);
+    Arguments args(argc, argv);
 
     bool  nocheck = args.nocheck;
     int   width   = args.width;

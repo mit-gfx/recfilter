@@ -17,7 +17,7 @@ using std::cerr;
 using std::endl;
 
 int main(int argc, char **argv) {
-    Arguments args("gauss_cognex_direct", argc, argv);
+    Arguments args(argc, argv);
 
     bool nocheck = args.nocheck;
     int  width  = args.width;
@@ -37,12 +37,10 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    int order     = 3;
-    int num_scans = 2;
-
-    Image<float> W(num_scans,order);
-    W(0,0) = 3.0f; W(0,1) = -3.0f; W(0,2) = 1.0f;
-    W(1,0) = 3.0f; W(1,1) = -3.0f; W(1,2) = 1.0f;
+    vector<float> W;
+    W.push_back( 3.0f);
+    W.push_back(-3.0f);
+    W.push_back( 1.0f);
 
     Func I("I");
     Func S("S");
@@ -77,8 +75,8 @@ int main(int argc, char **argv) {
     RecFilter filter("Gauss");
     filter.setArgs(x, y);
     filter.define(Expr(S(x, y)));
-    filter.addScan(x, rx, Internal::vec(W(0,0), W(0,1), W(0,2)));
-    filter.addScan(y, ry, Internal::vec(W(1,0), W(1,1), W(1,2)));
+    filter.addScan(x, rx, W, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(0,y));
+    filter.addScan(y, ry, W, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(x,0));
 
     filter.split(x, y, tile);
 

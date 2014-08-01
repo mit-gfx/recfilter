@@ -17,7 +17,7 @@ using std::cerr;
 using std::endl;
 
 int main(int argc, char **argv) {
-    Arguments args("gauss_anticausal_cascaded", argc, argv);
+    Arguments args(argc, argv);
 
     bool nocheck = args.nocheck;
     int  width   = args.width;

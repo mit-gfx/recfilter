@@ -15,7 +15,7 @@ using std::endl;
 
 
 int main(int argc, char **argv) {
-    Arguments args("summed_table", argc, argv);
+    Arguments args(argc, argv);
 
     bool  nocheck = args.nocheck;
     int   width   = args.width;

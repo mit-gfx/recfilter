@@ -311,11 +311,8 @@ public:
     int iterations;  ///< profiling iterations
     bool nocheck;    ///< skip check Halide result against reference solution
 
-    Arguments(
-            std::string app_name, ///< name of application
-            int argc,             ///< number of command line args
-            char** argv           ///< array of command line args
-            );
+    /** Parse command line args from number of args and list of args */
+    Arguments(int argc, char** argv);
 };
 
 // ----------------------------------------------------------------------------

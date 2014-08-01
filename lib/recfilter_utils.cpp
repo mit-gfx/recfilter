@@ -9,13 +9,14 @@ using std::runtime_error;
 
 using namespace Halide;
 
-Arguments::Arguments(string app_name, int argc, char** argv) :
+Arguments::Arguments(int argc, char** argv) :
     width  (256),
     block  (32),
     iterations(1),
     nocheck(false)
 {
-    string desc = "\nUsage\n ./"+ app_name;
+    string app_name = argv[0];
+    string desc = "\nUsage\n " + app_name;
     desc.append(string(
                 "[-width|-w w] [-tile|-block|-b|-t b] [-iter i] [-nocheck] [-help]\n\n"
                 "\twidth\t  width of input image [default = 256]\n"

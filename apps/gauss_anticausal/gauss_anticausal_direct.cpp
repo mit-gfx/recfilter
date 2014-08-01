@@ -17,7 +17,7 @@ using std::cerr;
 using std::endl;
 
 int main(int argc, char **argv) {
-    Arguments args("gauss_anticausal_direct", argc, argv);
+    Arguments args(argc, argv);
 
     bool nocheck = args.nocheck;
     int  width   = args.width;
@@ -58,26 +58,6 @@ int main(int argc, char **argv) {
     filter.split(x, tile);
 
     cerr << filter << endl;
-
-    map<string, Func> funcs = filter.funcs();
-    map<string, Func>::iterator f = funcs.begin();
-    for (; f != funcs.end(); f++) {
-        f->second.compute_root();
-        if (f->first.find("Tail") != f->first.npos ||
-            f->first.find("TDeps") != f->first.npos) {
-            Func ff;
-            ff(x) = f->second(0, x, 1);
-            Image<float> a = ff.realize(width/tile);
-            cerr << f->first << endl << a << endl;
-        }
-        if (f->first.find("Final") != f->first.npos ||
-                f->first.find("Deps") != f->first.npos) {
-            Func ff;
-            ff(x) = f->second(x%tile, x/tile, 1);
-            Image<float> a = ff.realize(width);
-            cerr << f->first << endl << a << endl;
-        }
-    }
 
     // ----------------------------------------------------------------------------------------------
 

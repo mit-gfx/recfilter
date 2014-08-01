@@ -17,7 +17,7 @@ using std::cerr;
 using std::endl;
 
 int main(int argc, char **argv) {
-    Arguments args("gauss_cognex_overlapped", argc, argv);
+    Arguments args(argc, argv);
 
     bool nocheck = args.nocheck;
     int  width  = args.width;
@@ -37,14 +37,10 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    int order     = 2;
-    int num_scans = 4;
-
-    Image<float> W(num_scans,order);
-    W(0,0) = 1.0f; W(0,1) =  0.0f;
-    W(1,0) = 2.0f; W(1,1) = -1.0f;
-    W(2,0) = 1.0f; W(2,1) =  0.0f;
-    W(3,0) = 2.0f; W(3,1) = -1.0f;
+    vector<float> W1, W2;
+    W1.push_back( 1.0f);
+    W2.push_back( 2.0f);
+    W2.push_back(-1.0f);
 
     Func I("I");
     Func S("S");
@@ -79,10 +75,10 @@ int main(int argc, char **argv) {
     RecFilter filter("Gauss");
     filter.setArgs(x, y);
     filter.define(Expr(S(x, y)));
-    filter.addScan(x, rx, Internal::vec(W(0,0), W(0,1)));
-    filter.addScan(x, rx, Internal::vec(W(1,0), W(1,1)));
-    filter.addScan(y, ry, Internal::vec(W(2,0), W(2,1)));
-    filter.addScan(y, ry, Internal::vec(W(3,0), W(3,1)));
+    filter.addScan(x, rx, W1, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(0,y));
+    filter.addScan(x, rx, W1, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(0,y));
+    filter.addScan(y, ry, W2, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(x,0));
+    filter.addScan(y, ry, W2, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(x,0));
 
     filter.split(x, y, tile);
 

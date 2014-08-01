@@ -765,8 +765,8 @@ static void add_prev_dimension_residual_to_tails(
                     Expr first_tile = (split_info_prev.scan_causal[k] ? (yo==0) : (yo==num_tiles-1));
                     Expr last_tile  = (split_info_prev.scan_causal[k] ? (yo==num_tiles-1) : (yo==0));
                     Expr val = Call::make(F_tail_prev_scanned, call_args, i);
-                    Expr wt  = (split_info_prev.scan_causal[k] ? weight(yi,o)  : weight(tile-1-yi),o);
-                    Expr cwt = (split_info_prev.scan_causal[k] ? c_weight(yi,o): c_weight(tile-1-yi),o);
+                    Expr wt  = (split_info_prev.scan_causal[k] ? weight(yi,o)  : weight(tile-1-yi,o));
+                    Expr cwt = (split_info_prev.scan_causal[k] ? c_weight(yi,o): c_weight(tile-1-yi,o));
 
                     // change the weight for the first tile only, only this tile is affected
                     // by clamping the image at all borders

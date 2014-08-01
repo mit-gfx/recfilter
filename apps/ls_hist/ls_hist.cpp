@@ -25,7 +25,7 @@ using std::endl;
 Func gaussian_blur(Func I, float sigma, Expr width, Expr height, int tile, string name);
 
 int main(int argc, char **argv) {
-    Arguments args("lshist_median", argc, argv);
+    Arguments args(argc, argv);
 
     bool nocheck = args.nocheck;
     int  width   = args.width;
