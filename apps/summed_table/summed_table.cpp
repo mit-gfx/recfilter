@@ -21,7 +21,6 @@ int main(int argc, char **argv) {
     int   width   = args.width;
     int   height  = args.width;
     int   tile    = args.block;
-    int   iterations = args.iterations;
 
     Image<float> random_image = generate_random_image<float>(width,height);
 
@@ -36,7 +35,7 @@ int main(int argc, char **argv) {
     RDom rx(0, image.width(), "rx");
     RDom ry(0, image.height(),"ry");
 
-    RecFilter filter;
+    RecFilter filter("SAT");
     filter.setArgs(x, y);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
     filter.addScan(x, rx);
@@ -60,12 +59,7 @@ int main(int argc, char **argv) {
     Buffer hl_out_buff(type_of<float>(), width,height);
     {
         Timer t("Running ... ");
-        for (int k=0; k<iterations; k++) {
-            filter.func().realize(hl_out_buff);
-            if (k < iterations-1) {
-                hl_out_buff.free_dev_buffer();
-            }
-        }
+        filter.func().realize(hl_out_buff);
     }
     hl_out_buff.copy_to_host();
     hl_out_buff.free_dev_buffer();

@@ -44,11 +44,6 @@ int main(int argc, char **argv) {
     RDom rx(0, image.width(), "rx");
     RDom ry(0, image.height(),"ry");
 
-    Expr left_border   = image(0,y);
-    Expr right_border  = image(image.width()-1,y);
-    Expr top_border    = image(x,0);
-    Expr bottom_border = image(x,image.height()-1);
-
     RecFilter filter("Gauss");
     filter.setArgs(x, y);
     filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));

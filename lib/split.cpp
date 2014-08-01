@@ -808,8 +808,6 @@ static void add_all_residuals_to_final_result(
 
     // each F_deps represents the residuals from one dimension
     // add this residual to the first scan in next dimension
-    Function F_deps_last;
-
     for (int i=0; i<F_deps.size(); i++) {
         Expr tile_width = split_info[i].tile_width;
         Expr num_tiles  = split_info[i].num_tiles;
@@ -817,45 +815,59 @@ static void add_all_residuals_to_final_result(
         for (int j=0; j<F_deps[i].size(); j++) {
             int next_scan = split_info[i].scan_id[j]+1;
 
-            if (next_scan < reductions.size()) {
-                vector<Expr> call_args = reductions[next_scan].args;
+            // multiply curr scan's residual to next scan after multiplying
+            // by next scan's feedforward coeff
+            Expr feedfwd = split_info[i].feedfwd_coeff(next_scan);
 
-                // multiply curr scan's residual to next scan after multiplying
-                // by next scan's feedforward coeff;
-                Expr fwd = split_info[i].feedfwd_coeff(next_scan);
-
-                // special case if the image has non-zero border clamping
-                // add 1 to the multuplicant if next scan is in same
-                // dimension and reverse causality or different dimension
-                if (!equal(split_info[i].border_expr[j], FLOAT_ZERO)) {
-                    if (j>0) {
-                        // next scan is either in same dimension
-                        bool next_causal = split_info[i].scan_causal[j-1];
-                        RVar next_rxi    = split_info[i].inner_rdom[j-1];
-                        Var  next_xo     = split_info[i].outer_var;
-                        Expr cond        = (next_rxi==0);
-                        cond = cond && (next_causal ? (next_xo==0) : (next_xo==num_tiles-1));
-                        fwd = select(cond, FLOAT_ONE, fwd);
-
-                    } else {
-                        // or next scan in next dimension
-                        int a = split_info[i+1].num_splits-1;
-                        bool next_causal = split_info[i+1].scan_causal[a];
-                        RVar next_rxi    = split_info[i+1].inner_rdom[a];
-                        Var  next_xo     = split_info[i+1].outer_var;
-                        Expr cond        = (next_rxi==0);
-                        cond = cond && (next_causal ? (next_xo==0) : (next_xo==num_tiles-1));
-                        fwd = select(cond, FLOAT_ONE, fwd);
-                    }
+            // if this is the last scan, then next_scan does not exist; therefore
+            // add a dummy scan which simply assigns the same pixel to itself;
+            // the residual from the last scan gets added to this
+            if (next_scan >= reductions.size()) {
+                assert(next_scan>0);
+                vector<Expr> temp_values;
+                for (int k=0; k<reductions[next_scan-1].values.size(); k++) {
+                    temp_values.push_back(Call::make(F_sub,
+                                reductions[next_scan-1].args, k));
                 }
+                ReductionDefinition temp_rdef;
+                temp_rdef.values   = temp_values;
+                temp_rdef.args     = reductions[next_scan-1].args;
+                temp_rdef.domain   = reductions[next_scan-1].domain;
+                temp_rdef.schedule = reductions[next_scan-1].schedule;
+                reductions.push_back(temp_rdef);
+                feedfwd = FLOAT_ONE;
+            }
 
-                for (int k=0; k<reductions[next_scan].values.size(); k++) {
-                    reductions[next_scan].values[k] +=
-                        fwd * Call::make(F_deps[i][j], call_args, k);
+            vector<Expr> call_args = reductions[next_scan].args;
+
+            // special case if the image has non-zero border clamping
+            // add 1 to the multuplicant if next scan is in same
+            // dimension and reverse causality or different dimension
+            if (!equal(split_info[i].border_expr[j], FLOAT_ZERO)) {
+                if (j>0) {
+                    // next scan is either in same dimension
+                    bool next_causal = split_info[i].scan_causal[j-1];
+                    RVar next_rxi    = split_info[i].inner_rdom[j-1];
+                    Var  next_xo     = split_info[i].outer_var;
+                    Expr cond        = (next_rxi==0);
+                    cond = cond && (next_causal ? (next_xo==0) : (next_xo==num_tiles-1));
+                    feedfwd = select(cond, FLOAT_ONE, feedfwd);
+
+                } else {
+                    // or next scan in next dimension
+                    int a = split_info[i+1].num_splits-1;
+                    bool next_causal = split_info[i+1].scan_causal[a];
+                    RVar next_rxi    = split_info[i+1].inner_rdom[a];
+                    Var  next_xo     = split_info[i+1].outer_var;
+                    Expr cond        = (next_rxi==0);
+                    cond = cond && (next_causal ? (next_xo==0) : (next_xo==num_tiles-1));
+                    feedfwd = select(cond, FLOAT_ONE, feedfwd);
                 }
-            } else {
-                // add this to the final result of all the scans
-                F_deps_last = F_deps[i][j];
+            }
+
+            for (int k=0; k<reductions[next_scan].values.size(); k++) {
+                Expr val = Call::make(F_deps[i][j], call_args, k);
+                reductions[next_scan].values[k] += feedfwd * val;
             }
         }
     }
@@ -879,8 +891,7 @@ static void add_all_residuals_to_final_result(
         final_call_args.push_back(Var(pure_args[i]));
     }
     for (int i=0; i<F.outputs(); i++) {
-        Expr val  = Call::make(F_sub, final_call_args, i) +
-            Call::make(F_deps_last, final_call_args, i);
+        Expr val  = Call::make(F_sub, final_call_args, i);
         final_pure_values.push_back(val);
     }
 
