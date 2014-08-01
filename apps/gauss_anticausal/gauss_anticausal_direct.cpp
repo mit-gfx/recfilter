@@ -42,17 +42,42 @@ int main(int argc, char **argv) {
     RDom rx(0, image.width(), "rx");
     RDom ry(0, image.height(),"ry");
 
-    RecFilter filter("Gauss");
+    Expr left_border   = image(0,y);
+    Expr right_border  = image(image.width()-1,y);
+    Expr top_border    = image(x,0);
+    Expr bottom_border = image(x,image.height()-1);
+
+    RecFilter filter("G");
     filter.setArgs(x, y);
     filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
-    filter.addScan(x, rx, B3, W3, RecFilter::CAUSAL);
-    filter.addScan(x, rx, B3, W3, RecFilter::ANTICAUSAL);
-    filter.addScan(y, ry, B3, W3, RecFilter::CAUSAL);
-    filter.addScan(y, ry, B3, W3, RecFilter::ANTICAUSAL);
+    filter.addScan(x, rx, B3, W3, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
+    filter.addScan(x, rx, B3, W3, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
+//    filter.addScan(y, ry, B3, W3, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
+//    filter.addScan(y, ry, B3, W3, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
 
-    filter.split(x, y, tile);
+    filter.split(x, tile);
 
     cerr << filter << endl;
+
+    map<string, Func> funcs = filter.funcs();
+    map<string, Func>::iterator f = funcs.begin();
+    for (; f != funcs.end(); f++) {
+        f->second.compute_root();
+        if (f->first.find("Tail") != f->first.npos ||
+            f->first.find("TDeps") != f->first.npos) {
+            Func ff;
+            ff(x) = f->second(0, x, 1);
+            Image<float> a = ff.realize(width/tile);
+            cerr << f->first << endl << a << endl;
+        }
+        if (f->first.find("Final") != f->first.npos ||
+                f->first.find("Deps") != f->first.npos) {
+            Func ff;
+            ff(x) = f->second(x%tile, x/tile, 1);
+            Image<float> a = ff.realize(width);
+            cerr << f->first << endl << a << endl;
+        }
+    }
 
     // ----------------------------------------------------------------------------------------------
 
@@ -79,7 +104,7 @@ int main(int argc, char **argv) {
         cerr << "\nChecking difference ...\n" << endl;
         Image<float> hl_out(hl_out_buff);
         Image<float> ref = reference_gaussian(random_image, sigma);
-        cerr << "Difference with true Gaussian \n" << CheckResult(ref,hl_out) << endl;
+        cerr << "Difference with true Gaussian \n" << CheckResultVerbose(ref,hl_out) << endl;
     }
 
     return 0;

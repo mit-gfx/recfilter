@@ -91,7 +91,8 @@ void RecFilter::addScan(
         float feedfwd,
         vector<float> feedback,
         Causality causality,
-        Expr border_expr)
+        Border border_mode,
+        Expr bexpr)
 {
     Function f = contents.ptr->recfilter.function();
 
@@ -111,18 +112,35 @@ void RecFilter::addScan(
         assert(false);
     }
 
-    if (expr_depends_on_var(border_expr, x.name())) {
-        cerr << "Image border expression for scan along " << x.name()
-            << " must not depend upon " << x.name() << endl;
-    }
 
-    if (expr_depends_on_var(border_expr, rx.x.name())) {
-        cerr << "Image border expression for scan along " << rx.x.name()
-            << " must not depend upon " << rx.x.name() << endl;
-    }
 
     // csausality
     bool causal = (causality == CAUSAL);
+
+    // border pixels
+    Expr border_expr;
+    switch (border_mode) {
+        case CLAMP_TO_ZERO:
+            border_expr = FLOAT_ZERO;
+            break;
+
+        case CLAMP_TO_EXPR:
+            border_expr = bexpr;
+            if (expr_depends_on_var(border_expr, x.name())) {
+                cerr << "Image border expression for scan along " << x.name()
+                    << " must not depend upon " << x.name() << endl;
+            }
+            if (expr_depends_on_var(border_expr, rx.x.name())) {
+                cerr << "Image border expression for scan along " << rx.x.name()
+                    << " must not depend upon " << rx.x.name() << endl;
+            }
+            break;
+
+        case CLAMP_TO_SELF:
+        default:
+            border_expr = Expr();
+            break;
+    }
 
     // image dimension for the scan
     int dimension = -1;
@@ -170,12 +188,13 @@ void RecFilter::addScan(
                 vector<Expr> call_args = args;
                 if (causal) {
                     call_args[dimension] = max(call_args[dimension]-(j+1),0);
-                    values[i] += feedback[j] * select(rx>j, Call::make(f,call_args,i),
-                            border_expr);
                 } else {
                     call_args[dimension] = min(call_args[dimension]+(j+1),width-1);
-                    values[i] += feedback[j] * select(rx>j, Call::make(f,call_args,i),
-                            border_expr);
+                }
+                if (border_expr.defined()) {
+                    values[i] += feedback[j] * select(rx>j, Call::make(f,call_args,i), border_expr);
+                } else {
+                    values[i] += feedback[j] * Call::make(f,call_args,i);
                 }
             }
         }
@@ -223,12 +242,12 @@ void RecFilter::addScan(
     }
 }
 
-void RecFilter::addScan(Var x, RDom rx, Causality c, Expr b) {
-    addScan(x, rx, 1.0f, vec(1.0f), c, b);
+void RecFilter::addScan(Var x, RDom rx, Causality c, Border b, Expr bexpr) {
+    addScan(x, rx, 1.0f, vec(1.0f), c, b, bexpr);
 }
 
-void RecFilter::addScan(Var x, RDom rx, vector<float> fb, Causality c, Expr b) {
-    addScan(x, rx, 1.0f, fb, c, b);
+void RecFilter::addScan(Var x, RDom rx, vector<float> fb, Causality c, Border b, Expr bexpr) {
+    addScan(x, rx, 1.0f, fb, c, b, bexpr);
 }
 
 // -----------------------------------------------------------------------------

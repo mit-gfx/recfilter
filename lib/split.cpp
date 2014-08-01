@@ -228,16 +228,18 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
         assert(dimension >= 0);
 
         // border expression: replace all variables x in border_expr with xo*tile+rxi
-        for (int j=0; j<F.args().size(); j++) {
-            string a = F.args()[j];
-            bool found = false;
-            for (int k=0; !found && k<split_info.size(); k++) {
-                if (a == split_info[k].var.name()) {
-                    Var  temp_xo  = split_info[k].outer_var;
-                    RVar temp_rxi = rxi[ split_info[k].filter_dim ];
-                    Expr temp_tile= split_info[k].tile_width;
-                    border_expr = substitute(a, temp_tile*temp_xo+temp_rxi, border_expr);
-                    found = true;
+        if (border_expr.defined()) {
+            for (int j=0; j<F.args().size(); j++) {
+                string a = F.args()[j];
+                bool found = false;
+                for (int k=0; !found && k<split_info.size(); k++) {
+                    if (a == split_info[k].var.name()) {
+                        Var  temp_xo  = split_info[k].outer_var;
+                        RVar temp_rxi = rxi[ split_info[k].filter_dim ];
+                        Expr temp_tile= split_info[k].tile_width;
+                        border_expr = substitute(a, temp_tile*temp_xo+temp_rxi, border_expr);
+                        found = true;
+                    }
                 }
             }
         }
@@ -252,14 +254,24 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
             for (int k=0; k<feedback.size(); k++) {
                 if (feedback[k] != 0.0f) {
                     vector<Expr> call_args = args;
+                    Expr first_tile = (causal ? (xo==0) : (xo==num_tiles-1));
                     if (causal) {
                         call_args[dimension] = max(call_args[dimension]-(k+1),0);
-                        values[j] += feedback[k] * select(rxi[filter_dim]>k, Call::make(F_intra,call_args,j),
-                                select(xo==0, border_expr, FLOAT_ZERO));
                     } else {
                         call_args[dimension] = min(call_args[dimension]+(k+1),tile_width-1);
-                        values[j] += feedback[k] * select(rxi[filter_dim]>k, Call::make(F_intra,call_args,j),
-                                select(xo==num_tiles-1, border_expr, FLOAT_ZERO));
+                    }
+
+                    // inner tiles must always be clamped to zero beyond tile borders
+                    // tiles on the image border must be clamped as specified in
+                    // RecFilter::addScan
+                    if (border_expr.defined()) {
+                        values[j] += feedback[k] * select(rxi[filter_dim]>k,
+                                Call::make(F_intra,call_args,j),
+                                select(first_tile, border_expr, FLOAT_ZERO));
+                    } else {
+                        values[j] += feedback[k] *
+                            select(first_tile || rxi[filter_dim]>k,
+                                Call::make(F_intra,call_args,j), FLOAT_ZERO);
                     }
                 }
             }
@@ -481,7 +493,7 @@ static vector<Function> create_tail_residual_term(
 
             // expressions for prev tile and checking for first tile for causal/anticausal scan j
             Expr first_tile = (split_info.scan_causal[j] ? (xo==0) : (xo==num_tiles-1));
-            Expr prev_tile  = (split_info.scan_causal[j] ? max(xo-1,0) : min(xo+1, simplify(num_tiles-1)));
+            Expr prev_tile  = (split_info.scan_causal[j] ? max(xo-1,0) : min(xo+1, num_tiles-1));
 
             // size of tail is equal to filter order, accumulate all
             // elements of the tail
@@ -753,8 +765,8 @@ static void add_prev_dimension_residual_to_tails(
                     Expr first_tile = (split_info_prev.scan_causal[k] ? (yo==0) : (yo==num_tiles-1));
                     Expr last_tile  = (split_info_prev.scan_causal[k] ? (yo==num_tiles-1) : (yo==0));
                     Expr val = Call::make(F_tail_prev_scanned, call_args, i);
-                    Expr wt  = (split_info_prev.scan_causal[k] ? weight(yi,o)  : weight(simplify(tile-1-yi),o));
-                    Expr cwt = (split_info_prev.scan_causal[k] ? c_weight(yi,o): c_weight(simplify(tile-1-yi),o));
+                    Expr wt  = (split_info_prev.scan_causal[k] ? weight(yi,o)  : weight(tile-1-yi),o);
+                    Expr cwt = (split_info_prev.scan_causal[k] ? c_weight(yi,o): c_weight(tile-1-yi),o);
 
                     // change the weight for the first tile only, only this tile is affected
                     // by clamping the image at all borders
