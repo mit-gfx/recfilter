@@ -1,12 +1,8 @@
-APP_NAME=lshist
-
 CXX=g++
 MKDIR=mkdir -p
 RM=rm -rf
 
-BUILD_DIR=_build
 BIN_DIR=../bin
-EXE=$(BIN_DIR)/$(APP_NAME)
 
 SPLITLIB_DIR=../../lib/
 SPLITLIB_INC=$(SPLITLIB_DIR)/recfilter.h
@@ -14,23 +10,17 @@ SPLITLIB_LIB=$(SPLITLIB_DIR)/libSplit.a
 
 HALIDE_LIB=$(HALIDE_DIR)/bin/libHalide.a
 
-SRC := $(wildcard *.cpp)
-OBJ := $(addprefix $(BUILD_DIR)/,$(notdir $(SRC:.cpp=.o)))
-INC := $(wildcard *.h)
+SRC  := $(wildcard *.cpp)
+APPS := $(addprefix $(BIN_DIR)/,$(notdir $(SRC:.cpp=.app)))
 
-all: $(EXE)
+all: $(APPS)
 
-$(BUILD_DIR)/%.o: %.cpp $(INC) $(SPLITLIB_INC)
-	@$(MKDIR) $(BUILD_DIR)
-	$(CXX) -c $< -o $@ -fno-rtti -I$(SPLITLIB_DIR) -I$(HALIDE_DIR)/include/
-
-$(EXE): $(OBJ) $(SPLITLIB_LIB) $(HALIDE_LIB)
+$(BIN_DIR)/%.app: %.cpp  $(SPLITLIB_LIB) $(HALIDE_LIB) $(SPLITLIB_INC)
 	@$(MKDIR) $(BIN_DIR)
-	$(CXX) -lz -lpthread -ldl -g -Wall $(OBJ) $(HALIDE_LIB) $(SPLITLIB_LIB) -o $(EXE)
+	$(CXX) $< -o $@ -fno-rtti -I$(SPLITLIB_DIR) -I$(HALIDE_DIR)/include/ -lz -lpthread -ldl -g -Wall $(HALIDE_LIB) $(SPLITLIB_LIB)
 
 $(SPLITLIB_LIB): $(SPLITLIB_INC)
 	make -C $(SPLITLIB_DIR)
 
 clean:
-	$(RM) $(BUILD_DIR)
-	$(RM) $(EXE)
+	$(RM) $(APPS)

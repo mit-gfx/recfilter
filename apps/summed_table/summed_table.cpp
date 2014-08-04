@@ -45,6 +45,37 @@ int main(int argc, char **argv) {
 
     cerr << filter << endl;
 
+    map<string,Func> funcs = filter.funcs();
+    map<string,Func>::iterator f = funcs.begin();
+    for (; f!=funcs.end(); f++) {
+        f->second.compute_root();
+    }
+    while (f!=funcs.end()) {
+        cerr << f->first << endl;
+        if (f->first.find("y") != string::npos) {
+            if (f->first.find("Tail_y") != string::npos) {
+                Func ff;
+                ff(x,y) = f->second(x%tile, x/tile, 0, y/tile);
+                Image<float> a = ff.realize(width, width/tile);
+                cerr << a << endl;
+            } else {
+                Func ff;
+                ff(x,y) = f->second(x%tile, x/tile, y%tile, y/tile);
+                Image<float> a = ff.realize(width, width);
+                cerr << a << endl;
+            }
+        } else {
+            if (f->first.find("Sub") != string::npos) {
+                Func ff;
+                ff(x,y) = f->second(x%tile, x/tile, y%tile, y/tile);
+                Image<float> a = ff.realize(width, width);
+                cerr << a << endl;
+            }
+        }
+        f++;
+    }
+    cerr << "done" << endl;
+
     // ----------------------------------------------------------------------------------------------
 
     Target target = get_jit_target_from_environment();

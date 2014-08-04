@@ -824,16 +824,19 @@ static void add_all_residuals_to_final_result(
             // the residual from the last scan gets added to this
             if (next_scan >= reductions.size()) {
                 assert(next_scan>0);
+                vector<Expr> temp_args;
                 vector<Expr> temp_values;
+                for (int k=0; k<pure_args.size(); k++) {
+                    temp_args.push_back(Var(pure_args[k]));
+                }
                 for (int k=0; k<reductions[next_scan-1].values.size(); k++) {
-                    temp_values.push_back(Call::make(F_sub,
-                                reductions[next_scan-1].args, k));
+                    temp_values.push_back(Call::make(F_sub, temp_args, k));
                 }
                 ReductionDefinition temp_rdef;
                 temp_rdef.values   = temp_values;
-                temp_rdef.args     = reductions[next_scan-1].args;
-                temp_rdef.domain   = reductions[next_scan-1].domain;
-                temp_rdef.schedule = reductions[next_scan-1].schedule;
+                temp_rdef.args     = temp_args;
+                temp_rdef.domain   = ReductionDomain();
+                temp_rdef.schedule = Schedule();
                 reductions.push_back(temp_rdef);
                 feedfwd = FLOAT_ONE;
             }
