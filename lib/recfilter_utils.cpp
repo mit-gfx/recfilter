@@ -91,23 +91,26 @@ ostream &operator<<(ostream &s, CheckResult v) {
     int height = ref.height();
     int channels = ref.channels();
 
-    Image<float> diff(width, height, channels);
+    Image<double> diff(width, height, channels);
 
-    float diff_sum = 0.0f;
-    float max_val  = 0.0f;
+    double re      = 0.0;
+    double max_re  = 0.0;
+    double mean_re = 0.0;
 
     for (int z=0; z<channels; z++) {
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {
-                diff(x,y,z) = float(ref(x,y,z)) - float(out(x,y,z));
-                diff_sum += abs(diff(x,y,z) * diff(x,y,z));
-                max_val = std::max(ref(x,y,z), max_val);
+                diff(x,y,z) = ref(x,y,z) - out(x,y,z);
+                re       = std::abs(diff(x,y,z)) / ref(x,y,z);
+                mean_re += re;
+                max_re   = std::max(re, max_re);
             }
         }
     }
-    float mse  = diff_sum/float(width*height*channels);
+    mean_re /= double(width*height*channels);
 
-    s << "Mean sq error = " << mse << "\n\n";
+    s << "Max  relative error = " << 100.0*max_re << " % \n";
+    s << "Mean relative error = " << 100.0*mean_re << " % \n\n";
 
     return s;
 }
@@ -124,26 +127,29 @@ ostream &operator<<(ostream &s, CheckResultVerbose v) {
     int height = ref.height();
     int channels = ref.channels();
 
-    Image<float> diff(width, height, channels);
+    Image<double> diff(width, height, channels);
 
-    float diff_sum = 0.0f;
-    float max_val  = 0.0f;
+    double re      = 0.0;
+    double max_re  = 0.0;
+    double mean_re = 0.0;
 
     for (int z=0; z<channels; z++) {
         for (int y=0; y<height; y++) {
             for (int x=0; x<width; x++) {
-                diff(x,y,z) = float(ref(x,y,z)) - float(out(x,y,z));
-                diff_sum += abs(diff(x,y,z) * diff(x,y,z));
-                max_val = std::max(ref(x,y,z), max_val);
+                diff(x,y,z) = (ref(x,y,z) - out(x,y,z));
+                re       = std::abs(diff(x,y,z)) / ref(x,y,z);
+                mean_re += re;
+                max_re   = std::max(re, max_re);
             }
         }
     }
-    float mse  = diff_sum/float(width*height*channels);
+    mean_re /= double(width*height*channels);
 
     s << "Reference" << "\n" << ref << "\n";
     s << "Halide output" << "\n" << out << "\n";
     s << "Difference " << "\n" << diff << "\n";
-    s << "Mean sq error = " << mse << "\n\n";
+    s << "Max  relative error = " << 100.0*max_re << " % \n";
+    s << "Mean relative error = " << 100.0*mean_re << " % \n\n";
 
     return s;
 }

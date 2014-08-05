@@ -190,10 +190,17 @@ public:
 
 
     /**@name Splitting routines
-     * @brief Split a list of dimensions, indicated by the pure args, by the
-     * same or separate tiling factors (defined in split.cpp)
+     * @brief Split a list of dimensions into their respective tile widths specified as
+     * variable-tile width pairs. If a single tile width expression is provided, then all
+     * specified dimensions are split by the same factor. If no variables are specified,
+     * then all the dimensions are split by the same tiling factor (defined in split.cpp).
+     *
+     * Preconditions:
+     * - dimension with specified variable name must exist
+     * - tile width must be a multiple of image width for each dimension
      */
     // {@
+    void split(Halide::Expr tx);
     void split(Halide::Var x, Halide::Expr tx);
     void split(Halide::Var x, Halide::Expr tx, Halide::Var y, Halide::Expr ty);
     void split(Halide::Var x, Halide::Var y, Halide::Expr t);
@@ -248,6 +255,10 @@ public:
      * @brief Merge multiple functions into a single function with mutiple outputs
      * The functions to be merged are searched in the dependency graph of functions
      * required to compute the recursive filter (defined in reorder.cpp)
+     *
+     * Preconditions: functions to be merged must have
+     * - same pure args
+     * - scans with same reduction args and reduction domains in same order
      */
     // {@
     void merge_func(
@@ -348,7 +359,6 @@ public:
 
     /** Platform independent function to get current timestamp in milliseconds */
     t_time milliseconds(void);
-
 };
 
 // ----------------------------------------------------------------------------
