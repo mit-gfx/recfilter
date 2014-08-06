@@ -75,10 +75,10 @@ int main(int argc, char **argv) {
     RecFilter filter("Gauss");
     filter.setArgs(x, y);
     filter.define(Expr(S(x, y)));
-    filter.addScan(x, rx, W1, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(0,y));
-    filter.addScan(x, rx, W1, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(0,y));
-    filter.addScan(y, ry, W2, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(x,0));
-    filter.addScan(y, ry, W2, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(x,0));
+    filter.addScan(x, rx, W1);
+    filter.addScan(x, rx, W1);
+    filter.addScan(y, ry, W2);
+    filter.addScan(y, ry, W2);
 
     filter.split(x, y, tile);
 

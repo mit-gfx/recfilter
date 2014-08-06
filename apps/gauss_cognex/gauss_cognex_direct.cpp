@@ -72,11 +72,11 @@ int main(int argc, char **argv) {
              -3.0f * I(x+2*box,y+3*box) +
               1.0f * I(x+3*box,y+3*box)) / norm;
 
-    RecFilter filter("Gauss");
+    RecFilter filter;
     filter.setArgs(x, y);
     filter.define(Expr(S(x, y)));
-    filter.addScan(x, rx, W, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(0,y));
-    filter.addScan(y, ry, W, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(x,0));
+    filter.addScan(x, rx, W);
+    filter.addScan(y, ry, W);
 
     filter.split(x, y, tile);
 

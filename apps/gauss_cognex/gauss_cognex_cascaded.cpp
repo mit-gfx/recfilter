@@ -71,13 +71,13 @@ int main(int argc, char **argv) {
              -3.0f * I(x+2*box,y+3*box) +
               1.0f * I(x+3*box,y+3*box)) / norm;
 
-    RecFilter filter("Gauss");
+    RecFilter filter;
     filter.setArgs(x, y);
     filter.define(Expr(S(x, y)));
-    filter.addScan(x, rx, W1, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(0,y));
-    filter.addScan(x, rx, W1, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(0,y));
-    filter.addScan(y, ry, W2, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(x,0));
-    filter.addScan(y, ry, W2, RecFilter::CAUSAL, RecFilter::CLAMP_TO_EXPR, I(x,0));
+    filter.addScan(x, rx, W1);
+    filter.addScan(x, rx, W1);
+    filter.addScan(y, ry, W2);
+    filter.addScan(y, ry, W2);
 
     // cascade the scans
     vector<RecFilter> cascaded_filters = filter.cascade(
@@ -99,12 +99,12 @@ int main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nJIT compilation ... " << endl;
-    filter2.func().compile_jit();
+    filter.func().compile_jit();
 
     Buffer hl_out_buff(type_of<float>(), width,height);
     {
         Timer t("Running ... ");
-        filter2.func().realize(hl_out_buff);
+        filter.func().realize(hl_out_buff);
     }
     hl_out_buff.copy_to_host();
     hl_out_buff.free_dev_buffer();
