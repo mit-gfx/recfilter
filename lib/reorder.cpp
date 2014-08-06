@@ -734,13 +734,26 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
             bool c          = contents.ptr->split_info[dim].scan_causal[idx];
             int order       = contents.ptr->split_info[dim].filter_order;
             float feedfwd   = contents.ptr->split_info[dim].feedfwd_coeff(scan_id);
+            Expr border_expr= contents.ptr->split_info[dim].border_expr[idx];
+
             vector<float> feedback;
             for (int u=0; u<order; u++) {
                 feedback.push_back(contents.ptr->split_info[dim].
                         feedback_coeff(scan_id,u));
             }
 
-            rf.addScan(x, rx, feedfwd, feedback, (c ? CAUSAL : ANTICAUSAL));
+            Causality causal = (c ? CAUSAL : ANTICAUSAL);
+
+            Border border_mode;
+            if (!border_expr.defined()) {
+                border_mode = CLAMP_TO_SELF;
+            } else if (equal(border_expr, FLOAT_ZERO)) {
+                border_mode = CLAMP_TO_ZERO;
+            } else {
+                border_mode = CLAMP_TO_EXPR;
+            }
+
+            rf.addScan(x, rx, feedfwd, feedback, causal, border_mode, border_expr);
         }
 
         recfilters.push_back(rf);

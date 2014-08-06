@@ -172,21 +172,22 @@ ostream &operator<<(ostream &s, Func f) {
 
 ostream &operator<<(ostream &s, Internal::Function f) {
     if (f.has_pure_definition()) {
-        vector<Expr> pure_value = f.values();
-        s << "Func " << f.name() << ";\n";
-        for (int v=0; v<pure_value.size(); v++) {
+
+        s << "Func " << f.name() << "(\"" << f.name() << "\");\n";
+
+        for (int v=0; v<f.values().size(); v++) {
             vector<string> args = f.args();
             s << f.name() << "(";
             for (int i=0; i<args.size(); i++) {
                 s << args[i];
                 if (i<args.size()-1)
-                    s << ",";
+                    s << ", ";
             }
-            if (pure_value.size()>1)
+            if (f.values().size()>1)
                 s << ")[" << v << "]";
             else
                 s << ")";
-            s << " = " << pure_value[v] << "\n";
+            s << " = " << f.values()[v] << ";\n";
         }
 
         // reduction definitions
@@ -198,13 +199,13 @@ ostream &operator<<(ostream &s, Internal::Function f) {
                 for (int i=0; i<args.size(); i++) {
                     s << args[i];
                     if (i<args.size()-1)
-                        s << ",";
+                        s << ", ";
                 }
                 if (reduction_value.size()>1)
                     s << ")[" << v << "]";
                 else
                     s << ")";
-                s << " = " << reduction_value[v];
+                s << " = " << reduction_value[v] << ";";
                 if (f.reductions()[j].domain.defined()) {
                     s << " with  ";
                     for (int k=0; k<f.reductions()[j].domain.domain().size(); k++) {

@@ -44,7 +44,7 @@ struct SplitInfo {
     vector<bool> scan_causal;   ///< causal or anticausal flag for each scan
     vector<int>  scan_id;       ///< scan or reduction definition id of each scan
 
-    vector<Halide::Expr> border_expr;   ///< image border value (can't contain var or rdom)
+    vector<Halide::Expr> border_expr;   ///< image border value (can't contain the var or rdom)
 
     Halide::Image<float> feedfwd_coeff; ///< feedforward coeffs, only one for each scan
     Halide::Image<float> feedback_coeff;///< feedback coeffs (num_scans x max_order) order j-th coeff of i-th scan is (i+1,j) */
