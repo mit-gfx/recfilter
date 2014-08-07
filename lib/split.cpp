@@ -127,6 +127,40 @@ static void extract_tails_from_each_scan(Function F_intra, vector<SplitInfo> spl
     }
 }
 
+// -----------------------------------------------------------------------------
+
+static void add_padding_to_avoid_bank_conflicts(Function F, vector<SplitInfo> split_info, bool flag) {
+    vector<Expr> args;
+    vector<Expr> values(F.outputs(), undef<float>());
+
+    // map inner var of first dimension to tile width +
+    // map inner vars of all other dimensions to 0
+    map<string,Expr> var_val;
+    for (int i=0; i<split_info.size(); i++) {
+        if (split_info[i].num_splits>0) {
+            string x = split_info[i].inner_var.name();
+            if (var_val.empty()) {
+                var_val[x] = split_info[i].tile_width;
+                if (flag) {
+                    var_val[x] += split_info[i].filter_order*split_info[i].num_splits;
+                }
+            } else {
+                var_val[x] = 0;
+            }
+        }
+    }
+
+    for (int i=0; i<F.args().size(); i++) {
+        string a = F.args()[i];
+        if (var_val.find(a) != var_val.end()) {
+            args.push_back(var_val.find(a)->second);
+        } else {
+            args.push_back(Var(a));
+        }
+    }
+
+    F.define_reduction(args, values);
+}
 
 // -----------------------------------------------------------------------------
 
@@ -791,7 +825,7 @@ static void add_prev_dimension_residual_to_tails(
 
 // -----------------------------------------------------------------------------
 
-static void add_all_residuals_to_final_result(
+static Function add_all_residuals_to_final_result(
         Function F,
         vector< vector<Function> >  F_deps,
         vector<SplitInfo> split_info)
@@ -886,20 +920,7 @@ static void add_all_residuals_to_final_result(
         F_sub.define_reduction(reductions[i].args, values);
     }
 
-    // add the residual of the last scan and above computed
-    // function to get the final result
-    vector<Expr> final_call_args;
-    vector<Expr> final_pure_values;
-    for (int i=0; i<pure_args.size(); i++) {
-        final_call_args.push_back(Var(pure_args[i]));
-    }
-    for (int i=0; i<F.outputs(); i++) {
-        Expr val  = Call::make(F_sub, final_call_args, i);
-        final_pure_values.push_back(val);
-    }
-
-    F.clear_all_definitions();
-    F.define(pure_args, final_pure_values);
+    return F_sub;
 }
 
 // -----------------------------------------------------------------------------
@@ -1073,7 +1094,11 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         extract_tails_from_each_scan(F_intra, split_info_current);
 
         // add all the residuals to the final term
-        add_all_residuals_to_final_result(F_final, F_deps, split_info_current);
+        F_final = add_all_residuals_to_final_result(F_final, F_deps, split_info_current);
+
+        // add padding to intra tile terms to avoid bank conflicts
+        add_padding_to_avoid_bank_conflicts(F_intra, split_info_current, true);
+        add_padding_to_avoid_bank_conflicts(F_final, split_info_current, false);
     }
 
     // change the original function to index into the final term
