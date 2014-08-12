@@ -1,4 +1,6 @@
-all:
+BIN_DIR=bin/
+
+all: scripts
 	make -C ../lib
 	make -C test_correctness -j8
 	make -C boxcar
@@ -16,3 +18,7 @@ clean:
 	make -C gauss_anticausal clean
 	make -C gauss_cognex clean
 	make -C test_correctness clean
+
+scripts: $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh
+	cp opencl_profile.sh $(BIN_DIR)/
+	cp cuda_profile.sh $(BIN_DIR)/

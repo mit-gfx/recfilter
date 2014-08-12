@@ -2,7 +2,7 @@ CXX=g++
 MKDIR=mkdir -p
 RM=rm -rf
 
-BIN_DIR=../bin
+BIN_DIR=../bin/gauss_recfilter
 
 SPLITLIB_DIR=../../lib/
 SPLITLIB_INC=$(SPLITLIB_DIR)/recfilter.h
