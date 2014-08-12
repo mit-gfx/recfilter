@@ -704,8 +704,10 @@ static void add_prev_dimension_residual_to_tails(
     Expr tile = split_info.tile_width;
     Expr num_tiles = split_info.num_tiles;
 
-    Var  yi             = split_info_prev.inner_var;
-    Var  yo             = split_info_prev.outer_var;
+    Var  yi   = split_info_prev.inner_var;
+    Var  yo   = split_info_prev.outer_var;
+    RDom ryi  = split_info_prev.inner_rdom;
+    RDom ryt  = split_info_prev.tail_rdom;
     Expr num_tiles_prev = split_info_prev.num_tiles;
 
     // add the residual term of previous dimension to the completed
@@ -714,7 +716,7 @@ static void add_prev_dimension_residual_to_tails(
         vector<string> pure_args = F_tail[j].args();
         vector<Expr> pure_values = F_tail[j].values();
 
-        // all tails of prev dimension add a residual
+        // each scan of prev dimension adds one residual
         for (int k=0; k<F_tail_prev.size(); k++) {
 
             // first scan the tail in the current dimension according using intra term
@@ -740,11 +742,18 @@ static void add_prev_dimension_residual_to_tails(
                 vector<Expr> args;
                 vector<Expr> values;
                 for (int u=0; u<F_intra.reductions()[i].args.size(); u++) {
-                    args.push_back(F_intra.reductions()[i].args[u]);
+                    Expr a = F_intra.reductions()[i].args[u];
+                    for (int v=0; v<ryi.dimensions(); v++) {
+                        a = substitute(ryi[v].name(), ryt[v], a);
+                    }
+                    args.push_back(a);
                 }
                 for (int u=0; u<F_intra.reductions()[i].values.size(); u++) {
                     Expr val = F_intra.reductions()[i].values[u];
                     val = substitute_func_call(F_intra.name(), F_tail_prev_scanned, val);
+                    for (int v=0; v<ryi.dimensions(); v++) {
+                        val = substitute(ryi[v].name(), ryt[v], val);
+                    }
                     values.push_back(val);
                 }
                 F_tail_prev_scanned.define_reduction(args, values);
@@ -825,7 +834,7 @@ static void add_prev_dimension_residual_to_tails(
 
 // -----------------------------------------------------------------------------
 
-static Function add_all_residuals_to_final_result(
+static void add_all_residuals_to_final_result(
         Function F,
         vector< vector<Function> >  F_deps,
         vector<SplitInfo> split_info)
@@ -835,6 +844,8 @@ static Function add_all_residuals_to_final_result(
     vector<ReductionDefinition> reductions = F.reductions();
 
     assert(split_info.size() == F_deps.size());
+
+    Function F_last_scan_deps;
 
     // define a function as a copy of the function F
     Function F_sub(F.name() + DELIMITER + PRE_FINAL_TERM);
@@ -882,29 +893,15 @@ static Function add_all_residuals_to_final_result(
             }
 
             // special case: next scan does not exist
-            // add a dummy scan which simply assigns the same pixel to itself;
-            // the residual from the last scan gets added to this
+            // add this residual directly to the final result
             if (next_scan >= reductions.size()) {
-                vector<Expr> temp_args;
-                vector<Expr> temp_values;
-                for (int k=0; k<pure_args.size(); k++) {
-                    temp_args.push_back(Var(pure_args[k]));
+                F_last_scan_deps = F_deps[i][j];
+            } else {
+                vector<Expr> call_args = reductions[next_scan].args;
+                for (int k=0; k<reductions[next_scan].values.size(); k++) {
+                    Expr val = Call::make(F_deps[i][j], call_args, k);
+                    reductions[next_scan].values[k] += feedfwd * val;
                 }
-                for (int k=0; k<reductions[next_scan-1].values.size(); k++) {
-                    temp_values.push_back(Call::make(F_sub, temp_args, k));
-                }
-                ReductionDefinition temp_rdef;
-                temp_rdef.values   = temp_values;
-                temp_rdef.args     = temp_args;
-                temp_rdef.domain   = ReductionDomain();
-                temp_rdef.schedule = Schedule();
-                reductions.push_back(temp_rdef);
-            }
-
-            vector<Expr> call_args = reductions[next_scan].args;
-            for (int k=0; k<reductions[next_scan].values.size(); k++) {
-                Expr val = Call::make(F_deps[i][j], call_args, k);
-                reductions[next_scan].values[k] += feedfwd * val;
             }
         }
     }
@@ -920,7 +917,25 @@ static Function add_all_residuals_to_final_result(
         F_sub.define_reduction(reductions[i].args, values);
     }
 
-    return F_sub;
+    // add padding to avoid bank conflicts
+    add_padding_to_avoid_bank_conflicts(F_sub, split_info, false);
+
+    // add the residual of the last scan to the final result
+    {
+        vector<string> pure_args = F.args();
+        vector<Expr> pure_values;
+        vector<Expr> call_args;
+        for (int i=0; i<pure_args.size(); i++) {
+            call_args.push_back(Var(pure_args[i]));
+        }
+        for (int i=0; i<F.outputs(); i++) {
+            Expr val = Call::make(F_sub, call_args, i)
+                + Call::make(F_last_scan_deps, call_args, i);
+            pure_values.push_back(val);
+        }
+        F.clear_all_definitions();
+        F.define(pure_args, pure_values);
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -1094,11 +1109,10 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         extract_tails_from_each_scan(F_intra, split_info_current);
 
         // add all the residuals to the final term
-        F_final = add_all_residuals_to_final_result(F_final, F_deps, split_info_current);
+        add_all_residuals_to_final_result(F_final, F_deps, split_info_current);
 
         // add padding to intra tile terms to avoid bank conflicts
         add_padding_to_avoid_bank_conflicts(F_intra, split_info_current, true);
-        add_padding_to_avoid_bank_conflicts(F_final, split_info_current, false);
     }
 
     // change the original function to index into the final term
@@ -1134,15 +1148,6 @@ void RecFilter::split(map<string,Expr> dim_tile) {
 
     // clear the depenendency graph of recursive filter
     contents.ptr->func_map.clear();
-    contents.ptr->func_list.clear();
-
-    // set the default schedule as compute_root
-    map<string,Func> funcs_list = funcs();
-    map<string,Func>::iterator fit = funcs_list.begin();
-    map<string,Func>::iterator fend= funcs_list.end();
-    for (; fit!=fend; fit++) {
-        fit->second.compute_root();
-    }
 }
 
 void RecFilter::split(Expr tx) {

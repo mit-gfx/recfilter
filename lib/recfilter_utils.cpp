@@ -10,20 +10,20 @@ using std::runtime_error;
 using namespace Halide;
 
 Arguments::Arguments(int argc, char** argv) :
-    width  (256),
+    width  (1024),
     block  (32),
     iterations(1),
     nocheck(false)
 {
     string app_name = argv[0];
-    string desc = "\nUsage\n " + app_name;
+    string desc = "\nUsage\n " + app_name + " ";
     desc.append(string(
                 "[-width|-w w] [-tile|-block|-b|-t b] [-iter i] [-nocheck] [-help]\n\n"
-                "\twidth\t  width of input image [default = 256]\n"
-                "\ttile\t   tile width for splitting each dimension image [default = 32]\n"
-                "\tnocheck\t do not check against reference solution [default = false]\n"
-                "\titer\t  number of profiling iterations [default = 1]\n"
-                "\thelp\t  show help message\n"
+                "\twidth    width of input image [default = 1024]\n"
+                "\ttile     tile width for splitting each dimension image [default = 32]\n"
+                "\tnocheck  do not check against reference solution [default = false]\n"
+                "\titer     number of profiling iterations [default = 1]\n"
+                "\thelp     show help message\n"
                 )
             );
 

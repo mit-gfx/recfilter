@@ -458,45 +458,37 @@ void RecFilter::inline_func(string func_name) {
         return;
     }
 
-    bool found = false;
-    vector<Function> func_list = contents.ptr->func_list;
+    Function F = func(func_name).function();
 
-    for (int i=0; !found && i<func_list.size(); i++) {
-        if (func_name == func_list[i].name()) {
-            inline_function(func_list[i], func_list);
-            found = true;
-        }
+    vector<Function> func_list;
+    map<string,Func> func_map = funcs();
+    map<string,Func>::iterator f = func_map.begin();
+    while (f != func_map.end()) {
+        func_list.push_back(f->second.function());
+        f++;
     }
-    if (!found) {
-        cerr << "Function " << func_name << " to be inlined not found" << endl;
-        assert(false);
-    }
+
+    inline_function(F, func_list);
+    contents.ptr->func_map.clear();
 }
 
+// -----------------------------------------------------------------------------
 
 void RecFilter::merge_func(string func_a, string func_b, string merged_name) {
-    Function FA;
-    Function FB;
-
-    vector<Function> func_list = contents.ptr->func_list;
-
-    for (int i=0; i<func_list.size(); i++) {
-        if (func_a == func_list[i].name())
-            FA = func_list[i];
-        if (func_b == func_list[i].name())
-            FB = func_list[i];
+    vector<Function> func_list;
+    map<string,Func> func_map = funcs();
+    map<string,Func>::iterator f = func_map.begin();
+    while (f != func_map.end()) {
+        func_list.push_back(f->second.function());
+        f++;
     }
 
-    if (!FA.has_pure_definition()) {
-        cerr << func_a << " to be merged not found" << endl;
-        assert(false);
-    }
-    if (!FB.has_pure_definition()) {
-        cerr << func_b << " to be merged not found" << endl;
-        assert(false);
-    }
+    Function FA = func(func_a).function();
+    Function FB = func(func_b).function();
 
-    merge_function(FA, FB, merged_name);
+    merge_function(FA, FB, merged_name, func_list);
+
+    contents.ptr->func_map.clear();
 }
 
 void RecFilter::merge_func(string func_a, string func_b, string func_c, string merged_name) {
@@ -528,19 +520,19 @@ void RecFilter::merge_func(std::vector<std::string> funcs, string merged) {
     }
 }
 
+// -----------------------------------------------------------------------------
+
 void RecFilter::swap_variables(string func_name, Var a, Var b) {
-    assert(!a.same_as(b) && "Variables to be swapped must be different");
+    swap_variables(func_name, a.name(), b.name());
+}
 
-    vector<Function> func_list = contents.ptr->func_list;
-
-    Function F;
-    for (int i=0; i<func_list.size(); i++) {
-        if (func_name == func_list[i].name()) {
-            F = func_list[i];
-        }
+void RecFilter::swap_variables(string func_name, string a, string b) {
+    if (a == b) {
+        cerr << "Variables to be swapped must be different" << endl;
+        assert(false);
     }
 
-    assert(F.has_pure_definition() && "Function to swap variables not found");
+    Function F = func(func_name).function();
 
     int va_idx = -1;
     int vb_idx = -1;
@@ -551,10 +543,10 @@ void RecFilter::swap_variables(string func_name, Var a, Var b) {
 
         // check that both a and b are variables of the function
         for (int i=0; i<F.args().size(); i++) {
-            if (F.args()[i] == a.name()) {
+            if (F.args()[i] == a) {
                 va_idx = i;
             }
-            if (F.args()[i] == b.name()) {
+            if (F.args()[i] == b) {
                 vb_idx = i;
             }
         }
@@ -567,50 +559,57 @@ void RecFilter::swap_variables(string func_name, Var a, Var b) {
     for (int i=0; i<values.size(); i++) {
         string temp_var_name = "temp_var_" + int_to_string(rand());
         Var t(temp_var_name);
-        values[i] = swap_vars_in_expr(a.name(), b.name(), values[i]);
+        values[i] = swap_vars_in_expr(a, b, values[i]);
     }
     F.clear_all_definitions();
     F.define(args, values);
 
     // find all function calls and swap the calling args
     // at indices va_idx and vb_idx
-    for (int i=0; i<func_list.size(); i++) {
-        if (func_name != func_list[i].name()) {
-            bool modified = false;
-            Function f = func_list[i];
+    map<string,Func> func_map = funcs();
+    map<string,Func>::iterator fit =func_map.begin();
+    for (; fit!=func_map.end(); fit++) {
+        if (fit->first == func_name) {
+            continue;
+        }
 
-            // change all RHS values of the function
-            vector<string> pure_args = f.args();
-            vector<Expr>   pure_values = f.values();
-            vector<ReductionDefinition> reductions = f.reductions();
-            for (int i=0; i<pure_values.size(); i++) {
-                if (expr_depends_on_func(pure_values[i], F.name())) {
-                    pure_values[i] = swap_args_in_func_call(
-                            F.name(), va_idx, vb_idx, pure_values[i]);
+        Function f = fit->second.function();
+
+        bool modified = false;
+
+        // change all RHS values of the function
+        vector<string> pure_args = f.args();
+        vector<Expr>   pure_values = f.values();
+        vector<ReductionDefinition> reductions = f.reductions();
+        for (int i=0; i<pure_values.size(); i++) {
+            if (expr_depends_on_func(pure_values[i], F.name())) {
+                pure_values[i] = swap_args_in_func_call(
+                        F.name(), va_idx, vb_idx, pure_values[i]);
+                modified = true;
+            }
+        }
+        for (int k=0; k<reductions.size(); k++) {
+            for (int u=0; u<reductions[k].values.size(); u++) {
+                if (expr_depends_on_func(reductions[k].values[u], F.name())) {
+                    reductions[k].values[u] = swap_args_in_func_call(
+                            F.name(), va_idx, vb_idx, reductions[k].values[u]);
                     modified = true;
                 }
             }
+        }
+        if (modified) {
+            f.clear_all_definitions();
+            f.define(pure_args, pure_values);
             for (int k=0; k<reductions.size(); k++) {
-                for (int u=0; u<reductions[k].values.size(); u++) {
-                    if (expr_depends_on_func(reductions[k].values[u], F.name())) {
-                        reductions[k].values[u] = swap_args_in_func_call(
-                                F.name(), va_idx, vb_idx, reductions[k].values[u]);
-                        modified = true;
-                    }
-                }
-            }
-            if (modified) {
-                f.clear_all_definitions();
-                f.define(pure_args, pure_values);
-                for (int k=0; k<reductions.size(); k++) {
-                    vector<Expr> reduction_args   = reductions[k].args;
-                    vector<Expr> reduction_values = reductions[k].values;
-                    f.define_reduction(reduction_args, reduction_values);
-                }
+                vector<Expr> reduction_args   = reductions[k].args;
+                vector<Expr> reduction_values = reductions[k].values;
+                f.define_reduction(reduction_args, reduction_values);
             }
         }
     }
 }
+
+// -----------------------------------------------------------------------------
 
 vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
     // check that the order does not violate

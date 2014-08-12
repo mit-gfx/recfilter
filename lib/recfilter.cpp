@@ -257,8 +257,9 @@ Func RecFilter::func(void) {
 }
 
 Func RecFilter::func(string func_name) {
-    if (contents.ptr->func_map.empty() || contents.ptr->func_list.empty()) {
-        funcs();    // just to rebuild the dependency graph
+    // build the dependency graph of the recursive filter
+    if (contents.ptr->func_map.empty()) {
+        contents.ptr->func_map = find_transitive_calls(contents.ptr->recfilter.function());
     }
 
     map<string,Function>::iterator f = contents.ptr->func_map.find(func_name);
@@ -273,13 +274,8 @@ Func RecFilter::func(string func_name) {
 
 map<string,Func> RecFilter::funcs(void) {
     // build the dependency graph of the recursive filter
-    if (contents.ptr->func_map.empty() || contents.ptr->func_list.empty()) {
+    if (contents.ptr->func_map.empty()) {
         contents.ptr->func_map = find_transitive_calls(contents.ptr->recfilter.function());
-        map<string,Function>::iterator f = contents.ptr->func_map.begin();
-        while (f != contents.ptr->func_map.end()) {
-            contents.ptr->func_list.push_back(f->second);
-            f++;
-        }
     }
 
     map<string,Func> func_map;
@@ -289,4 +285,13 @@ map<string,Func> RecFilter::funcs(void) {
         f++;
     }
     return func_map;
+}
+
+void RecFilter::set_default_schedule(void) {
+    map<string,Func> funcs_list = funcs();
+    map<string,Func>::iterator fit = funcs_list.begin();
+    map<string,Func>::iterator fend= funcs_list.end();
+    for (; fit!=fend; fit++) {
+        fit->second.compute_root();
+    }
 }

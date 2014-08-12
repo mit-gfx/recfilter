@@ -63,9 +63,6 @@ struct RecFilterContents {
     /** List of functions along with their names that the filter depends upon */
     std::map<std::string, Halide::Internal::Function> func_map;
 
-    /** List of functions that the filter depends upon */
-    std::vector<Halide::Internal::Function> func_list;
-
     /** Splitting info for each dimension of the filter */
     std::vector<SplitInfo> split_info;
 };
@@ -242,13 +239,20 @@ public:
             );
 
 
-    /** @brief Reorder memory layout by swapping two dimensions of a function
+    /** @name Reorder memory layout by swapping two dimensions of a function
      * (defined in reorder.cpp) */
+    // {@
     void swap_variables(
             std::string func,   ///< name of function whose dimensions must be swapped
             Halide::Var a,      ///< pure arg of first dimension to swap
             Halide::Var b       ///< pure arg of second dimension to swap
             );
+    void swap_variables(
+            std::string func,   ///< name of function whose dimensions must be swapped
+            std::string a,      ///< pure arg of first dimension to swap
+            std::string b       ///< pure arg of second dimension to swap
+            );
+    // @}
 
 
     /**@name Merging routines
@@ -283,6 +287,14 @@ public:
             std::vector<std::string> func, ///< list of names of functions to merge
             std::string merged             ///< name of merged function
             );
+    // @}
+
+
+    /**@name Default schedule for all generated functions
+     * @brief set the default schedule as compute_root
+     */
+    // {@
+    void set_default_schedule(void);
     // @}
 };
 
