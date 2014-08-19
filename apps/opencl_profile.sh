@@ -1,20 +1,22 @@
 #/usr/bin/bash
 
-TFILE=$( mktemp )
+TFILE1=$( mktemp )
+TFILE2=$( mktemp )
 
-if [ -z "$TFILE" ]
+if [ -z "$TFILE1" -o -z "$TFILE2" ]
 then
-    TFILE="$(basename $0).$$.tmp"
+    TFILE1="$(basename $0).$RANDOM.tmp"
+    TFILE2="$(basename $0).$RANDOM.tmp"
 fi
 
 if [ $# -ge 1 ]
 then
-    HL_JIT_TARGET=opencl-gpu_debug $@ 2> $TFILE
+    HL_JIT_TARGET=opencl-gpu_debug $@ 2> $TFILE1
 
     if [ $? == 0 ]
     then
-        echo -e 'Kernel name \t GPU tiles \t GPU threads \t Shared memory (KB) \t  Kernel execution time (ms)'
-        cat $TFILE | \
+        echo 'Kernel Blocks Threads Shared_mem(KB) Time(ms)' > $TFILE2
+        cat $TFILE1 | \
             sed '/halide_dev_run\|Time/!d' | \
             sed '/halide_dev_run/,+1!d' | \
             sed 's/CL.*entry: //g' | \
@@ -22,13 +24,13 @@ then
             sed 's/blocks: \|threads: \|shmem: \|Time: \|ms/;\t/g' | \
             sed 's/,\|)//g'  | \
             sed 's/ \|\t//g' | \
-            sed 's/;/\t/g'   | \
-            sed 's/\t\t/\t/g'
+            sed 's/;/ /g' >> $TFILE2
+        cat $TFILE2 | column -t
     else
-        cat $TFILE
+        cat $TFILE1
     fi
 
-    rm -f $TFILE
+    rm -f $TFILE1 $TFILE2
 
 else
     echo 'Usage: ./opencl_profile [application_command_line]'

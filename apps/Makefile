@@ -20,5 +20,9 @@ clean:
 	make -C test_correctness clean
 
 scripts: $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh
+
+$(BIN_DIR)/opencl_profile.sh: opencl_profile.sh
 	cp opencl_profile.sh $(BIN_DIR)/
+
+$(BIN_DIR)/cuda_profile.sh: cuda_profile.sh
 	cp cuda_profile.sh $(BIN_DIR)/
