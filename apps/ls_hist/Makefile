@@ -4,9 +4,9 @@ RM=rm -rf
 
 BIN_DIR=../bin/local_smooth_hist
 
-SPLITLIB_DIR=../../lib/
-SPLITLIB_INC=$(SPLITLIB_DIR)/recfilter.h
-SPLITLIB_LIB=$(SPLITLIB_DIR)/libSplit.a
+LIBRECFILTER_DIR=../../lib/
+LIBRECFILTER_INC=$(LIBRECFILTER_DIR)/recfilter.h
+LIBRECFILTER_LIB=$(LIBRECFILTER_DIR)/libRecfilter.a
 
 HALIDE_LIB=$(HALIDE_DIR)/bin/libHalide.a
 
@@ -15,12 +15,12 @@ APPS := $(addprefix $(BIN_DIR)/,$(notdir $(SRC:.cpp=.app)))
 
 all: $(APPS)
 
-$(BIN_DIR)/%.app: %.cpp  $(SPLITLIB_LIB) $(HALIDE_LIB) $(SPLITLIB_INC)
+$(BIN_DIR)/%.app: %.cpp  $(LIBRECFILTER_LIB) $(HALIDE_LIB) $(LIBRECFILTER_INC)
 	@$(MKDIR) $(BIN_DIR)
-	$(CXX) $< -o $@ -fno-rtti -I$(SPLITLIB_DIR) -I$(HALIDE_DIR)/include/ -lz -lpthread -ldl -g -Wall $(HALIDE_LIB) $(SPLITLIB_LIB)
+	$(CXX) $< -o $@ -fno-rtti -I$(LIBRECFILTER_DIR) -I$(HALIDE_DIR)/include/ -lz -lpthread -ldl -g -Wall $(HALIDE_LIB) $(LIBRECFILTER_LIB)
 
-$(SPLITLIB_LIB): $(SPLITLIB_INC)
-	make -C $(SPLITLIB_DIR)
+$(LIBRECFILTER_LIB): $(LIBRECFILTER_INC)
+	make -C $(LIBRECFILTER_DIR)
 
 clean:
 	$(RM) $(APPS)

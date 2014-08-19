@@ -3,7 +3,7 @@ MKDIR=mkdir -p
 RM=rm -rf
 
 BUILD_DIR=_build
-LIB=libSplit.a
+LIB=libRecfilter.a
 
 HALIDE_LIB=$(HALIDE_DIR)/bin/libHalide.a
 

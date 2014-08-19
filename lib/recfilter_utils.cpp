@@ -190,29 +190,29 @@ ostream &operator<<(ostream &s, Internal::Function f) {
             s << " = " << f.values()[v] << ";\n";
         }
 
-        // reduction definitions
-        for (int j=0; j<f.reductions().size(); j++) {
-            vector<Expr> reduction_value = f.reductions()[j].values;
-            for (int v=0; v<reduction_value.size(); v++) {
-                vector<Expr> args = f.reductions()[j].args;
+        // update definitions
+        for (int j=0; j<f.updates().size(); j++) {
+            vector<Expr> update_value = f.updates()[j].values;
+            for (int v=0; v<update_value.size(); v++) {
+                vector<Expr> args = f.updates()[j].args;
                 s << f.name() << "(";
                 for (int i=0; i<args.size(); i++) {
                     s << args[i];
                     if (i<args.size()-1)
                         s << ", ";
                 }
-                if (reduction_value.size()>1)
+                if (update_value.size()>1)
                     s << ")[" << v << "]";
                 else
                     s << ")";
-                s << " = " << reduction_value[v] << ";";
-                if (f.reductions()[j].domain.defined()) {
+                s << " = " << update_value[v] << ";";
+                if (f.updates()[j].domain.defined()) {
                     s << " with  ";
-                    for (int k=0; k<f.reductions()[j].domain.domain().size(); k++) {
-                        string r = f.reductions()[j].domain.domain()[k].var;
+                    for (int k=0; k<f.updates()[j].domain.domain().size(); k++) {
+                        string r = f.updates()[j].domain.domain()[k].var;
                         s << r << "("
-                            << f.reductions()[j].domain.domain()[k].min   << ","
-                            << f.reductions()[j].domain.domain()[k].extent<< ") ";
+                            << f.updates()[j].domain.domain()[k].min   << ","
+                            << f.updates()[j].domain.domain()[k].extent<< ") ";
                     }
                 }
                 s << "\n";

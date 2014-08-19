@@ -12,12 +12,12 @@ using std::map;
 
 // -----------------------------------------------------------------------------
 
-/** Infer the dimension which contains the reduction variable in a given
- * reduction definition */
-static int get_scan_dimension(ReductionDefinition r) {
+/** Infer the dimension which contains the update variable in a given
+ * update definition */
+static int get_scan_dimension(UpdateDefinition r) {
     vector<int> scan_dim;
 
-    // return -1 if there is no RDom associated with the reduction
+    // return -1 if there is no RDom associated with the update
     if (r.domain.defined()) {
         vector<ReductionVariable> vars = r.domain.domain();
         for (int i=0; i<vars.size(); i++) {
@@ -74,10 +74,10 @@ std::vector<Func> cascade_dimensions(Func& func) {
 
     // loop over all the redunction defs and add each to the function
     // corresponding to the scan dimension
-    for (int j=0; j<F.reductions().size(); j++) {
-        int dim = get_scan_dimension(F.reductions()[j]);
+    for (int j=0; j<F.updates().size(); j++) {
+        int dim = get_scan_dimension(F.updates()[j]);
         if (dim<0) {
-            cerr << "Function cascading can be used if each reduction has exactly one reduction "
+            cerr << "Function cascading can be used if each update has exactly one update "
                 " variable in exactly one dimension" << endl;
             assert(false);
         }
@@ -85,11 +85,11 @@ std::vector<Func> cascade_dimensions(Func& func) {
         Function f = func_list[dim].function();
 
         // add the scan replacing all calls to original function with the new function
-        vector<Expr> values = F.reductions()[j].values;
+        vector<Expr> values = F.updates()[j].values;
         for (int k=0; k<values.size(); k++) {
             values[k] = substitute_func_call(F.name(), f, values[k]);
         }
-        f.define_reduction(F.reductions()[j].args, values);
+        f.define_update(F.updates()[j].args, values);
     }
 
     // change the original function to index into the last function in the list
@@ -115,9 +115,9 @@ std::vector<Func> cascade_dimensions(Func& func) {
 std::vector<Func> cascade_repeated_scans(Func& func) {
     Function F = func.function();
 
-    // there can be at most as many functions as reductions defs
+    // there can be at most as many functions as updates defs
     vector<Func> func_list;
-    for (int i=0; i<F.reductions().size(); i++) {
+    for (int i=0; i<F.updates().size(); i++) {
         Function f(F.name() + "_" + int_to_string(i));
 
         if (i==0) { // pure def of first dimension uses the original pure def
@@ -139,39 +139,39 @@ std::vector<Func> cascade_repeated_scans(Func& func) {
         func_list.push_back(Func(f));
     }
 
-    // the index of the function which should get the next reduction
-    // definition in each dimension; the first reduction in each dimension
+    // the index of the function which should get the next update
+    // definition in each dimension; the first update in each dimension
     // can go to the first function
     vector<int> func_id(F.args().size(), 0);
 
-    // loop over all the reduction defs and add each
+    // loop over all the update defs and add each
     // corresponding to the scan dimension
-    for (int j=0; j<F.reductions().size(); j++) {
-        int dim = get_scan_dimension(F.reductions()[j]);
+    for (int j=0; j<F.updates().size(); j++) {
+        int dim = get_scan_dimension(F.updates()[j]);
         if (dim<0) {
-            cerr << "Function cascading can be used if each reduction has exactly one reduction "
+            cerr << "Function cascading can be used if each update has exactly one update "
                 " variable in exactly one dimension" << endl;
             assert(false);
         }
 
-        // get the function to which this reduction def should be added
+        // get the function to which this update def should be added
         Function f = func_list[func_id[dim]].function();
 
         // add the scan replacing all calls to original function with the new function
-        vector<Expr> values = F.reductions()[j].values;
+        vector<Expr> values = F.updates()[j].values;
         for (int k=0; k<values.size(); k++) {
             values[k] = substitute_func_call(F.name(), f, values[k]);
         }
-        f.define_reduction(F.reductions()[j].args, values);
+        f.define_update(F.updates()[j].args, values);
 
         // next repeated scan in this dimension should be added to
         // the next function
         func_id[dim]++;
     }
 
-    // remove the functions which do not have any reductions - redundant
+    // remove the functions which do not have any updates - redundant
     for (int i=0; i<func_list.size(); i++) {
-        if (!func_list[i].is_reduction()) {
+        if (!func_list[i].has_update_definition()) {
             func_list.erase(func_list.begin() + i);
             i--;
         }
@@ -221,7 +221,7 @@ static void inline_function(Function f, vector<Function> func_list) {
 
         vector<string> args   = g.args();
         vector<Expr>   values = g.values();
-        vector<ReductionDefinition> reductions = g.reductions();
+        vector<UpdateDefinition> updates = g.updates();
 
         for (int k=0; k<values.size(); k++) {
             values[k] = inline_function(values[k], f);
@@ -229,16 +229,16 @@ static void inline_function(Function f, vector<Function> func_list) {
         g.clear_all_definitions();
         g.define(args, values);
 
-        for (int k=0; k<reductions.size(); k++) {
-            vector<Expr> reduction_args   = reductions[k].args;
-            vector<Expr> reduction_values = reductions[k].values;
-            for (int u=0; u<reduction_args.size(); u++) {
-                reduction_args[u] = inline_function(reduction_args[u], f);
+        for (int k=0; k<updates.size(); k++) {
+            vector<Expr> update_args   = updates[k].args;
+            vector<Expr> update_values = updates[k].values;
+            for (int u=0; u<update_args.size(); u++) {
+                update_args[u] = inline_function(update_args[u], f);
             }
-            for (int u=0; u<reduction_values.size(); u++) {
-                reduction_values[u] = inline_function(reduction_values[u], f);
+            for (int u=0; u<update_values.size(); u++) {
+                update_values[u] = inline_function(update_values[u], f);
             }
-            g.define_reduction(reduction_args, reduction_values);
+            g.define_update(update_args, update_values);
         }
     }
 }
@@ -257,9 +257,9 @@ static bool merge_feasible(Function A, Function B, string& error) {
         error = "Functions to be merged must have same args in pure defs";
     }
 
-    // each reduction definition must have same args and reduction domain
-    vector<ReductionDefinition> Ar = A.reductions();
-    vector<ReductionDefinition> Br = B.reductions();
+    // each update definition must have same args and update domain
+    vector<UpdateDefinition> Ar = A.updates();
+    vector<UpdateDefinition> Br = B.updates();
     for (int i=0; can_merge && i<std::min(Ar.size(),Br.size()); i++) {
         can_merge &= Ar[i].domain.same_as(Br[i].domain);
         can_merge &= (Ar[i].args.size() == Br[i].args.size());
@@ -268,16 +268,16 @@ static bool merge_feasible(Function A, Function B, string& error) {
         }
     }
     if (!can_merge) {
-        error = "Functions to be merged must have same args in reduction defs";
+        error = "Functions to be merged must have same args in update defs";
     }
 
     // A must not depend upon B
     for (int i=0; can_merge && i<A.values().size(); i++) {
         can_merge &= (!expr_depends_on_func(A.values()[i], B.name()));
     }
-    for (int i=0; can_merge && i<A.reductions().size(); i++) {
-        for (int j=0; can_merge && j<A.reductions()[i].values.size(); j++) {
-            can_merge &= (!expr_depends_on_func(A.reductions()[i].values[j], B.name()));
+    for (int i=0; can_merge && i<A.updates().size(); i++) {
+        for (int j=0; can_merge && j<A.updates()[i].values.size(); j++) {
+            can_merge &= (!expr_depends_on_func(A.updates()[i].values[j], B.name()));
         }
     }
     if (!can_merge) {
@@ -288,9 +288,9 @@ static bool merge_feasible(Function A, Function B, string& error) {
     for (int i=0; can_merge && i<B.values().size(); i++) {
         can_merge &= (!expr_depends_on_func(B.values()[i], A.name()));
     }
-    for (int i=0; can_merge && i<B.reductions().size(); i++) {
-        for (int j=0; can_merge && j<B.reductions()[i].values.size(); j++) {
-            can_merge &= (!expr_depends_on_func(B.reductions()[i].values[j], A.name()));
+    for (int i=0; can_merge && i<B.updates().size(); i++) {
+        for (int j=0; can_merge && j<B.updates()[i].values.size(); j++) {
+            can_merge &= (!expr_depends_on_func(B.updates()[i].values[j], A.name()));
         }
     }
     if (!can_merge) {
@@ -305,20 +305,20 @@ static bool check_duplicate(Function A, Function B) {
     string err;
     bool duplicate = merge_feasible(A,B, err);
 
-    // no. of outputs and reduction definitions must be same
+    // no. of outputs and update definitions must be same
     duplicate &= (A.outputs() == B.outputs());
-    duplicate &= (A.reductions().size() == B.reductions().size());
+    duplicate &= (A.updates().size() == B.updates().size());
 
     // compare pure defs
     for (int i=0; duplicate && i<A.outputs(); i++) {
         duplicate &= equal(A.values()[i], B.values()[i]);
     }
 
-    // compare reduction definition outputs
-    for (int i=0; duplicate && i<A.reductions().size(); i++) {
-        for (int j=0; duplicate && j<A.reductions()[i].values.size(); j++) {
-            Expr a = A.reductions()[i].values[j];
-            Expr b = B.reductions()[i].values[j];
+    // compare update definition outputs
+    for (int i=0; duplicate && i<A.updates().size(); i++) {
+        for (int j=0; duplicate && j<A.updates()[i].values.size(); j++) {
+            Expr a = A.updates()[i].values[j];
+            Expr b = B.updates()[i].values[j];
             duplicate &= equal(a, substitute_func_call(B.name(),A,b));
         }
     }
@@ -371,26 +371,26 @@ static void merge_function(
         AB.define(A.args(), values);
     }
 
-    // merged tuple for each of reduction definitions
+    // merged tuple for each of update definitions
     {
-        vector<ReductionDefinition> Ar = A.reductions();
-        vector<ReductionDefinition> Br = B.reductions();
+        vector<UpdateDefinition> Ar = A.updates();
+        vector<UpdateDefinition> Br = B.updates();
         for (int i=0; i<std::max(Ar.size(),Br.size()); i++) {
             vector<Expr> values;
 
-            // RHS of reduction definitions of A
+            // RHS of update definitions of A
             for (int j=0; j<num_outputs_A; j++) {
                 if (i < Ar.size()) {
                     // replace all recursive calls to A with calls to AB
                     Expr val = substitute_func_call(A.name(), AB, Ar[i].values[j]);
                     values.push_back(val);
                 } else {
-                    // add redundant reduction if A has no more reduction definitions
+                    // add redundant update if A has no more update definitions
                     values.push_back(Call::make(AB, Ar[i].args, j));
                 }
             }
 
-            // RHS of reduction definitions of B
+            // RHS of update definitions of B
             // if A and B are identical, no need to create a Tuple
             // with RHS of both A and B, just RHS of A will suffice
             for (int j=0; !duplicate && j<num_outputs_B; j++) {
@@ -401,12 +401,12 @@ static void merge_function(
                     val = increment_value_index_in_func_call(AB.name(), num_outputs_A, val);
                     values.push_back(val);
                 } else {
-                    // add redundant reduction if B has no more reduction definitions
+                    // add redundant update if B has no more update definitions
                     values.push_back(Call::make(AB, Br[i].args, j+num_outputs_A));
                 }
             }
 
-            AB.define_reduction(Ar[i].args, values);
+            AB.define_update(Ar[i].args, values);
         }
     }
 
@@ -580,7 +580,7 @@ void RecFilter::swap_variables(string func_name, string a, string b) {
         // change all RHS values of the function
         vector<string> pure_args = f.args();
         vector<Expr>   pure_values = f.values();
-        vector<ReductionDefinition> reductions = f.reductions();
+        vector<UpdateDefinition> updates = f.updates();
         for (int i=0; i<pure_values.size(); i++) {
             if (expr_depends_on_func(pure_values[i], F.name())) {
                 pure_values[i] = swap_args_in_func_call(
@@ -588,11 +588,11 @@ void RecFilter::swap_variables(string func_name, string a, string b) {
                 modified = true;
             }
         }
-        for (int k=0; k<reductions.size(); k++) {
-            for (int u=0; u<reductions[k].values.size(); u++) {
-                if (expr_depends_on_func(reductions[k].values[u], F.name())) {
-                    reductions[k].values[u] = swap_args_in_func_call(
-                            F.name(), va_idx, vb_idx, reductions[k].values[u]);
+        for (int k=0; k<updates.size(); k++) {
+            for (int u=0; u<updates[k].values.size(); u++) {
+                if (expr_depends_on_func(updates[k].values[u], F.name())) {
+                    updates[k].values[u] = swap_args_in_func_call(
+                            F.name(), va_idx, vb_idx, updates[k].values[u]);
                     modified = true;
                 }
             }
@@ -600,10 +600,10 @@ void RecFilter::swap_variables(string func_name, string a, string b) {
         if (modified) {
             f.clear_all_definitions();
             f.define(pure_args, pure_values);
-            for (int k=0; k<reductions.size(); k++) {
-                vector<Expr> reduction_args   = reductions[k].args;
-                vector<Expr> reduction_values = reductions[k].values;
-                f.define_reduction(reduction_args, reduction_values);
+            for (int k=0; k<updates.size(); k++) {
+                vector<Expr> update_args   = updates[k].args;
+                vector<Expr> update_values = updates[k].values;
+                f.define_update(update_args, update_values);
             }
         }
     }

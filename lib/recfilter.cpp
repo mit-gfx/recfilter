@@ -200,13 +200,13 @@ void RecFilter::addScan(
         }
         values[i] = simplify(values[i]);
     }
-    f.define_reduction(args, values);
+    f.define_update(args, values);
 
     int scan_order = feedback.size();
 
     // add details to the split info struct
     SplitInfo s = contents.ptr->split_info[dimension];
-    s.scan_id    .insert(s.scan_id.begin(), f.reductions().size()-1);
+    s.scan_id    .insert(s.scan_id.begin(), f.updates().size()-1);
     s.scan_causal.insert(s.scan_causal.begin(), causal);
     s.border_expr.insert(s.border_expr.begin(), border_expr);
     s.rdom         = rx;
@@ -218,7 +218,7 @@ void RecFilter::addScan(
 
     // copy all the existing feedback/feedfwd coeff to the new arrays
     // add the coeff of the newly added scan as the last row of coeff
-    int num_scans = f.reductions().size();
+    int num_scans = f.updates().size();
     int max_order = s.feedback_coeff.height();
     Image<float> feedfwd_coeff(num_scans);
     Image<float> feedback_coeff(num_scans, std::max(max_order,scan_order));

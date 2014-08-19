@@ -30,12 +30,12 @@ using std::make_pair;
 static vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> split_info) {
     vector<string> args = F.args();
     vector<Expr>  values = F.values();
-    vector<ReductionDefinition> reductions = F.reductions();
+    vector<UpdateDefinition> updates = F.updates();
 
     // split info struct must contain info about each dimension
     assert(split_info.size() == args.size());
 
-    vector<ReductionDefinition> new_reductions;
+    vector<UpdateDefinition> new_updates;
     vector<SplitInfo>           new_split_info = split_info;
 
     // use all scans with dimension 0 first, then 1 and so on
@@ -43,17 +43,17 @@ static vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> 
         for (int j=0; j<split_info[i].num_splits; j++) {
             int curr = split_info[i].num_splits-1-j;
             int scan = split_info[i].scan_id[curr];
-            new_reductions.push_back(reductions[scan]);
-            new_split_info[i].scan_id[curr] = new_reductions.size()-1;
+            new_updates.push_back(updates[scan]);
+            new_split_info[i].scan_id[curr] = new_updates.size()-1;
         }
     }
-    assert(new_reductions.size() == reductions.size());
+    assert(new_updates.size() == updates.size());
 
-    // reorder the reduction definitions as per the new order
+    // reorder the update definitions as per the new order
     F.clear_all_definitions();
     F.define(args, values);
-    for (int i=0; i<new_reductions.size(); i++) {
-        F.define_reduction(new_reductions[i].args, new_reductions[i].values);
+    for (int i=0; i<new_updates.size(); i++) {
+        F.define_update(new_updates[i].args, new_updates[i].values);
     }
 
     return new_split_info;
@@ -64,16 +64,16 @@ static vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> 
 static void extract_tails_from_each_scan(Function F_intra, vector<SplitInfo> split_info) {
     vector<string> pure_args = F_intra.args();
     vector<Expr> pure_values = F_intra.values();
-    vector<ReductionDefinition> reductions = F_intra.reductions();
+    vector<UpdateDefinition> updates = F_intra.updates();
 
     // pure definitions remain unchanged
     F_intra.clear_all_definitions();
     F_intra.define(pure_args, pure_values);
 
-    // new reductions to be added for all the split reductions
-    map<int, std::pair< vector<Expr>, vector<Expr> > > new_reductions;
+    // new updates to be added for all the split updates
+    map<int, std::pair< vector<Expr>, vector<Expr> > > new_updates;
 
-    // create the new reduction definitions to extract the tail
+    // create the new update definitions to extract the tail
     // of each scan that is split
     for (int i=0; i<split_info.size(); i++) {
         int  dim   = split_info[i].filter_dim;
@@ -82,13 +82,13 @@ static void extract_tails_from_each_scan(Function F_intra, vector<SplitInfo> spl
         RDom rxt   = split_info[i].tail_rdom;
         Expr tile  = split_info[i].tile_width;
 
-        // new reduction to extract the tail of each split scan
+        // new update to extract the tail of each split scan
         for (int j=0; j<split_info[i].num_splits; j++) {
             int  scan_id     = split_info[i].scan_id[j];
             bool scan_causal = split_info[i].scan_causal[j];
 
-            vector<Expr> args      = reductions[scan_id].args;
-            vector<Expr> call_args = reductions[scan_id].args;
+            vector<Expr> args      = updates[scan_id].args;
+            vector<Expr> call_args = updates[scan_id].args;
             vector<Expr> values;
 
             // replace rxi by rxt (involves replacing rxi.x by rxt.x etc)
@@ -107,22 +107,22 @@ static void extract_tails_from_each_scan(Function F_intra, vector<SplitInfo> spl
                 }
             }
 
-            for (int k=0; k<reductions[scan_id].values.size(); k++) {
+            for (int k=0; k<updates[scan_id].values.size(); k++) {
                 values.push_back(Call::make(F_intra, call_args, k));
             }
 
-            new_reductions[scan_id] = make_pair(args, values);
+            new_updates[scan_id] = make_pair(args, values);
         }
     }
 
     // add extra update steps to copy tail of each scan to another buffer
     // that is beyond the bounds of the intra tile RVars
-    for (int i=0; i<reductions.size(); i++) {
-        F_intra.define_reduction(reductions[i].args, reductions[i].values);
-        if (new_reductions.find(i) != new_reductions.end()) {
-            vector<Expr> args   = new_reductions[i].first;
-            vector<Expr> values = new_reductions[i].second;
-            F_intra.define_reduction(args, values);
+    for (int i=0; i<updates.size(); i++) {
+        F_intra.define_update(updates[i].args, updates[i].values);
+        if (new_updates.find(i) != new_updates.end()) {
+            vector<Expr> args   = new_updates[i].first;
+            vector<Expr> values = new_updates[i].second;
+            F_intra.define_update(args, values);
         }
     }
 }
@@ -159,7 +159,7 @@ static void add_padding_to_avoid_bank_conflicts(Function F, vector<SplitInfo> sp
         }
     }
 
-    F.define_reduction(args, values);
+    F.define_update(args, values);
 }
 
 // -----------------------------------------------------------------------------
@@ -196,7 +196,7 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
     }
 
     // split info object and split id for each scan
-    vector< pair<int,int> > scan(F.reductions().size());
+    vector< pair<int,int> > scan(F.updates().size());
     for (int i=0; i<split_info.size(); i++) {
         for (int j=0; j<split_info[i].num_splits; j++) {
             scan[ split_info[i].scan_id[j] ] = make_pair(i,j);
@@ -204,7 +204,7 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
     }
 
     // create the scans from the split info object
-    vector<ReductionDefinition> reductions;
+    vector<UpdateDefinition> updates;
     for (int i=0; i<scan.size(); i++) {
         SplitInfo s = split_info[ scan[i].first ];
 
@@ -229,7 +229,7 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
             feedback[j] = s.feedback_coeff(i,j);
         }
 
-        // reduction args: replace rx the RVar of this dimension in rxi and xo
+        // update args: replace rx the RVar of this dimension in rxi and xo
         // replace all other pure args with their respective RVar in rxi
         vector<Expr> args;
         for (int j=0; j<F.args().size(); j++) {
@@ -278,7 +278,7 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
             }
         }
 
-        // reduction values: create the intra tile scans with special
+        // update values: create the intra tile scans with special
         // borders for all tile on image boundary is border_expr as specified
         // border for all internal tiles is zero
         vector<Expr> values(F_intra.outputs());
@@ -311,7 +311,7 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
             }
             values[j] = simplify(values[j]);
         }
-        F_intra.define_reduction(args, values);
+        F_intra.define_update(args, values);
     }
 
     return F_intra;
@@ -326,8 +326,8 @@ static Function create_copy(Function F, string func_name) {
     B.define(F.args(), F.values());
 
     // replace all calls to old function with the copy
-    for (int i=0; i<F.reductions().size(); i++) {
-        ReductionDefinition r = F.reductions()[i];
+    for (int i=0; i<F.updates().size(); i++) {
+        UpdateDefinition r = F.updates()[i];
         vector<Expr> args;
         vector<Expr> values;
         for (int j=0; j<r.args.size(); j++) {
@@ -336,7 +336,7 @@ static Function create_copy(Function F, string func_name) {
         for (int j=0; j<r.values.size(); j++) {
             values.push_back(substitute_func_call(F.name(), B, r.values[j]));
         }
-        B.define_reduction(args, values);
+        B.define_update(args, values);
     }
     return B;
 }
@@ -433,7 +433,7 @@ static vector<Function> create_complete_tail_term(
             function.define(F_tail[k].args(), values);
         }
 
-        // reduction definition
+        // update definition
         {
             vector<Expr> args;
             vector<Expr> values;
@@ -475,7 +475,7 @@ static vector<Function> create_complete_tail_term(
                 values.push_back(val);
             }
 
-            function.define_reduction(args, values);
+            function.define_update(args, values);
         }
         F_ctail.push_back(function);
     }
@@ -711,14 +711,14 @@ static void add_residual_to_tails(
             values[i] += Call::make(F_deps[j], call_args, i);
         }
 
-        // reductions remain unaffected
-        vector<ReductionDefinition> reductions = F_tail[j].reductions();
+        // updates remain unaffected
+        vector<UpdateDefinition> updates = F_tail[j].updates();
 
         // redefine tail
         F_tail[j].clear_all_definitions();
         F_tail[j].define(args, values);
-        for (int i=0; i<reductions.size(); i++) {
-            F_tail[j].define_reduction(reductions[i].args, reductions[i].values);
+        for (int i=0; i<updates.size(); i++) {
+            F_tail[j].define_update(updates[i].args, updates[i].values);
         }
     }
 }
@@ -775,22 +775,22 @@ static void add_prev_dimension_residual_to_tails(
             for (int i=first_scan; i<=last_scan; i++) {
                 vector<Expr> args;
                 vector<Expr> values;
-                for (int u=0; u<F_intra.reductions()[i].args.size(); u++) {
-                    Expr a = F_intra.reductions()[i].args[u];
+                for (int u=0; u<F_intra.updates()[i].args.size(); u++) {
+                    Expr a = F_intra.updates()[i].args[u];
                     for (int v=0; v<ryi.dimensions(); v++) {
                         a = substitute(ryi[v].name(), ryt[v], a);
                     }
                     args.push_back(a);
                 }
-                for (int u=0; u<F_intra.reductions()[i].values.size(); u++) {
-                    Expr val = F_intra.reductions()[i].values[u];
+                for (int u=0; u<F_intra.updates()[i].values.size(); u++) {
+                    Expr val = F_intra.updates()[i].values[u];
                     val = substitute_func_call(F_intra.name(), F_tail_prev_scanned, val);
                     for (int v=0; v<ryi.dimensions(); v++) {
                         val = substitute(ryi[v].name(), ryt[v], val);
                     }
                     values.push_back(val);
                 }
-                F_tail_prev_scanned.define_reduction(args, values);
+                F_tail_prev_scanned.define_update(args, values);
             }
 
 
@@ -854,14 +854,14 @@ static void add_prev_dimension_residual_to_tails(
             }
         }
 
-        // reduction defs of the tail remain unaffected
-        vector<ReductionDefinition> reductions = F_tail[j].reductions();
+        // update defs of the tail remain unaffected
+        vector<UpdateDefinition> updates = F_tail[j].updates();
 
         // redefine tail
         F_tail[j].clear_all_definitions();
         F_tail[j].define(pure_args, pure_values);
-        for (int i=0; i<reductions.size(); i++) {
-            F_tail[j].define_reduction(reductions[i].args, reductions[i].values);
+        for (int i=0; i<updates.size(); i++) {
+            F_tail[j].define_update(updates[i].args, updates[i].values);
         }
     }
 }
@@ -875,7 +875,7 @@ static void add_all_residuals_to_final_result(
 {
     vector<string> pure_args   = F.args();
     vector<Expr>   pure_values = F.values();
-    vector<ReductionDefinition> reductions = F.reductions();
+    vector<UpdateDefinition> updates = F.updates();
 
     assert(split_info.size() == F_deps.size());
 
@@ -928,27 +928,27 @@ static void add_all_residuals_to_final_result(
 
             // special case: next scan does not exist
             // add this residual directly to the final result
-            if (next_scan >= reductions.size()) {
+            if (next_scan >= updates.size()) {
                 F_last_scan_deps = F_deps[i][j];
             } else {
-                vector<Expr> call_args = reductions[next_scan].args;
-                for (int k=0; k<reductions[next_scan].values.size(); k++) {
+                vector<Expr> call_args = updates[next_scan].args;
+                for (int k=0; k<updates[next_scan].values.size(); k++) {
                     Expr val = Call::make(F_deps[i][j], call_args, k);
-                    reductions[next_scan].values[k] += feedfwd * val;
+                    updates[next_scan].values[k] += feedfwd * val;
                 }
             }
         }
     }
 
-    // replace calls to F by F_sub in the reduction def of F_sub
-    for (int i=0; i<reductions.size(); i++) {
+    // replace calls to F by F_sub in the update def of F_sub
+    for (int i=0; i<updates.size(); i++) {
         vector<Expr> values;
-        for (int j=0; j<reductions[i].values.size(); j++) {
+        for (int j=0; j<updates[i].values.size(); j++) {
             Expr val = substitute_func_call(F.name(), F_sub,
-                    simplify(reductions[i].values[j]));
+                    simplify(updates[i].values[j]));
             values.push_back(val);
         }
-        F_sub.define_reduction(reductions[i].args, values);
+        F_sub.define_update(updates[i].args, values);
     }
 
     // add padding to avoid bank conflicts
@@ -1079,7 +1079,7 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         inner_scan_rvars.push_back(r);
     }
 
-    // populate the inner, outer and tail reduction domains to all dimensions
+    // populate the inner, outer and tail update domains to all dimensions
     for (map<string,Expr>::iterator it=dim_tile.begin(); it!=dim_tile.end(); it++) {
         bool found = false;
         string x = it->first;
