@@ -22,8 +22,8 @@ using std::make_pair;
 #define COMPLETE_TAIL_RESIDUAL "TDeps"
 #define FINAL_RESULT_RESIDUAL  "Deps"
 #define FINAL_TERM             "Final"
-#define PRE_FINAL_TERM         "Sub"
-#define DELIMITER              '-'
+#define SUB                    "Sub"
+#define DASH                   '_'
 
 // -----------------------------------------------------------------------------
 
@@ -165,7 +165,7 @@ static void add_padding_to_avoid_bank_conflicts(Function F, vector<SplitInfo> sp
 // -----------------------------------------------------------------------------
 
 static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info) {
-    Function F_intra(F.name() + DELIMITER + INTRA_TILE_RESULT);
+    Function F_intra(F.name() + DASH + INTRA_TILE_RESULT);
 
     // manipulate the pure def
     vector<string> pure_args   = F.args();
@@ -354,7 +354,7 @@ static vector<Function> create_intra_tail_term(
     vector<Function> tail_functions_list;
 
     for (int k=0; k<split_info.num_splits; k++) {
-        Function function(func_name + "_" + int_to_string(split_info.scan_id[k]));
+        Function function(func_name + DASH + int_to_string(split_info.scan_id[k]));
 
         int scan_id = split_info.scan_id[k];
         int order   = split_info.filter_order;
@@ -411,7 +411,8 @@ static vector<Function> create_complete_tail_term(
     vector<Function> F_ctail;
 
     for (int k=0; k<split_info.num_splits; k++) {
-        Function function(func_name + "_" + int_to_string(split_info.scan_id[k]));
+        Function function(func_name + DASH + int_to_string(split_info.scan_id[k])
+                + DASH + SUB);
 
         Image<float> weight = tail_weights(split_info, k);
 
@@ -486,6 +487,39 @@ static vector<Function> create_complete_tail_term(
 
 // -----------------------------------------------------------------------------
 
+static vector<Function> wrap_complete_tail_term(
+        vector<Function> F_ctail,
+        SplitInfo split_info,
+        string func_name)
+{
+    vector<Function> F_ctailw;
+
+    for (int k=0; k<F_ctail.size(); k++) {
+        Function function(func_name + DASH + int_to_string(split_info.scan_id[k]));
+
+        // simply create a pure function that calls the completed tail
+        vector<string> args;
+        vector<Expr>   values;
+        vector<Expr>   call_args;
+
+        for (int i=0; i<F_ctail[k].args().size(); i++) {
+            args.push_back(F_ctail[k].args()[i]);
+            call_args.push_back(Var(F_ctail[k].args()[i]));
+        }
+        for (int i=0; i<F_ctail[k].outputs(); i++) {
+            values.push_back(Call::make(F_ctail[k], call_args, i));
+        }
+
+        function.define(args, values);
+
+        F_ctailw.push_back(function);
+    }
+
+    return F_ctailw;
+}
+
+// -----------------------------------------------------------------------------
+
 static vector<Function> create_tail_residual_term(
         vector<Function> F_ctail,
         SplitInfo split_info,
@@ -505,7 +539,7 @@ static vector<Function> create_tail_residual_term(
     vector<Function> dependency_functions;
 
     for (int u=0; u<split_info.num_splits; u++) {
-        Function function(func_name + "_" + int_to_string(split_info.scan_id[u]));
+        Function function(func_name + DASH + int_to_string(split_info.scan_id[u]));
 
         // args are same as completed tail terms
         vector<string> args = F_ctail[0].args();
@@ -589,7 +623,7 @@ static vector<Function> create_final_residual_term(
 
     // accumulate contribution from each completed tail
     for (int j=0; j<split_info.num_splits; j++) {
-        Function function(func_name + "_" + int_to_string(split_info.scan_id[j]));
+        Function function(func_name + DASH + int_to_string(split_info.scan_id[j]));
 
         int num_args    = F_ctail[j].args().size();
         int num_outputs = F_ctail[j].outputs();
@@ -720,8 +754,8 @@ static void add_prev_dimension_residual_to_tails(
         for (int k=0; k<F_tail_prev.size(); k++) {
 
             // first scan the tail in the current dimension according using intra term
-            Function F_tail_prev_scanned(F_tail_prev[k].name() + DELIMITER + x.name()
-                    + DELIMITER + int_to_string(split_info.scan_id[j]));
+            Function F_tail_prev_scanned(F_tail_prev[k].name() + DASH + x.name()
+                    + DASH + int_to_string(split_info.scan_id[j]));
 
             // pure def simply calls the completed tail
             vector<Expr> prev_call_args;
@@ -848,7 +882,7 @@ static void add_all_residuals_to_final_result(
     Function F_last_scan_deps;
 
     // define a function as a copy of the function F
-    Function F_sub(F.name() + DELIMITER + PRE_FINAL_TERM);
+    Function F_sub(F.name() + DASH + SUB);
     F_sub.define(pure_args, pure_values);
 
     // each F_deps represents the residuals from one dimension
@@ -944,9 +978,7 @@ static vector< vector<Function> > split_scans(
         Function F_intra,
         vector<SplitInfo> &split_info)
 {
-    vector< vector<Function> > F_tail_list;
     vector< vector<Function> > F_ctail_list;
-    vector< vector<Function> > F_tdeps_list;
     vector< vector<Function> > F_deps_list;
 
     /// TODO: this order of Function generation requires that F_ctail are
@@ -956,15 +988,16 @@ static vector< vector<Function> > split_scans(
     for (int i=0; i<split_info.size(); i++) {
         string x = split_info[i].var.name();
 
-        string s0 = F_intra.name() + DELIMITER + INTRA_TILE_TAIL_TERM  + "_" + x;
-        string s1 = F_intra.name() + DELIMITER + INTER_TILE_TAIL_SUM   + "_" + x;
-        string s2 = F_intra.name() + DELIMITER + COMPLETE_TAIL_RESIDUAL+ "_" + x;
-        string s3 = F_intra.name() + DELIMITER + FINAL_RESULT_RESIDUAL + "_" + x;
+        string s0 = F_intra.name() + DASH + INTRA_TILE_TAIL_TERM  + DASH + x;
+        string s1 = F_intra.name() + DASH + INTER_TILE_TAIL_SUM   + DASH + x;
+        string s2 = F_intra.name() + DASH + COMPLETE_TAIL_RESIDUAL+ DASH + x;
+        string s3 = F_intra.name() + DASH + FINAL_RESULT_RESIDUAL + DASH + x;
 
-        vector<Function> F_tail  = create_intra_tail_term    (F_intra, split_info[i], s0);
-        vector<Function> F_ctail = create_complete_tail_term (F_tail,  split_info[i], s1);
-        vector<Function> F_tdeps = create_tail_residual_term (F_ctail, split_info[i], s2);
-        vector<Function> F_deps  = create_final_residual_term(F_ctail, split_info[i], s3);
+        vector<Function> F_tail   = create_intra_tail_term    (F_intra,  split_info[i], s0);
+        vector<Function> F_ctail  = create_complete_tail_term (F_tail,   split_info[i], s1);
+        vector<Function> F_ctailw = wrap_complete_tail_term   (F_ctail,  split_info[i], s1);
+        vector<Function> F_tdeps  = create_tail_residual_term (F_ctailw, split_info[i], s2);
+        vector<Function> F_deps   = create_final_residual_term(F_ctailw, split_info[i], s3);
 
         // add the dependency from each scan to the tail of the next scan
         // this ensures that the tail of each scan includes the complete
@@ -978,11 +1011,10 @@ static vector< vector<Function> > split_scans(
                     F_ctail_list[j], split_info[i], split_info[j]);
         }
 
-        F_tail_list .push_back(F_tail);
-        F_ctail_list.push_back(F_ctail);
-        F_tdeps_list.push_back(F_tdeps);
+        F_ctail_list.push_back(F_ctailw);
         F_deps_list .push_back(F_deps);
     }
+
     return F_deps_list;
 }
 
@@ -1100,7 +1132,7 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         Function F_intra = create_intra_tile_term(F, split_info_current);
 
         // create a function will hold the final result, copy of the intra tile term
-        F_final = create_copy(F_intra, F.name() + DELIMITER + FINAL_TERM);
+        F_final = create_copy(F_intra, F.name() + DASH + FINAL_TERM);
 
         // compute the residuals from splits in each dimension
         vector< vector<Function> > F_deps = split_scans(F_intra, split_info_current);
