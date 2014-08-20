@@ -816,9 +816,9 @@ static void add_prev_dimension_residual_to_tails(
                         // if the scan in prev dimension was causal, then accumulate
                         // the tail of prev tile in that dimension, else next tile
                         if (split_info_prev.scan_causal[k]) {
-                            call_args.push_back(yo-1);
+                            call_args.push_back(max(yo-1,0));
                         } else {
-                            call_args.push_back(yo+1);
+                            call_args.push_back(min(yo+1,num_tiles));
                         }
                     }
                     else if (arg == yi.name()) {

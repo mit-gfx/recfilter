@@ -66,8 +66,8 @@ int main(int argc, char **argv) {
         Var rxox("rxo.x$r"), rxoy("rxo.y$r"), rxoz("rxo.z$r");
         Var ryox("ryo.x$r"), ryoy("ryo.y$r"), ryoz("ryo.z$r");
 
-        Func SAT_GPU         = filter.func("SAT_Final");
-        Func SAT_Final       = filter.func("SAT_Final_Sub");
+        Func SAT_Final       = filter.func("SAT_Final");
+        Func SAT_Final_sub   = filter.func("SAT_Final_Sub");
         Func SAT_Intra       = filter.func("SAT_Intra");
         Func SAT_Tail        = filter.func("SAT_Intra_Tail");
         Func SAT_CTail_x     = filter.func("SAT_Intra_CTail_x_0");
@@ -102,58 +102,63 @@ int main(int argc, char **argv) {
 
         // stage 3
         {
+#if 0
             SAT_CTail_xy.compute_at(SAT_CTail_y_sub, Var::gpu_blocks());
-            SAT_CTail_xy.reorder(xi,yi,xo,yo).gpu_threads(yi);
-            SAT_CTail_xy.update().reorder(ryi,rxt,xo,yo).unroll(ryi);
+            SAT_CTail_xy.reorder(xi,yi,xo,yo).split(xo,xo,x,MAX_THREADS/tile).gpu_threads(yi);
+            SAT_CTail_xy.update().reorder(ryi,rxt,xo,yo).split(xo,xo,x,MAX_THREADS/tile).gpu_threads(x).unroll(ryi);
+
+            SAT_CTail_y_sub.compute_root();
+            SAT_CTail_y_sub.reorder_storage(xi,yi,xo,yo);
+            SAT_CTail_y_sub.split(xo,xo,x,MAX_THREADS/tile).fuse(x,xi,xi).reorder(xi,yi,xo,yo).gpu_blocks(xo,yo).gpu_threads(xi,yi);
+
+            SAT_CTail_y_sub.bound(xo,0,image.width()/tile ).bound(xi,0,tile);
+            SAT_CTail_y_sub.bound(yo,0,image.height()/tile).bound(yi,0,1);
+#else
+            SAT_CTail_xy.compute_at(SAT_CTail_y_sub, Var::gpu_blocks());
+            SAT_CTail_xy.reorder(xi,yi,xo,yo).gpu_threads(yi).unroll(xi);
+            SAT_CTail_xy.update().reorder(ryi,rxt,xo,yo).unroll(rxt).unroll(ryi);
 
             SAT_CTail_y_sub.compute_root();
             SAT_CTail_y_sub.reorder_storage(xi,xo,yi,yo);
             SAT_CTail_y_sub.reorder(xi,yi,xo,yo).gpu_blocks(xo,yo).gpu_threads(xi);
-
+#endif
             SAT_CTail_y_sub.update().reorder(ryox,ryoy,ryoz,xi,xo).fuse(xi,xo,x).gpu_tile(x,MAX_THREADS);
         }
 
         // stage 4
         {
-            SAT_Deps_x.compute_at(SAT_GPU, Var::gpu_blocks());
-            SAT_Deps_y.compute_at(SAT_GPU, Var::gpu_blocks());
+            SAT_Deps_x.compute_at(SAT_Final, Var::gpu_blocks());
+            SAT_Deps_y.compute_at(SAT_Final, Var::gpu_blocks());
             SAT_Deps_x.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
             SAT_Deps_y.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
 
-            SAT_Final.compute_at(SAT_GPU, Var::gpu_blocks());
-            SAT_Final.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
-            SAT_Final.update(0).reorder(rxi,ryi,xo,yo).gpu_threads(ryi).unroll(rxi);
-            SAT_Final.update(1).reorder(ryi,rxi,xo,yo).gpu_threads(rxi).unroll(ryi);
+            SAT_Final_sub.compute_at(SAT_Final, Var::gpu_blocks());
+            SAT_Final_sub.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
+            SAT_Final_sub.update(0).reorder(rxi,ryi,xo,yo).gpu_threads(ryi).unroll(rxi);
+            SAT_Final_sub.update(1).reorder(ryi,rxi,xo,yo).gpu_threads(rxi).unroll(ryi);
 
-            SAT_GPU.compute_root();
-            SAT_GPU.reorder_storage(xi,yi,xo,yo);
-            SAT_GPU.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
+            SAT_Final.compute_root();
+            SAT_Final.reorder_storage(xi,xo,yi,yo);
+            SAT_Final.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
         }
     }
 
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nJIT compilation ... " << endl;
+//    Func f = filter.func("SAT_Final");
     filter.func().compile_to_lowered_stmt("hl_stmt.html", HTML);
-    filter.func().compile_jit();
-
-    Buffer hl_out_buff(type_of<float>(), width,height);
-    {
-        Timer t("Running ... ");
-        for (int i=0; i<iter; i++) {
-            filter.func().realize(hl_out_buff);
-            if (i!=iter-1) {
-            }
-        }
+    cerr << "\nRunning ... " << endl;
+    for (int i=0; i<iter; i++) {
+//        f.realize(tile,width/tile,tile,height/tile);
+        filter.func().realize(width,height);
     }
-    hl_out_buff.copy_to_host();
-    hl_out_buff.free_dev_buffer();
 
     // ----------------------------------------------------------------------------------------------
 
     if (!nocheck) {
         cerr << "\nChecking difference ... " << endl;
-        Image<float> hl_out(hl_out_buff);
+        Image<float> hl_out = filter.func().realize(width,height);
         Image<float> ref(width,height);
 
         for (int y=0; y<height; y++) {
