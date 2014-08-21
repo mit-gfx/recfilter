@@ -144,8 +144,7 @@ Halide::Expr swap_vars_in_expr(
         Halide::Expr original   ///< original expression
         );
 
-/**@name
- * @brief Extract vars referenced in a Expr
+/**@name Extract vars referenced in a Expr
  *  (defined in modifiers.cpp) */
 // {@
 std::vector<std::string> extract_rvars_in_expr(Halide::Expr expr);
@@ -153,8 +152,11 @@ std::vector<std::string> extract_params_in_expr(Halide::Expr expr);
 std::vector<std::string> extract_vars_or_rvars_in_expr(Halide::Expr expr);
 // @}
 
-/** @brief Extract the list of dependencies of a Function
+/** @name Extract the list of dependencies of a Function
  *  (defined in modifiers.cpp) */
-std::map<std::string, Halide::Func> extract_func_calls(Halide::Func func);
+// {@
+std::map<std::string, Halide::Func>   extract_func_calls  (Halide::Func func);
+std::map<std::string, Halide::Buffer> extract_buffer_calls(Halide::Func func);
+// @}
 
 #endif // _MODIFIERS_H_

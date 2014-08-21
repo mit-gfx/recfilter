@@ -296,6 +296,13 @@ public:
     // {@
     void set_default_schedule(void);
     // @}
+
+    /**@name Compile and run
+     */
+    // {@
+    void compile_jit(std::string filename="");
+    void realize    (Halide::Buffer out, int iterations);
+    // @}
 };
 
 // -----------------------------------------------------------------------------

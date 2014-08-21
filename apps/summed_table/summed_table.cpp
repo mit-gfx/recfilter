@@ -146,19 +146,17 @@ int main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nJIT compilation ... " << endl;
-//    Func f = filter.func("SAT_Final");
-    filter.func().compile_to_lowered_stmt("hl_stmt.html", HTML);
+    filter.compile_jit("hl_stmt.html");
+
     cerr << "\nRunning ... " << endl;
-    for (int i=0; i<iter; i++) {
-//        f.realize(tile,width/tile,tile,height/tile);
-        filter.func().realize(width,height);
-    }
+    Buffer out(type_of<float>(), width, height);
+    filter.realize(out, iter);
 
     // ----------------------------------------------------------------------------------------------
 
     if (!nocheck) {
         cerr << "\nChecking difference ... " << endl;
-        Image<float> hl_out = filter.func().realize(width,height);
+        Image<float> hl_out(out);
         Image<float> ref(width,height);
 
         for (int y=0; y<height; y++) {

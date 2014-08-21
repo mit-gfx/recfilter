@@ -74,6 +74,43 @@ public:
 
 // -----------------------------------------------------------------------------
 
+// Extract buffer calls referenced in Expr
+class ExtractBufferCallsInExpr : public IRVisitor {
+private:
+    using IRVisitor::visit;
+    void visit(const Call *op) {
+        if (op->image.defined()) {
+            buff_list[op->image.name()] = op->image;
+        }
+        if (op->param.defined() && op->param.is_buffer()) {
+            buff_list[op->param.name()] = op->param.get_buffer();
+        }
+
+        // recursive calls
+        for (int i=0; i<op->args.size(); i++) {
+            op->args[i].accept(this);
+        }
+
+        // Consider extern call args
+        Function f = op->func;
+        if (op->call_type == Call::Halide && f.has_extern_definition()) {
+            for (int i=0; i<f.extern_arguments().size(); i++) {
+                ExternFuncArgument arg = f.extern_arguments()[i];
+                if (arg.is_expr()) {
+                    arg.expr.accept(this);
+                }
+            }
+        }
+    }
+
+public:
+    map<string,Buffer> buff_list;
+
+    ExtractBufferCallsInExpr(map<string,Buffer> b) : buff_list(b) {}
+};
+
+// -----------------------------------------------------------------------------
+
 // Extract variables referenced in Expr
 class ExtractVarsInExpr : public IRVisitor {
 private:
@@ -648,4 +685,33 @@ map<string, Func> extract_func_calls(Func func) {
         f_it++;
     }
     return func_list;
+}
+
+map<string, Buffer> extract_buffer_calls(Func func) {
+    map<string, Buffer>   buff_list;
+    map<string, Function> func_map = find_transitive_calls(func.function());
+    map<string, Function>::iterator f_it;
+
+    ExtractBufferCallsInExpr extract(buff_list);
+
+    for (f_it=func_map.begin(); f_it!=func_map.end(); f_it++) {
+        Function f = f_it->second;
+
+        // all buffers in pure values
+        for (int i=0; i<f.values().size(); i++) {
+            f.values()[i].accept(&extract);
+        }
+
+        // all buffers in update args and values
+        for (int j=0; j<f.updates().size(); j++) {
+            for (int i=0; i<f.updates()[j].args.size(); i++) {
+                f.updates()[j].args[i].accept(&extract);
+            }
+            for (int i=0; i<f.updates()[j].values.size(); i++) {
+                f.updates()[j].values[i].accept(&extract);
+            }
+        }
+    }
+
+    return extract.buff_list;
 }

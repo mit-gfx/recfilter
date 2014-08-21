@@ -1228,3 +1228,30 @@ void RecFilter::split(vector<Var> vars, Expr t) {
     }
     split(dim_tile);
 }
+
+// -----------------------------------------------------------------------------
+
+void RecFilter::compile_jit(string filename) {
+    if (!filename.empty()) {
+//        contents.ptr->recfilter.compile_to_lowered_stmt(filename, HTML);
+    }
+    contents.ptr->recfilter.compile_jit();
+}
+
+void RecFilter::realize(Buffer out, int iterations) {
+    // upload all buffers to device
+    map<string,Buffer> buff = extract_buffer_calls(contents.ptr->recfilter);
+    for (map<string,Buffer>::iterator b=buff.begin(); b!=buff.end(); b++) {
+        b->second.copy_to_dev();
+    }
+
+    // profiling realizations without copying result back to host
+    for (int i=0; i<iterations-1; i++) {
+        contents.ptr->recfilter.realize(out);
+    }
+
+    // last realization copies result back to host
+    contents.ptr->recfilter.realize(out);
+    out.copy_to_host();
+    out.free_dev_buffer();
+}
