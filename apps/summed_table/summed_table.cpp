@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nJIT compilation ... " << endl;
-    filter.compile_jit("hl_stmt.html");
+    filter.compile_jit(target, "hl_stmt.html");
 
     cerr << "\nRunning ... " << endl;
     Buffer out(type_of<float>(), width, height);

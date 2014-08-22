@@ -300,7 +300,7 @@ public:
     /**@name Compile and run
      */
     // {@
-    void compile_jit(std::string filename="");
+    void compile_jit(Halide::Target target, std::string filename="");
     void realize    (Halide::Buffer out, int iterations);
     // @}
 };

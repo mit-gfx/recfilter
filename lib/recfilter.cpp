@@ -295,3 +295,30 @@ void RecFilter::set_default_schedule(void) {
         fit->second.compute_root();
     }
 }
+
+// -----------------------------------------------------------------------------
+
+void RecFilter::compile_jit(Target target, string filename) {
+    if (!filename.empty()) {
+        contents.ptr->recfilter.compile_to_lowered_stmt(filename, HTML, target);
+    }
+    contents.ptr->recfilter.compile_jit(target);
+}
+
+void RecFilter::realize(Buffer out, int iterations) {
+    // upload all buffers to device
+    map<string,Buffer> buff = extract_buffer_calls(contents.ptr->recfilter);
+    for (map<string,Buffer>::iterator b=buff.begin(); b!=buff.end(); b++) {
+        b->second.copy_to_dev();
+    }
+
+    // profiling realizations without copying result back to host
+    for (int i=0; i<iterations-1; i++) {
+        contents.ptr->recfilter.realize(out);
+    }
+
+    // last realization copies result back to host
+    contents.ptr->recfilter.realize(out);
+    out.copy_to_host();
+    out.free_dev_buffer();
+}
