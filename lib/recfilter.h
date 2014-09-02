@@ -339,6 +339,7 @@ public:
     int width;       ///< image width
     int block;       ///< block size
     int iterations;  ///< profiling iterations
+    int threads;     ///< maximum threads per GPU tile
     bool nocheck;    ///< skip check Halide result against reference solution
 
     /** Parse command line args from number of args and list of args */

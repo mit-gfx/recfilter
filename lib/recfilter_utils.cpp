@@ -13,14 +13,16 @@ Arguments::Arguments(int argc, char** argv) :
     width  (1024),
     block  (32),
     iterations(1),
+    threads(192),
     nocheck(false)
 {
     string app_name = argv[0];
     string desc = "\nUsage\n " + app_name + " ";
     desc.append(string(
-                "[-width|-w w] [-tile|-block|-b|-t b] [-iter i] [-nocheck] [-help]\n\n"
+                "[-width|-w w] [-tile|-block|-b|-t b] [-thread n] [-iter i] [-nocheck] [-help]\n\n"
                 "\twidth    width of input image [default = 1024]\n"
                 "\ttile     tile width for splitting each dimension image [default = 32]\n"
+                "\tthread   maximum threads per tile [default = 192]\n"
                 "\tnocheck  do not check against reference solution [default = false]\n"
                 "\titer     number of profiling iterations [default = 1]\n"
                 "\thelp     show help message\n"
@@ -43,7 +45,14 @@ Arguments::Arguments(int argc, char** argv) :
                 if ((i+1) < argc)
                     iterations = atoi(argv[++i]);
                 else
-                    throw runtime_error("-iterations requires a int value");
+                    throw runtime_error("-iter requires a int value");
+            }
+
+            else if (!option.compare("-thread") || !option.compare("--thread")) {
+                if ((i+1) < argc)
+                    threads = atoi(argv[++i]);
+                else
+                    throw runtime_error("-thread requires a int value");
             }
 
             else if (!option.compare("-w") || !option.compare("--w") || !option.compare("-width") || !option.compare("--width")) {

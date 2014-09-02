@@ -996,7 +996,7 @@ static vector< vector<Function> > split_scans(
         vector<Function> F_tail   = create_intra_tail_term    (F_intra,  split_info[i], s0);
         vector<Function> F_ctail  = create_complete_tail_term (F_tail,   split_info[i], s1);
         vector<Function> F_ctailw = wrap_complete_tail_term   (F_ctail,  split_info[i], s1);
-        vector<Function> F_tdeps  = create_tail_residual_term (F_ctailw, split_info[i], s2);
+        vector<Function> F_tdeps  = create_tail_residual_term (F_ctail,  split_info[i], s2);
         vector<Function> F_deps   = create_final_residual_term(F_ctailw, split_info[i], s3);
 
         // add the dependency from each scan to the tail of the next scan
@@ -1227,31 +1227,4 @@ void RecFilter::split(vector<Var> vars, Expr t) {
         dim_tile[vars[i].name()] = t;
     }
     split(dim_tile);
-}
-
-// -----------------------------------------------------------------------------
-
-void RecFilter::compile_jit(string filename) {
-    if (!filename.empty()) {
-//        contents.ptr->recfilter.compile_to_lowered_stmt(filename, HTML);
-    }
-    contents.ptr->recfilter.compile_jit();
-}
-
-void RecFilter::realize(Buffer out, int iterations) {
-    // upload all buffers to device
-    map<string,Buffer> buff = extract_buffer_calls(contents.ptr->recfilter);
-    for (map<string,Buffer>::iterator b=buff.begin(); b!=buff.end(); b++) {
-        b->second.copy_to_dev();
-    }
-
-    // profiling realizations without copying result back to host
-    for (int i=0; i<iterations-1; i++) {
-        contents.ptr->recfilter.realize(out);
-    }
-
-    // last realization copies result back to host
-    contents.ptr->recfilter.realize(out);
-    out.copy_to_host();
-    out.free_dev_buffer();
 }
