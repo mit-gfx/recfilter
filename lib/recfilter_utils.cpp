@@ -10,7 +10,7 @@ using std::runtime_error;
 using namespace Halide;
 
 Arguments::Arguments(int argc, char** argv) :
-    width  (1024),
+    width  (4096),
     block  (32),
     iterations(1),
     threads(192),
@@ -20,7 +20,7 @@ Arguments::Arguments(int argc, char** argv) :
     string desc = "\nUsage\n " + app_name + " ";
     desc.append(string(
                 "[-width|-w w] [-tile|-block|-b|-t b] [-thread n] [-iter i] [-nocheck] [-help]\n\n"
-                "\twidth    width of input image [default = 1024]\n"
+                "\twidth    width of input image [default = 4096]\n"
                 "\ttile     tile width for splitting each dimension image [default = 32]\n"
                 "\tthread   maximum threads per tile [default = 192]\n"
                 "\tnocheck  do not check against reference solution [default = false]\n"

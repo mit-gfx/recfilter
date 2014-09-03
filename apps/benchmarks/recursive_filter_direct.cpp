@@ -64,82 +64,12 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Target target = get_jit_target_from_environment();
-    if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
-        Var t("t");
-
-        Var xi("xi"), yi("yi"), rxi("rxi"), rxt("rxt");
-        Var xo("xo"), yo("yo"), ryi("ryi"), ryt("ryt");
-
-        Var rxox("rxo.x$r"), rxoy("rxo.y$r"), rxoz("rxo.z$r");
-        Var ryox("ryo.x$r"), ryoy("ryo.y$r"), ryoz("ryo.z$r");
-
-        Func S_Final       = filter.func("S_Final");
-        Func S_Final_sub   = filter.func("S_Final_Sub");
-        Func S_Intra       = filter.func("S_Intra");
-        Func S_Tail        = filter.func("S_Intra_Tail");
-        Func S_CTail_x     = filter.func("S_Intra_CTail_x_0");
-        Func S_CTail_y     = filter.func("S_Intra_CTail_y_1");
-        Func S_CTail_x_sub = filter.func("S_Intra_CTail_x_0_Sub");
-        Func S_CTail_y_sub = filter.func("S_Intra_CTail_y_1_Sub");
-        Func S_CTail_xy    = filter.func("S_Intra_CTail_x_0_y_1");
-        Func S_Deps_x      = filter.func("S_Intra_Deps_x_0");
-        Func S_Deps_y      = filter.func("S_Intra_Deps_y_1");
-
-        // stage 1
-        {
-            S_Intra.compute_at(S_Tail, Var::gpu_blocks());
-            S_Intra.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
-            S_Intra.update(0).reorder(rxi,ryi,xo,yo).gpu_threads(ryi).unroll(rxi);
-            S_Intra.update(1).reorder(rxt,ryi,xo,yo).gpu_threads(ryi).unroll(rxt);
-            S_Intra.update(2).reorder(ryi,rxi,xo,yo).gpu_threads(rxi).unroll(ryi);
-            S_Intra.update(3).reorder(ryt,rxi,xo,yo).gpu_threads(rxi).unroll(ryt);
-
-            S_Tail.compute_root();
-            S_Tail.reorder_storage(xi,yi,xo,yo);
-            S_Tail.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
-        }
-
-        // stage 2:
-        {
-            S_CTail_x_sub.compute_root();
-            S_CTail_x_sub.reorder_storage(yi,yo,xi,xo);
-            S_CTail_x_sub.reorder(xi,xo,yi,yo).fuse(yi,yo,y).gpu_tile(y,MAX_THREADS);
-            S_CTail_x_sub.update().reorder(rxox,rxoy,rxoz,yi,yo).fuse(yi,yo,y).gpu_tile(y,MAX_THREADS);
-        }
-
-        // stage 3
-        {
-            S_CTail_xy.compute_at(S_CTail_y_sub, Var::gpu_blocks());
-            S_CTail_xy.reorder(xi,yi,xo,yo).gpu_threads(yi).unroll(xi);
-            S_CTail_xy.update().reorder(ryi,rxt,xo,yo).unroll(rxt).unroll(ryi);
-
-            S_CTail_y_sub.compute_root();
-            S_CTail_y_sub.reorder_storage(xi,xo,yi,yo);
-            S_CTail_y_sub.reorder(xi,yi,xo,yo).gpu_blocks(xo,yo).gpu_threads(xi);
-
-            S_CTail_y_sub.update().reorder(ryox,ryoy,ryoz,xi,xo).fuse(xi,xo,x).gpu_tile(x,MAX_THREADS);
-        }
-
-        // stage 4
-        {
-            S_Deps_x.compute_at(S_Final, Var::gpu_blocks());
-            S_Deps_y.compute_at(S_Final, Var::gpu_blocks());
-            S_Deps_x.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
-            S_Deps_y.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
-
-            S_Final_sub.compute_at(S_Final, Var::gpu_blocks());
-            S_Final_sub.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
-            S_Final_sub.update(0).reorder(rxi,ryi,xo,yo).gpu_threads(ryi).unroll(rxi);
-            S_Final_sub.update(1).reorder(ryi,rxi,xo,yo).gpu_threads(rxi).unroll(ryi);
-
-            S_Final.compute_root();
-            S_Final.reorder_storage(xi,xo,yi,yo);
-            S_Final.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
-        }
+    {
     }
 
     // ----------------------------------------------------------------------------------------------
+
+    Target target = get_jit_target_from_environment();
 
     cerr << "\nJIT compilation ... " << endl;
     filter.compile_jit(target, "hl_stmt.html");
