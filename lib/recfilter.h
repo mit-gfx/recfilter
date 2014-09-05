@@ -231,12 +231,19 @@ public:
     // @}
 
 
-    /** @brief Inline all calls to a pure function
+    /** @name  Inline all calls to a pure function
      * (defined in reorder.cpp)
      */
+    // {@
     void inline_func(
             std::string func_name   ///< name of function to be inlined
             );
+
+    void inline_func(
+            Halide::Func a,         ///< function to be inlined
+            Halide::Func b          ///< function in which to inline
+            );
+    // @}
 
 
     /** @name Reorder memory layout by swapping two dimensions of a function

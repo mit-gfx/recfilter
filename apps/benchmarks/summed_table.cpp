@@ -94,10 +94,18 @@ int main(int argc, char **argv) {
 
         // stage 2:
         {
-            SAT_CTail_x_sub.compute_root();
-            SAT_CTail_x_sub.reorder_storage(yi,yo,xi,xo);
+#if 0
+            SAT_CTail_x_sub.compute_root().reorder_storage(yi,yo,xi,xo);
             SAT_CTail_x_sub.reorder(xi,xo,yi,yo).fuse(yi,yo,y).gpu_tile(y,MAX_THREADS);
             SAT_CTail_x_sub.update().reorder(rxox,rxoy,rxoz,yi,yo).fuse(yi,yo,y).gpu_tile(y,MAX_THREADS);
+#else
+            SAT_CTail_x_sub.compute_at(SAT_CTail_x, Var::gpu_blocks());
+            SAT_CTail_x_sub.reorder(xi,xo,yi,yo).split(yo,yo,y,UNROLL_FACTOR).gpu_threads(yi,y);
+            SAT_CTail_x_sub.update().reorder(rxox,rxoy,rxoz,yi,yo).split(yo,yo,y,UNROLL_FACTOR).gpu_threads(yi,y);
+
+            SAT_CTail_x.compute_root().reorder_storage(yi,yo,xi,xo);
+            SAT_CTail_x.reorder(xi,xo,yi,yo).split(yo,yo,y,UNROLL_FACTOR).gpu_threads(yi,y).gpu_blocks(yo);
+#endif
         }
 
         // stage 3
@@ -127,10 +135,8 @@ int main(int argc, char **argv) {
 
         // stage 4
         {
-            SAT_Deps_x.compute_at(SAT_Final, Var::gpu_blocks());
-            SAT_Deps_y.compute_at(SAT_Final, Var::gpu_blocks());
-            SAT_Deps_x.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
-            SAT_Deps_y.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
+            SAT_Deps_x.compute_at(SAT_Final, Var::gpu_blocks()).reorder(xi,yi,xo,yo).gpu_threads(yi);
+            SAT_Deps_y.compute_at(SAT_Final, Var::gpu_blocks()).reorder(xi,yi,xo,yo).gpu_threads(xi);
 
             SAT_Final_sub.compute_at(SAT_Final, Var::gpu_blocks());
             SAT_Final_sub.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);

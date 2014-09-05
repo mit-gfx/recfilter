@@ -9,7 +9,6 @@ all: scripts
 	make -C benchmarks -j8
 	make -C ls_hist
 
-
 clean:
 	make -C ../lib clean
 	make -C boxcar clean
@@ -18,6 +17,7 @@ clean:
 	make -C gauss_cognex clean
 	make -C test_correctness clean
 	make -C benchmarks clean
+	rm -f $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh
 
 scripts: $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh
 

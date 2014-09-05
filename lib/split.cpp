@@ -36,7 +36,7 @@ static vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> 
     assert(split_info.size() == args.size());
 
     vector<UpdateDefinition> new_updates;
-    vector<SplitInfo>           new_split_info = split_info;
+    vector<SplitInfo>        new_split_info = split_info;
 
     // use all scans with dimension 0 first, then 1 and so on
     for (int i=0; i<split_info.size(); i++) {
@@ -618,18 +618,37 @@ static vector<Function> create_final_residual_term(
 
     assert(split_info.num_splits == F_ctail.size());
 
-    // accumulate all completed tails
+    // create functions that just reindex the completed tails
+    // this seemingly redundant reindexing allows the application to
+    // read the completed tail into shared memory in
     vector<Function> F_deps;
+
+    for (int j=0; j<split_info.num_splits; j++) {
+        Function function(func_name + DASH + int_to_string(split_info.scan_id[j]));
+        vector<Expr> values;
+        vector<Expr> call_args;
+        for (int i=0; i<F_ctail[j].args().size(); i++) {
+            call_args.push_back(Var(F_ctail[j].args()[i]));
+        }
+        for (int i=0; i<F_ctail[j].values().size(); i++) {
+            values.push_back(Call::make(F_ctail[j], call_args, i));
+        }
+        function.define(F_ctail[j].args(), values);
+        F_deps.push_back(function);
+    }
+
+    // accumulate all completed tails
+    vector<Function> F_deps_sub;
 
     // accumulate contribution from each completed tail
     for (int j=0; j<split_info.num_splits; j++) {
-        Function function(func_name + DASH + int_to_string(split_info.scan_id[j]));
+        Function function(func_name + DASH + int_to_string(split_info.scan_id[j]) + DASH + SUB);
 
-        int num_args    = F_ctail[j].args().size();
-        int num_outputs = F_ctail[j].outputs();
+        int num_args    = F_deps[j].args().size();
+        int num_outputs = F_deps[j].outputs();
 
         // args are same as completed tail terms
-        vector<string> args = F_ctail[j].args();
+        vector<string> args = F_deps[j].args();
         vector<Expr> values(num_outputs, FLOAT_ZERO);
 
         // weight matrix for accumulating completed tail elements
@@ -641,7 +660,7 @@ static vector<Function> create_final_residual_term(
         for (int k=0; k<order; k++) {
             vector<Expr> call_args;
             for (int i=0; i<num_args; i++) {
-                string arg = F_ctail[j].args()[i];
+                string arg = F_deps[j].args()[i];
                 if (xo.name() == arg) {
                     if (split_info.scan_causal[j]) {
                         call_args.push_back(max(xo-1,0));  // prev tile
@@ -659,11 +678,11 @@ static vector<Function> create_final_residual_term(
                 Expr val;
                 if (split_info.scan_causal[j]) {
                     val = select(xo>0,
-                            weight(xi,k) * Call::make(F_ctail[j], call_args, i),
+                            weight(xi,k) * Call::make(F_deps[j], call_args, i),
                             FLOAT_ZERO);
                 } else {
                     val = select(xo<num_tiles-1,
-                            weight(simplify(tile-1-xi),k) * Call::make(F_ctail[j], call_args, i),
+                            weight(simplify(tile-1-xi),k) * Call::make(F_deps[j], call_args, i),
                             FLOAT_ZERO);
                 }
                 values[i] = simplify(values[i] + val);
@@ -671,10 +690,10 @@ static vector<Function> create_final_residual_term(
         }
         function.define(args, values);
 
-        F_deps.push_back(function);
+        F_deps_sub.push_back(function);
     }
 
-    return F_deps;
+    return F_deps_sub;
 }
 
 // -----------------------------------------------------------------------------
@@ -1145,6 +1164,19 @@ void RecFilter::split(map<string,Expr> dim_tile) {
 
         // add padding to intra tile terms to avoid bank conflicts
         add_padding_to_avoid_bank_conflicts(F_intra, split_info_current, true);
+
+        // inline all residual functions, not required any more
+        map<string,Function> func_map = find_direct_calls(F_final);
+        map<string,Function>::iterator f = func_map.begin();
+        for (; f!=func_map.end(); f++) {
+            for (int i=0; i<F_deps.size(); i++) {
+                for (int j=0; j<F_deps[i].size(); j++) {
+                    if (!F_deps[i][j].same_as(f->second)) {
+                        inline_func(Func(F_deps[i][j]), Func(f->second));
+                    }
+                }
+            }
+        }
     }
 
     // change the original function to index into the final term

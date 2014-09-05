@@ -463,13 +463,16 @@ void RecFilter::inline_func(string func_name) {
     vector<Function> func_list;
     map<string,Func> func_map = funcs();
     map<string,Func>::iterator f = func_map.begin();
-    while (f != func_map.end()) {
+    for (; f!=func_map.end(); f++) {
         func_list.push_back(f->second.function());
-        f++;
     }
 
     inline_function(F, func_list);
     contents.ptr->func_map.clear();
+}
+
+void RecFilter::inline_func(Func a, Func b) {
+    inline_function(a.function(), Internal::vec(b.function()));
 }
 
 // -----------------------------------------------------------------------------
@@ -478,9 +481,8 @@ void RecFilter::merge_func(string func_a, string func_b, string merged_name) {
     vector<Function> func_list;
     map<string,Func> func_map = funcs();
     map<string,Func>::iterator f = func_map.begin();
-    while (f != func_map.end()) {
+    for (; f!=func_map.end(); f++) {
         func_list.push_back(f->second.function());
-        f++;
     }
 
     Function FA = func(func_a).function();
