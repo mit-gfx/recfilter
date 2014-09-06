@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
 
         // stage 2:
         {
-#if 0
+#if 1
             SAT_CTail_x_sub.compute_root().reorder_storage(yi,yo,xi,xo);
             SAT_CTail_x_sub.reorder(xi,xo,yi,yo).fuse(yi,yo,y).gpu_tile(y,MAX_THREADS);
             SAT_CTail_x_sub.update().reorder(rxox,rxoy,rxoz,yi,yo).fuse(yi,yo,y).gpu_tile(y,MAX_THREADS);
