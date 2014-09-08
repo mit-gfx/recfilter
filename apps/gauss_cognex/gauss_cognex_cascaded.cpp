@@ -92,11 +92,12 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Target target = get_jit_target_from_environment();
-    if (target.has_gpu_feature() || (target.features & Target::GPUDebug)) {
+    {
     }
 
     // ----------------------------------------------------------------------------------------------
+
+    Target target = get_jit_target_from_environment();
 
     cerr << "\nJIT compilation ... " << endl;
     filter.func().compile_jit();
