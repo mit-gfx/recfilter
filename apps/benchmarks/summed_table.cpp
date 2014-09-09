@@ -5,6 +5,7 @@
 
 #define MAX_THREADS   192
 #define UNROLL_FACTOR 6
+#define NUM_TILES     6
 
 using namespace Halide;
 
@@ -65,8 +66,8 @@ int main(int argc, char **argv) {
         Var rxox("rxo.x$r"), rxoy("rxo.y$r"), rxoz("rxo.z$r");
         Var ryox("ryo.x$r"), ryoy("ryo.y$r"), ryoz("ryo.z$r");
 
+        Func SAT             = filter.func("SAT");
         Func SAT_Final       = filter.func("SAT_Final");
-        Func SAT_Final_sub   = filter.func("SAT_Final_Sub");
         Func SAT_Intra       = filter.func("SAT_Intra");
         Func SAT_Tail        = filter.func("SAT_Intra_Tail");
         Func SAT_CTail_x     = filter.func("SAT_Intra_CTail_x_0");
@@ -77,75 +78,51 @@ int main(int argc, char **argv) {
         Func SAT_Deps_x      = filter.func("SAT_Intra_Deps_x_0");
         Func SAT_Deps_y      = filter.func("SAT_Intra_Deps_y_1");
 
-        // stage 1
-        {
-            SAT_Intra.compute_at(SAT_Tail, Var::gpu_blocks());
-            SAT_Intra.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
-            SAT_Intra.update(0).reorder(rxi,ryi,xo,yo).gpu_threads(ryi).unroll(rxi);
-            SAT_Intra.update(1).reorder(rxt,ryi,xo,yo).gpu_threads(ryi).unroll(rxt);
-            SAT_Intra.update(2).reorder(ryi,rxi,xo,yo).gpu_threads(rxi).unroll(ryi);
-            SAT_Intra.update(3).reorder(ryt,rxi,xo,yo).gpu_threads(rxi).unroll(ryt);
+        SAT_Intra.compute_at(SAT_Tail, Var::gpu_blocks());
+        SAT_Intra.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
+        SAT_Intra.update(0).reorder(rxi,ryi,xo,yo).gpu_threads(ryi).unroll(rxi);
+        SAT_Intra.update(1).reorder(rxt,ryi,xo,yo).gpu_threads(ryi).unroll(rxt);
+        SAT_Intra.update(2).reorder(ryi,rxi,xo,yo).gpu_threads(rxi).unroll(ryi);
+        SAT_Intra.update(3).reorder(ryt,rxi,xo,yo).gpu_threads(rxi).unroll(ryt);
 
-            SAT_Tail.compute_root();
-            SAT_Tail.reorder_storage(xi,yi,xo,yo);
-            SAT_Tail.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
-        }
+        SAT_Tail.compute_root();
+        SAT_Tail.reorder_storage(xi,yi,xo,yo);
+        SAT_Tail.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
 
-        // stage 2:
-        {
-#if 1
-            SAT_CTail_x_sub.compute_root().reorder_storage(yi,yo,xi,xo);
-            SAT_CTail_x_sub.reorder(xi,xo,yi,yo).fuse(yi,yo,y).gpu_tile(y,MAX_THREADS);
-            SAT_CTail_x_sub.update().reorder(rxox,rxoy,rxoz,yi,yo).fuse(yi,yo,y).gpu_tile(y,MAX_THREADS);
-#else
-            SAT_CTail_x_sub.compute_at(SAT_CTail_x, Var::gpu_blocks());
-            SAT_CTail_x_sub.reorder(xi,xo,yi,yo).split(yo,yo,y,UNROLL_FACTOR).gpu_threads(yi,y);
-            SAT_CTail_x_sub.update().reorder(rxox,rxoy,rxoz,yi,yo).split(yo,yo,y,UNROLL_FACTOR).gpu_threads(yi,y);
+        //
 
-            SAT_CTail_x.compute_root().reorder_storage(yi,yo,xi,xo);
-            SAT_CTail_x.reorder(xi,xo,yi,yo).split(yo,yo,y,UNROLL_FACTOR).gpu_threads(yi,y).gpu_blocks(yo);
-#endif
-        }
+        SAT_CTail_x_sub.compute_root().reorder_storage(yi,yo,xi,xo);
+        SAT_CTail_x_sub.reorder(xi,xo,yi,yo).fuse(yi,yo,y).gpu_tile(y,MAX_THREADS);
+        SAT_CTail_x_sub.update().reorder(rxox,rxoy,rxoz,yi,yo).fuse(yi,yo,y).gpu_tile(y,MAX_THREADS);
 
-        // stage 3
-        {
-#if 0
-            SAT_CTail_xy.compute_at(SAT_CTail_y_sub, Var::gpu_blocks());
-            SAT_CTail_xy.reorder(xi,yi,xo,yo).split(xo,xo,x,MAX_THREADS/tile).gpu_threads(yi);
-            SAT_CTail_xy.update().reorder(ryi,rxt,xo,yo).split(xo,xo,x,MAX_THREADS/tile).gpu_threads(x).unroll(ryi);
+        //
 
-            SAT_CTail_y_sub.compute_root();
-            SAT_CTail_y_sub.reorder_storage(xi,yi,xo,yo);
-            SAT_CTail_y_sub.split(xo,xo,x,MAX_THREADS/tile).fuse(x,xi,xi).reorder(xi,yi,xo,yo).gpu_blocks(xo,yo).gpu_threads(xi,yi);
+        SAT_CTail_xy.compute_at(SAT_CTail_y_sub, Var::gpu_blocks());
+        SAT_CTail_xy.reorder(xi,yi,xo,yo).gpu_threads(yi).unroll(xi);
+        SAT_CTail_xy.update().reorder(ryi,rxt,xo,yo).unroll(rxt).unroll(ryi);
 
-            SAT_CTail_y_sub.bound(xo,0,image.width()/tile ).bound(xi,0,tile);
-            SAT_CTail_y_sub.bound(yo,0,image.height()/tile).bound(yi,0,1);
-#else
-            SAT_CTail_xy.compute_at(SAT_CTail_y_sub, Var::gpu_blocks());
-            SAT_CTail_xy.reorder(xi,yi,xo,yo).gpu_threads(yi).unroll(xi);
-            SAT_CTail_xy.update().reorder(ryi,rxt,xo,yo).unroll(rxt).unroll(ryi);
+        SAT_CTail_y_sub.compute_root();
+        SAT_CTail_y_sub.reorder_storage(xi,xo,yi,yo);
+        SAT_CTail_y_sub.reorder(xi,yi,xo,yo).gpu_blocks(xo,yo).gpu_threads(xi);
+        SAT_CTail_y_sub.update().reorder(ryox,ryoy,ryoz,xi,xo).fuse(xi,xo,x).gpu_tile(x,MAX_THREADS);
 
-            SAT_CTail_y_sub.compute_root();
-            SAT_CTail_y_sub.reorder_storage(xi,xo,yi,yo);
-            SAT_CTail_y_sub.reorder(xi,yi,xo,yo).gpu_blocks(xo,yo).gpu_threads(xi);
-#endif
-            SAT_CTail_y_sub.update().reorder(ryox,ryoy,ryoz,xi,xo).fuse(xi,xo,x).gpu_tile(x,MAX_THREADS);
-        }
+        //
 
-        // stage 4
-        {
-            SAT_Deps_x.compute_at(SAT_Final, Var::gpu_blocks()).reorder(xi,yi,xo,yo).gpu_threads(yi);
-            SAT_Deps_y.compute_at(SAT_Final, Var::gpu_blocks()).reorder(xi,yi,xo,yo).gpu_threads(xi);
+        SAT_Deps_x.compute_at(SAT, Var::gpu_blocks()).reorder(xi,yi,xo,yo).gpu_threads(yi);
+        SAT_Deps_y.compute_at(SAT, Var::gpu_blocks()).reorder(xi,yi,xo,yo).gpu_threads(xi);
 
-            SAT_Final_sub.compute_at(SAT_Final, Var::gpu_blocks());
-            SAT_Final_sub.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
-            SAT_Final_sub.update(0).reorder(rxi,ryi,xo,yo).gpu_threads(ryi).unroll(rxi);
-            SAT_Final_sub.update(1).reorder(ryi,rxi,xo,yo).gpu_threads(rxi).unroll(ryi);
+        SAT_Final.compute_at(SAT, Var::gpu_blocks());
+        SAT_Final.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
+        SAT_Final.update(0).reorder(rxt,ryi,xo,yo).gpu_threads(ryi).unroll(rxt);
+        SAT_Final.update(1).reorder(rxi,ryi,xo,yo).gpu_threads(ryi).unroll(rxi);
+        SAT_Final.update(2).reorder(ryt,rxi,xo,yo).gpu_threads(rxi).unroll(ryt);
+        SAT_Final.update(3).reorder(ryi,rxi,xo,yo).gpu_threads(rxi).unroll(ryi);
 
-            SAT_Final.compute_root();
-            SAT_Final.reorder_storage(xi,xo,yi,yo);
-            SAT_Final.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
-        }
+        SAT.compute_root();
+        SAT.split(x,xo,xi,tile).split(y,yo,yi,tile);
+        SAT.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
+
+        SAT.bound(x,0,width).bound(y,0,height);
     }
 
     // ----------------------------------------------------------------------------------------------
