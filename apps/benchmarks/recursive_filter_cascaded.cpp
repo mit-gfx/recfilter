@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
     float b0 = 0.425294f;
     vector<float> W2;
     W2.push_back(0.885641f);
-    W2.push_back(-0.310935f);
+//    W2.push_back(-0.310935f);
 //    W2.push_back(-0.000005f);
 
     Var x("x");
@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
 //    filterx.merge_func("S_0_Intra_CTail_x_0","S_0_Intra_CTail_x_1","S_0_Intra_CTail_x");
 //    filtery.merge_func("S_1_Intra_CTail_y_0","S_1_Intra_CTail_y_1","S_1_Intra_CTail_y");
 
-    cerr << filtery << endl;
+    cerr << filterx << endl;
 
     // ----------------------------------------------------------------------------------------------
 
@@ -189,11 +189,11 @@ int main(int argc, char **argv) {
     Target target = get_jit_target_from_environment();
 
     cerr << "\nJIT compilation ... " << endl;
-    filtery.compile_jit(target, "hl_stmt.html");
+    filterx.compile_jit(target, "stmt.html");
 
     cerr << "\nRunning ... " << endl;
     Buffer out(type_of<float>(), width, height);
-    filtery.realize(out, iter);
+    filterx.realize(out, iter);
 
     // ----------------------------------------------------------------------------------------------
 
