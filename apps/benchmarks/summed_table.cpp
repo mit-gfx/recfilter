@@ -5,7 +5,6 @@
 
 #define MAX_THREADS   192
 #define UNROLL_FACTOR 6
-#define NUM_TILES     6
 
 using namespace Halide;
 
