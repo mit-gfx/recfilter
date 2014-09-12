@@ -917,19 +917,33 @@ static void add_all_residuals_to_final_result(
             int  curr_scan   = split_info[i].scan_id[j];
             RDom rxi         = split_info[i].inner_rdom;
             RDom rxt         = split_info[i].tail_rdom;
+            RDom rxf         = split_info[i].truncated_inner_rdom;
             vector<Expr> args= updates[curr_scan].args;
-
-            // replace rxi by rxt (involves replacing rxi.x by rxt.x etc)
-            // for the dimension undergoing scan
-            for (int k=0; k<rxi.dimensions(); k++) {
-                for (int u=0; u<args.size(); u++) {
-                    args[u] = substitute(rxi[k].name(), rxt[k], args[u]);
-                }
-            }
 
             vector<Expr> values;
             for (int k=0; k<F_deps[i][j].outputs(); k++) {
-                values.push_back(Call::make(F, args, k) + Call::make(F_deps[i][j], args, k));
+                values.push_back(updates[curr_scan].values[k] + Call::make(F_deps[i][j], args, k));
+            }
+
+            for (int k=0; k<rxi.dimensions(); k++) {
+                // replace rxi by rxt (involves replacing rxi.x by rxt.x etc)
+                // for the dimension undergoing scan
+                for (int u=0; u<args.size(); u++) {
+                    args[u] = substitute(rxi[k].name(), rxt[k], args[u]);
+                }
+                for (int u=0; u<values.size(); u++) {
+                    values[u] = substitute(rxi[k].name(), rxt[k], values[u]);
+                }
+
+                // the new update runs the scan for the first t elements
+                // change the reduction domain of the original update to
+                // run from t onwards, t = filter order
+                for (int u=0; u<updates[curr_scan].args.size(); u++) {
+                    updates[curr_scan].args[u] = substitute(rxi[k].name(), rxf[k], updates[curr_scan].args[u]);
+                }
+                for (int u=0; u<updates[curr_scan].values.size(); u++) {
+                    updates[curr_scan].values[u] = substitute(rxi[k].name(), rxf[k], updates[curr_scan].values[u]);
+                }
             }
 
             new_updates[curr_scan] = make_pair(args, values);
@@ -944,6 +958,7 @@ static void add_all_residuals_to_final_result(
             vector<Expr> args   = new_updates[i].first;
             vector<Expr> values = new_updates[i].second;
             F.define_update(args, values);
+
         }
         F.define_update(updates[i].args, updates[i].values);
     }
@@ -1184,6 +1199,14 @@ void RecFilter::split(map<string,Expr> dim_tile) {
                 inner_tail_rvars[j].min    = 0;
                 inner_tail_rvars[j].extent = filter_order;
                 contents.ptr->split_info[j].tail_rdom = RDom(ReductionDomain(inner_tail_rvars));
+
+                // same as inner rdom except that the domain is from filter_order to tile_width-1
+                // instead of 0 to tile_width-1
+                vector<ReductionVariable> inner_truncated_rvars = inner_scan_rvars;
+                inner_truncated_rvars[j].var    = "r"+name+"f";
+                inner_truncated_rvars[j].min    = filter_order;
+                inner_truncated_rvars[j].extent = simplify(max(inner_truncated_rvars[j].extent-filter_order,0));
+                contents.ptr->split_info[j].truncated_inner_rdom = RDom(ReductionDomain(inner_truncated_rvars));
 
                 // outer_rdom.x: over tail elems of prev tile to compute tail of current tile
                 // outer_rdom.y: over all tail elements of current tile

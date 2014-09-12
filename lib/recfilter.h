@@ -24,25 +24,26 @@
 
 /** Info required to split a particular dimension of the recursive filter */
 struct SplitInfo {
-    int filter_order;           ///< order of recursive filter in a given dimension
-    int filter_dim;             ///< dimension id
-    int num_splits;             ///< number of scans in the dimension that must be tiled
+    int filter_order;                   ///< order of recursive filter in a given dimension
+    int filter_dim;                     ///< dimension id
+    int num_splits;                     ///< number of scans in the dimension that must be tiled
 
-    Halide::Expr tile_width;    ///< width of each tile after splitting the dimension
-    Halide::Expr image_width;   ///< width of the image in this dimension
-    Halide::Expr num_tiles;     ///< number of tile in this dimension
+    Halide::Expr tile_width;            ///< width of each tile after splitting the dimension
+    Halide::Expr image_width;           ///< width of the image in this dimension
+    Halide::Expr num_tiles;             ///< number of tile in this dimension
 
-    Halide::Var  var;           ///< variable that represents this dimension
-    Halide::Var  inner_var;     ///< inner variable after splitting
-    Halide::Var  outer_var;     ///< outer variable or tile index after splitting
+    Halide::Var  var;                   ///< variable that represents this dimension
+    Halide::Var  inner_var;             ///< inner variable after splitting
+    Halide::Var  outer_var;             ///< outer variable or tile index after splitting
 
-    Halide::RDom rdom;          ///< RDom update domain of each scan
-    Halide::RDom inner_rdom;    ///< inner RDom of each scan
-    Halide::RDom outer_rdom;    ///< outer RDom of each scan
-    Halide::RDom tail_rdom;     ///< RDom to extract the tail of each scan
+    Halide::RDom rdom;                  ///< RDom update domain of each scan
+    Halide::RDom inner_rdom;            ///< inner RDom of each scan
+    Halide::RDom truncated_inner_rdom;  ///< inner RDom width a truncated
+    Halide::RDom outer_rdom;            ///< outer RDom of each scan
+    Halide::RDom tail_rdom;             ///< RDom to extract the tail of each scan
 
-    vector<bool> scan_causal;   ///< causal or anticausal flag for each scan
-    vector<int>  scan_id;       ///< scan or update definition id of each scan
+    vector<bool> scan_causal;           ///< causal or anticausal flag for each scan
+    vector<int>  scan_id;               ///< scan or update definition id of each scan
 
     vector<Halide::Expr> border_expr;   ///< image border value (can't contain the var or rdom)
 

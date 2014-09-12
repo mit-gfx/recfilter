@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
     filter.addScan(y, ry, B3, W3, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
     filter.addScan(y, ry, B3, W3, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
 
-    filter.split(x, y, tile);
+    filter.split(tile);
 
     cerr << filter << endl;
 
