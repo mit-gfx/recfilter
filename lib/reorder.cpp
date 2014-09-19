@@ -301,9 +301,9 @@ static bool merge_feasible(Function A, Function B, string& error) {
 }
 
 static bool check_duplicate(Function A, Function B) {
-    // duplicate functions can always be merged
+    bool duplicate = true;
+
     string err;
-    bool duplicate = merge_feasible(A,B, err);
 
     // no. of outputs and update definitions must be same
     duplicate &= (A.outputs() == B.outputs());
@@ -448,6 +448,138 @@ static void merge_function(
     if (!func_list.empty()) {
         inline_function(A, func_list);
         inline_function(B, func_list);
+    }
+}
+
+/** Merge two functions to create a new function which interleaves the outputs
+ * of both the functions; and replace calls to the two original functions by
+ * the merged function
+ */
+static void interleave_function(
+        Function A,                 ///< first function to be interleaved
+        Function B,                 ///< second function to be interleaved
+        string   merged_name,       ///< name of the interleaved function
+        Var      var,               ///< var to the used for interleaving
+        Expr     stride,            ///< interleaving stride
+        vector<Function> func_list = vector<Function>() ///< list of functions where A and B must be replaced
+        )
+{
+    string merge_error;
+
+    // check if interleaving is possible
+    {
+        if (!merge_feasible(A,B,merge_error)) {
+            cerr << merge_error << endl;
+            assert(false);
+        }
+        if (A.has_update_definition() || B.has_update_definition()) {
+            cerr << "Cannot interleave two functions which have update definitions" << endl;
+            assert(false);
+        }
+        if (A.outputs()==B.outputs()) {
+            cerr << "Cannot interleave two functions which have different number of outputs" << endl;
+            assert(false);
+        }
+    }
+
+    if (check_duplicate(A,B)) {
+        // create a copy of A as the merged function
+        Function AB(merged_name);
+        AB.define(A.args(), A.values());
+        for (int i=0; i<A.updates().size(); i++) {
+            UpdateDefinition r = A.updates()[i];
+            vector<Expr> args;
+            vector<Expr> values;
+            for (int j=0; j<r.args.size(); j++) {
+                args.push_back(substitute_func_call(A.name(), AB, r.args[j]));
+            }
+            for (int j=0; j<r.values.size(); j++) {
+                values.push_back(substitute_func_call(A.name(), AB, r.values[j]));
+            }
+            AB.define_update(args, values);
+        }
+
+        // mutate A and B to index into merged function
+        vector<Expr> call_args;
+        vector<Expr> values;
+        for (int i=0; i<A.args().size(); i++) {
+            call_args.push_back(Var(A.args()[i]));
+        }
+        for (int i=0; i<A.values().size(); i++) {
+            values.push_back(Call::make(AB, call_args, i));
+        }
+        A.clear_all_definitions();
+        B.clear_all_definitions();
+        A.define(AB.args(), values);
+        B.define(AB.args(), values);
+
+        // inline A and B
+        if (!func_list.empty()) {
+            inline_function(A, func_list);
+            inline_function(B, func_list);
+        }
+    } else {
+
+        // interleave procedure
+        Function AB(merged_name);
+
+        int var_idx = -1;
+        for (int i=0; i<A.args().size(); i++) {
+            if (var.name()==A.args()[i]) {
+                var_idx = i;
+            }
+        }
+
+        if (var_idx<0) {
+            cerr << "Var provided for interleaving is not an argument of the function" <<  endl;
+            assert(false);
+        }
+
+        // interleaved pure definition, A and B have no update defs
+        {
+            vector<Expr> values;
+            for (int j=0; j<A.outputs(); j++) {
+                values.push_back(select(var<stride, A.values()[j], B.values()[j]));
+            }
+            AB.define(A.args(), values);
+        }
+
+        // mutate A to index into merged function
+        {
+            vector<string> args = A.args();
+            vector<Expr> call_args;
+            vector<Expr> values;
+            for (int i=0; i<A.args().size(); i++) {
+                call_args.push_back(Var(A.args()[i]));
+            }
+            for (int i=0; i<A.values().size(); i++) {
+                values.push_back(Call::make(AB, call_args, i));
+            }
+            A.clear_all_definitions();
+            A.define(args, values);
+        }
+
+        // mutate B to index into merged function such have var_idx is offset by stride
+        {
+            vector<string> args = B.args();
+            vector<Expr> call_args;
+            vector<Expr> values;
+            for (int i=0; i<B.args().size(); i++) {
+                call_args.push_back(Var(B.args()[i]));
+            }
+            call_args[ var_idx ] += stride;
+            for (int i=0; i<B.values().size(); i++) {
+                values.push_back(Call::make(AB, call_args, i));
+            }
+            B.clear_all_definitions();
+            B.define(args, values);
+        }
+
+        // inline A and B
+        if (!func_list.empty()) {
+            inline_function(A, func_list);
+            inline_function(B, func_list);
+        }
     }
 }
 
