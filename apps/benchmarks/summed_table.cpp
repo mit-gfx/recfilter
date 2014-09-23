@@ -69,9 +69,9 @@ int main(int argc, char **argv) {
         Func SAT_Tail        = filter.func("SAT_Intra_Tail");
         Func SAT_CTail_x     = filter.func("SAT_Intra_CTail_x_0");
         Func SAT_CTail_y     = filter.func("SAT_Intra_CTail_y_1");
-        Func SAT_CTail_xy    = filter.func("SAT_Intra_CTail_x_0_y_1");
         Func SAT_CTail_x_sub = filter.func("SAT_Intra_CTail_x_0_Sub");
         Func SAT_CTail_y_sub = filter.func("SAT_Intra_CTail_y_1_Sub");
+        Func SAT_CTail_xy    = filter.func("SAT_Intra_CTail_x_0_y_1");
         Func SAT_CTail_xy_sub= filter.func("SAT_Intra_CTail_x_0_y_1_Sub");
         Func SAT_Deps_x      = filter.func("SAT_Intra_Deps_x_0");
         Func SAT_Deps_y      = filter.func("SAT_Intra_Deps_y_1");
@@ -95,13 +95,19 @@ int main(int argc, char **argv) {
 
         //
 
-        SAT_CTail_xy.compute_at(SAT_CTail_y_sub, Var::gpu_blocks());
-        SAT_CTail_xy.reorder(xi,yi,xo,yo).gpu_threads(yi).unroll(xi);
-        SAT_CTail_xy.update().reorder(ryi,rxt,xo,yo).unroll(rxt).unroll(ryi);
+        SAT_CTail_xy_sub.compute_at(SAT_CTail_xy, Var::gpu_blocks());
+        SAT_CTail_xy_sub.reorder(xi,yi,xo,yo).gpu_threads(yi).unroll(xi);
+        SAT_CTail_xy_sub.update().reorder(ryi,rxt,xo,yo).unroll(rxt).unroll(ryi);
+
+        SAT_CTail_xy.compute_root();
+        SAT_CTail_xy.reorder(xi,yi,xo,yo).gpu_threads(yi).unroll(xi).gpu_blocks(xo,yo);
+
+        //
 
         SAT_CTail_y_sub.compute_root();
         SAT_CTail_y_sub.reorder_storage(xi,xo,yi,yo);
-        SAT_CTail_y_sub.reorder(xi,yi,xo,yo).gpu_blocks(xo,yo).gpu_threads(xi);
+        SAT_CTail_y_sub.reorder(yi,yo,xi,xo).fuse(xi,xo,x).gpu_tile(x,MAX_THREADS);
+        //SAT_CTail_y_sub.reorder(xi,yi,xo,yo).gpu_blocks(xo,yo).gpu_threads(xi);
         SAT_CTail_y_sub.update().reorder(ryox,ryoy,ryoz,xi,xo).fuse(xi,xo,x).gpu_tile(x,MAX_THREADS);
 
         //
