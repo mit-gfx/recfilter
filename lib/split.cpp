@@ -779,8 +779,8 @@ static void add_prev_dimension_residual_to_tails(
         for (int k=0; k<F_tail_prev.size(); k++) {
 
             // first scan the tail in the current dimension according using intra term
-            Function F_tail_prev_scanned(F_tail_prev[k].name() + DASH + x.name()
-                    + DASH + int_to_string(split_info.scan_id[j]));
+            Function F_tail_prev_scanned_sub(F_tail_prev[k].name() + DASH + x.name()
+                    + DASH + int_to_string(split_info.scan_id[j]) + DASH + SUB);
 
             // pure def simply calls the completed tail
             vector<Expr> prev_call_args;
@@ -791,7 +791,7 @@ static void add_prev_dimension_residual_to_tails(
             for (int i=0; i<F_tail_prev[k].outputs(); i++) {
                 prev_values.push_back(Call::make(F_tail_prev[k], prev_call_args, i));
             }
-            F_tail_prev_scanned.define(F_tail_prev[k].args(), prev_values);
+            F_tail_prev_scanned_sub.define(F_tail_prev[k].args(), prev_values);
 
             // apply all scans between the prev dimension and current dimension
             int first_scan = split_info_prev.scan_id[0]+1;
@@ -809,15 +809,30 @@ static void add_prev_dimension_residual_to_tails(
                 }
                 for (int u=0; u<F_intra.updates()[i].values.size(); u++) {
                     Expr val = F_intra.updates()[i].values[u];
-                    val = substitute_func_call(F_intra.name(), F_tail_prev_scanned, val);
+                    val = substitute_func_call(F_intra.name(), F_tail_prev_scanned_sub, val);
                     for (int v=0; v<ryi.dimensions(); v++) {
                         val = substitute(ryi[v].name(), ryt[v], val);
                     }
                     values.push_back(val);
                 }
-                F_tail_prev_scanned.define_update(args, values);
+                F_tail_prev_scanned_sub.define_update(args, values);
             }
 
+            // create a pure function as a wrapper for the above function
+            // allows compute_at schedules
+            Function F_tail_prev_scanned(F_tail_prev[k].name() + DASH + x.name()
+                    + DASH + int_to_string(split_info.scan_id[j]));
+            {
+                vector<Expr> call_args;
+                vector<Expr> values;
+                for (int u=0; u<F_tail_prev_scanned_sub.args().size(); u++) {
+                    call_args.push_back(Var(F_tail_prev_scanned_sub.args()[u]));
+                }
+                for (int u=0; u<F_tail_prev_scanned_sub.outputs(); u++) {
+                    values.push_back(Call::make(F_tail_prev_scanned_sub, call_args, u));
+                }
+                F_tail_prev_scanned.define(F_tail_prev_scanned_sub.args(), values);
+            }
 
             // weight matrix for accumulating completed tail elements
             // of scan after applying all subsequent scans

@@ -451,16 +451,15 @@ static void merge_function(
     }
 }
 
-/** Merge two functions to create a new function which interleaves the outputs
- * of both the functions; and replace calls to the two original functions by
- * the merged function
+/** Interleave two functions to create a new function which interleaves the outputs
+ * of both the functions; and replace calls to the two original functions by new function
  */
 static void interleave_function(
         Function A,                 ///< first function to be interleaved
         Function B,                 ///< second function to be interleaved
         string   merged_name,       ///< name of the interleaved function
         Var      var,               ///< var to the used for interleaving
-        Expr     stride,            ///< interleaving stride
+        Expr     offset,            ///< interleaving offset
         vector<Function> func_list = vector<Function>() ///< list of functions where A and B must be replaced
         )
 {
@@ -476,7 +475,7 @@ static void interleave_function(
             cerr << "Cannot interleave two functions which have update definitions" << endl;
             assert(false);
         }
-        if (A.outputs()==B.outputs()) {
+        if (A.outputs() != B.outputs()) {
             cerr << "Cannot interleave two functions which have different number of outputs" << endl;
             assert(false);
         }
@@ -513,11 +512,6 @@ static void interleave_function(
         A.define(AB.args(), values);
         B.define(AB.args(), values);
 
-        // inline A and B
-        if (!func_list.empty()) {
-            inline_function(A, func_list);
-            inline_function(B, func_list);
-        }
     } else {
 
         // interleave procedure
@@ -539,7 +533,9 @@ static void interleave_function(
         {
             vector<Expr> values;
             for (int j=0; j<A.outputs(); j++) {
-                values.push_back(select(var<stride, A.values()[j], B.values()[j]));
+                Expr val_a = A.values()[j];
+                Expr val_b = substitute(var.name(), var-offset, B.values()[j]);
+                values.push_back(select(var<offset, val_a, val_b));
             }
             AB.define(A.args(), values);
         }
@@ -559,7 +555,7 @@ static void interleave_function(
             A.define(args, values);
         }
 
-        // mutate B to index into merged function such have var_idx is offset by stride
+        // mutate B to index into merged function such have var_idx is offset
         {
             vector<string> args = B.args();
             vector<Expr> call_args;
@@ -567,19 +563,19 @@ static void interleave_function(
             for (int i=0; i<B.args().size(); i++) {
                 call_args.push_back(Var(B.args()[i]));
             }
-            call_args[ var_idx ] += stride;
+            call_args[ var_idx ] += offset;
             for (int i=0; i<B.values().size(); i++) {
                 values.push_back(Call::make(AB, call_args, i));
             }
             B.clear_all_definitions();
             B.define(args, values);
         }
+    }
 
-        // inline A and B
-        if (!func_list.empty()) {
-            inline_function(A, func_list);
-            inline_function(B, func_list);
-        }
+    // inline A and B
+    if (!func_list.empty()) {
+        inline_function(A, func_list);
+        inline_function(B, func_list);
     }
 }
 
@@ -609,6 +605,22 @@ void RecFilter::inline_func(Func a, Func b) {
 
 // -----------------------------------------------------------------------------
 
+void RecFilter::interleave_func(string func_a, string func_b, string merged_name, string var, Expr offset) {
+    vector<Function> func_list;
+    map<string,Func> func_map = funcs();
+    map<string,Func>::iterator f = func_map.begin();
+    for (; f!=func_map.end(); f++) {
+        func_list.push_back(f->second.function());
+    }
+
+    Function FA = func(func_a).function();
+    Function FB = func(func_b).function();
+
+    interleave_function(FA, FB, merged_name, Var(var), offset, func_list);
+
+    contents.ptr->func_map.clear();
+}
+
 void RecFilter::merge_func(string func_a, string func_b, string merged_name) {
     vector<Function> func_list;
     map<string,Func> func_map = funcs();
@@ -637,21 +649,6 @@ void RecFilter::merge_func(string func_a, string func_b, string func_c, string f
     merge_func(func_a, func_b, func_ab);
     merge_func(func_c, func_d, func_cd);
     merge_func(func_ab,func_cd,merged_name);
-}
-
-void RecFilter::merge_func(std::vector<std::string> funcs, string merged) {
-    assert(funcs.size() > 1);
-    string func_prev_merge = funcs[0];
-    string func_next_merge;
-    for (int i=1; i<funcs.size(); i++) {
-        if (i == funcs.size()-1) {
-            func_next_merge = merged;
-        } else {
-            func_next_merge = "Merged_%d" + int_to_string(rand());
-        }
-        merge_func(funcs[i], func_prev_merge, func_next_merge);
-        func_prev_merge = func_next_merge;
-    }
 }
 
 // -----------------------------------------------------------------------------

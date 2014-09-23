@@ -262,8 +262,27 @@ public:
             );
     // @}
 
+    /**@name Merging and interleaving routines
+     *
+     * @brief Interleave two functions into a single function with output that contains
+     * the buffers of both the input functions.  The functions to be interleaved are
+     * searched in the dependency graph of functions required to compute the recursive filter
+     * (defined in reorder.cpp)
+     *
+     * Preconditions: functions to be interleaved must
+     * - have same args
+     * - be pure functions (no update defs)
+     */
+    // {@
+    void interleave_func(
+            std::string  func_a,    ///< name of first function to interleave
+            std::string  func_b,    ///< name of second function to interleave
+            std::string  merged,    ///< name of interleaved function
+            std::string  var,       ///< var to the used for interleaving
+            Halide::Expr stride     ///< interleaving stride
+            );
 
-    /**@name Merging routines
+    /**
      * @brief Merge multiple functions into a single function with mutiple outputs
      * The functions to be merged are searched in the dependency graph of functions
      * required to compute the recursive filter (defined in reorder.cpp)
@@ -272,7 +291,6 @@ public:
      * - same pure args
      * - scans with same update args and update domains in same order
      */
-    // {@
     void merge_func(
             std::string func_a, ///< name of first function to merge
             std::string func_b, ///< name of second function to merge
@@ -290,10 +308,6 @@ public:
             std::string func_c, ///< name of third function to merge
             std::string func_d, ///< name of fourth function to merge
             std::string merged  ///< name of merged function
-            );
-    void merge_func(
-            std::vector<std::string> func, ///< list of names of functions to merge
-            std::string merged             ///< name of merged function
             );
     // @}
 

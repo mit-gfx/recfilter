@@ -47,10 +47,8 @@ int main(int argc, char **argv) {
     filter.split(tile);
 
     filter.swap_variables("SAT_Intra_Tail_y_1", "xi", "yi");
-    filter.merge_func(
-            "SAT_Intra_Tail_x_0",
-            "SAT_Intra_Tail_y_1",
-            "SAT_Intra_Tail");
+    //filter.merge_func("SAT_Intra_Tail_x_0", "SAT_Intra_Tail_y_1", "SAT_Intra_Tail");
+    filter.interleave_func("SAT_Intra_Tail_x_0", "SAT_Intra_Tail_y_1", "SAT_Intra_Tail", "xi", 1);
 
     cerr << filter << endl;
 
@@ -59,8 +57,8 @@ int main(int argc, char **argv) {
     {
         Var t("t");
 
-        Var xi("xi"), yi("yi"), rxi("rxi"), rxt("rxt");
-        Var xo("xo"), yo("yo"), ryi("ryi"), ryt("ryt");
+        Var xi("xi"), yi("yi"), rxi("rxi"), rxf("rxf"), rxt("rxt");
+        Var xo("xo"), yo("yo"), ryi("ryi"), ryf("ryf"), ryt("ryt");
 
         Var rxox("rxo.x$r"), rxoy("rxo.y$r"), rxoz("rxo.z$r");
         Var ryox("ryo.x$r"), ryoy("ryo.y$r"), ryoz("ryo.z$r");
@@ -71,9 +69,10 @@ int main(int argc, char **argv) {
         Func SAT_Tail        = filter.func("SAT_Intra_Tail");
         Func SAT_CTail_x     = filter.func("SAT_Intra_CTail_x_0");
         Func SAT_CTail_y     = filter.func("SAT_Intra_CTail_y_1");
+        Func SAT_CTail_xy    = filter.func("SAT_Intra_CTail_x_0_y_1");
         Func SAT_CTail_x_sub = filter.func("SAT_Intra_CTail_x_0_Sub");
         Func SAT_CTail_y_sub = filter.func("SAT_Intra_CTail_y_1_Sub");
-        Func SAT_CTail_xy    = filter.func("SAT_Intra_CTail_x_0_y_1");
+        Func SAT_CTail_xy_sub= filter.func("SAT_Intra_CTail_x_0_y_1_Sub");
         Func SAT_Deps_x      = filter.func("SAT_Intra_Deps_x_0");
         Func SAT_Deps_y      = filter.func("SAT_Intra_Deps_y_1");
 
@@ -113,9 +112,9 @@ int main(int argc, char **argv) {
         SAT_Final.compute_at(SAT, Var::gpu_blocks());
         SAT_Final.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
         SAT_Final.update(0).reorder(rxt,ryi,xo,yo).gpu_threads(ryi).unroll(rxt);
-        SAT_Final.update(1).reorder(rxi,ryi,xo,yo).gpu_threads(ryi).unroll(rxi);
+        SAT_Final.update(1).reorder(rxf,ryi,xo,yo).gpu_threads(ryi).unroll(rxf);
         SAT_Final.update(2).reorder(ryt,rxi,xo,yo).gpu_threads(rxi).unroll(ryt);
-        SAT_Final.update(3).reorder(ryi,rxi,xo,yo).gpu_threads(rxi).unroll(ryi);
+        SAT_Final.update(3).reorder(ryf,rxi,xo,yo).gpu_threads(rxi).unroll(ryf);
 
         SAT.compute_root();
         SAT.split(x,xo,xi,tile).split(y,yo,yi,tile);
