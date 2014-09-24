@@ -181,6 +181,49 @@ public:
 
 // -----------------------------------------------------------------------------
 
+class RemoveFunctionCallWithCallArgs : public IRMutator {
+private:
+    using IRMutator::visit;
+    void visit(const Call *op) {
+        vector<Expr> new_args(op->args.size());
+        bool changed = false;
+
+        // Mutate the args
+        for (size_t i=0; i<op->args.size(); i++) {
+            Expr old_arg = op->args[i];
+            Expr new_arg = mutate(old_arg);
+            if (!new_arg.same_as(old_arg)) changed = true;
+            new_args[i] = new_arg;
+        }
+
+        if (changed) {
+            expr = Call::make(op->type, op->name, new_args, op->call_type,
+                    op->func, op->value_index, op->image, op->param);
+        } else {
+            expr = op;
+        }
+
+        if (op->call_type==Call::Halide && op->name==func_name) {
+            bool identical_call_args = (new_args.size() == call_args.size());
+            for (int i=0; identical_call_args && i<call_args.size(); i++) {
+                identical_call_args &= equal(call_args[i], new_args[i]);
+            }
+            if (identical_call_args) {
+                expr = make_zero(op->func.output_types()[op->value_index]);
+            }
+        }
+    }
+
+    string func_name;
+    vector<Expr> call_args;
+
+public:
+    vector<Expr> removed_expr;
+    RemoveFunctionCallWithCallArgs(string f, vector<Expr> c) : func_name(f), call_args(c) {}
+};
+
+// -----------------------------------------------------------------------------
+
 // Add an Expr to Func call
 class AugmentFunctionCall : public IRMutator {
 private:
@@ -599,6 +642,11 @@ Expr substitute_func_call(string func_name, Function new_func, Expr original) {
 
 Expr remove_func_calls(string func_name, bool matching, Expr original) {
     RemoveFunctionCall s(func_name, matching);
+    return simplify(s.mutate(original));
+}
+
+Expr remove_func_call_with_args(string func_name, vector<Expr> call_args, Expr original) {
+    RemoveFunctionCallWithCallArgs s(func_name, call_args);
     return simplify(s.mutate(original));
 }
 

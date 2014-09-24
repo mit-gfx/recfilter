@@ -112,6 +112,15 @@ Halide::Expr substitute_func_call(
         );
 
 
+/** @brief Remove all calls to a particular Function if
+ * the calling args match the given list (defined in modifiers.cpp)
+ */
+Halide::Expr remove_func_call_with_args(
+        std::string func_name,                  ///< name of Function
+        std::vector<Halide::Expr> call_args,    ///< list of calling args to match
+        Halide::Expr original                   ///< original expression
+        );
+
 /** @brief Remove all calls to a particular Function or to all
  * Functions except for a particular Function by identity
  * as determined by a boolean flag argument, all calls

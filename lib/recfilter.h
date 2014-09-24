@@ -325,6 +325,10 @@ public:
     void compile_jit(Halide::Target target, std::string filename="");
     void realize    (Halide::Buffer out, int iterations);
     // @}
+
+    /** Generic routine to remove the pure def of a Function and add it to the first update
+     * def; replacing the pure def with zero */
+    void remove_pure_def(Halide::Func F);
 };
 
 // -----------------------------------------------------------------------------

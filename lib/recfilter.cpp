@@ -322,3 +322,45 @@ void RecFilter::realize(Buffer out, int iterations) {
     out.copy_to_host();
     out.free_dev_buffer();
 }
+
+void RecFilter::remove_pure_def(Func F) {
+    Function f = F.function();
+
+    vector<string> args   = f.args();
+    vector<Expr>   values = f.values();
+    vector<UpdateDefinition> updates = f.updates();
+
+    // nothing to do if function has not update defs
+    if (updates.empty()) {
+        return;
+    }
+
+    // add pure def to the first update def
+    {
+        for (int j=0; j<updates[0].values.size(); j++) {
+
+            // remove call to current pixel of the function
+            updates[0].values[j] = remove_func_call_with_args(f.name(), updates[0].args, updates[0].values[j]);
+
+            // replace pure args by update def args in the pure value
+            Expr val = values[j];
+            for (int k=0; k<args.size(); k++) {
+                val = substitute(args[k], updates[0].args[k], val);
+            }
+
+            // add pure value
+            updates[0].values[j] = simplify(updates[0].values[j] + val);
+        }
+    }
+
+    // set all pure defs to zero
+    for (int i=0; i<values.size(); i++) {
+        values[i] = FLOAT_ZERO;
+    }
+
+    f.clear_all_definitions();
+    f.define(args, values);
+    for (int i=0; i<updates.size(); i++) {
+        f.define_update(updates[i].args, updates[i].values);
+    }
+}
