@@ -25,7 +25,15 @@ then
             sed 's/,\|)//g'  | \
             sed 's/ \|\t//g' | \
             sed 's/;/ /g' >> $TFILE2
-        cat $TFILE2 | column -t
+
+        column -t < $TFILE2
+
+        # calculate total time; extract last column, remove top row and sum
+        echo ''
+        echo ''
+        echo 'Total tile for kernel execution in ms'
+        awk ' { if (NR!=1) print } ' $TFILE2 | awk '{ sum += $5 } END { print sum }'
+
     else
         cat $TFILE1
     fi
