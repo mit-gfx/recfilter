@@ -323,8 +323,10 @@ void RecFilter::realize(Buffer out, int iterations) {
     out.free_dev_buffer();
 }
 
-void RecFilter::remove_pure_def(Func F) {
-    Function f = F.function();
+// -----------------------------------------------------------------------------
+
+void RecFilter::remove_pure_def(string func_name) {
+    Function f = func(func_name).function();
 
     vector<string> args   = f.args();
     vector<Expr>   values = f.values();
@@ -339,17 +341,15 @@ void RecFilter::remove_pure_def(Func F) {
     {
         for (int j=0; j<updates[0].values.size(); j++) {
 
-            // remove call to current pixel of the function
-            updates[0].values[j] = remove_func_call_with_args(f.name(), updates[0].args, updates[0].values[j]);
-
             // replace pure args by update def args in the pure value
             Expr val = values[j];
             for (int k=0; k<args.size(); k++) {
                 val = substitute(args[k], updates[0].args[k], val);
             }
 
-            // add pure value
-            updates[0].values[j] = simplify(updates[0].values[j] + val);
+            // remove call to current pixel of the function
+            updates[0].values[j] = substitute_func_call_with_args(f.name(),
+                    updates[0].args, val, updates[0].values[j]);
         }
     }
 

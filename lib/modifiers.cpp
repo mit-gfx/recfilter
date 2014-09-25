@@ -181,7 +181,7 @@ public:
 
 // -----------------------------------------------------------------------------
 
-class RemoveFunctionCallWithCallArgs : public IRMutator {
+class SubstituteFunctionCallWithCallArgs : public IRMutator {
 private:
     using IRMutator::visit;
     void visit(const Call *op) {
@@ -209,17 +209,18 @@ private:
                 identical_call_args &= equal(call_args[i], new_args[i]);
             }
             if (identical_call_args) {
-                expr = make_zero(op->func.output_types()[op->value_index]);
+                expr = replace;
             }
         }
     }
 
     string func_name;
+    Expr   replace;
     vector<Expr> call_args;
 
 public:
-    vector<Expr> removed_expr;
-    RemoveFunctionCallWithCallArgs(string f, vector<Expr> c) : func_name(f), call_args(c) {}
+    SubstituteFunctionCallWithCallArgs(string f, vector<Expr> c, Expr r)
+        : func_name(f), replace(r), call_args(c) {}
 };
 
 // -----------------------------------------------------------------------------
@@ -640,13 +641,13 @@ Expr substitute_func_call(string func_name, Function new_func, Expr original) {
     return s.mutate(original);
 }
 
-Expr remove_func_calls(string func_name, bool matching, Expr original) {
-    RemoveFunctionCall s(func_name, matching);
+Expr substitute_func_call_with_args(string func_name, vector<Expr> call_args, Expr replace, Expr original) {
+    SubstituteFunctionCallWithCallArgs s(func_name, call_args, replace);
     return simplify(s.mutate(original));
 }
 
-Expr remove_func_call_with_args(string func_name, vector<Expr> call_args, Expr original) {
-    RemoveFunctionCallWithCallArgs s(func_name, call_args);
+Expr remove_func_calls(string func_name, bool matching, Expr original) {
+    RemoveFunctionCall s(func_name, matching);
     return simplify(s.mutate(original));
 }
 

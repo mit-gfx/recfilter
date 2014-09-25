@@ -29,6 +29,16 @@ Halide::Expr substitute_in_func_call(
         Halide::Expr original   ///< original expression
         );
 
+/** @brief Substitute all calls to a particular Function by a given expression
+ * the calling args match the given list (defined in modifiers.cpp)
+ */
+Halide::Expr substitute_func_call_with_args(
+        std::string func_name,                  ///< name of Function
+        std::vector<Halide::Expr> call_args,    ///< list of calling args to match
+        Halide::Expr replace,                   ///< replacement expression
+        Halide::Expr original                   ///< original expression
+        );
+
 /** @brief Add a calling argument to all calls to a particular Function
  *  (defined in modifiers.cpp) */
 Halide::Expr insert_arg_in_func_call(
@@ -111,15 +121,6 @@ Halide::Expr substitute_func_call(
         Halide::Expr original               ///< original expression
         );
 
-
-/** @brief Remove all calls to a particular Function if
- * the calling args match the given list (defined in modifiers.cpp)
- */
-Halide::Expr remove_func_call_with_args(
-        std::string func_name,                  ///< name of Function
-        std::vector<Halide::Expr> call_args,    ///< list of calling args to match
-        Halide::Expr original                   ///< original expression
-        );
 
 /** @brief Remove all calls to a particular Function or to all
  * Functions except for a particular Function by identity

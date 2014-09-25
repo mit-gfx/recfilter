@@ -46,9 +46,11 @@ int main(int argc, char **argv) {
 
     filter.split(tile);
 
-    filter.swap_variables("SAT_Intra_Tail_y_1", "xi", "yi");
-    //filter.merge_func("SAT_Intra_Tail_x_0", "SAT_Intra_Tail_y_1", "SAT_Intra_Tail");
+    filter.swap_variables ("SAT_Intra_Tail_y_1", "xi", "yi");
     filter.interleave_func("SAT_Intra_Tail_x_0", "SAT_Intra_Tail_y_1", "SAT_Intra_Tail", "xi", 1);
+
+    filter.remove_pure_def("SAT_Intra_CTail_x_0_Sub");
+    filter.remove_pure_def("SAT_Intra_CTail_y_1_Sub");
 
     cerr << filter << endl;
 
@@ -107,7 +109,6 @@ int main(int argc, char **argv) {
         SAT_CTail_y_sub.compute_root();
         SAT_CTail_y_sub.reorder_storage(xi,xo,yi,yo);
         SAT_CTail_y_sub.reorder(yi,yo,xi,xo).fuse(xi,xo,x).gpu_tile(x,MAX_THREADS);
-        //SAT_CTail_y_sub.reorder(xi,yi,xo,yo).gpu_blocks(xo,yo).gpu_threads(xi);
         SAT_CTail_y_sub.update().reorder(ryox,ryoy,ryoz,xi,xo).fuse(xi,xo,x).gpu_tile(x,MAX_THREADS);
 
         //

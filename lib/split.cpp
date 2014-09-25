@@ -447,10 +447,10 @@ static vector<Function> create_complete_tail_term(
                     if (split_info.scan_causal[k]) {
                         args.push_back(rxo.z);
                         call_args_curr_tile.push_back(rxo.z);
-                        call_args_prev_tile.push_back(rxo.z-1);
+                        call_args_prev_tile.push_back(max(0,rxo.z-1));
                     } else {
                         args.push_back(simplify(num_tiles-1-rxo.z));
-                        call_args_curr_tile.push_back(simplify(num_tiles-1-rxo.z));
+                        call_args_curr_tile.push_back(min(num_tiles-1,num_tiles-1-rxo.z));
                         call_args_prev_tile.push_back(num_tiles-rxo.z);
                     }
                 } else if (arg == xi.name()) {
@@ -469,10 +469,11 @@ static vector<Function> create_complete_tail_term(
 
             // multiply each tail element with its weight before adding
             for (int i=0; i<F_tail[k].outputs(); i++) {
+                Expr cond= (split_info.scan_causal[k] ? (rxo.z>0) : (rxo.z<num_tiles-1));
+                Expr w   = weight(tile-rxo.y-1, rxo.x);
                 Expr val = Call::make(function, call_args_curr_tile, i) +
-                    weight(simplify(tile-rxo.y-1), rxo.x) *
-                    Call::make(function, call_args_prev_tile, i);
-                values.push_back(val);
+                    select(cond, w*Call::make(function, call_args_prev_tile, i), FLOAT_ZERO);
+                values.push_back(simplify(val));
             }
 
             function.define_update(args, values);
@@ -982,110 +983,6 @@ static void add_all_residuals_to_final_result(
     add_padding_to_avoid_bank_conflicts(F, split_info, false);
 }
 
-// static void add_all_residuals_to_final_result(
-//         Function F,
-//         vector< vector<Function> >  F_deps,
-//         vector<SplitInfo> split_info)
-// {
-//     vector<string> pure_args   = F.args();
-//     vector<Expr>   pure_values = F.values();
-//     vector<UpdateDefinition> updates = F.updates();
-//
-//     assert(split_info.size() == F_deps.size());
-//
-//     Function F_last_scan_deps;
-//
-//     // define a function as a copy of the function F
-//     Function F_sub(F.name() + DASH + SUB);
-//     F_sub.define(pure_args, pure_values);
-//
-//     // each F_deps represents the residuals from one dimension
-//     // add this residual to the first scan in next dimension
-//     for (int i=0; i<F_deps.size(); i++) {
-//         Expr tile_width = split_info[i].tile_width;
-//         Expr num_tiles  = split_info[i].num_tiles;
-//
-//         for (int j=0; j<F_deps[i].size(); j++) {
-//             int next_scan = split_info[i].scan_id[j]+1;
-//
-//             // add curr scan's residual to next scan after multiplying
-//             // by next scan's feedforward coeff
-//             Expr feedfwd = FLOAT_ONE;
-//
-//             // use 1 as feedforward coeff only if (a) next scan is in same dimension
-//             // and reverse causality, or (b) next scan is in different dimension
-//             if (!equal(split_info[i].border_expr[j], FLOAT_ZERO)) {
-//
-//                 // case one: next scan is in same dimension
-//                 if (j>0) {
-//                     assert(next_scan == split_info[i].scan_id[j-1]);
-//                     bool curr_causal = split_info[i].scan_causal[j];
-//                     bool next_causal = split_info[i].scan_causal[j-1];
-//                     RVar next_rxi    = split_info[i].inner_rdom[split_info[i].filter_dim];
-//                     Var  next_xo     = split_info[i].outer_var;
-//                     if (next_causal != curr_causal) {
-//                         Expr cond    = (next_rxi==0 && (next_causal ? (next_xo==0) : (next_xo==num_tiles-1)));
-//                         feedfwd      = select(cond, FLOAT_ONE, split_info[i].feedfwd_coeff(next_scan));
-//                     }
-//                 }
-//
-//                 // case two: next scan is different dimension
-//                 else if (i<split_info.size()-1 && split_info[i+1].num_splits>0) {
-//                     assert(next_scan == split_info[i+1].scan_id[split_info[i+1].num_splits-1]);
-//                     bool next_causal = split_info[i+1].scan_causal[split_info[i+1].num_splits-1];
-//                     RVar next_rxi    = split_info[i+1].inner_rdom[split_info[i+1].filter_dim];
-//                     Var  next_xo     = split_info[i+1].outer_var;
-//                     Expr cond        = (next_rxi==0 && (next_causal ? (next_xo==0) : (next_xo==num_tiles-1)));
-//                     feedfwd          = select(cond, FLOAT_ONE, split_info[i].feedfwd_coeff(next_scan));
-//                 }
-//             }
-//
-//             // special case: next scan does not exist
-//             // add this residual directly to the final result
-//             if (next_scan >= updates.size()) {
-//                 F_last_scan_deps = F_deps[i][j];
-//             } else {
-//                 vector<Expr> call_args = updates[next_scan].args;
-//                 for (int k=0; k<updates[next_scan].values.size(); k++) {
-//                     Expr val = Call::make(F_deps[i][j], call_args, k);
-//                     updates[next_scan].values[k] += feedfwd * val;
-//                 }
-//             }
-//         }
-//     }
-//
-//     // replace calls to F by F_sub in the update def of F_sub
-//     for (int i=0; i<updates.size(); i++) {
-//         vector<Expr> values;
-//         for (int j=0; j<updates[i].values.size(); j++) {
-//             Expr val = substitute_func_call(F.name(), F_sub,
-//                     simplify(updates[i].values[j]));
-//             values.push_back(val);
-//         }
-//         F_sub.define_update(updates[i].args, values);
-//     }
-//
-//     // add padding to avoid bank conflicts
-//     add_padding_to_avoid_bank_conflicts(F_sub, split_info, false);
-//
-//     // add the residual of the last scan to the final result
-//     {
-//         vector<string> pure_args = F.args();
-//         vector<Expr> pure_values;
-//         vector<Expr> call_args;
-//         for (int i=0; i<pure_args.size(); i++) {
-//             call_args.push_back(Var(pure_args[i]));
-//         }
-//         for (int i=0; i<F.outputs(); i++) {
-//             Expr val = Call::make(F_sub, call_args, i)
-//                 + Call::make(F_last_scan_deps, call_args, i);
-//             pure_values.push_back(val);
-//         }
-//         F.clear_all_definitions();
-//         F.define(pure_args, pure_values);
-//     }
-// }
-
 // -----------------------------------------------------------------------------
 
 static vector< vector<Function> > split_scans(
@@ -1227,7 +1124,7 @@ void RecFilter::split(map<string,Expr> dim_tile) {
                 // outer_rdom.y: over all tail elements of current tile
                 // outer_rdom.z: over all tiles
                 contents.ptr->split_info[j].outer_rdom = RDom(0, filter_order, 0, filter_order,
-                        1, num_tiles-1, "r"+name+"o");
+                        0, num_tiles, "r"+name+"o");
 
                 found = true;
             }
