@@ -3,8 +3,9 @@
 
 #include "../../lib/recfilter.h"
 
-#define MAX_THREADS   192
-#define UNROLL_FACTOR 6
+#define MAX_THREADS    192
+#define UNROLL_FACTOR  6
+#define TILES_PER_WARP 4
 
 using namespace Halide;
 
@@ -97,11 +98,11 @@ int main(int argc, char **argv) {
         //
 
         SAT_CTail_xy_sub.compute_at(SAT_CTail_xy, Var::gpu_blocks());
-        SAT_CTail_xy_sub.reorder(xi,yi,xo,yo).gpu_threads(yi);
-        SAT_CTail_xy_sub.update().reorder(ryi,rxt,xo,yo).unroll(ryi);
+        SAT_CTail_xy_sub.split(xo,xo,x,TILES_PER_WARP).reorder(yi,xi,x,xo,yo).gpu_threads(x,yi);
+        SAT_CTail_xy_sub.update().split(xo,xo,x,TILES_PER_WARP).reorder(ryi,rxt,x,xo,yo).gpu_threads(x).unroll(ryi);
 
         SAT_CTail_xy.compute_root();
-        SAT_CTail_xy.reorder(xi,yi,xo,yo).gpu_threads(yi).gpu_blocks(xo,yo);
+        SAT_CTail_xy.split(xo,xo,x,TILES_PER_WARP).reorder(yi,xi,x,xo,yo).gpu_threads(x,yi).gpu_blocks(xo,yo);
 
         //
 
