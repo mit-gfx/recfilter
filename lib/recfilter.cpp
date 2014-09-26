@@ -353,9 +353,9 @@ void RecFilter::remove_pure_def(string func_name) {
         }
     }
 
-    // set all pure defs to zero
+    // set all pure defs to zero or undef
     for (int i=0; i<values.size(); i++) {
-        values[i] = FLOAT_ZERO;
+        values[i] = FLOAT_UNDEF;
     }
 
     f.clear_all_definitions();

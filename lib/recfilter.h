@@ -21,6 +21,12 @@
 /** Symbolic floating point one */
 #define FLOAT_ONE  Halide::Internal::make_one(Halide::type_of<float>())
 
+/** Symbolic undefined integer point constant */
+#define INT_UNDEF Halide::undef<int>()
+
+/** Symbolic undefined floating point constant */
+#define FLOAT_UNDEF Halide::undef<float>()
+
 
 /** Info required to split a particular dimension of the recursive filter */
 struct SplitInfo {
@@ -327,8 +333,10 @@ public:
     // @}
 
     /** Remove the pure def of a Function and add it to the first update
-     * def; replacing the pure def with zero */
-    void remove_pure_def(std::string func_name);
+     * def; replacing the pure def with zero or undefine */
+    void remove_pure_def(
+            std::string func_name  ///< name of function
+            );
 };
 
 // -----------------------------------------------------------------------------
