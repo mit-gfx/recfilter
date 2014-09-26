@@ -340,12 +340,15 @@ void RecFilter::remove_pure_def(string func_name) {
     // add pure def to the first update def
     {
         for (int j=0; j<updates[0].values.size(); j++) {
-
             // replace pure args by update def args in the pure value
             Expr val = values[j];
             for (int k=0; k<args.size(); k++) {
                 val = substitute(args[k], updates[0].args[k], val);
             }
+
+            // remove let statements in the expression because we need to
+            // compare calling args
+            updates[0].values[j] = remove_lets(updates[0].values[j]);
 
             // remove call to current pixel of the function
             updates[0].values[j] = substitute_func_call_with_args(f.name(),

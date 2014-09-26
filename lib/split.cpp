@@ -450,8 +450,8 @@ static vector<Function> create_complete_tail_term(
                         call_args_prev_tile.push_back(max(0,rxo.z-1));
                     } else {
                         args.push_back(simplify(num_tiles-1-rxo.z));
-                        call_args_curr_tile.push_back(min(num_tiles-1,num_tiles-1-rxo.z));
-                        call_args_prev_tile.push_back(num_tiles-rxo.z);
+                        call_args_curr_tile.push_back(num_tiles-1-rxo.z);
+                        call_args_prev_tile.push_back(min(num_tiles-1,num_tiles-rxo.z));
                     }
                 } else if (arg == xi.name()) {
                     // replace xi by rxo.y as tail element index in args and current tile term
@@ -469,10 +469,9 @@ static vector<Function> create_complete_tail_term(
 
             // multiply each tail element with its weight before adding
             for (int i=0; i<F_tail[k].outputs(); i++) {
-                Expr cond= (split_info.scan_causal[k] ? (rxo.z>0) : (rxo.z<num_tiles-1));
                 Expr w   = weight(tile-rxo.y-1, rxo.x);
                 Expr val = Call::make(function, call_args_curr_tile, i) +
-                    select(cond, w*Call::make(function, call_args_prev_tile, i), FLOAT_ZERO);
+                    select(rxo.z>0, w*Call::make(function, call_args_prev_tile, i), FLOAT_ZERO);
                 values.push_back(simplify(val));
             }
 
