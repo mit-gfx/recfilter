@@ -438,40 +438,55 @@ static vector<Function> create_complete_tail_term(
             vector<Expr> args;
             vector<Expr> values;
             vector<Expr> call_args_curr_tile;
-            vector<Expr> call_args_prev_tile;
+            vector< vector<Expr> > call_args_prev_tile(order);
 
             for (int i=0; i<F_tail[k].args().size(); i++) {
                 string arg = F_tail[k].args()[i];
                 if (arg == xo.name()) {
-                    // replace xo by rxo.z or rxo.z-1 as tile idx,
+                    // replace xo by rxo.y or rxo.y-1 as tile idx,
                     if (split_info.scan_causal[k]) {
-                        args.push_back(rxo.z);
-                        call_args_curr_tile.push_back(rxo.z);
-                        call_args_prev_tile.push_back(max(0,rxo.z-1));
-                    } else {
-                        args.push_back(simplify(num_tiles-1-rxo.z));
-                        call_args_curr_tile.push_back(num_tiles-1-rxo.z);
-                        call_args_prev_tile.push_back(min(num_tiles-1,num_tiles-rxo.z));
+                        args.push_back(rxo.y);
+                        call_args_curr_tile.push_back(rxo.y);
+                        for (int j=0; j<order; j++) {
+                            call_args_prev_tile[j].push_back(max(rxo.y-1,0));
+                        }
                     }
-                } else if (arg == xi.name()) {
-                    // replace xi by rxo.y as tail element index in args and current tile term
-                    // replace xi by rxo.x as tail element in prev tile term because each rxo.y
-                    // is computed from all prev tile tail elements
-                    args.push_back(rxo.y);
-                    call_args_curr_tile.push_back(rxo.y);
-                    call_args_prev_tile.push_back(rxo.x);
-                } else {
+                    else {
+                        args.push_back(simplify(num_tiles-1-rxo.y));
+                        call_args_curr_tile.push_back(num_tiles-1-rxo.y);
+                        for (int j=0; j<order; j++) {
+                            call_args_prev_tile[j].push_back(min(num_tiles-rxo.y,num_tiles-1));
+                        }
+                    }
+                }
+                else if (arg == xi.name()) {
+                    // replace xi by rxo.x as tail element index in args and current tile term
+                    // replace xi by order number as tail element in prev tile term
+                    args.push_back(rxo.x);
+                    call_args_curr_tile.push_back(rxo.x);
+                    for (int j=0; j<order; j++) {
+                        call_args_prev_tile[j].push_back(j);
+                    }
+                }
+                else {
                     args.push_back(Var(arg));
                     call_args_curr_tile.push_back(Var(arg));
-                    call_args_prev_tile.push_back(Var(arg));
+                    for (int j=0; j<order; j++) {
+                        call_args_prev_tile[j].push_back(Var(arg));
+                    }
                 }
             }
 
             // multiply each tail element with its weight before adding
             for (int i=0; i<F_tail[k].outputs(); i++) {
-                Expr w   = weight(tile-rxo.y-1, rxo.x);
+                Expr prev_tile_expr = FLOAT_ZERO;
+                for (int j=0; j<order; j++) {
+                    prev_tile_expr += weight(tile-rxo.x-1, j) *
+                        Call::make(function, call_args_prev_tile[j], i);
+                }
+
                 Expr val = Call::make(function, call_args_curr_tile, i) +
-                    select(rxo.z>0, w*Call::make(function, call_args_prev_tile, i), FLOAT_ZERO);
+                    select(rxo.y>0, prev_tile_expr, FLOAT_ZERO);
                 values.push_back(simplify(val));
             }
 
@@ -1119,10 +1134,9 @@ void RecFilter::split(map<string,Expr> dim_tile) {
                 inner_truncated_rvars[j].extent = simplify(max(inner_truncated_rvars[j].extent-filter_order,0));
                 contents.ptr->split_info[j].truncated_inner_rdom = RDom(ReductionDomain(inner_truncated_rvars));
 
-                // outer_rdom.x: over tail elems of prev tile to compute tail of current tile
-                // outer_rdom.y: over all tail elements of current tile
-                // outer_rdom.z: over all tiles
-                contents.ptr->split_info[j].outer_rdom = RDom(0, filter_order, 0, filter_order,
+                // outer_rdom.x: over all tail elements of current tile
+                // outer_rdom.y: over all tiles
+                contents.ptr->split_info[j].outer_rdom = RDom(0, filter_order,
                         0, num_tiles, "r"+name+"o");
 
                 found = true;

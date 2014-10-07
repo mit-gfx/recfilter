@@ -78,6 +78,8 @@ int main(int argc, char **argv) {
 
     cerr << filtery << endl;
 
+    filtery.set_default_schedule();
+
     // ----------------------------------------------------------------------------------------------
 
     {
@@ -108,7 +110,7 @@ int main(int argc, char **argv) {
         Func Sy_Deps_1  = filtery.func("S_1_Intra_Deps_y_1");
 
         // x filtering
-        {
+        if (0) {
             Sx_Intra.compute_at(Sx_Tail, Var::gpu_blocks());
             Sx_Intra.split(y,yo,yi,tile).split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
             Sx_Intra.update(0).split(y,yo,yi,tile).reorder(rxi,yi,xo,yo).gpu_threads(yi).unroll(rxi);
@@ -116,7 +118,7 @@ int main(int argc, char **argv) {
             Sx_Intra.update(2).split(y,yo,yi,tile).reorder(rxi,yi,xo,yo).gpu_threads(yi).unroll(rxi);
             Sx_Intra.update(3).split(y,yo,yi,tile).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
 
-            Sx_Tail.compute_root();
+            Sx_Tail.compute_root().reorder_storage(y,xi,xo);
             Sx_Tail.split(y,yo,yi,tile).split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
 
             //
@@ -147,7 +149,7 @@ int main(int argc, char **argv) {
         }
 
         // y filtering
-        {
+        if (0) {
 
             Sy_Intra.compute_at(Sy_Tail, Var::gpu_blocks());
             Sy_Intra.split(x,xo,xi,tile).split(xi,xi,t,UNROLL_FACTOR).reorder(t,yi,xi,yo,xo).gpu_threads(yi,xi).unroll(t);
@@ -216,7 +218,8 @@ int main(int argc, char **argv) {
             for (int x=0; x<width; x++) {
                 ref(x,y) = b0*ref(x,y)
                     + W2[0]*ref(std::max(x-1,0),y)
-                    + W2[1]*ref(std::max(x-2,0),y);
+                    + W2[1]*ref(std::max(x-2,0),y)
+                    ;
             }
         }
         for (int y=0; y<height; y++) {
