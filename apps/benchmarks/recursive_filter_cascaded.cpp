@@ -78,8 +78,6 @@ int main(int argc, char **argv) {
 
     cerr << filtery << endl;
 
-    filtery.set_default_schedule();
-
     // ----------------------------------------------------------------------------------------------
 
     {
@@ -88,8 +86,8 @@ int main(int argc, char **argv) {
         Var xi("xi"), yi("yi"), rxi("rxi"), rxt("rxt"), rxf("rxf");
         Var xo("xo"), yo("yo"), ryi("ryi"), ryt("ryt"), ryf("ryf");
 
-        Var rxox("rxo.x$r"), rxoy("rxo.y$r"), rxoz("rxo.z$r");
-        Var ryox("ryo.x$r"), ryoy("ryo.y$r"), ryoz("ryo.z$r");
+        Var rxox("rxo.x$r"), rxoy("rxo.y$r");
+        Var ryox("ryo.x$r"), ryoy("ryo.y$r");
 
         Func Sx         = filterx.func("S_0");
         Func Sx_Final   = filterx.func("S_0_Final");
@@ -110,7 +108,7 @@ int main(int argc, char **argv) {
         Func Sy_Deps_1  = filtery.func("S_1_Intra_Deps_y_1");
 
         // x filtering
-        if (0) {
+        {
             Sx_Intra.compute_at(Sx_Tail, Var::gpu_blocks());
             Sx_Intra.split(y,yo,yi,tile).split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
             Sx_Intra.update(0).split(y,yo,yi,tile).reorder(rxi,yi,xo,yo).gpu_threads(yi).unroll(rxi);
@@ -124,10 +122,10 @@ int main(int argc, char **argv) {
             //
 
             Sx_CTail_0.compute_root();
-            Sx_CTail_0.update().reorder(rxox,rxoy,rxoz,y).unroll(rxox).unroll(rxoy).split(y,yo,yi,MAX_THREADS).gpu(yo,yi);
+            Sx_CTail_0.update().reorder(rxox,rxoy,y).unroll(rxox).split(y,yo,yi,MAX_THREADS).gpu(yo,yi);
 
             Sx_CTail_1.compute_root();
-            Sx_CTail_1.update().reorder(rxox,rxoy,rxoz,y).unroll(rxox).unroll(rxoy).split(y,yo,yi,MAX_THREADS).gpu(yo,yi);
+            Sx_CTail_1.update().reorder(rxox,rxoy,y).unroll(rxox).split(y,yo,yi,MAX_THREADS).gpu(yo,yi);
 
             //
 
@@ -149,8 +147,7 @@ int main(int argc, char **argv) {
         }
 
         // y filtering
-        if (0) {
-
+        {
             Sy_Intra.compute_at(Sy_Tail, Var::gpu_blocks());
             Sy_Intra.split(x,xo,xi,tile).split(xi,xi,t,UNROLL_FACTOR).reorder(t,yi,xi,yo,xo).gpu_threads(yi,xi).unroll(t);
             Sy_Intra.update(0).split(x,xo,xi,tile).reorder(ryi,xi,yo,xo).gpu_threads(xi).unroll(ryi);
@@ -164,12 +161,12 @@ int main(int argc, char **argv) {
             //
 
             Sy_CTail_0.compute_root();
-            Sy_CTail_0.update().reorder(ryox,ryoy,ryoz,x).unroll(ryox).unroll(ryoy).split(x,xo,xi,MAX_THREADS).gpu(xo,xi);
+            Sy_CTail_0.update().reorder(ryox,ryoy,x).unroll(ryox).split(x,xo,xi,MAX_THREADS).gpu(xo,xi);
 
             //
 
             Sy_CTail_1.compute_root();
-            Sy_CTail_1.update().reorder(ryox,ryoy,ryoz,x).unroll(ryox).unroll(ryoy).split(x,xo,xi,MAX_THREADS).gpu(xo,xi);
+            Sy_CTail_1.update().reorder(ryox,ryoy,x).unroll(ryox).split(x,xo,xi,MAX_THREADS).gpu(xo,xi);
 
             //
 
@@ -187,7 +184,7 @@ int main(int argc, char **argv) {
             Sy.split(y,yo,yi,tile);
             Sy.split(x,xo,xi,MAX_THREADS).reorder(yi,xi,yo,xo).gpu_blocks(yo,xo).gpu_threads(xi).unroll(yi);
 
-            Sy.bound(x,0,width).bound(y,0,height);
+            Sy.bound(y,0,height);
         }
     }
 

@@ -63,8 +63,8 @@ int main(int argc, char **argv) {
         Var xi("xi"), yi("yi"), rxi("rxi"), rxf("rxf"), rxt("rxt");
         Var xo("xo"), yo("yo"), ryi("ryi"), ryf("ryf"), ryt("ryt");
 
-        Var rxox("rxo.x$r"), rxoy("rxo.y$r"), rxoz("rxo.z$r");
-        Var ryox("ryo.x$r"), ryoy("ryo.y$r"), ryoz("ryo.z$r");
+        Var rxox("rxo.x$r"), rxoy("rxo.y$r");
+        Var ryox("ryo.x$r"), ryoy("ryo.y$r");
 
         Func SAT             = filter.func("SAT");
         Func SAT_Final       = filter.func("SAT_Final");
@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
         //
 
         SAT_CTail_x_sub.compute_root().reorder_storage(yi,yo,xi,xo);
-        SAT_CTail_x_sub.update().reorder(rxox,rxoy,rxoz,yi,yo).fuse(yi,yo,y).gpu_tile(y,MAX_THREADS);
+        SAT_CTail_x_sub.update().reorder(rxox,rxoy,yi,yo).fuse(yi,yo,y).gpu_tile(y,MAX_THREADS);
 
         //
 
@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
         //
 
         SAT_CTail_y_sub.compute_root().reorder_storage(xi,xo,yi,yo);
-        SAT_CTail_y_sub.update().reorder(ryox,ryoy,ryoz,xi,xo).fuse(xi,xo,x).gpu_tile(x,MAX_THREADS);
+        SAT_CTail_y_sub.update().reorder(ryox,ryoy,xi,xo).fuse(xi,xo,x).gpu_tile(x,MAX_THREADS);
 
         //
 
