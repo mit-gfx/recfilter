@@ -138,6 +138,88 @@ public:
 
 // -----------------------------------------------------------------------------
 
+class RemoveLets : public IRMutator {
+private:
+    Expr canonicalize(Expr e) {
+        set<Expr, IRDeepCompare>::iterator i = canonical.find(e);
+        if (i != canonical.end()) {
+            return *i;
+        } else {
+            canonical.insert(e);
+            return e;
+        }
+    }
+
+    using IRMutator::mutate;
+
+    Expr find_replacement(Expr e) {
+        for (size_t i = replacement.size(); i > 0; i--) {
+            map<Expr, Expr, ExprCompare>::iterator iter = replacement[i-1].find(e);
+            if (iter != replacement[i-1].end()) return iter->second;
+        }
+        return Expr();
+    }
+
+    void add_replacement(Expr key, Expr value) {
+        replacement[replacement.size()-1][key] = value;
+    }
+
+    void enter_scope() {
+        replacement.resize(replacement.size()+1);
+    }
+
+    void leave_scope() {
+        replacement.pop_back();
+    }
+
+    using IRMutator::visit;
+
+    void visit(const Let *let) {
+        Expr var = canonicalize(Variable::make(let->value.type(), let->name));
+
+        Expr new_value = mutate(let->value);
+        enter_scope();
+        add_replacement(var, new_value);
+        expr = mutate(let->body);
+        leave_scope();
+    }
+
+    void visit(const LetStmt *let) {
+        Expr var = canonicalize(Variable::make(let->value.type(), let->name));
+        Expr new_value = mutate(let->value);
+        enter_scope();
+        add_replacement(var, new_value);
+        stmt = mutate(let->body);
+        leave_scope();
+    }
+
+public:
+    set<Expr, IRDeepCompare> canonical;
+    vector<map<Expr, Expr, ExprCompare> > replacement;
+
+    RemoveLets() {
+        enter_scope();
+    }
+
+    Expr mutate(Expr e) {
+        e = canonicalize(e);
+
+        Expr r = find_replacement(e);
+        if (r.defined()) {
+            return r;
+        } else {
+            Expr new_expr = canonicalize(IRMutator::mutate(e));
+            add_replacement(e, new_expr);
+            return new_expr;
+        }
+
+
+    }
+
+};
+
+// -----------------------------------------------------------------------------
+
 // Replace all
 // - all Func calls to func_name with 0 if matching flag is set
 // - all Func calls other than func_name with 0 if matching flag is not set
@@ -634,6 +716,10 @@ bool expr_depends_on_func(Expr expr, string func_name) {
     ExprDependsOnFunc depends(func_name);
     expr.accept(&depends);
     return depends.result;
+}
+
+Expr remove_lets(Expr e) {
+    return RemoveLets().mutate(e);
 }
 
 Expr substitute_func_call(string func_name, Function new_func, Expr original) {

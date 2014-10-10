@@ -154,6 +154,12 @@ Halide::Expr swap_vars_in_expr(
         Halide::Expr original   ///< original expression
         );
 
+/** Remove all lets by inlining; all sub-expressions will exist once
+ * in memory, but may have many pointers to them, so this doesn't cause
+ * a combinatorial explosion; if you walk over this as if it were a tree,
+ * however, you're going to have a bad time (defined in modifiers.cpp) */
+Halide::Expr remove_lets(Halide::Expr);
+
 /**@name Extract vars referenced in a Expr
  *  (defined in modifiers.cpp) */
 // {@
