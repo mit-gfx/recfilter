@@ -11,6 +11,7 @@ using std::cerr;
 using std::endl;
 using std::vector;
 using std::map;
+using std::set;
 using std::pair;
 using std::make_pair;
 
@@ -57,6 +58,65 @@ static vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> 
     }
 
     return new_split_info;
+}
+
+// -----------------------------------------------------------------------------
+
+static void move_init_to_update_def(Function F, vector<SplitInfo> split_info) {
+    vector<string> pure_args = F.args();
+    vector<Expr> values = F.values();
+    vector<UpdateDefinition> updates = F.updates();
+
+    // leave the pure def undefined
+    {
+        for (int i=0; i<split_info.size(); i++) {
+            Var x  = split_info[i].var;
+            Var xi = split_info[i].inner_var;
+            Var xo = split_info[i].outer_var;
+
+            // replace x by xi in LHS pure args
+            // replace x by tile*xo+xi in RHS values
+            for (int j=0; j<pure_args.size(); j++) {
+                if (pure_args[j] == x.name()) {
+                    pure_args[j] = xi.name();
+                    pure_args.insert(pure_args.begin()+j+1, xo.name());
+                }
+            }
+        }
+        vector<Expr> undef_values(F.outputs(), FLOAT_UNDEF);
+        F.clear_all_definitions();
+        F.define(pure_args, undef_values);
+    }
+
+    // initialize the buffer in the first update def
+    {
+        cerr << F.name() << endl;
+        vector<Expr> args;
+        for (int j=0; j<pure_args.size(); j++) {
+            args.push_back(Var(pure_args[j]));
+        }
+        for (int i=0; i<split_info.size(); i++) {
+            Var  x    = split_info[i].var;
+            Var  xo   = split_info[i].outer_var;
+            Var  xi   = split_info[i].inner_var;
+            RVar rxi  = split_info[i].inner_rdom[ split_info[i].filter_dim ];
+            Expr tile = split_info[i].tile_width;
+            for (int j=0; j<args.size(); j++) {
+                args[j] = substitute(xi.name(), rxi, args[j]);
+                cerr << args[j] << endl;
+            }
+            for (int j=0; j<values.size(); j++) {
+                values[j] = substitute(xi.name(), rxi, values[j]);
+                cerr << values[j] << endl;
+            }
+        }
+        F.define_update(args, values);
+    }
+
+    // add all the other scans
+    for (int i=0; i<updates.size(); i++) {
+        F.define_update(updates[i].args, updates[i].values);
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -130,8 +190,25 @@ static void extract_tails_from_each_scan(Function F_intra, vector<SplitInfo> spl
 // -----------------------------------------------------------------------------
 
 static void add_padding_to_avoid_bank_conflicts(Function F, vector<SplitInfo> split_info, bool flag) {
-    vector<Expr> args;
-    vector<Expr> values(F.outputs(), undef<float>());
+//    // find all the dimensions containing a scan
+//    set<int> update_dimensions;
+//    for (int i=0; i<F.updates().size(); i++) {
+//        UpdateDefinition u = F.updates()[i];
+//        ReductionDomain r = u.domain;
+//        for (int j=0; j<u.args.size(); j++) {
+//            for (int k=0; k<r.domain().size(); k++) {
+//                if (expr_depends_on_var(u.args[j], r.domain()[k].var)) {
+//                    update_dimensions.insert(j);
+//                }
+//            }
+//        }
+//    }
+//
+//    // bank conflicts expected if there are scans in multiple dimensions
+//    bool bank_conflicts = (update_dimensions.size()>1);
+//    if (!bank_conflicts) {
+//        return;
+//    }
 
     // map inner var of first dimension to tile width +
     // map inner vars of all other dimensions to 0
@@ -150,6 +227,7 @@ static void add_padding_to_avoid_bank_conflicts(Function F, vector<SplitInfo> sp
         }
     }
 
+    vector<Expr> args;
     for (int i=0; i<F.args().size(); i++) {
         string a = F.args()[i];
         if (var_val.find(a) != var_val.end()) {
@@ -159,6 +237,7 @@ static void add_padding_to_avoid_bank_conflicts(Function F, vector<SplitInfo> sp
         }
     }
 
+    vector<Expr> values(F.outputs(), FLOAT_UNDEF);
     F.define_update(args, values);
 }
 
@@ -229,7 +308,7 @@ static Function create_intra_tile_term(Function F, vector<SplitInfo> split_info)
             feedback[j] = s.feedback_coeff(i,j);
         }
 
-        // update args: replace rx the RVar of this dimension in rxi and xo
+        // update args: replace rx by the RVar of this dimension in rxi and xo
         // replace all other pure args with their respective RVar in rxi
         vector<Expr> args;
         for (int j=0; j<F.args().size(); j++) {
@@ -988,13 +1067,15 @@ static void add_all_residuals_to_final_result(
             vector<Expr> args   = new_updates[i].first;
             vector<Expr> values = new_updates[i].second;
             F.define_update(args, values);
-
         }
         F.define_update(updates[i].args, updates[i].values);
     }
 
     // add padding to avoid bank conflicts
     add_padding_to_avoid_bank_conflicts(F, split_info, false);
+
+    // move initialization to update def in intra tile function
+    move_init_to_update_def(F, split_info);
 }
 
 // -----------------------------------------------------------------------------
@@ -1103,6 +1184,7 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         r.var    = "r" + contents.ptr->split_info[i].var.name() + "i";
         inner_scan_rvars.push_back(r);
     }
+    RDom inner_rdom = RDom(ReductionDomain(inner_scan_rvars));
 
     // populate the inner, outer and tail update domains to all dimensions
     for (map<string,Expr>::iterator it=dim_tile.begin(); it!=dim_tile.end(); it++) {
@@ -1116,7 +1198,7 @@ void RecFilter::split(map<string,Expr> dim_tile) {
                 int  filter_order = contents.ptr->split_info[j].filter_order;
 
                 // set inner rdom, same for all dimensions
-                contents.ptr->split_info[j].inner_rdom = RDom(ReductionDomain(inner_scan_rvars));
+                contents.ptr->split_info[j].inner_rdom = inner_rdom;
 
                 // same as inner rdom except that the extent of scan dimension
                 // is filter order rather than tile width
@@ -1177,6 +1259,9 @@ void RecFilter::split(map<string,Expr> dim_tile) {
 
         // add padding to intra tile terms to avoid bank conflicts
         add_padding_to_avoid_bank_conflicts(F_intra, split_info_current, true);
+
+        // move initialization to update def in intra tile function
+        move_init_to_update_def(F_intra, split_info_current);
 
         // inline all residual functions, not required any more
         map<string,Function> func_map = find_direct_calls(F_final);

@@ -80,11 +80,11 @@ int main(int argc, char **argv) {
         Func SAT_Deps_y      = filter.func("SAT_Intra_Deps_y_1");
 
         SAT_Intra.compute_at(SAT_Tail, Var::gpu_blocks());
-        SAT_Intra.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
-        SAT_Intra.update(0).reorder(rxi,ryi,xo,yo).gpu_threads(ryi).unroll(rxi);
-        SAT_Intra.update(1).reorder(rxt,ryi,xo,yo).gpu_threads(ryi).unroll(rxt);
-        SAT_Intra.update(2).reorder(ryi,rxi,xo,yo).gpu_threads(rxi).unroll(ryi);
-        SAT_Intra.update(3).reorder(ryt,rxi,xo,yo).gpu_threads(rxi).unroll(ryt);
+        SAT_Intra.update(0).split(ryi,yi,t,UNROLL_FACTOR).reorder(t,rxi,yi,xo,yo).gpu_threads(rxi,yi).unroll(t);
+        SAT_Intra.update(1).reorder(rxi,ryi,xo,yo).gpu_threads(ryi).unroll(rxi);
+        SAT_Intra.update(2).reorder(rxt,ryi,xo,yo).gpu_threads(ryi).unroll(rxt);
+        SAT_Intra.update(3).reorder(ryi,rxi,xo,yo).gpu_threads(rxi).unroll(ryi);
+        SAT_Intra.update(4).reorder(ryt,rxi,xo,yo).gpu_threads(rxi).unroll(ryt);
 
         SAT_Tail.compute_root();
         SAT_Tail.reorder_storage(xi,yi,xo,yo);
@@ -115,11 +115,11 @@ int main(int argc, char **argv) {
         SAT_Deps_y.compute_at(SAT, Var::gpu_blocks()).reorder(xi,yi,xo,yo).gpu_threads(xi);
 
         SAT_Final.compute_at(SAT, Var::gpu_blocks());
-        SAT_Final.split(yi,yi,t,UNROLL_FACTOR).reorder(t,xi,yi,xo,yo).gpu_threads(xi,yi).unroll(t);
-        SAT_Final.update(0).reorder(rxt,ryi,xo,yo).gpu_threads(ryi).unroll(rxt);
-        SAT_Final.update(1).reorder(rxf,ryi,xo,yo).gpu_threads(ryi).unroll(rxf);
-        SAT_Final.update(2).reorder(ryt,rxi,xo,yo).gpu_threads(rxi).unroll(ryt);
-        SAT_Final.update(3).reorder(ryf,rxi,xo,yo).gpu_threads(rxi).unroll(ryf);
+        SAT_Final.update(0).split(ryi,yi,t,UNROLL_FACTOR).reorder(t,rxi,yi,xo,yo).gpu_threads(rxi,yi).unroll(t);
+        SAT_Final.update(1).reorder(rxt,ryi,xo,yo).gpu_threads(ryi).unroll(rxt);
+        SAT_Final.update(2).reorder(rxf,ryi,xo,yo).gpu_threads(ryi).unroll(rxf);
+        SAT_Final.update(3).reorder(ryt,rxi,xo,yo).gpu_threads(rxi).unroll(ryt);
+        SAT_Final.update(4).reorder(ryf,rxi,xo,yo).gpu_threads(rxi).unroll(ryf);
 
         SAT.compute_root();
         SAT.split(x,xo,xi,tile).split(y,yo,yi,tile);
