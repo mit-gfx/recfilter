@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
         SAT.split(x,xo,xi,tile).split(y,yo,yi,tile);
         SAT.split(yi,yi,t,UNROLL).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
 
-        SAT         .bound(x,0,width).bound(y,0,height);
+        SAT.bound(x,0,width).bound(y,0,height);
     }
 
     // ----------------------------------------------------------------------------------------------
