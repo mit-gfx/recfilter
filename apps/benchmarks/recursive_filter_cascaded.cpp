@@ -170,8 +170,8 @@ int main(int argc, char **argv) {
 
             // stage 2 and 3
 
-            Sx_CTail_0.compute_root().update().reorder(rxox,rxoy,y).split(y,yo,yi,MAX_THREADS).gpu(yo,yi).vectorize(rxox);
-            Sx_CTail_1.compute_root().update().reorder(rxox,rxoy,y).split(y,yo,yi,MAX_THREADS).gpu(yo,yi).vectorize(rxox);
+            Sx_CTail_0.compute_root().reorder_storage(y,xi,xo).update().reorder(rxox,rxoy,y).split(y,yo,yi,MAX_THREADS).gpu(yo,yi).vectorize(rxox);
+            Sx_CTail_1.compute_root().reorder_storage(y,xi,xo).update().reorder(rxox,rxoy,y).split(y,yo,yi,MAX_THREADS).gpu(yo,yi).vectorize(rxox);
 
             // stage 4
 
@@ -197,13 +197,13 @@ int main(int argc, char **argv) {
             Sy_Intra.update(3).split(x,xo,xi,tile).reorder(ryi,xi,yo,xo).gpu_threads(xi).unroll(ryi);
             Sy_Intra.update(4).split(x,xo,xi,tile).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
 
-            Sy_Tail.compute_root();
+            Sy_Tail.compute_root().reorder_storage(x,yi,yo);
             Sy_Tail.split(x,xo,xi,tile).split(xi,xi,t,UNROLL).reorder(t,yi,xi,yo,xo).gpu(yo,xo,yi,xi).unroll(t);
 
             // stage 6 and 7
 
-            Sy_CTail_0.compute_root().update().reorder(ryox,ryoy,x).split(x,xo,xi,MAX_THREADS).gpu(xo,xi).vectorize(ryox);
-            Sy_CTail_1.compute_root().update().reorder(ryox,ryoy,x).split(x,xo,xi,MAX_THREADS).gpu(xo,xi).vectorize(ryox);
+            Sy_CTail_0.compute_root().reorder_storage(x,yi,yo).update().reorder(ryox,ryoy,x).split(x,xo,xi,MAX_THREADS).gpu(xo,xi).vectorize(ryox);
+            Sy_CTail_1.compute_root().reorder_storage(x,yi,yo).update().reorder(ryox,ryoy,x).split(x,xo,xi,MAX_THREADS).gpu(xo,xi).vectorize(ryox);
 
             // stage 8
 
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
             Sy_Final.update(3).split(x,xo,xi,tile).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
             Sy_Final.update(4).split(x,xo,xi,tile).reorder(ryf,xi,yo,xo).gpu_threads(xi).unroll(ryf);
 
-            Sy.compute_root().reorder_storage(y,x).split(x,xo,xi,tile).split(y,yo,yi,tile);
+            Sy.compute_root().reorder_storage(x,y).split(x,xo,xi,tile).split(y,yo,yi,tile);
             Sy.split(xi,xi,t,UNROLL).reorder(t,yi,xi,yo,xo).gpu(yo,xo,yi,xi).unroll(t);
 
 

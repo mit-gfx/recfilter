@@ -84,13 +84,12 @@ int main(int argc, char **argv) {
         SAT_Intra.update(3).reorder(ryi,rxi,xo,yo).gpu_threads(rxi).unroll(ryi);
         SAT_Intra.update(4).reorder(ryt,rxi,xo,yo).gpu_threads(rxi).unroll(ryt);
 
-        SAT_Tail.compute_root();
-        SAT_Tail.reorder_storage(xi,yi,xo,yo);
+        SAT_Tail.compute_root().reorder_storage(xi,yi,xo,yo);
         SAT_Tail.split(yi,yi,t,UNROLL).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
 
         //
 
-        SAT_CTail_x.compute_root().reorder_storage(yi,yo,xi,xo);
+        SAT_CTail_x.compute_root().reorder_storage(yi,xi,yo,xo);
         SAT_CTail_x.update().reorder(rxox,rxoy,yi,yo).fuse(yi,yo,y).gpu_tile(y,MAX_THREADS);
 
         //
@@ -99,12 +98,12 @@ int main(int argc, char **argv) {
         SAT_CTail_xy_sub.split(xo,xo,x,TILES_PER_WARP).reorder(yi,xi,x,xo,yo).gpu_threads(x,yi);
         SAT_CTail_xy_sub.update().split(xo,xo,x,TILES_PER_WARP).reorder(ryi,rxt,x,xo,yo).gpu_threads(x).unroll(ryi);
 
-        SAT_CTail_xy.compute_root();
+        SAT_CTail_xy.compute_root().reorder_storage(yi,xi,yo,xo);
         SAT_CTail_xy.split(xo,xo,x,TILES_PER_WARP).reorder(yi,xi,x,xo,yo).gpu_threads(x,yi).gpu_blocks(xo,yo);
 
         //
 
-        SAT_CTail_y.compute_root();
+        SAT_CTail_y.compute_root().reorder_storage(xi,yi,xo,yo);
         SAT_CTail_y.update().reorder(ryox,ryoy,xi,xo).fuse(xi,xo,x).gpu_tile(x,MAX_THREADS);
 
         //
