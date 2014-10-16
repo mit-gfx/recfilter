@@ -219,7 +219,7 @@ static void add_padding_to_avoid_bank_conflicts(Function F, vector<SplitInfo> sp
             if (var_val.empty()) {
                 var_val[x] = split_info[i].tile_width;
                 if (flag) {
-                    var_val[x] += split_info[i].filter_order*split_info[i].num_splits;
+                    var_val[x] += split_info[i].filter_order*split_info[i].num_splits+1;
                 }
             } else {
                 var_val[x] = 0;
