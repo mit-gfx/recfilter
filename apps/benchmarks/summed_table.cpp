@@ -4,7 +4,7 @@
 #include "../../lib/recfilter.h"
 
 #define MAX_THREADS    192
-#define UNROLL         6
+#define UNROLL         8
 #define TILES_PER_WARP 4
 
 using namespace Halide;
@@ -86,6 +86,8 @@ int main(int argc, char **argv) {
 
         SAT_Tail.compute_root().reorder_storage(xi,yi,xo,yo);
         SAT_Tail.split(yi,yi,t,UNROLL).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
+
+        SAT_Tail.compile_to_simplified_lowered_stmt("stmt2.html", 2, width/tile, tile, width/tile, HTML, get_jit_target_from_environment());
 
         //
 

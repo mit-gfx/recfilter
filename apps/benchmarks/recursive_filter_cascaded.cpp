@@ -7,7 +7,7 @@
 #include "../../lib/recfilter.h"
 
 #define MAX_THREADS 192
-#define UNROLL      4
+#define UNROLL      8
 
 using namespace Halide;
 

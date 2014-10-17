@@ -1,5 +1,9 @@
 #/usr/bin/bash
 
+function mean_time_with_outlier_rejection {
+    awk ' { if (NR!=1) print } ' $1 | awk '{ sum += $5 } END { print sum }'
+}
+
 TFILE1=$( mktemp )
 TFILE2=$( mktemp )
 
@@ -33,7 +37,7 @@ then
         echo ''
         echo ''
         echo 'Total tile for kernel execution in ms'
-        awk ' { if (NR!=1) print } ' $TFILE2 | awk '{ sum += $5 } END { print sum }'
+        mean_time_with_outlier_rejection $TFILE2
 
     else
         cat $TFILE1
