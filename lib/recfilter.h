@@ -72,6 +72,9 @@ struct RecFilterContents {
 
     /** Splitting info for each dimension of the filter */
     std::vector<SplitInfo> split_info;
+
+    /** List of functions along with their names that the filter depends upon */
+    std::map<std::string, RecFilterSchedule> func_schedule;
 };
 
 // ----------------------------------------------------------------------------
