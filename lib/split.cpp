@@ -1279,7 +1279,7 @@ void RecFilter::split(map<string,Expr> dim_tile) {
     }
 
     // add the generated final term
-    add_generated_func(F);
+
 
     // change the original function to index into the final term
     {

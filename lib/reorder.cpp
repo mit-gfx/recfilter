@@ -245,8 +245,11 @@ static void inline_function(Function f, vector<Func> func_list) {
 
 // -----------------------------------------------------------------------------
 
-static bool merge_feasible(Function A, Function B, string& error) {
+static bool merge_feasible(RecFilterFunc fA, RecFilterFunc fB, string& error) {
     bool can_merge = true;
+
+    Function A = fA.func;
+    Function B = fB.func;
 
     // pure definitions must have same args
     can_merge &= (A.args().size() == B.args().size());
@@ -297,6 +300,32 @@ static bool merge_feasible(Function A, Function B, string& error) {
         error = "Functions to be merged must not call each other";
     }
 
+    // A and B must have the same scheduling tags for the function itself
+    // and all the pure and update variables
+    {
+        can_merge &= (fA.func_category == fB.func_category);
+
+        map<string,RecFilterFunc::VarCategory>::iterator it = fA.pure_var_category.begin();
+
+        for (it=fA.pure_var_category.begin(); it!=fA.pure_var_category.end(); it++) {
+            can_merge &= (it->second == fB.pure_var_category[it->first]);
+        }
+        for (it=fB.pure_var_category.begin(); it!=fB.pure_var_category.end(); it++) {
+            can_merge &= (it->second == fA.pure_var_category[it->first]);
+        }
+        for (int i=0; i<std::min(fA.update_var_category.size(),fB.update_var_category.size()); i++) {
+            for (it=fA.update_var_category[i].begin(); it!=fA.update_var_category[i].end(); it++) {
+                can_merge &= (it->second == fB.update_var_category[i][it->first]);
+            }
+            for (it=fB.update_var_category[i].begin(); it!=fB.update_var_category[i].end(); it++) {
+                can_merge &= (it->second == fA.update_var_category[i][it->first]);
+            }
+        }
+        if (!can_merge) {
+            error = "Functions to be merged must have the same scheduling tags";
+        }
+    }
+
     return can_merge;
 }
 
@@ -331,17 +360,23 @@ static bool check_duplicate(Function A, Function B) {
  * of both the functions in a Tuple; and replace calls to the two original
  * functions by the merged function in all calls in
  */
-static void merge_function(
-        Function A,              ///< first function to be merged
-        Function B,              ///< second function to be merged
+static RecFilterFunc& merge_function(
+        RecFilterFunc fA,        ///< first function to be merged
+        RecFilterFunc fB,        ///< second function to be merged
         string merged_name,      ///< name of the merged function
-        vector<Func> func_list = vector<Func>() ///< list of functions where A and B must be replaced by the merged function
+        vector<Func> func_list   ///< list of functions where A and B must be replaced by the merged function
         )
 {
-    string merge_error;
-    if (!merge_feasible(A,B,merge_error)) {
-        cerr << merge_error << std::endl;
-        assert(false);
+    Function A = fA.func;
+    Function B = fB.func;
+
+    // check if merge is feasible
+    {
+        string merge_error;
+        if (!merge_feasible(fA, fB ,merge_error)) {
+            cerr << merge_error << std::endl;
+            assert(false);
+        }
     }
 
     int num_outputs_A = A.outputs();
@@ -454,20 +489,22 @@ static void merge_function(
 /** Interleave two functions to create a new function which interleaves the outputs
  * of both the functions; and replace calls to the two original functions by new function
  */
-static void interleave_function(
-        Function A,                 ///< first function to be interleaved
-        Function B,                 ///< second function to be interleaved
-        string   merged_name,       ///< name of the interleaved function
-        Var      var,               ///< var to the used for interleaving
-        Expr     offset,            ///< interleaving offset
-        vector<Func> func_list = vector<Func>() ///< list of functions where A and B must be replaced
+static RecFilterFunc& interleave_function(
+        RecFilterFunc fA,       ///< first function to be interleaved
+        RecFilterFunc fB,       ///< second function to be interleaved
+        string   merged_name,   ///< name of the interleaved function
+        Var      var,           ///< var to the used for interleaving
+        Expr     offset,        ///< interleaving offset
+        vector<Func> func_list  ///< list of functions where A and B must be replaced
         )
 {
-    string merge_error;
+    Function A = fA.func;
+    Function B = fB.func;
 
     // check if interleaving is possible
     {
-        if (!merge_feasible(A,B,merge_error)) {
+        string merge_error;
+        if (!merge_feasible(fA, fB, merge_error)) {
             cerr << merge_error << endl;
             assert(false);
         }
@@ -481,9 +518,10 @@ static void interleave_function(
         }
     }
 
+    Function AB(merged_name);
+
     if (check_duplicate(A,B)) {
-        // create a copy of A as the merged function
-        Function AB(merged_name);
+        // create a copy of A as the interleaved function
         AB.define(A.args(), A.values());
         for (int i=0; i<A.updates().size(); i++) {
             UpdateDefinition r = A.updates()[i];
@@ -498,7 +536,7 @@ static void interleave_function(
             AB.define_update(args, values);
         }
 
-        // mutate A and B to index into merged function
+        // mutate A and B to index into interleaved function
         vector<Expr> call_args;
         vector<Expr> values;
         for (int i=0; i<A.args().size(); i++) {
@@ -515,8 +553,6 @@ static void interleave_function(
     } else {
 
         // interleave procedure
-        Function AB(merged_name);
-
         int var_idx = -1;
         for (int i=0; i<A.args().size(); i++) {
             if (var.name()==A.args()[i]) {
@@ -585,12 +621,8 @@ void RecFilter::inline_func(string func_name) {
     if (contents.ptr->recfilter.name() == func_name) {
         return;
     }
-
-    Function F = func(func_name).function();
-    vector<Func> func_list = funcs();
-    inline_function(F, func_list);
-
-    contents.ptr->func.erase(func_name);
+    Function F = function(func_name).func;
+    inline_function(F, funcs());
 }
 
 void RecFilter::inline_func(Func a, Func b) {
@@ -600,23 +632,17 @@ void RecFilter::inline_func(Func a, Func b) {
 // -----------------------------------------------------------------------------
 
 void RecFilter::interleave_func(string func_a, string func_b, string merged_name, string var, Expr offset) {
-    vector<Func> func_list = funcs();
-    Function FA = func(func_a).function();
-    Function FB = func(func_b).function();
-    interleave_function(FA, FB, merged_name, Var(var), offset, func_list);
-
-    // TODO: schedule info for merged func
-    add_generated_func(merged_name);
+    RecFilterFunc FA = function(func_a);
+    RecFilterFunc FB = function(func_b);
+    RecFilterFunc F  = interleave_function(FA, FB, merged_name, Var(var), offset, funcs());
+    contents.ptr->func.insert(make_pair(F.func.name(), F));
 }
 
 void RecFilter::merge_func(string func_a, string func_b, string merged_name) {
-    vector<Func> func_list = funcs();
-    Function FA = func(func_a).function();
-    Function FB = func(func_b).function();
-    merge_function(FA, FB, merged_name, func_list);
-
-    // TODO: schedule info for merged func
-    add_generated_func(merged_name);
+    RecFilterFunc FA = function(func_a);
+    RecFilterFunc FB = function(func_b);
+    RecFilterFunc F  = merge_function(FA, FB, merged_name, funcs());
+    contents.ptr->func.insert(make_pair(F.func.name(), F));
 }
 
 void RecFilter::merge_func(string func_a, string func_b, string func_c, string merged_name) {
@@ -645,7 +671,8 @@ void RecFilter::transpose_dimensions(string func_name, string a, string b) {
         assert(false);
     }
 
-    Function F = func(func_name).function();
+    RecFilterFunc rF = function(func_name);
+    Function       F = rF.func;
 
     int va_idx = -1;
     int vb_idx = -1;
@@ -719,6 +746,9 @@ void RecFilter::transpose_dimensions(string func_name, string a, string b) {
             }
         }
     }
+
+    // swap the scheduling tags of the dimensions
+
 }
 
 // -----------------------------------------------------------------------------
@@ -884,5 +914,22 @@ vector<RecFilter> RecFilter::cascade(vector<int> a, vector<int> b) {
     vector<vector<int> > scans;
     scans.push_back(a);
     scans.push_back(b);
+    return cascade(scans);
+};
+
+vector<RecFilter> RecFilter::cascade(vector<int> a, vector<int> b, vector<int> c) {
+    vector<vector<int> > scans;
+    scans.push_back(a);
+    scans.push_back(b);
+    scans.push_back(c);
+    return cascade(scans);
+};
+
+vector<RecFilter> RecFilter::cascade(vector<int> a, vector<int> b, vector<int> c, vector<int> d) {
+    vector<vector<int> > scans;
+    scans.push_back(a);
+    scans.push_back(b);
+    scans.push_back(c);
+    scans.push_back(d);
     return cascade(scans);
 };

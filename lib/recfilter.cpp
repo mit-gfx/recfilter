@@ -290,12 +290,6 @@ RecFilterFunc& RecFilter::function(string func_name) {
     }
 }
 
-void RecFilter::add_generated_func(Function func) {
-    RecFilterFunc rf;
-    rf.func = func;
-    contents.ptr->func.insert(make_pair(func.name(),rf));
-}
-
 // -----------------------------------------------------------------------------
 
 void RecFilter::compile_jit(Target target, string filename) {
