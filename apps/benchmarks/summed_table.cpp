@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
 
     filter.split(tile);
 
-    filter.swap_variables ("SAT_Intra_Tail_y_1", "xi", "yi");
+    filter.transpose_dimensions ("SAT_Intra_Tail_y_1", "xi", "yi");
     filter.interleave_func("SAT_Intra_Tail_x_0", "SAT_Intra_Tail_y_1", "SAT_Intra_Tail", "xi", 1);
 
     filter.remove_pure_def("SAT_Intra_CTail_x_0_Sub");

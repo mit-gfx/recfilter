@@ -289,12 +289,12 @@ public:
     /** @name Reorder memory layout by swapping two dimensions of a function
      * (defined in reorder.cpp) */
     // {@
-    void swap_variables(
+    void transpose_dimensions(
             std::string func,   ///< name of function whose dimensions must be swapped
             Halide::Var a,      ///< pure arg of first dimension to swap
             Halide::Var b       ///< pure arg of second dimension to swap
             );
-    void swap_variables(
+    void transpose_dimensions(
             std::string func,   ///< name of function whose dimensions must be swapped
             std::string a,      ///< pure arg of first dimension to swap
             std::string b       ///< pure arg of second dimension to swap

@@ -635,11 +635,11 @@ void RecFilter::merge_func(string func_a, string func_b, string func_c, string f
 
 // -----------------------------------------------------------------------------
 
-void RecFilter::swap_variables(string func_name, Var a, Var b) {
-    swap_variables(func_name, a.name(), b.name());
+void RecFilter::transpose_dimensions(string func_name, Var a, Var b) {
+    transpose_dimensions(func_name, a.name(), b.name());
 }
 
-void RecFilter::swap_variables(string func_name, string a, string b) {
+void RecFilter::transpose_dimensions(string func_name, string a, string b) {
     if (a == b) {
         cerr << "Variables to be swapped must be different" << endl;
         assert(false);

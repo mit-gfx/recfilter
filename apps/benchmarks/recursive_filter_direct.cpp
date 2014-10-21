@@ -54,8 +54,8 @@ int main(int argc, char **argv) {
 
     filter.split(tile);
 
-    filter.swap_variables("S_Intra_Tail_y_2", "xi", "yi");
-    filter.swap_variables("S_Intra_Tail_y_3", "xi", "yi");
+    filter.transpose_dimensions("S_Intra_Tail_y_2", "xi", "yi");
+    filter.transpose_dimensions("S_Intra_Tail_y_3", "xi", "yi");
     filter.merge_func("S_Intra_Tail_x_0", "S_Intra_Tail_x_1",
                  "S_Intra_Tail_y_2", "S_Intra_Tail_y_3",
                  "S_Intra_Tail");
