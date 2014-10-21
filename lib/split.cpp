@@ -1,6 +1,7 @@
 #include "recfilter.h"
 #include "recfilter_utils.h"
 #include "coefficients.h"
+#include "schedule.h"
 #include "modifiers.h"
 
 using namespace Halide;
@@ -1263,7 +1264,7 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         // move initialization to update def in intra tile function
         move_init_to_update_def(F_intra, split_info_current);
 
-        // inline all residual functions, not required any more
+        // inline all residual functions not required any more
         map<string,Function> func_map = find_direct_calls(F_final);
         map<string,Function>::iterator f = func_map.begin();
         for (; f!=func_map.end(); f++) {
@@ -1276,6 +1277,9 @@ void RecFilter::split(map<string,Expr> dim_tile) {
             }
         }
     }
+
+    // add the generated final term
+    add_generated_func(F);
 
     // change the original function to index into the final term
     {
@@ -1307,9 +1311,6 @@ void RecFilter::split(map<string,Expr> dim_tile) {
     }
 
     contents.ptr->recfilter = Func(F);
-
-    // clear the depenendency graph of recursive filter
-    contents.ptr->func_map.clear();
 }
 
 void RecFilter::split(Expr tx) {

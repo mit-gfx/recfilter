@@ -1,5 +1,6 @@
 #include "recfilter.h"
 #include "recfilter_utils.h"
+#include "schedule.h"
 #include "modifiers.h"
 
 using std::string;
@@ -257,14 +258,9 @@ Func RecFilter::func(void) {
 }
 
 Func RecFilter::func(string func_name) {
-    // build the dependency graph of the recursive filter
-    if (contents.ptr->func_map.empty()) {
-        contents.ptr->func_map = find_transitive_calls(contents.ptr->recfilter.function());
-    }
-
-    map<string,Function>::iterator f = contents.ptr->func_map.find(func_name);
-    if (f != contents.ptr->func_map.end()) {
-        return Func(f->second);
+    map<string,RecFilterFunc>::iterator f = contents.ptr->func.find(func_name);
+    if (f != contents.ptr->func.end()) {
+        return Func(f->second.func);
     } else {
         cerr << "Function " << func_name << " not found as a dependency of ";
         cerr << "recursive filter " << contents.ptr->recfilter.name() << endl;
@@ -272,28 +268,32 @@ Func RecFilter::func(string func_name) {
     }
 }
 
-map<string,Func> RecFilter::funcs(void) {
-    // build the dependency graph of the recursive filter
-    if (contents.ptr->func_map.empty()) {
-        contents.ptr->func_map = find_transitive_calls(contents.ptr->recfilter.function());
-    }
+vector<Func> RecFilter::funcs(void) {
+    vector<Func> func_list;
+    map<string,RecFilterFunc>::iterator f = contents.ptr->func.begin();
+    map<string,RecFilterFunc>::iterator fe= contents.ptr->func.end();
 
-    map<string,Func> func_map;
-    map<string,Function>::iterator f = contents.ptr->func_map.begin();
-    while (f != contents.ptr->func_map.end()) {
-        func_map[f->first] = Func(f->second);
+    while (f!=fe) {
+        func_list.push_back(Func(f->second.func));
         f++;
     }
-    return func_map;
 }
 
-void RecFilter::set_default_schedule(void) {
-    map<string,Func> funcs_list = funcs();
-    map<string,Func>::iterator fit = funcs_list.begin();
-    map<string,Func>::iterator fend= funcs_list.end();
-    for (; fit!=fend; fit++) {
-        fit->second.compute_root();
+RecFilterFunc& RecFilter::function(string func_name) {
+    map<string,RecFilterFunc>::iterator f = contents.ptr->func.find(func_name);
+    if (f != contents.ptr->func.end()) {
+        return f->second;
+    } else {
+        cerr << "Function " << func_name << " not found as a dependency of ";
+        cerr << "recursive filter " << contents.ptr->recfilter.name() << endl;
+        assert(false);
     }
+}
+
+void RecFilter::add_generated_func(Function func) {
+    RecFilterFunc rf;
+    rf.func = func;
+    contents.ptr->func.insert(make_pair(func.name(),rf));
 }
 
 // -----------------------------------------------------------------------------

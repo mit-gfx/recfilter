@@ -203,7 +203,7 @@ std::vector<Func> cascade_repeated_scans(Func& func) {
  * \param f function to be inlined
  * \param func_list list of functions in which calls to first parameter must be inlined
  */
-static void inline_function(Function f, vector<Function> func_list) {
+static void inline_function(Function f, vector<Func> func_list) {
     if (!f.is_pure()) {
         cerr << "Function " << f.name() << " to be inlined must be pure" << endl;
         assert(false);
@@ -211,7 +211,7 @@ static void inline_function(Function f, vector<Function> func_list) {
 
     // go to all other functions and inline calls to f
     for (int j=0; j<func_list.size(); j++) {
-        Function g = func_list[j];
+        Function g = func_list[j].function();
 
         // check if g not same as f and g calls f
         map<string,Function> called_funcs = find_direct_calls(g);
@@ -335,7 +335,7 @@ static void merge_function(
         Function A,              ///< first function to be merged
         Function B,              ///< second function to be merged
         string merged_name,      ///< name of the merged function
-        vector<Function> func_list = vector<Function>() ///< list of functions where A and B must be replaced by the merged function
+        vector<Func> func_list = vector<Func>() ///< list of functions where A and B must be replaced by the merged function
         )
 {
     string merge_error;
@@ -460,7 +460,7 @@ static void interleave_function(
         string   merged_name,       ///< name of the interleaved function
         Var      var,               ///< var to the used for interleaving
         Expr     offset,            ///< interleaving offset
-        vector<Function> func_list = vector<Function>() ///< list of functions where A and B must be replaced
+        vector<Func> func_list = vector<Func>() ///< list of functions where A and B must be replaced
         )
 {
     string merge_error;
@@ -587,54 +587,36 @@ void RecFilter::inline_func(string func_name) {
     }
 
     Function F = func(func_name).function();
-
-    vector<Function> func_list;
-    map<string,Func> func_map = funcs();
-    map<string,Func>::iterator f = func_map.begin();
-    for (; f!=func_map.end(); f++) {
-        func_list.push_back(f->second.function());
-    }
-
+    vector<Func> func_list = funcs();
     inline_function(F, func_list);
-    contents.ptr->func_map.clear();
+
+    contents.ptr->func.erase(func_name);
 }
 
 void RecFilter::inline_func(Func a, Func b) {
-    inline_function(a.function(), Internal::vec(b.function()));
+    inline_function(a.function(), Internal::vec(b));
 }
 
 // -----------------------------------------------------------------------------
 
 void RecFilter::interleave_func(string func_a, string func_b, string merged_name, string var, Expr offset) {
-    vector<Function> func_list;
-    map<string,Func> func_map = funcs();
-    map<string,Func>::iterator f = func_map.begin();
-    for (; f!=func_map.end(); f++) {
-        func_list.push_back(f->second.function());
-    }
-
+    vector<Func> func_list = funcs();
     Function FA = func(func_a).function();
     Function FB = func(func_b).function();
-
     interleave_function(FA, FB, merged_name, Var(var), offset, func_list);
 
-    contents.ptr->func_map.clear();
+    // TODO: schedule info for merged func
+    add_generated_func(merged_name);
 }
 
 void RecFilter::merge_func(string func_a, string func_b, string merged_name) {
-    vector<Function> func_list;
-    map<string,Func> func_map = funcs();
-    map<string,Func>::iterator f = func_map.begin();
-    for (; f!=func_map.end(); f++) {
-        func_list.push_back(f->second.function());
-    }
-
+    vector<Func> func_list = funcs();
     Function FA = func(func_a).function();
     Function FB = func(func_b).function();
-
     merge_function(FA, FB, merged_name, func_list);
 
-    contents.ptr->func_map.clear();
+    // TODO: schedule info for merged func
+    add_generated_func(merged_name);
 }
 
 void RecFilter::merge_func(string func_a, string func_b, string func_c, string merged_name) {
@@ -697,14 +679,13 @@ void RecFilter::swap_variables(string func_name, string a, string b) {
 
     // find all function calls and swap the calling args
     // at indices va_idx and vb_idx
-    map<string,Func> func_map = funcs();
-    map<string,Func>::iterator fit =func_map.begin();
-    for (; fit!=func_map.end(); fit++) {
+    map<string,RecFilterFunc>::iterator fit = contents.ptr->func.begin();
+    for (; fit!=contents.ptr->func.end(); fit++) {
         if (fit->first == func_name) {
             continue;
         }
 
-        Function f = fit->second.function();
+        Function f = fit->second.func;
 
         bool modified = false;
 

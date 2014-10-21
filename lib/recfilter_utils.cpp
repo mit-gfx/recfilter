@@ -164,12 +164,9 @@ ostream &operator<<(ostream &s, CheckResultVerbose v) {
 }
 
 ostream &operator<<(ostream &s, RecFilter r) {
-    map<string,Func> funcs = r.funcs();
-    map<string,Func>::iterator f  = funcs.begin();
-    map<string,Func>::iterator fe = funcs.end();
-    while (f != fe) {
-        s << f->second << endl;
-        f++;
+    vector<Func> f = r.funcs();
+    for (int i=0; i<f.size(); i++) {
+        s << f[i] << endl;
     }
     return s;
 }
