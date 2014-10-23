@@ -30,6 +30,11 @@ using namespace Halide::Internal;
 RecFilter::RecFilter(string n) {
     contents = new RecFilterContents;
     contents.ptr->recfilter = Func(n);
+
+    RecFilterFunc f;
+    f.func = contents.ptr->recfilter.function();
+    f.func_category = RecFilterFunc::FULL_RESULT_PURE;
+    contents.ptr->func.insert(f)
 }
 
 void RecFilter::setArgs(Var x)              { setArgs(vec(x));      }
@@ -37,6 +42,8 @@ void RecFilter::setArgs(Var x, Var y)       { setArgs(vec(x,y));    }
 void RecFilter::setArgs(Var x, Var y, Var z){ setArgs(vec(x,y,z));  }
 
 void RecFilter::setArgs(vector<Var> args) {
+    RecFilterFunc f = function( contents.ptr->recfilter.name() );
+
     for (int i=0; i<args.size(); i++) {
         SplitInfo s;
 
@@ -55,6 +62,9 @@ void RecFilter::setArgs(vector<Var> args) {
         s.feedback_coeff = Image<float>(0,0);
 
         contents.ptr->split_info.push_back(s);
+
+        // add tag the dimension as pure
+        f.pure_var_category.insert(make_pair(args[i].name(), RecFilterFunc::PURE_DIMENSION));
     }
 }
 
@@ -95,7 +105,8 @@ void RecFilter::addScan(
         Border border_mode,
         Expr bexpr)
 {
-    Function f = contents.ptr->recfilter.function();
+    RecFilterFunc rf = function( contents.ptr->recfilter.name() );
+    Function       f = contents.ptr->recfilter.function();
 
     if (!f.has_pure_definition()) {
         cerr << "Cannot add scans to recursive filter " << f.name()
@@ -113,7 +124,13 @@ void RecFilter::addScan(
         assert(false);
     }
 
-
+    // copy the dimension tags from pure def replacing x by rx
+    // change the function tag from pure to scan
+    map<string, RecFilterFunc::VarCategory> update_var_category = rf.pure_var_category;
+    update_var_category.erase(x.name());
+    update_var_category.insert(make_pair(rx.x.name(), RecFilterFunc::SCAN_DIMENSION));
+    f.push_back(update_var_category);
+    f.func_category = RecFilterFunc::FULL_RESULT_SCAN;
 
     // csausality
     bool causal = (causality == CAUSAL);

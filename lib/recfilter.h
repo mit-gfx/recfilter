@@ -62,23 +62,27 @@ struct SplitInfo {
 /** Scheduling interface for functions generated for the recursive filter */
 struct RecFilterFunc {
     typedef enum {
-        INTRA_TILE_nD_SCAN         = 0x001,
-        INTER_TILE_1D_SCAN         = 0x002,
-        INTER_TILE_2D_SCAN         = 0x004,
-        INTER_TILE_3D_SCAN         = 0x008,
-        INTER_TILE_4D_SCAN         = 0x010,
-        INTRA_TILE_nD_SCAN_WRAPPER = 0x020,
-        INTER_TILE_1D_SCAN_WRAPPER = 0x040,
-        INTER_TILE_2D_SCAN_WRAPPER = 0x080,
-        INTER_TILE_3D_SCAN_WRAPPER = 0x100,
-        INTER_TILE_4D_SCAN_WRAPPER = 0x200
+        NONE               = 0x000,
+        FULL_RESULT_SCAN   = 0x001,
+        FULL_RESULT_PURE   = 0x002,
+        INTRA_TILE_nD_SCAN = 0x004,
+        INTER_TILE_1D_SCAN = 0x008,
+        INTER_TILE_2D_SCAN = 0x010,
+        INTER_TILE_3D_SCAN = 0x020,
+        INTER_TILE_4D_SCAN = 0x040,
+        REINDEX_FOR_WRITE  = 0x080,
+        REINDEX_FOR_READ   = 0x100
     } FuncCategory;
 
     typedef enum {
         INNER_PURE_VAR = 0x01,
         INNER_SCAN_VAR = 0x02,
         OUTER_PURE_VAR = 0x04,
-        OUTER_SCAN_VAR = 0x08
+        OUTER_SCAN_VAR = 0x08,
+        TAIL_PURE_VAR  = 0x10,
+        TAIL_SCAN_VAR  = 0x20,
+        PURE_DIMENSION = 0x40,
+        SCAN_DIMENSION = 0x80
     } VarCategory;
 
     Halide::Internal::Function       func;
