@@ -29,6 +29,48 @@ using std::make_pair;
 
 // -----------------------------------------------------------------------------
 
+static RecFilterFunc::FuncCategory& operator|=(RecFilterFunc::FuncCategory& a, const RecFilterFunc::FuncCategory& b) {
+    a = static_cast<RecFilterFunc::FuncCategory>(static_cast<int>(a) | static_cast<int>(b));
+    return a;
+}
+
+static RecFilterFunc::FuncCategory& operator&=(RecFilterFunc::FuncCategory& a, const RecFilterFunc::FuncCategory& b) {
+    a = static_cast<RecFilterFunc::FuncCategory>(static_cast<int>(a) & static_cast<int>(b));
+    return a;
+}
+
+static RecFilterFunc::VarCategory& operator|=(RecFilterFunc::VarCategory& a, const RecFilterFunc::VarCategory& b) {
+    a = static_cast<RecFilterFunc::VarCategory>(static_cast<int>(a) | static_cast<int>(b));
+    return a;
+}
+
+static RecFilterFunc::VarCategory& operator&=(RecFilterFunc::VarCategory& a, const RecFilterFunc::VarCategory& b) {
+    a = static_cast<RecFilterFunc::VarCategory>(static_cast<int>(a) & static_cast<int>(b));
+    return a;
+}
+
+static RecFilterFunc::FuncCategory operator|(const RecFilterFunc::FuncCategory& a, const RecFilterFunc::FuncCategory& b) {
+
+    return static_cast<RecFilterFunc::FuncCategory>(static_cast<int>(a) | static_cast<int>(b));
+}
+
+static RecFilterFunc::FuncCategory operator&(const RecFilterFunc::FuncCategory& a, const RecFilterFunc::FuncCategory& b) {
+
+    return static_cast<RecFilterFunc::FuncCategory>(static_cast<int>(a) & static_cast<int>(b));
+}
+
+static RecFilterFunc::VarCategory operator|(const RecFilterFunc::VarCategory& a, const RecFilterFunc::VarCategory& b) {
+
+    return static_cast<RecFilterFunc::VarCategory>(static_cast<int>(a) | static_cast<int>(b));
+}
+
+static RecFilterFunc::VarCategory operator&(const RecFilterFunc::VarCategory& a, const RecFilterFunc::VarCategory& b) {
+
+    return static_cast<RecFilterFunc::VarCategory>(static_cast<int>(a) & static_cast<int>(b));
+}
+
+// -----------------------------------------------------------------------------
+
 static vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> split_info) {
     vector<string> args = F.args();
     vector<Expr>  values = F.values();
@@ -63,10 +105,15 @@ static vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> 
 
 // -----------------------------------------------------------------------------
 
-static void move_init_to_update_def(Function F, vector<SplitInfo> split_info) {
+static void move_init_to_update_def(RecFilterFunc rF, vector<SplitInfo> split_info) {
+    Function F = rF.func;
+
     vector<string> pure_args = F.args();
     vector<Expr> values = F.values();
     vector<UpdateDefinition> updates = F.updates();
+
+    // scheduling tags for the new update def are same as pure def
+    map<string,RecFilterFunc::VarCategory> update_var_category = rF.pure_var_category;
 
     // leave the pure def undefined
     {
@@ -90,8 +137,8 @@ static void move_init_to_update_def(Function F, vector<SplitInfo> split_info) {
     }
 
     // initialize the buffer in the first update def
+    // replace the scheduling tags of xi by rxi
     {
-        cerr << F.name() << endl;
         vector<Expr> args;
         for (int j=0; j<pure_args.size(); j++) {
             args.push_back(Var(pure_args[j]));
@@ -104,11 +151,11 @@ static void move_init_to_update_def(Function F, vector<SplitInfo> split_info) {
             Expr tile = split_info[i].tile_width;
             for (int j=0; j<args.size(); j++) {
                 args[j] = substitute(xi.name(), rxi, args[j]);
-                cerr << args[j] << endl;
+                update_var_category.insert(make_pair(rxi.name(), update_var_category[xi.name()]));
+                update_var_category.erase(xi.name());
             }
             for (int j=0; j<values.size(); j++) {
                 values[j] = substitute(xi.name(), rxi, values[j]);
-                cerr << values[j] << endl;
             }
         }
         F.define_update(args, values);
@@ -118,21 +165,31 @@ static void move_init_to_update_def(Function F, vector<SplitInfo> split_info) {
     for (int i=0; i<updates.size(); i++) {
         F.define_update(updates[i].args, updates[i].values);
     }
+
+    // add the scheduling tags for the new update def in front of tags for
+    // all other update defs
+    rF.update_var_category.insert(rF.update_var_category.begin(), update_var_category);
 }
 
 // -----------------------------------------------------------------------------
 
-static void extract_tails_from_each_scan(Function F_intra, vector<SplitInfo> split_info) {
+static void extract_tails_from_each_scan(RecFilterFunc rF_intra, vector<SplitInfo> split_info) {
+    Function F_intra = rF_intra.func;
+
     vector<string> pure_args = F_intra.args();
     vector<Expr> pure_values = F_intra.values();
     vector<UpdateDefinition> updates = F_intra.updates();
+    vector< map<string,RecFilterFunc::VarCategory> > update_var_category = rF_intra.update_var_category;
 
     // pure definitions remain unchanged
     F_intra.clear_all_definitions();
     F_intra.define(pure_args, pure_values);
+    rF_intra.update_var_category.clear();
 
-    // new updates to be added for all the split updates
+    // new updates and scheduling tags for the new updates to be
+    // added for all the split updates
     map<int, std::pair< vector<Expr>, vector<Expr> > > new_updates;
+    map<int, map<string,RecFilterFunc::VarCategory> > new_update_var_category;
 
     // create the new update definitions to extract the tail
     // of each scan that is split
@@ -152,10 +209,13 @@ static void extract_tails_from_each_scan(Function F_intra, vector<SplitInfo> spl
             vector<Expr> call_args = updates[scan_id].args;
             vector<Expr> values;
 
-            // replace rxi by rxt (involves replacing rxi.x by rxt.x etc)
-            // for the dimension undergoing scan, use a buffer of length filter_order
-            // beyond tile boundary as LHS args and tile-1-rxt on RHS to extract
-            // the tail elements
+            // copy the scheduling tags from the original update def
+            map<string,RecFilterFunc::VarCategory> var_cat = update_var_category[scan_id];
+
+            // replace rxi by rxt (involves replacing rxi.x by rxt.x etc) for the
+            // dimension undergoing scan, use a buffer of length filter_order beyond
+            // tile boundary as LHS args and tile-1-rxt on RHS to extract tail elements;
+            // same replacement in scheduling tags
             for (int k=0; k<rxi.dimensions(); k++) {
                 for (int u=0; u<args.size(); u++) {
                     if (expr_depends_on_var(args[u], rxi[dim].name())) {
@@ -166,6 +226,9 @@ static void extract_tails_from_each_scan(Function F_intra, vector<SplitInfo> spl
                         call_args[u] = substitute(rxi[k].name(), rxt[k], call_args[u]);
                     }
                 }
+                RecFilterFunc::VarCategory vc = update_var_category[scan_id][rxi[k].name()];
+                var_cat.insert(make_pair(rxt[k].name(), vc | RecFilterFunc::TAIL_DIMENSION));
+                var_cat.erase(rxi[k].name());
             }
 
             for (int k=0; k<updates[scan_id].values.size(); k++) {
@@ -173,24 +236,30 @@ static void extract_tails_from_each_scan(Function F_intra, vector<SplitInfo> spl
             }
 
             new_updates[scan_id] = make_pair(args, values);
+            new_update_var_category[scan_id] = var_cat;
         }
     }
 
     // add extra update steps to copy tail of each scan to another buffer
     // that is beyond the bounds of the intra tile RVars
+    // for each update def add the corresponding mapping of update var scheduling tags
     for (int i=0; i<updates.size(); i++) {
         F_intra.define_update(updates[i].args, updates[i].values);
+        rF_intra.update_var_category.push_back(update_var_category[i]);
         if (new_updates.find(i) != new_updates.end()) {
             vector<Expr> args   = new_updates[i].first;
             vector<Expr> values = new_updates[i].second;
             F_intra.define_update(args, values);
+            rF_intra.update_var_category.push_back(new_update_var_category[i]);
         }
     }
 }
 
 // -----------------------------------------------------------------------------
 
-static void add_padding_to_avoid_bank_conflicts(Function F, vector<SplitInfo> split_info, bool flag) {
+static void add_padding_to_avoid_bank_conflicts(RecFilterFunc rF, vector<SplitInfo> split_info, bool flag) {
+    Function F = rF.func;
+
 //    // find all the dimensions containing a scan
 //    set<int> update_dimensions;
 //    for (int i=0; i<F.updates().size(); i++) {
@@ -240,6 +309,18 @@ static void add_padding_to_avoid_bank_conflicts(Function F, vector<SplitInfo> sp
 
     vector<Expr> values(F.outputs(), FLOAT_UNDEF);
     F.define_update(args, values);
+
+    // use the same scheduling tags for the new update def as the pure def of
+    // the function, except that all inner vars have been removed
+    map<string, RecFilterFunc::VarCategory> update_var_category;
+    map<string, RecFilterFunc::VarCategory>::iterator it = rF.pure_var_category.begin();
+    map<string, RecFilterFunc::VarCategory>::iterator end= rF.pure_var_category.end();
+    for (; it!=end; it++) {
+        if (it->second != RecFilterFunc::INNER_PURE_VAR) {
+            update_var_category.insert(make_pair(it->first, it->second));
+        }
+    }
+    rF.update_var_category.push_back(update_var_category);
 }
 
 // -----------------------------------------------------------------------------
@@ -249,8 +330,8 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
     Function F_intra(F.name() + DASH + INTRA_TILE_RESULT);
 
     // scheduling tags for function dimensions
-    map<string, VarCategory>         pure_var_category   = rF.pure_var_category;
-    vector<map<string,VarCategory> > update_var_category = rF.update_var_category;
+    map<string,RecFilterFunc::VarCategory>          pure_var_category   = rF.pure_var_category;
+    vector<map<string,RecFilterFunc::VarCategory> > update_var_category = rF.update_var_category;
 
     // manipulate the pure def
     vector<string> pure_args   = F.args();
@@ -412,10 +493,10 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
     }
 
     RecFilterFunc rF_intra;
-    rF_intra.func          = F_intra;
-    rF_intra.func_category = RecFilterFunc::INTRA_TILE_nD_SCAN;
-    rB.pure_var_category   = pure_var_category;
-    rB.update_var_category = update_var_category;
+    rF_intra.func               = F_intra;
+    rF_intra.func_category      = RecFilterFunc::INTRA_TILE_nD_SCAN;
+    rF_intra.pure_var_category  = pure_var_category;
+    rF_intra.update_var_category= update_var_category;
 
     return rF_intra;
 }
@@ -424,7 +505,7 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
 
 static RecFilterFunc create_copy(RecFilterFunc rF, string func_name) {
     Function F = rF.func;
-    Function rB(func_name);
+    Function B(func_name);
 
     // same pure definition
     B.define(F.args(), F.values());
@@ -444,6 +525,7 @@ static RecFilterFunc create_copy(RecFilterFunc rF, string func_name) {
     }
 
     // copy the scheduling tags
+    RecFilterFunc rB;
     rB.func                = B;
     rB.func_category       = rF.func_category;
     rB.pure_var_category   = rF.pure_var_category;
@@ -461,6 +543,8 @@ static vector<RecFilterFunc> create_intra_tail_term(
 {
     Expr tile = split_info.tile_width;
     Var  xi   = split_info.inner_var;
+
+    Function F_intra = rF_intra.func;
 
     vector<RecFilterFunc> tail_functions_list;
 
@@ -497,9 +581,9 @@ static vector<RecFilterFunc> create_intra_tail_term(
         // and add the tag for the tail vars
         RecFilterFunc rf;
         rf.func = function;
-        rf.function = rF_intra.func_category | RecFilterFunc::REINDEX_FOR_WRITE;
+        rf.func_category     = rF_intra.func_category | RecFilterFunc::REINDEX_FOR_WRITE;
         rf.pure_var_category = rF_intra.pure_var_category;
-        rf.pure_var_category[xi.name()] |= RecFilter::TAIL_DIMENSION;
+        rf.pure_var_category[xi.name()] |= RecFilterFunc::TAIL_DIMENSION;
 
         tail_functions_list.push_back(rf);
     }
@@ -625,8 +709,8 @@ static vector<RecFilterFunc> create_complete_tail_term(
         rf.pure_var_category = rF_tail[k].pure_var_category;
         rf.update_var_category.push_back(rF_tail[k].pure_var_category);
         rf.update_var_category[0].erase(xo.name());
-        rf.update_var_category[0].insert(make_pair(rxo.x.name(), TAIL_SCAN_VAR));
-        rf.update_var_category[0].insert(make_pair(rxo.y.name(), OUTER_SCAN_VAR));
+        rf.update_var_category[0].insert(make_pair(rxo.x.name(), RecFilterFunc::INNER_SCAN_VAR | RecFilterFunc::TAIL_DIMENSION));
+        rf.update_var_category[0].insert(make_pair(rxo.y.name(), RecFilterFunc::OUTER_SCAN_VAR));
         rF_ctail.push_back(rf);
     }
 
@@ -688,13 +772,13 @@ static vector<RecFilterFunc> create_tail_residual_term(
     Expr num_tiles  = split_info.num_tiles;
     Expr tile       = split_info.tile_width;
 
-    int num_args    = F_ctail[0].args().size();
-    int num_outputs = F_ctail[0].outputs();
-
     vector<Function> F_ctail;
     for (int i=0; i<rF_ctail.size(); i++) {
         F_ctail.push_back(rF_ctail[i].func);
     }
+
+    int num_args    = F_ctail[0].args().size();
+    int num_outputs = F_ctail[0].outputs();
 
     assert(split_info.num_splits == F_ctail.size());
 
@@ -761,7 +845,7 @@ static vector<RecFilterFunc> create_tail_residual_term(
         // mark for inline schedule
         RecFilterFunc rf;
         rf.func = function;
-        rf.func_category = NONE;
+        rf.func_category = RecFilterFunc::INLINE;
 
         rF_tdeps.push_back(rf);
     }
@@ -794,6 +878,7 @@ static vector<RecFilterFunc> create_final_residual_term(
     // create functions that just reindex the completed tails
     // this seemingly redundant reindexing allows the application to
     // read the completed tail into shared memory
+    vector<Function>       F_deps;
     vector<RecFilterFunc> rF_deps;
 
     for (int j=0; j<split_info.num_splits; j++) {
@@ -816,7 +901,9 @@ static vector<RecFilterFunc> create_final_residual_term(
         rf.func_category    |= RecFilterFunc::REINDEX_FOR_READ;
         rf.func_category    &= RecFilterFunc::REINDEX_FOR_WRITE;
         rf.pure_var_category = rF_ctail[j].pure_var_category;
+
         rF_deps.push_back(rf);
+        F_deps.push_back(rf.func);
     }
 
     // accumulate all completed tails
@@ -881,7 +968,7 @@ static vector<RecFilterFunc> create_final_residual_term(
         // mark for inline schedule
         RecFilterFunc rf;
         rf.func = function;
-        rf.func_category = NONE;
+        rf.func_category = RecFilterFunc::INLINE;
 
         rF_deps_sub.push_back(rf);
     }
@@ -1121,10 +1208,11 @@ static void add_all_residuals_to_final_result(
 {
 
     Function F = rF.func;
-    vector<Function> F_deps;
+
+    vector<vector<Function> > F_deps(rF_deps.size());
     for (int i=0; i<rF_deps.size(); i++) {
         for (int j=0; j<rF_deps[i].size(); j++) {
-            F_deps.push_back(rF_deps[i][j].func);
+            F_deps[i].push_back(rF_deps[i][j].func);
         }
     }
 
@@ -1191,12 +1279,6 @@ static void add_all_residuals_to_final_result(
         }
         F.define_update(updates[i].args, updates[i].values);
     }
-
-    // add padding to avoid bank conflicts
-    add_padding_to_avoid_bank_conflicts(F, split_info, false);
-
-    // move initialization to update def in intra tile function
-    move_init_to_update_def(F, split_info);
 }
 
 // -----------------------------------------------------------------------------
@@ -1215,10 +1297,10 @@ static vector< vector<RecFilterFunc> > split_scans(
     for (int i=0; i<split_info.size(); i++) {
         string x = split_info[i].var.name();
 
-        string s0 = F_intra.name() + DASH + INTRA_TILE_TAIL_TERM  + DASH + x;
-        string s1 = F_intra.name() + DASH + INTER_TILE_TAIL_SUM   + DASH + x;
-        string s2 = F_intra.name() + DASH + COMPLETE_TAIL_RESIDUAL+ DASH + x;
-        string s3 = F_intra.name() + DASH + FINAL_RESULT_RESIDUAL + DASH + x;
+        string s0 = F_intra.func.name() + DASH + INTRA_TILE_TAIL_TERM  + DASH + x;
+        string s1 = F_intra.func.name() + DASH + INTER_TILE_TAIL_SUM   + DASH + x;
+        string s2 = F_intra.func.name() + DASH + COMPLETE_TAIL_RESIDUAL+ DASH + x;
+        string s3 = F_intra.func.name() + DASH + FINAL_RESULT_RESIDUAL + DASH + x;
 
         vector<RecFilterFunc> F_tail   = create_intra_tail_term    (F_intra,  split_info[i], s0);
         vector<RecFilterFunc> F_ctail  = create_complete_tail_term (F_tail,   split_info[i], s1);
@@ -1248,7 +1330,8 @@ static vector< vector<RecFilterFunc> > split_scans(
 // -----------------------------------------------------------------------------
 
 void RecFilter::split(map<string,Expr> dim_tile) {
-    Function F = contents.ptr->recfilter.function();
+    RecFilterFunc rF = internal_function(contents.ptr->recfilter.name());
+    Function       F = rF.func;
 
     // flush out any previous splitting info
     for (int i=0; i<contents.ptr->split_info.size(); i++) {
@@ -1352,7 +1435,7 @@ void RecFilter::split(map<string,Expr> dim_tile) {
     contents.ptr->split_info = group_scans_by_dimension(F, contents.ptr->split_info);
 
     // apply the actual splitting
-    RecFilterFunc F_final;
+    RecFilterFunc rF_final;
     {
         // create a copy of the split info structs retaining only the
         // dimensions to be split
@@ -1364,42 +1447,24 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         }
 
         // compute the intra tile result
-        RecFilterFunc F_intra = create_intra_tile_term(F, split_info_current);
+        RecFilterFunc rF_intra = create_intra_tile_term(rF, split_info_current);
 
         // create a function will hold the final result, copy of the intra tile term
-        F_final = create_copy(F_intra.func, F.name() + DASH + FINAL_TERM);
+        rF_final = create_copy(rF_intra, F.name() + DASH + FINAL_TERM);
 
         // compute the residuals from splits in each dimension
-        vector< vector<RecFilterFunc> > F_deps = split_scans(F_intra, split_info_current);
+        vector< vector<RecFilterFunc> > rF_deps = split_scans(rF_intra, split_info_current);
 
         // transfer the tail of each scan to another buffer
-        extract_tails_from_each_scan(F_intra, split_info_current);
+        extract_tails_from_each_scan(rF_intra, split_info_current);
 
         // add all the residuals to the final term
-        add_all_residuals_to_final_result(F_final, F_deps, split_info_current);
-
-        // add padding to intra tile terms to avoid bank conflicts
-        add_padding_to_avoid_bank_conflicts(F_intra, split_info_current, true);
-
-        // move initialization to update def in intra tile function
-        move_init_to_update_def(F_intra, split_info_current);
-
-        // inline all residual functions not required any more
-        map<string,Function> func_map = find_direct_calls(F_final);
-        map<string,Function>::iterator f = func_map.begin();
-        for (; f!=func_map.end(); f++) {
-            for (int i=0; i<F_deps.size(); i++) {
-                for (int j=0; j<F_deps[i].size(); j++) {
-                    if (!F_deps[i][j].same_as(f->second)) {
-                        inline_func(Func(F_deps[i][j]), Func(f->second));
-                    }
-                }
-            }
-        }
+        add_all_residuals_to_final_result(rF_final, rF_deps, split_info_current);
     }
 
     // change the original function to index into the final term
     {
+        Function F_final = rF_final.func;
         vector<string> args = F.args();
         vector<Expr> values;
         vector<Expr> call_args;
@@ -1425,6 +1490,10 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         }
         F.clear_all_definitions();
         F.define(args, values);
+
+        // remove the scheduling tags of the update defs
+        rF.func_category = RecFilterFunc::FULL_RESULT_PURE;
+        rF.update_var_category.clear();
     }
 
     contents.ptr->recfilter = Func(F);
@@ -1475,4 +1544,48 @@ void RecFilter::split(vector<Var> vars, Expr t) {
         dim_tile[vars[i].name()] = t;
     }
     split(dim_tile);
+}
+
+void RecFilter::finalize(Target target) {
+//     // inline all functions not required any more
+//     for (map<string,RecFilterFunc> f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
+//         if (f->func_category == RecFilter::INLINE) {
+//             inline_function(f->func.name());
+//         }
+//     }
+//
+//     // remove the initializations of all scans which are scheduled as compute_root
+//     // to avoid extra kernel execution for initializing the output buffer
+//
+//     if (target.has_gpu_feature()) {     // GPU specific optimization
+//
+//         for (map<string,RecFilterFunc> f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
+//             RecFilterFunc::FuncCategory category = f->func_category;
+//
+//             if (category & RecFilterFunc::INTRA_TILE_TAIL_TERM) {
+//
+//                 // move initialization to update def in intra tile computation stages
+//                 move_init_to_update_def(F_intra, split_info_current);
+//
+//                 // add padding to intra tile terms to avoid bank conflicts
+//                 add_padding_to_avoid_bank_conflicts(F_intra, split_info_current, true);
+//
+//                 // merge all the functions that reindex the tail from intra tile computation
+//                 vector<string> funcs_to_merge;
+//                 for (map<string,RecFilterFunc> g=contents.ptr->func.begin(); g!=contents.ptr->func.end(); g++) {
+//                     if (g->func_category & RecFilterFunc::REINDEX_FOR_WRITE) {
+//                         funcs_to_merge.push_back(g->func.name());
+//                     }
+//                 }
+//                 for (int i=0; i<funcs_to_merge; i++) {
+//                     // find the funcs tail dimension
+//                     // transpose every other funcs tail with the first func's tail dimension
+//                 }
+//                 // merge all the funcs
+//
+//             }
+//         }
+//     } else {                            // CPU specific optimization
+//
+//     }
 }

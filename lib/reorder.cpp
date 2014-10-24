@@ -621,7 +621,7 @@ void RecFilter::inline_func(string func_name) {
     if (contents.ptr->recfilter.name() == func_name) {
         return;
     }
-    Function F = function(func_name).func;
+    Function F = internal_function(func_name).func;
     inline_function(F, funcs());
 }
 
@@ -632,15 +632,15 @@ void RecFilter::inline_func(Func a, Func b) {
 // -----------------------------------------------------------------------------
 
 void RecFilter::interleave_func(string func_a, string func_b, string merged_name, string var, Expr offset) {
-    RecFilterFunc FA = function(func_a);
-    RecFilterFunc FB = function(func_b);
+    RecFilterFunc FA = internal_function(func_a);
+    RecFilterFunc FB = internal_function(func_b);
     RecFilterFunc F  = interleave_function(FA, FB, merged_name, Var(var), offset, funcs());
     contents.ptr->func.insert(make_pair(F.func.name(), F));
 }
 
 void RecFilter::merge_func(string func_a, string func_b, string merged_name) {
-    RecFilterFunc FA = function(func_a);
-    RecFilterFunc FB = function(func_b);
+    RecFilterFunc FA = internal_function(func_a);
+    RecFilterFunc FB = internal_function(func_b);
     RecFilterFunc F  = merge_function(FA, FB, merged_name, funcs());
     contents.ptr->func.insert(make_pair(F.func.name(), F));
 }
@@ -671,7 +671,7 @@ void RecFilter::transpose_dimensions(string func_name, string a, string b) {
         assert(false);
     }
 
-    RecFilterFunc rF = function(func_name);
+    RecFilterFunc rF = internal_function(func_name);
     Function       F = rF.func;
 
     int va_idx = -1;

@@ -61,28 +61,31 @@ struct SplitInfo {
 
 /** Scheduling interface for functions generated for the recursive filter */
 struct RecFilterFunc {
+
+    // Function categories
     typedef enum {
-        NONE               = 0x000,
-        FULL_RESULT_SCAN   = 0x001,
-        FULL_RESULT_PURE   = 0x002,
-        INTRA_TILE_nD_SCAN = 0x004,
-        INTER_TILE_1D_SCAN = 0x008,
-        INTER_TILE_2D_SCAN = 0x010,
-        INTER_TILE_3D_SCAN = 0x020,
-        INTER_TILE_4D_SCAN = 0x040,
-        REINDEX_FOR_WRITE  = 0x080,
-        REINDEX_FOR_READ   = 0x100
+        INLINE             = 0x0000,
+        FULL_RESULT_SCAN   = 0x0001,
+        FULL_RESULT_PURE   = 0x0002,
+        INTRA_TILE_nD_SCAN = 0x0004,
+        INTER_TILE_1D_SCAN = 0x0008,
+        INTER_TILE_2D_SCAN = 0x0010,
+        INTER_TILE_3D_SCAN = 0x0020,
+        INTER_TILE_4D_SCAN = 0x0040,
+        REINDEX_FOR_WRITE  = 0x0080,
+        REINDEX_FOR_READ   = 0x0100,
     } FuncCategory;
 
+    // Var categories
     typedef enum {
-        INNER_PURE_VAR = 0x01,
-        INNER_SCAN_VAR = 0x02,
-        OUTER_PURE_VAR = 0x04,
-        OUTER_SCAN_VAR = 0x08,
-        TAIL_PURE_VAR  = 0x10,
-        TAIL_SCAN_VAR  = 0x20,
-        PURE_DIMENSION = 0x40,
-        SCAN_DIMENSION = 0x80
+        NONE               = 0x0000,
+        INNER_PURE_VAR     = 0x0100,
+        INNER_SCAN_VAR     = 0x0200,
+        OUTER_PURE_VAR     = 0x0400,
+        OUTER_SCAN_VAR     = 0x0800,
+        TAIL_DIMENSION     = 0x1000,
+        PURE_DIMENSION     = 0x2000,
+        SCAN_DIMENSION     = 0x4000
     } VarCategory;
 
     Halide::Internal::Function       func;
@@ -167,9 +170,8 @@ public:
     /**@name Compile and run
      */
     // {@
-
     /** Finalize the filter; triggers automatic function transformations and cleanup */
-    void finalize(void);
+    void finalize(Halide::Target target);
 
     /** Trigger JIT compilation for specified hardware-platform target; dumps the generated
      * codegen in human readable HTML format if filename is specified */
@@ -392,7 +394,7 @@ public:
 
 private:
     /** Recursive filter function */
-    RecFilterFunc& function(std::string func_name);
+    RecFilterFunc& internal_function(std::string func_name);
 };
 
 // -----------------------------------------------------------------------------

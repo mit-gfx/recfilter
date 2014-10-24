@@ -34,7 +34,7 @@ RecFilter::RecFilter(string n) {
     RecFilterFunc f;
     f.func = contents.ptr->recfilter.function();
     f.func_category = RecFilterFunc::FULL_RESULT_PURE;
-    contents.ptr->func.insert(f)
+    contents.ptr->func.insert(make_pair(f.func.name(), f));
 }
 
 void RecFilter::setArgs(Var x)              { setArgs(vec(x));      }
@@ -42,7 +42,7 @@ void RecFilter::setArgs(Var x, Var y)       { setArgs(vec(x,y));    }
 void RecFilter::setArgs(Var x, Var y, Var z){ setArgs(vec(x,y,z));  }
 
 void RecFilter::setArgs(vector<Var> args) {
-    RecFilterFunc f = function( contents.ptr->recfilter.name() );
+    RecFilterFunc f = internal_function( contents.ptr->recfilter.name() );
 
     for (int i=0; i<args.size(); i++) {
         SplitInfo s;
@@ -105,7 +105,7 @@ void RecFilter::addScan(
         Border border_mode,
         Expr bexpr)
 {
-    RecFilterFunc rf = function( contents.ptr->recfilter.name() );
+    RecFilterFunc rf = internal_function( contents.ptr->recfilter.name() );
     Function       f = contents.ptr->recfilter.function();
 
     if (!f.has_pure_definition()) {
@@ -129,8 +129,8 @@ void RecFilter::addScan(
     map<string, RecFilterFunc::VarCategory> update_var_category = rf.pure_var_category;
     update_var_category.erase(x.name());
     update_var_category.insert(make_pair(rx.x.name(), RecFilterFunc::SCAN_DIMENSION));
-    f.push_back(update_var_category);
-    f.func_category = RecFilterFunc::FULL_RESULT_SCAN;
+    rf.update_var_category.push_back(update_var_category);
+    rf.func_category = RecFilterFunc::FULL_RESULT_SCAN;
 
     // csausality
     bool causal = (causality == CAUSAL);
@@ -289,14 +289,14 @@ vector<Func> RecFilter::funcs(void) {
     vector<Func> func_list;
     map<string,RecFilterFunc>::iterator f = contents.ptr->func.begin();
     map<string,RecFilterFunc>::iterator fe= contents.ptr->func.end();
-
     while (f!=fe) {
         func_list.push_back(Func(f->second.func));
         f++;
     }
+    return func_list;
 }
 
-RecFilterFunc& RecFilter::function(string func_name) {
+RecFilterFunc& RecFilter::internal_function(string func_name) {
     map<string,RecFilterFunc>::iterator f = contents.ptr->func.find(func_name);
     if (f != contents.ptr->func.end()) {
         return f->second;
