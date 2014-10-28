@@ -494,7 +494,7 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
 
     RecFilterFunc rF_intra;
     rF_intra.func               = F_intra;
-    rF_intra.func_category      = RecFilterFunc::INTRA_TILE_nD_SCAN;
+    rF_intra.func_category      = RecFilterFunc::INTRA_TILE_SCAN;
     rF_intra.pure_var_category  = pure_var_category;
     rF_intra.update_var_category= update_var_category;
 
@@ -705,7 +705,7 @@ static vector<RecFilterFunc> create_complete_tail_term(
         // update var tags are same as pure var tags expect for outer scan var xo
         RecFilterFunc rf;
         rf.func = function;
-        rf.func_category = RecFilterFunc::INTER_TILE_1D_SCAN;
+        rf.func_category = RecFilterFunc::INTER_TILE_SCAN;
         rf.pure_var_category = rF_tail[k].pure_var_category;
         rf.update_var_category.push_back(rF_tail[k].pure_var_category);
         rf.update_var_category[0].erase(xo.name());
@@ -1072,8 +1072,15 @@ static void add_prev_dimension_residual_to_tails(
         for (int k=0; k<F_tail_prev.size(); k++) {
 
             // first scan the tail in the current dimension according using intra term
+            RecFilterFunc rF_tail_prev_scanned_sub;
             Function F_tail_prev_scanned_sub(F_tail_prev[k].name() + DASH + x.name()
                     + DASH + int_to_string(split_info.scan_id[j]) + DASH + SUB);
+
+            // scheduling tags: copy func type as F_intra, pure def tags from the
+            // tail function or F_intra (both same) copy update tags from F_intra
+            rF_tail_prev_scanned_sub.func = F_tail_prev_scanned_sub;
+            rF_tail_prev_scanned_sub.func_category = RecFilterFunc::INTRA_TILE_SCAN;
+            rF_tail_prev_scanned_sub.pure_var_category = rF_tail_prev[k].pure_var_category;
 
             // pure def simply calls the completed tail
             vector<Expr> prev_call_args;
@@ -1091,12 +1098,14 @@ static void add_prev_dimension_residual_to_tails(
             int last_scan  = split_info.scan_id[j];
 
             for (int i=first_scan; i<=last_scan; i++) {
+                map<string, RecFilterFunc::VarCategory> uvar_category = rF_intra.update_var_category[i];
                 vector<Expr> args;
                 vector<Expr> values;
                 for (int u=0; u<F_intra.updates()[i].args.size(); u++) {
                     Expr a = F_intra.updates()[i].args[u];
                     for (int v=0; v<ryi.dimensions(); v++) {
                         a = substitute(ryi[v].name(), ryt[v], a);
+                        uvar_category.erase(ryi[v].name());
                     }
                     args.push_back(a);
                 }
@@ -1109,10 +1118,13 @@ static void add_prev_dimension_residual_to_tails(
                     values.push_back(val);
                 }
                 F_tail_prev_scanned_sub.define_update(args, values);
+
+                rF_tail_prev_scanned_sub.update_var_category.push_back(uvar_category);
             }
 
             // create a pure function as a wrapper for the above function
             // allows compute_at schedules
+            RecFilterFunc rF_tail_prev_scanned;
             Function F_tail_prev_scanned(F_tail_prev[k].name() + DASH + x.name()
                     + DASH + int_to_string(split_info.scan_id[j]));
             {
@@ -1125,6 +1137,11 @@ static void add_prev_dimension_residual_to_tails(
                     values.push_back(Call::make(F_tail_prev_scanned_sub, call_args, u));
                 }
                 F_tail_prev_scanned.define(F_tail_prev_scanned_sub.args(), values);
+
+                // copy the scheduling tags of the scan
+                rF_tail_prev_scanned.func = F_tail_prev_scanned;
+                rF_tail_prev_scanned.func_category = rF_tail_prev_scanned.func_category | RecFilterFunc::REINDEX_FOR_WRITE;
+                rF_tail_prev_scanned.pure_var_category = rF_tail_prev_scanned_sub.pure_var_category;
             }
 
             // weight matrix for accumulating completed tail elements

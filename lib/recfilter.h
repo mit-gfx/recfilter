@@ -27,6 +27,7 @@
 /** Symbolic undefined floating point constant */
 #define FLOAT_UNDEF Halide::undef<float>()
 
+// -----------------------------------------------------------------------------
 
 /** Info required to split a particular dimension of the recursive filter */
 struct SplitInfo {
@@ -62,39 +63,35 @@ struct SplitInfo {
 /** Scheduling interface for functions generated for the recursive filter */
 struct RecFilterFunc {
 
-    // Function categories
+    /** Function categories */
     typedef enum {
         INLINE             = 0x0000,
         FULL_RESULT_SCAN   = 0x0001,
         FULL_RESULT_PURE   = 0x0002,
-        INTRA_TILE_nD_SCAN = 0x0004,
-        INTER_TILE_1D_SCAN = 0x0008,
-        INTER_TILE_2D_SCAN = 0x0010,
-        INTER_TILE_3D_SCAN = 0x0020,
-        INTER_TILE_4D_SCAN = 0x0040,
-        REINDEX_FOR_WRITE  = 0x0080,
-        REINDEX_FOR_READ   = 0x0100,
+        INTRA_TILE_SCAN    = 0x0004,
+        INTER_TILE_SCAN    = 0x0008,
+        REINDEX_FOR_WRITE  = 0x0010,
+        REINDEX_FOR_READ   = 0x0020,
     } FuncCategory;
 
-    // Var categories
+    /** Var categories */
     typedef enum {
-        NONE               = 0x0000,
-        INNER_PURE_VAR     = 0x0100,
-        INNER_SCAN_VAR     = 0x0200,
-        OUTER_PURE_VAR     = 0x0400,
-        OUTER_SCAN_VAR     = 0x0800,
-        TAIL_DIMENSION     = 0x1000,
-        PURE_DIMENSION     = 0x2000,
-        SCAN_DIMENSION     = 0x4000
+        INNER_PURE_VAR = 0x0100,
+        INNER_SCAN_VAR = 0x0200,
+        OUTER_PURE_VAR = 0x0400,
+        OUTER_SCAN_VAR = 0x0800,
+        TAIL_DIMENSION = 0x1000,
+        PURE_DIMENSION = 0x2000,
+        SCAN_DIMENSION = 0x4000
     } VarCategory;
 
-    Halide::Internal::Function       func;
-    FuncCategory                     func_category;
-    map<string, VarCategory>         pure_var_category;
-    vector<map<string,VarCategory> > update_var_category;
+    Halide::Internal::Function             func;
+    FuncCategory                           func_category;
+    map<std::string, VarCategory>          pure_var_category;
+    vector<map<std::string,VarCategory> >  update_var_category;
 
     /** Function schedule in human readable form */
-    vector<std::string> schedule_description;
+    vector<std::string> as_string;
 };
 
 // ----------------------------------------------------------------------------
@@ -413,15 +410,15 @@ private:
 #include "recfilter.h"
 
 
-/** @name Printing utils for recursive filter, Halide functions and
+/** @name Printing utils for recursive filter, Halide functions, schedules and
  * difference between computed result and reference result  */
 // {@
-std::ostream &operator<<(std::ostream &s, RecFilter r);
-std::ostream &operator<<(std::ostream &s, RecFilterFunc f);
-std::ostream &operator<<(std::ostream &s, Halide::Func f);
-std::ostream &operator<<(std::ostream &s, Halide::Internal::Function f);
-std::ostream &operator<<(std::ostream &s, CheckResult v);
-std::ostream &operator<<(std::ostream &s, CheckResultVerbose v);
+std::ostream &operator<<(std::ostream &s, const RecFilter& r);
+std::ostream &operator<<(std::ostream &s, const RecFilterFunc& f);
+std::ostream &operator<<(std::ostream &s, const Halide::Func& f);
+std::ostream &operator<<(std::ostream &s, const Halide::Internal::Function& f);
+std::ostream &operator<<(std::ostream &s, const CheckResult& v);
+std::ostream &operator<<(std::ostream &s, const CheckResultVerbose& v);
 // @}
 
 // ----------------------------------------------------------------------------

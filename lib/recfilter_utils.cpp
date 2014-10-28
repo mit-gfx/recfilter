@@ -88,7 +88,7 @@ Arguments::Arguments(int argc, char** argv) :
 
 // -----------------------------------------------------------------------------
 
-ostream &operator<<(ostream &s, CheckResult v) {
+ostream &operator<<(ostream &s, const CheckResult& v) {
     Image<float> ref = v.ref;
     Image<float> out = v.out;
 
@@ -124,7 +124,7 @@ ostream &operator<<(ostream &s, CheckResult v) {
     return s;
 }
 
-ostream &operator<<(ostream &s, CheckResultVerbose v) {
+ostream &operator<<(ostream &s, const CheckResultVerbose& v) {
     Image<float> ref = v.ref;
     Image<float> out = v.out;
 
@@ -163,7 +163,29 @@ ostream &operator<<(ostream &s, CheckResultVerbose v) {
     return s;
 }
 
-ostream &operator<<(ostream &s, RecFilter r) {
+static ostream& operator<<(ostream& s, const RecFilterFunc::FuncCategory& f) {
+    if (f & RecFilterFunc::INLINE           ) { s << "INLINE            " << endl; }
+    if (f & RecFilterFunc::FULL_RESULT_SCAN ) { s << "FULL_RESULT_SCAN  " << endl; }
+    if (f & RecFilterFunc::FULL_RESULT_PURE ) { s << "FULL_RESULT_PURE  " << endl; }
+    if (f & RecFilterFunc::INTRA_TILE_SCAN  ) { s << "INTRA_TILE_SCAN   " << endl; }
+    if (f & RecFilterFunc::INTER_TILE_SCAN  ) { s << "INTER_TILE_SCAN   " << endl; }
+    if (f & RecFilterFunc::REINDEX_FOR_WRITE) { s << "REINDEX_FOR_WRITE " << endl; }
+    if (f & RecFilterFunc::REINDEX_FOR_READ ) { s << "REINDEX_FOR_READ  " << endl; }
+    return s;
+}
+
+static ostream& operator<<(ostream& s, const RecFilterFunc::VarCategory& v) {
+    if (v & RecFilterFunc::INNER_PURE_VAR) { s << "INNER_PURE_VAR " << endl; }
+    if (v & RecFilterFunc::INNER_SCAN_VAR) { s << "INNER_SCAN_VAR " << endl; }
+    if (v & RecFilterFunc::OUTER_PURE_VAR) { s << "OUTER_PURE_VAR " << endl; }
+    if (v & RecFilterFunc::OUTER_SCAN_VAR) { s << "OUTER_SCAN_VAR " << endl; }
+    if (v & RecFilterFunc::TAIL_DIMENSION) { s << "TAIL_DIMENSION " << endl; }
+    if (v & RecFilterFunc::PURE_DIMENSION) { s << "PURE_DIMENSION " << endl; }
+    if (v & RecFilterFunc::SCAN_DIMENSION) { s << "SCAN_DIMENSION " << endl; }
+    return s;
+}
+
+ostream &operator<<(ostream &s, RecFilter& r) {
     vector<Func> f = r.funcs();
     for (int i=0; i<f.size(); i++) {
         s << f[i] << endl;
@@ -171,13 +193,15 @@ ostream &operator<<(ostream &s, RecFilter r) {
     return s;
 }
 
-ostream &operator<<(ostream &s, Func f) {
+ostream &operator<<(ostream &s, Func& f) {
     s << f.function();
     return s;
 }
 
-ostream &operator<<(ostream &s, Internal::Function f) {
+ostream &operator<<(ostream &s, Internal::Function& f) {
     if (f.has_pure_definition()) {
+
+        s << "{\n";
 
         s << "Func " << f.name() << "(\"" << f.name() << "\");\n";
 
@@ -225,6 +249,34 @@ ostream &operator<<(ostream &s, Internal::Function f) {
             }
         }
     }
+    s << "\n}\n";
+    return s;
+}
+
+ostream& operator<<(std::ostream& s, const RecFilterFunc& f) {
+    s << "{\n";
+    s << "// Func " << f.func.name() << " scheduling tags \n";
+    s << "// Function tag: " << f.func_category << "\n";
+
+    if (!(f.func_category & RecFilterFunc::INLINE)) {
+        map<string, RecFilterFunc::VarCategory>::const_iterator it;
+        s << "// \n";
+        s << "// Pure def tags: \n";
+        for (it=f.pure_var_category.begin(); it!=f.pure_var_category.end(); it++) {
+            s << "// \t Var " << it->first << ": " << it->second << "\n";
+        }
+        if (!f.update_var_category.empty()) {
+            s << "// \n";
+            s << "// Update def tags: \n";
+            for (int i=0; i<f.update_var_category.size(); i++) {
+                for (it=f.update_var_category[i].begin(); it!=f.update_var_category[i].end(); it++) {
+                    s << "// \t Var " << it->first << ": " << it->second << "\n";
+                }
+            }
+        }
+    }
+    s << "// \n";
+    s << f.func;
     return s;
 }
 
