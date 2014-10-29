@@ -181,13 +181,13 @@ ostream &operator<<(ostream &s, const CheckResultVerbose &v) {
 }
 
 static ostream &operator<<(ostream &s, const RecFilterFunc::FuncCategory &f) {
-    if (f ==RecFilterFunc::INLINE           ) { s << "INLINE            "; }
-    if (f & RecFilterFunc::FULL_RESULT_SCAN ) { s << "FULL_RESULT_SCAN  "; }
-    if (f & RecFilterFunc::FULL_RESULT_PURE ) { s << "FULL_RESULT_PURE  "; }
-    if (f & RecFilterFunc::INTRA_TILE_SCAN  ) { s << "INTRA_TILE_SCAN   "; }
-    if (f & RecFilterFunc::INTER_TILE_SCAN  ) { s << "INTER_TILE_SCAN   "; }
+    if (f ==RecFilterFunc::INLINE           ) { s << "INLINE "           ; }
+    if (f & RecFilterFunc::FULL_RESULT_SCAN ) { s << "FULL_RESULT_SCAN " ; }
+    if (f & RecFilterFunc::FULL_RESULT_PURE ) { s << "FULL_RESULT_PURE " ; }
+    if (f & RecFilterFunc::INTRA_TILE_SCAN  ) { s << "INTRA_TILE_SCAN "  ; }
+    if (f & RecFilterFunc::INTER_TILE_SCAN  ) { s << "INTER_TILE_SCAN "  ; }
     if (f & RecFilterFunc::REINDEX_FOR_WRITE) { s << "REINDEX_FOR_WRITE "; }
-    if (f & RecFilterFunc::REINDEX_FOR_READ ) { s << "REINDEX_FOR_READ  "; }
+    if (f & RecFilterFunc::REINDEX_FOR_READ ) { s << "REINDEX_FOR_READ " ; }
     return s;
 }
 
@@ -319,7 +319,14 @@ ostream &operator<<(std::ostream &os, const RecFilterFunc &f) {
     stringstream s;
 
     s << "// Func " << f.func.name() << " synopsis\n";
-    s << "// Function tag: " << f.func_category << "\n";
+    s << "// Function tag: " << f.func_category;
+    if (f.func_category & RecFilterFunc::REINDEX_FOR_WRITE) {
+        s << " (calls " << f.callee_func <<  ")";
+    }
+    if (f.func_category & RecFilterFunc::REINDEX_FOR_READ) {
+        s << " (called by " << f.caller_func <<  ")";
+    }
+    s << "\n";
 
     if (f.func_category != RecFilterFunc::INLINE) {
         map<string, RecFilterFunc::VarCategory>::const_iterator it;

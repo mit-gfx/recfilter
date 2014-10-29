@@ -6,6 +6,7 @@
 #include <string>
 #include <stdexcept>
 #include <cstdio>
+#include <algorithm>
 
 #include <Halide.h>
 
@@ -82,15 +83,30 @@ struct RecFilterFunc {
         OUTER_SCAN_VAR = 0x0800,
         TAIL_DIMENSION = 0x1000,
         PURE_DIMENSION = 0x2000,
-        SCAN_DIMENSION = 0x4000
+        SCAN_DIMENSION = 0x4000,
     } VarCategory;
 
-    Halide::Internal::Function             func;
-    FuncCategory                           func_category;
-    map<std::string, VarCategory>          pure_var_category;
+    /** Halide function */
+    Halide::Internal::Function func;
+
+    /** Category tag for the function */
+    FuncCategory func_category;
+
+    /** Category tags for all the pure def vars  */
+    map<std::string, VarCategory> pure_var_category;
+
+    /** Category tags for all the vars in all the update defs */
     vector<map<std::string,VarCategory> >  update_var_category;
 
-    /** Function schedule in human readable form */
+    /** Name of a function that calls this function; set if this function
+     * has the REINDEX_FOR_READ tag set */
+    string caller_func;
+
+    /** Name of a function that this function calls; set if this function
+     * has the REINDEX_FOR_WRITE tag set */
+    string callee_func;
+
+    /** Function schedule as valid Halide code */
     vector<std::string> as_string;
 };
 

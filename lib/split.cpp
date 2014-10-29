@@ -49,6 +49,10 @@ static RecFilterFunc::VarCategory& operator&=(RecFilterFunc::VarCategory& a, con
     return a;
 }
 
+static RecFilterFunc::FuncCategory operator~(const RecFilterFunc::FuncCategory& a) {
+    return static_cast<RecFilterFunc::FuncCategory>(~ static_cast<int>(a));
+}
+
 static RecFilterFunc::FuncCategory operator|(const RecFilterFunc::FuncCategory& a, const RecFilterFunc::FuncCategory& b) {
 
     return static_cast<RecFilterFunc::FuncCategory>(static_cast<int>(a) | static_cast<int>(b));
@@ -57,6 +61,10 @@ static RecFilterFunc::FuncCategory operator|(const RecFilterFunc::FuncCategory& 
 static RecFilterFunc::FuncCategory operator&(const RecFilterFunc::FuncCategory& a, const RecFilterFunc::FuncCategory& b) {
 
     return static_cast<RecFilterFunc::FuncCategory>(static_cast<int>(a) & static_cast<int>(b));
+}
+
+static RecFilterFunc::VarCategory operator~(const RecFilterFunc::VarCategory& a) {
+    return static_cast<RecFilterFunc::VarCategory>(~ static_cast<int>(a));
 }
 
 static RecFilterFunc::VarCategory operator|(const RecFilterFunc::VarCategory& a, const RecFilterFunc::VarCategory& b) {
@@ -595,6 +603,7 @@ static vector<RecFilterFunc> create_intra_tail_term(
         rf.func_category     = rF_intra.func_category | RecFilterFunc::REINDEX_FOR_WRITE;
         rf.pure_var_category = rF_intra.pure_var_category;
         rf.pure_var_category[xi.name()] |= RecFilterFunc::TAIL_DIMENSION;
+        rf.callee_func       = rF_intra.func.name();
 
         // add the genertaed recfilter function to the global list
         recfilter_func_list.insert(make_pair(rf.func.name(), rf));
@@ -769,6 +778,7 @@ static vector<RecFilterFunc> wrap_complete_tail_term(
         RecFilterFunc rf;
         rf.func = function;
         rf.func_category     = rF_ctail[k].func_category | RecFilterFunc::REINDEX_FOR_WRITE;
+        rf.callee_func       = rF_ctail[k].func.name();
         rf.pure_var_category = rF_ctail[k].pure_var_category;
 
         // add the genertaed recfilter function to the global list
@@ -921,9 +931,9 @@ static vector<RecFilterFunc> create_final_residual_term(
         // since this is useful for reading into shared mem
         RecFilterFunc rf;
         rf.func = function;
-        rf.func_category     = rF_ctail[j].func_category;
-        rf.func_category    |= RecFilterFunc::REINDEX_FOR_READ;
-        rf.func_category    &= RecFilterFunc::REINDEX_FOR_WRITE;
+        rf.func_category  = rF_ctail[j].func_category;
+        rf.func_category |= RecFilterFunc::REINDEX_FOR_READ;
+        rf.func_category &= ~RecFilterFunc::REINDEX_FOR_WRITE;
         rf.pure_var_category = rF_ctail[j].pure_var_category;
 
         // add the genertaed recfilter function to the global list
@@ -1172,6 +1182,7 @@ static void add_prev_dimension_residual_to_tails(
                 rF_tail_prev_scanned.func = F_tail_prev_scanned;
                 rF_tail_prev_scanned.func_category = rF_tail_prev_scanned.func_category | RecFilterFunc::REINDEX_FOR_WRITE;
                 rF_tail_prev_scanned.pure_var_category = rF_tail_prev_scanned_sub.pure_var_category;
+                rF_tail_prev_scanned.callee_func       = rF_tail_prev_scanned_sub.func.name();
             }
 
             // weight matrix for accumulating completed tail elements

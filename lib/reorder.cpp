@@ -9,193 +9,194 @@ using std::cerr;
 using std::endl;
 using std::vector;
 using std::map;
+using std::pair;
+using std::make_pair;
 
 // -----------------------------------------------------------------------------
 
-/** Infer the dimension which contains the update variable in a given
- * update definition */
-static int get_scan_dimension(UpdateDefinition r) {
-    vector<int> scan_dim;
-
-    // return -1 if there is no RDom associated with the update
-    if (r.domain.defined()) {
-        vector<ReductionVariable> vars = r.domain.domain();
-        for (int i=0; i<vars.size(); i++) {
-            for (int j=0; j<r.args.size(); j++) {
-                if (expr_depends_on_var(r.args[j], vars[i].var)) {
-                    scan_dim.push_back(j);
-                }
-            }
-        }
-
-        // return the scan dimension if the scan is in a single
-        // dimension, else return -1
-        if (scan_dim.size() == 1) {
-            return scan_dim[0];
-        } else {
-            return -1;
-        }
-    } else {
-        return -1;
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-std::vector<Func> cascade_dimensions(Func& func) {
-    Function F = func.function();
-    int num_dimensions = F.args().size();
-
-    vector<Func> func_list;
-
-    // loop over all dimensions of the function
-    // and create a separate function for scans in each dimension
-    for (int i=0; i<num_dimensions; i++) {
-        Function f(F.name() + "_" + int_to_string(i));
-
-        if (i==0) { // pure def of first dimension uses the original pure def
-            f.define(F.args(), F.values());
-        }
-        else {  // pure defs of other dimension use previous dimension as pure def
-            vector<Expr> call_args;
-            vector<Expr> values;
-            for (int j=0; j<F.args().size(); j++) {
-                call_args.push_back(Var(F.args()[j]));
-            }
-            for (int j=0; j<F.values().size(); j++) {
-                values.push_back(Call::make(func_list[i-1].function(), call_args, j));
-            }
-            f.define(F.args(), values);
-        }
-
-        // add the function to the list of cascaded functions
-        func_list.push_back(Func(f));
-    }
-
-    // loop over all the redunction defs and add each to the function
-    // corresponding to the scan dimension
-    for (int j=0; j<F.updates().size(); j++) {
-        int dim = get_scan_dimension(F.updates()[j]);
-        if (dim<0) {
-            cerr << "Function cascading can be used if each update has exactly one update "
-                " variable in exactly one dimension" << endl;
-            assert(false);
-        }
-
-        Function f = func_list[dim].function();
-
-        // add the scan replacing all calls to original function with the new function
-        vector<Expr> values = F.updates()[j].values;
-        for (int k=0; k<values.size(); k++) {
-            values[k] = substitute_func_call(F.name(), f, values[k]);
-        }
-        f.define_update(F.updates()[j].args, values);
-    }
-
-    // change the original function to index into the last function in the list
-    {
-        F.clear_all_definitions();
-        Function f = func_list[func_list.size()-1].function();
-
-        vector<Expr> call_args;
-        vector<Expr> values;
-        for (int j=0; j<f.args().size(); j++) {
-            call_args.push_back(Var(f.args()[j]));
-        }
-        for (int j=0; j<f.values().size(); j++) {
-            values.push_back(Call::make(f, call_args, j));
-        }
-        F.define(f.args(), values);
-        func = Func(F);
-    }
-
-    return func_list;
-}
-
-std::vector<Func> cascade_repeated_scans(Func& func) {
-    Function F = func.function();
-
-    // there can be at most as many functions as updates defs
-    vector<Func> func_list;
-    for (int i=0; i<F.updates().size(); i++) {
-        Function f(F.name() + "_" + int_to_string(i));
-
-        if (i==0) { // pure def of first dimension uses the original pure def
-            f.define(F.args(), F.values());
-        }
-        else {  // pure defs of other dimension use previous dimension as pure def
-            vector<Expr> call_args;
-            vector<Expr> values;
-            for (int j=0; j<F.args().size(); j++) {
-                call_args.push_back(Var(F.args()[j]));
-            }
-            for (int j=0; j<F.values().size(); j++) {
-                values.push_back(Call::make(func_list[i-1].function(), call_args, j));
-            }
-            f.define(F.args(), values);
-        }
-
-        // add the function to the list of cascaded functions
-        func_list.push_back(Func(f));
-    }
-
-    // the index of the function which should get the next update
-    // definition in each dimension; the first update in each dimension
-    // can go to the first function
-    vector<int> func_id(F.args().size(), 0);
-
-    // loop over all the update defs and add each
-    // corresponding to the scan dimension
-    for (int j=0; j<F.updates().size(); j++) {
-        int dim = get_scan_dimension(F.updates()[j]);
-        if (dim<0) {
-            cerr << "Function cascading can be used if each update has exactly one update "
-                " variable in exactly one dimension" << endl;
-            assert(false);
-        }
-
-        // get the function to which this update def should be added
-        Function f = func_list[func_id[dim]].function();
-
-        // add the scan replacing all calls to original function with the new function
-        vector<Expr> values = F.updates()[j].values;
-        for (int k=0; k<values.size(); k++) {
-            values[k] = substitute_func_call(F.name(), f, values[k]);
-        }
-        f.define_update(F.updates()[j].args, values);
-
-        // next repeated scan in this dimension should be added to
-        // the next function
-        func_id[dim]++;
-    }
-
-    // remove the functions which do not have any updates - redundant
-    for (int i=0; i<func_list.size(); i++) {
-        if (!func_list[i].has_update_definition()) {
-            func_list.erase(func_list.begin() + i);
-            i--;
-        }
-    }
-
-    // change the original function to index into the last function in the list
-    {
-        F.clear_all_definitions();
-        Function f = func_list[func_list.size()-1].function();
-
-        vector<Expr> call_args;
-        vector<Expr> values;
-        for (int j=0; j<f.args().size(); j++) {
-            call_args.push_back(Var(f.args()[j]));
-        }
-        for (int j=0; j<f.values().size(); j++) {
-            values.push_back(Call::make(f, call_args, j));
-        }
-        F.define(f.args(), values);
-        func = Func(F);
-    }
-
-    return func_list;
-}
+// /** Infer the dimension which contains the update variable in a given
+//  * update definition */
+// static int get_scan_dimension(UpdateDefinition r) {
+//     vector<int> scan_dim;
+//
+//     // return -1 if there is no RDom associated with the update
+//     if (r.domain.defined()) {
+//         vector<ReductionVariable> vars = r.domain.domain();
+//         for (int i=0; i<vars.size(); i++) {
+//             for (int j=0; j<r.args.size(); j++) {
+//                 if (expr_depends_on_var(r.args[j], vars[i].var)) {
+//                     scan_dim.push_back(j);
+//                 }
+//             }
+//         }
+//
+//         // return the scan dimension if the scan is in a single
+//         // dimension, else return -1
+//         if (scan_dim.size() == 1) {
+//             return scan_dim[0];
+//         } else {
+//             return -1;
+//         }
+//     } else {
+//         return -1;
+//     }
+// }
+//
+//
+// std::vector<Func> cascade_dimensions(Func& func) {
+//     Function F = func.function();
+//     int num_dimensions = F.args().size();
+//
+//     vector<Func> func_list;
+//
+//     // loop over all dimensions of the function
+//     // and create a separate function for scans in each dimension
+//     for (int i=0; i<num_dimensions; i++) {
+//         Function f(F.name() + "_" + int_to_string(i));
+//
+//         if (i==0) { // pure def of first dimension uses the original pure def
+//             f.define(F.args(), F.values());
+//         }
+//         else {  // pure defs of other dimension use previous dimension as pure def
+//             vector<Expr> call_args;
+//             vector<Expr> values;
+//             for (int j=0; j<F.args().size(); j++) {
+//                 call_args.push_back(Var(F.args()[j]));
+//             }
+//             for (int j=0; j<F.values().size(); j++) {
+//                 values.push_back(Call::make(func_list[i-1].function(), call_args, j));
+//             }
+//             f.define(F.args(), values);
+//         }
+//
+//         // add the function to the list of cascaded functions
+//         func_list.push_back(Func(f));
+//     }
+//
+//     // loop over all the update defs and add each to the function
+//     // corresponding to the scan dimension
+//     for (int j=0; j<F.updates().size(); j++) {
+//         int dim = get_scan_dimension(F.updates()[j]);
+//         if (dim<0) {
+//             cerr << "Function cascading can be used if each update has exactly one update "
+//                 " variable in exactly one dimension" << endl;
+//             assert(false);
+//         }
+//
+//         Function f = func_list[dim].function();
+//
+//         // add the scan replacing all calls to original function with the new function
+//         vector<Expr> values = F.updates()[j].values;
+//         for (int k=0; k<values.size(); k++) {
+//             values[k] = substitute_func_call(F.name(), f, values[k]);
+//         }
+//         f.define_update(F.updates()[j].args, values);
+//     }
+//
+//     // change the original function to index into the last function in the list
+//     {
+//         F.clear_all_definitions();
+//         Function f = func_list[func_list.size()-1].function();
+//
+//         vector<Expr> call_args;
+//         vector<Expr> values;
+//         for (int j=0; j<f.args().size(); j++) {
+//             call_args.push_back(Var(f.args()[j]));
+//         }
+//         for (int j=0; j<f.values().size(); j++) {
+//             values.push_back(Call::make(f, call_args, j));
+//         }
+//         F.define(f.args(), values);
+//         func = Func(F);
+//     }
+//
+//     return func_list;
+// }
+//
+// std::vector<Func> cascade_repeated_scans(Func& func) {
+//     Function F = func.function();
+//
+//     // there can be at most as many functions as updates defs
+//     vector<Func> func_list;
+//     for (int i=0; i<F.updates().size(); i++) {
+//         Function f(F.name() + "_" + int_to_string(i));
+//
+//         if (i==0) { // pure def of first dimension uses the original pure def
+//             f.define(F.args(), F.values());
+//         }
+//         else {  // pure defs of other dimension use previous dimension as pure def
+//             vector<Expr> call_args;
+//             vector<Expr> values;
+//             for (int j=0; j<F.args().size(); j++) {
+//                 call_args.push_back(Var(F.args()[j]));
+//             }
+//             for (int j=0; j<F.values().size(); j++) {
+//                 values.push_back(Call::make(func_list[i-1].function(), call_args, j));
+//             }
+//             f.define(F.args(), values);
+//         }
+//
+//         // add the function to the list of cascaded functions
+//         func_list.push_back(Func(f));
+//     }
+//
+//     // the index of the function which should get the next update
+//     // definition in each dimension; the first update in each dimension
+//     // can go to the first function
+//     vector<int> func_id(F.args().size(), 0);
+//
+//     // loop over all the update defs and add each
+//     // corresponding to the scan dimension
+//     for (int j=0; j<F.updates().size(); j++) {
+//         int dim = get_scan_dimension(F.updates()[j]);
+//         if (dim<0) {
+//             cerr << "Function cascading can be used if each update has exactly one update "
+//                 " variable in exactly one dimension" << endl;
+//             assert(false);
+//         }
+//
+//         // get the function to which this update def should be added
+//         Function f = func_list[func_id[dim]].function();
+//
+//         // add the scan replacing all calls to original function with the new function
+//         vector<Expr> values = F.updates()[j].values;
+//         for (int k=0; k<values.size(); k++) {
+//             values[k] = substitute_func_call(F.name(), f, values[k]);
+//         }
+//         f.define_update(F.updates()[j].args, values);
+//
+//         // next repeated scan in this dimension should be added to
+//         // the next function
+//         func_id[dim]++;
+//     }
+//
+//     // remove the functions which do not have any updates - redundant
+//     for (int i=0; i<func_list.size(); i++) {
+//         if (!func_list[i].has_update_definition()) {
+//             func_list.erase(func_list.begin() + i);
+//             i--;
+//         }
+//     }
+//
+//     // change the original function to index into the last function in the list
+//     {
+//         F.clear_all_definitions();
+//         Function f = func_list[func_list.size()-1].function();
+//
+//         vector<Expr> call_args;
+//         vector<Expr> values;
+//         for (int j=0; j<f.args().size(); j++) {
+//             call_args.push_back(Var(f.args()[j]));
+//         }
+//         for (int j=0; j<f.values().size(); j++) {
+//             values.push_back(Call::make(f, call_args, j));
+//         }
+//         F.define(f.args(), values);
+//         func = Func(F);
+//     }
+//
+//     return func_list;
+// }
 
 // -----------------------------------------------------------------------------
 
@@ -243,92 +244,100 @@ static void inline_function(Function f, vector<Func> func_list) {
     }
 }
 
-// -----------------------------------------------------------------------------
-
-static bool merge_feasible(RecFilterFunc fA, RecFilterFunc fB, string& error) {
-    bool can_merge = true;
-
-    Function A = fA.func;
-    Function B = fB.func;
-
-    // pure definitions must have same args
-    can_merge &= (A.args().size() == B.args().size());
-    for (int i=0; can_merge && i<A.args().size(); i++) {
-        can_merge &= (A.args()[i] == B.args()[i]);
-    }
-    if (!can_merge) {
-        error = "Functions to be merged must have same args in pure defs";
+/** Transpose the dimensions of a function to reshape the output buffer */
+static void transpose_function_dimensions(
+        RecFilterFunc& rF,      ///> recursive filter function whose dimensions must be transposed
+        string a,               ///< name of first dimension to be transposed
+        string b,               ///< name of second dimension to be transposed
+        vector<Func> func_list  ///< list of functions in which calls to first parameter must be changed
+        )
+{
+    if (a == b) {
+        cerr << "Variables to be swapped must be different" << endl;
+        assert(false);
     }
 
-    // each update definition must have same args and update domain
-    vector<UpdateDefinition> Ar = A.updates();
-    vector<UpdateDefinition> Br = B.updates();
-    for (int i=0; can_merge && i<std::min(Ar.size(),Br.size()); i++) {
-        can_merge &= Ar[i].domain.same_as(Br[i].domain);
-        can_merge &= (Ar[i].args.size() == Br[i].args.size());
-        for (int j=0; can_merge && j<Ar[i].args.size(); j++) {
-            can_merge &= equal(Ar[i].args[j], Br[i].args[j]);
-        }
-    }
-    if (!can_merge) {
-        error = "Functions to be merged must have same args in update defs";
-    }
+    Function F = rF.func;
 
-    // A must not depend upon B
-    for (int i=0; can_merge && i<A.values().size(); i++) {
-        can_merge &= (!expr_depends_on_func(A.values()[i], B.name()));
-    }
-    for (int i=0; can_merge && i<A.updates().size(); i++) {
-        for (int j=0; can_merge && j<A.updates()[i].values.size(); j++) {
-            can_merge &= (!expr_depends_on_func(A.updates()[i].values[j], B.name()));
-        }
-    }
-    if (!can_merge) {
-        error = "Functions to be merged must not call each other";
-    }
+    int va_idx = -1;
+    int vb_idx = -1;
 
-    // B must not depend upon A
-    for (int i=0; can_merge && i<B.values().size(); i++) {
-        can_merge &= (!expr_depends_on_func(B.values()[i], A.name()));
-    }
-    for (int i=0; can_merge && i<B.updates().size(); i++) {
-        for (int j=0; can_merge && j<B.updates()[i].values.size(); j++) {
-            can_merge &= (!expr_depends_on_func(B.updates()[i].values[j], A.name()));
-        }
-    }
-    if (!can_merge) {
-        error = "Functions to be merged must not call each other";
-    }
-
-    // A and B must have the same scheduling tags for the function itself
-    // and all the pure and update variables
+    // basic checks
     {
-        can_merge &= (fA.func_category == fB.func_category);
+        assert(F.is_pure() && "Variable swapping can only be applied to pure functions");
 
-        map<string,RecFilterFunc::VarCategory>::iterator it = fA.pure_var_category.begin();
-
-        for (it=fA.pure_var_category.begin(); it!=fA.pure_var_category.end(); it++) {
-            can_merge &= (it->second == fB.pure_var_category[it->first]);
-        }
-        for (it=fB.pure_var_category.begin(); it!=fB.pure_var_category.end(); it++) {
-            can_merge &= (it->second == fA.pure_var_category[it->first]);
-        }
-        for (int i=0; i<std::min(fA.update_var_category.size(),fB.update_var_category.size()); i++) {
-            for (it=fA.update_var_category[i].begin(); it!=fA.update_var_category[i].end(); it++) {
-                can_merge &= (it->second == fB.update_var_category[i][it->first]);
+        // check that both a and b are variables of the function
+        for (int i=0; i<F.args().size(); i++) {
+            if (F.args()[i] == a) {
+                va_idx = i;
             }
-            for (it=fB.update_var_category[i].begin(); it!=fB.update_var_category[i].end(); it++) {
-                can_merge &= (it->second == fA.update_var_category[i][it->first]);
+            if (F.args()[i] == b) {
+                vb_idx = i;
             }
         }
-        if (!can_merge) {
-            error = "Functions to be merged must have the same scheduling tags";
+        assert(va_idx>=0 && vb_idx>=0 && "Both variables must be args of function");
+    }
+
+    // change all RHS values of the function
+    vector<string> args = F.args();
+    vector<Expr>   values = F.values();
+    for (int i=0; i<values.size(); i++) {
+        string temp_var_name = "temp_var_" + int_to_string(rand());
+        Var t(temp_var_name);
+        values[i] = swap_vars_in_expr(a, b, values[i]);
+    }
+    F.clear_all_definitions();
+    F.define(args, values);
+
+    // find all function calls and swap the calling args
+    // at indices va_idx and vb_idx
+    for (int i=0; i<func_list.size(); i++) {
+        Function f = func_list[i].function();
+
+        if (f.name() == F.name()) {
+            continue;
+        }
+
+        bool modified = false;
+
+        // change all RHS values of the function
+        vector<string> pure_args = f.args();
+        vector<Expr>   pure_values = f.values();
+        vector<UpdateDefinition> updates = f.updates();
+        for (int i=0; i<pure_values.size(); i++) {
+            if (expr_depends_on_func(pure_values[i], F.name())) {
+                pure_values[i] = swap_args_in_func_call(
+                        F.name(), va_idx, vb_idx, pure_values[i]);
+                modified = true;
+            }
+        }
+        for (int k=0; k<updates.size(); k++) {
+            for (int u=0; u<updates[k].values.size(); u++) {
+                if (expr_depends_on_func(updates[k].values[u], F.name())) {
+                    updates[k].values[u] = swap_args_in_func_call(
+                            F.name(), va_idx, vb_idx, updates[k].values[u]);
+                    modified = true;
+                }
+            }
+        }
+        if (modified) {
+            f.clear_all_definitions();
+            f.define(pure_args, pure_values);
+            for (int k=0; k<updates.size(); k++) {
+                vector<Expr> update_args   = updates[k].args;
+                vector<Expr> update_values = updates[k].values;
+                f.define_update(update_args, update_values);
+            }
         }
     }
 
-    return can_merge;
+    // swap the scheduling tags of the dimensions
+    RecFilterFunc::VarCategory temp = rF.pure_var_category[a];
+    rF.pure_var_category[a] = rF.pure_var_category[b];
+    rF.pure_var_category[b] = temp;
 }
 
+/** Check if two functions are identical */
 static bool check_duplicate(Function A, Function B) {
     bool duplicate = true;
 
@@ -354,7 +363,125 @@ static bool check_duplicate(Function A, Function B) {
     return duplicate;
 }
 
-// -----------------------------------------------------------------------------
+
+/** Check if the output buffers of two functions can be merged or interleaved
+ * \param A first function to be merged/interleaved
+ * \param B second function to be merged/interleaved
+ * \param error error message if functions cannot be merged
+ */
+static bool merge_feasible(Function A, Function B, string& error) {
+    bool can_merge = true;
+
+    // pure definitions must have same args
+    can_merge &= (A.args().size() == B.args().size());
+    for (int i=0; can_merge && i<A.args().size(); i++) {
+        can_merge &= (A.args()[i] == B.args()[i]);
+    }
+    if (!can_merge) {
+        error = "Functions to be merged must have same args in pure defs";
+    }
+
+    // no update defs
+    if (A.has_update_definition() || B.has_update_definition()) {
+        error = "Function to be merged must not have update definitions";
+        can_merge = false;
+    }
+
+    // same number of outputs
+    if (A.outputs() != B.outputs()) {
+        error = "Function to be merged must have same number of outputs";
+        can_merge = false;
+    }
+
+    // A must not depend upon B and B must not depend upon A
+    for (int i=0; can_merge && i<A.values().size(); i++) {
+        can_merge &= (!expr_depends_on_func(A.values()[i], B.name()));
+    }
+    for (int i=0; can_merge && i<B.values().size(); i++) {
+        can_merge &= (!expr_depends_on_func(B.values()[i], A.name()));
+    }
+    if (!can_merge) {
+        error = "Functions to be merged must not call each other";
+    }
+
+    return can_merge;
+}
+
+
+/** Check the scheduling tags of two functions before merging or interleaving their output buffers;
+ * and transpose the dimensions of one function which will make the output buffers identical
+ * \returns true if scheduling tags are same or if dimensions can be transposed to the same effect
+ */
+static bool check_scheduling_tags(
+        RecFilterFunc& fA,      ///< first function to be merged/interleaved
+        RecFilterFunc& fB,      ///< second function to be merged/interleaved
+        vector<Func> func_list  ///< list of functions where fA and fB must be replaced
+        )
+{
+    Function A = fA.func;
+    Function B = fB.func;
+
+    bool same_func_tags = true;
+    bool same_pure_def_tags = true;
+
+    vector<string> diff_vars;
+
+    map<string,RecFilterFunc::VarCategory>::iterator it;
+
+    // A and B must have the same scheduling tags for the function itself
+    same_func_tags &= (fA.func_category == fB.func_category);
+
+    // check pure def scheduling tags and make a list of different tags
+    same_pure_def_tags &= (fA.pure_var_category.size()==fB.pure_var_category.size());
+    for (it=fB.pure_var_category.begin(); it!=fB.pure_var_category.end(); it++) {
+        if (it->second != fA.pure_var_category[it->first]) {
+            diff_vars.push_back(it->first);
+            same_pure_def_tags &= false;
+        }
+    }
+
+    if (!same_pure_def_tags && diff_vars.size()%2==0) {
+        // check if transposing dimensions can fix the scheduling tags
+        // loop over all combinations of dimension dimension transposes
+        do {
+            vector< pair<string,string> > var_swaps;
+            for (int i=0; i<diff_vars.size(); i+=2) {
+                var_swaps.push_back(make_pair(diff_vars[i],diff_vars[i+1]));
+            }
+
+            bool same_pure_def_tags_after_dummy_swap = true;
+
+            // apply these swaps on dummy scheduling tags lists
+            map<string,RecFilterFunc::VarCategory> var_cat_A = fA.pure_var_category;
+            map<string,RecFilterFunc::VarCategory> var_cat_B = fB.pure_var_category;
+            for (int i=0; i<var_swaps.size(); i++) {
+                string a = var_swaps[i].first;
+                string b = var_swaps[i].second;
+                RecFilterFunc::VarCategory temp = var_cat_B[a];
+                var_cat_B[a] = var_cat_B[b];
+                var_cat_B[b] = temp;
+            }
+            for (it=var_cat_B.begin(); it!=var_cat_B.end(); it++) {
+                same_pure_def_tags_after_dummy_swap &= (it->second != var_cat_A[it->first]);
+            }
+
+            // actually apply dimension transposes because they will fix the dimensions
+            if (same_pure_def_tags_after_dummy_swap) {
+                for (int i=0; i<var_swaps.size(); i++) {
+                    string a = var_swaps[i].first;
+                    string b = var_swaps[i].second;
+                    transpose_function_dimensions(fB, a, b, func_list);
+                }
+                same_pure_def_tags = true;
+            }
+
+        } while (next_permutation(diff_vars.begin(), diff_vars.end()));
+    }
+
+    return (same_func_tags && same_pure_def_tags);
+}
+
+
 
 /** Merge two functions to create a new function which contains the outputs
  * of both the functions in a Tuple; and replace calls to the two original
@@ -373,8 +500,14 @@ static RecFilterFunc merge_function(
     // check if merge is feasible
     {
         string merge_error;
-        if (!merge_feasible(fA, fB ,merge_error)) {
-            cerr << merge_error << std::endl;
+        if (!merge_feasible(fA.func, fB.func, merge_error)) {
+            cerr << merge_error << endl;
+            assert(false);
+        }
+
+        if (!check_scheduling_tags(fA, fB, func_list)) {
+            cerr << "Functions to be merged have different dimensions as " <<
+                "inferred from scheduling tags; could not be fixed by dimension transpose" << endl;
             assert(false);
         }
     }
@@ -404,45 +537,6 @@ static RecFilterFunc merge_function(
         }
 
         AB.define(A.args(), values);
-    }
-
-    // merged tuple for each of update definitions
-    {
-        vector<UpdateDefinition> Ar = A.updates();
-        vector<UpdateDefinition> Br = B.updates();
-        for (int i=0; i<std::max(Ar.size(),Br.size()); i++) {
-            vector<Expr> values;
-
-            // RHS of update definitions of A
-            for (int j=0; j<num_outputs_A; j++) {
-                if (i < Ar.size()) {
-                    // replace all recursive calls to A with calls to AB
-                    Expr val = substitute_func_call(A.name(), AB, Ar[i].values[j]);
-                    values.push_back(val);
-                } else {
-                    // add redundant update if A has no more update definitions
-                    values.push_back(Call::make(AB, Ar[i].args, j));
-                }
-            }
-
-            // RHS of update definitions of B
-            // if A and B are identical, no need to create a Tuple
-            // with RHS of both A and B, just RHS of A will suffice
-            for (int j=0; !duplicate && j<num_outputs_B; j++) {
-                if (i < Br.size()) {
-                    // replace all recursive calls to B with calls to AB and
-                    // increment value indices by number of outputs of A
-                    Expr val = substitute_func_call(B.name(), AB, Br[i].values[j]);
-                    val = increment_value_index_in_func_call(AB.name(), num_outputs_A, val);
-                    values.push_back(val);
-                } else {
-                    // add redundant update if B has no more update definitions
-                    values.push_back(Call::make(AB, Br[i].args, j+num_outputs_A));
-                }
-            }
-
-            AB.define_update(Ar[i].args, values);
-        }
     }
 
     // mutate A to index into merged function
@@ -489,9 +583,10 @@ static RecFilterFunc merge_function(
     // since tags are identical
     RecFilterFunc fAB;
     fAB.func = AB;
-    fAB.func_category       = fA.func_category;
-    fAB.pure_var_category   = fA.pure_var_category;
-    fAB.update_var_category = fA.update_var_category;
+    fAB.func_category     = fA.func_category;
+    fAB.pure_var_category = fA.pure_var_category;
+    fAB.caller_func       = fA.caller_func;
+    fAB.callee_func       = fA.callee_func;
     return fAB;
 }
 
@@ -504,7 +599,7 @@ static RecFilterFunc interleave_function(
         string   merged_name,   ///< name of the interleaved function
         Var      var,           ///< var to the used for interleaving
         Expr     offset,        ///< interleaving offset
-        vector<Func> func_list  ///< list of functions where A and B must be replaced
+        vector<Func> func_list  ///< list of functions where A and B must be replaced by the merged function
         )
 {
     Function A = fA.func;
@@ -513,16 +608,14 @@ static RecFilterFunc interleave_function(
     // check if interleaving is possible
     {
         string merge_error;
-        if (!merge_feasible(fA, fB, merge_error)) {
+        if (!merge_feasible(fA.func, fB.func, merge_error)) {
             cerr << merge_error << endl;
             assert(false);
         }
-        if (A.has_update_definition() || B.has_update_definition()) {
-            cerr << "Cannot interleave two functions which have update definitions" << endl;
-            assert(false);
-        }
-        if (A.outputs() != B.outputs()) {
-            cerr << "Cannot interleave two functions which have different number of outputs" << endl;
+
+        if (!check_scheduling_tags(fA, fB, func_list)) {
+            cerr << "Functions to be interleaved have different dimensions as " <<
+                "inferred from scheduling tags; could not be fixed by dimension transpose" << endl;
             assert(false);
         }
     }
@@ -629,6 +722,8 @@ static RecFilterFunc interleave_function(
     fAB.func = AB;
     fAB.func_category     = fA.func_category;
     fAB.pure_var_category = fA.pure_var_category;
+    fAB.caller_func       = fA.caller_func;
+    fAB.callee_func       = fA.callee_func;
     return fAB;
 }
 
@@ -683,89 +778,7 @@ void RecFilter::transpose_dimensions(string func_name, Var a, Var b) {
 }
 
 void RecFilter::transpose_dimensions(string func_name, string a, string b) {
-    if (a == b) {
-        cerr << "Variables to be swapped must be different" << endl;
-        assert(false);
-    }
-
-    RecFilterFunc rF = internal_function(func_name);
-    Function       F = rF.func;
-
-    int va_idx = -1;
-    int vb_idx = -1;
-
-    // basic checks
-    {
-        assert(F.is_pure() && "Variable swapping can only be applied to pure functions");
-
-        // check that both a and b are variables of the function
-        for (int i=0; i<F.args().size(); i++) {
-            if (F.args()[i] == a) {
-                va_idx = i;
-            }
-            if (F.args()[i] == b) {
-                vb_idx = i;
-            }
-        }
-        assert(va_idx>=0 && vb_idx>=0 && "Both variables must be args of function");
-    }
-
-    // change all RHS values of the function
-    vector<string> args = F.args();
-    vector<Expr>   values = F.values();
-    for (int i=0; i<values.size(); i++) {
-        string temp_var_name = "temp_var_" + int_to_string(rand());
-        Var t(temp_var_name);
-        values[i] = swap_vars_in_expr(a, b, values[i]);
-    }
-    F.clear_all_definitions();
-    F.define(args, values);
-
-    // find all function calls and swap the calling args
-    // at indices va_idx and vb_idx
-    map<string,RecFilterFunc>::iterator fit = contents.ptr->func.begin();
-    for (; fit!=contents.ptr->func.end(); fit++) {
-        if (fit->first == func_name) {
-            continue;
-        }
-
-        Function f = fit->second.func;
-
-        bool modified = false;
-
-        // change all RHS values of the function
-        vector<string> pure_args = f.args();
-        vector<Expr>   pure_values = f.values();
-        vector<UpdateDefinition> updates = f.updates();
-        for (int i=0; i<pure_values.size(); i++) {
-            if (expr_depends_on_func(pure_values[i], F.name())) {
-                pure_values[i] = swap_args_in_func_call(
-                        F.name(), va_idx, vb_idx, pure_values[i]);
-                modified = true;
-            }
-        }
-        for (int k=0; k<updates.size(); k++) {
-            for (int u=0; u<updates[k].values.size(); u++) {
-                if (expr_depends_on_func(updates[k].values[u], F.name())) {
-                    updates[k].values[u] = swap_args_in_func_call(
-                            F.name(), va_idx, vb_idx, updates[k].values[u]);
-                    modified = true;
-                }
-            }
-        }
-        if (modified) {
-            f.clear_all_definitions();
-            f.define(pure_args, pure_values);
-            for (int k=0; k<updates.size(); k++) {
-                vector<Expr> update_args   = updates[k].args;
-                vector<Expr> update_values = updates[k].values;
-                f.define_update(update_args, update_values);
-            }
-        }
-    }
-
-    // swap the scheduling tags of the dimensions
-
+    RecFilterFunc& rF = internal_function(func_name);
 }
 
 // -----------------------------------------------------------------------------
