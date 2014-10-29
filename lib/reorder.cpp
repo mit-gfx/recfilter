@@ -484,6 +484,15 @@ static RecFilterFunc merge_function(
         inline_function(A, func_list);
         inline_function(B, func_list);
     }
+
+    // copy the scheduling tags of either of the two functions
+    // since tags are identical
+    RecFilterFunc fAB;
+    fAB.func = AB;
+    fAB.func_category       = fA.func_category;
+    fAB.pure_var_category   = fA.pure_var_category;
+    fAB.update_var_category = fA.update_var_category;
+    return fAB;
 }
 
 /** Interleave two functions to create a new function which interleaves the outputs
@@ -613,6 +622,14 @@ static RecFilterFunc interleave_function(
         inline_function(A, func_list);
         inline_function(B, func_list);
     }
+
+    // copy the scheduling tags of either of the two functions
+    // since tags are identical
+    RecFilterFunc fAB;
+    fAB.func = AB;
+    fAB.func_category     = fA.func_category;
+    fAB.pure_var_category = fA.pure_var_category;
+    return fAB;
 }
 
 // -----------------------------------------------------------------------------
