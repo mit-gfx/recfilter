@@ -5,9 +5,26 @@ using std::vector;
 using std::cerr;
 using std::endl;
 using std::ostream;
+using std::stringstream;
 using std::runtime_error;
 
 using namespace Halide;
+using namespace Halide::Internal;
+
+// -----------------------------------------------------------------------------
+
+/** Remove $r from variable names which is attached by Halide automatically to all RVar names */
+static string clean_var_names(string str) {
+    int start_pos = 0;
+    string replace_str = "$r";
+    string null_str = "";
+    while ((start_pos = str.find(replace_str, start_pos)) != string::npos) {
+        str.replace(start_pos, replace_str.length(), null_str);
+    }
+    return str;
+}
+
+// -----------------------------------------------------------------------------
 
 Arguments::Arguments(int argc, char** argv) :
     width  (4096),
@@ -64,7 +81,7 @@ Arguments::Arguments(int argc, char** argv) :
             }
 
             else if (!option.compare("-b") || !option.compare("--b") || !option.compare("-block") || !option.compare("--block") ||
-                     !option.compare("-t") || !option.compare("--t") || !option.compare("-tile") || !option.compare("--tile"))
+                    !option.compare("-t") || !option.compare("--t") || !option.compare("-tile") || !option.compare("--tile"))
             {
                 if ((i+1) < argc)
                     block = atoi(argv[++i]);
@@ -80,7 +97,7 @@ Arguments::Arguments(int argc, char** argv) :
         if (width%block)
             throw runtime_error("Width should be a multiple of block size");
 
-    } catch (runtime_error& e) {
+    } catch (runtime_error & e) {
         cerr << endl << e.what() << endl << desc << endl;
         exit(EXIT_FAILURE);
     }
@@ -124,7 +141,7 @@ ostream &operator<<(ostream &s, const CheckResult& v) {
     return s;
 }
 
-ostream &operator<<(ostream &s, const CheckResultVerbose& v) {
+ostream &operator<<(ostream &s, const CheckResultVerbose &v) {
     Image<float> ref = v.ref;
     Image<float> out = v.out;
 
@@ -163,121 +180,167 @@ ostream &operator<<(ostream &s, const CheckResultVerbose& v) {
     return s;
 }
 
-static ostream& operator<<(ostream& s, const RecFilterFunc::FuncCategory& f) {
-    if (f & RecFilterFunc::INLINE           ) { s << "INLINE            " << endl; }
-    if (f & RecFilterFunc::FULL_RESULT_SCAN ) { s << "FULL_RESULT_SCAN  " << endl; }
-    if (f & RecFilterFunc::FULL_RESULT_PURE ) { s << "FULL_RESULT_PURE  " << endl; }
-    if (f & RecFilterFunc::INTRA_TILE_SCAN  ) { s << "INTRA_TILE_SCAN   " << endl; }
-    if (f & RecFilterFunc::INTER_TILE_SCAN  ) { s << "INTER_TILE_SCAN   " << endl; }
-    if (f & RecFilterFunc::REINDEX_FOR_WRITE) { s << "REINDEX_FOR_WRITE " << endl; }
-    if (f & RecFilterFunc::REINDEX_FOR_READ ) { s << "REINDEX_FOR_READ  " << endl; }
+static ostream &operator<<(ostream &s, const RecFilterFunc::FuncCategory &f) {
+    if (f ==RecFilterFunc::INLINE           ) { s << "INLINE            "; }
+    if (f & RecFilterFunc::FULL_RESULT_SCAN ) { s << "FULL_RESULT_SCAN  "; }
+    if (f & RecFilterFunc::FULL_RESULT_PURE ) { s << "FULL_RESULT_PURE  "; }
+    if (f & RecFilterFunc::INTRA_TILE_SCAN  ) { s << "INTRA_TILE_SCAN   "; }
+    if (f & RecFilterFunc::INTER_TILE_SCAN  ) { s << "INTER_TILE_SCAN   "; }
+    if (f & RecFilterFunc::REINDEX_FOR_WRITE) { s << "REINDEX_FOR_WRITE "; }
+    if (f & RecFilterFunc::REINDEX_FOR_READ ) { s << "REINDEX_FOR_READ  "; }
     return s;
 }
 
-static ostream& operator<<(ostream& s, const RecFilterFunc::VarCategory& v) {
-    if (v & RecFilterFunc::INNER_PURE_VAR) { s << "INNER_PURE_VAR " << endl; }
-    if (v & RecFilterFunc::INNER_SCAN_VAR) { s << "INNER_SCAN_VAR " << endl; }
-    if (v & RecFilterFunc::OUTER_PURE_VAR) { s << "OUTER_PURE_VAR " << endl; }
-    if (v & RecFilterFunc::OUTER_SCAN_VAR) { s << "OUTER_SCAN_VAR " << endl; }
-    if (v & RecFilterFunc::TAIL_DIMENSION) { s << "TAIL_DIMENSION " << endl; }
-    if (v & RecFilterFunc::PURE_DIMENSION) { s << "PURE_DIMENSION " << endl; }
-    if (v & RecFilterFunc::SCAN_DIMENSION) { s << "SCAN_DIMENSION " << endl; }
+static ostream &operator<<(ostream &s, const RecFilterFunc::VarCategory &v) {
+    if (v & RecFilterFunc::INNER_PURE_VAR) { s << "INNER_PURE_VAR "; }
+    if (v & RecFilterFunc::INNER_SCAN_VAR) { s << "INNER_SCAN_VAR "; }
+    if (v & RecFilterFunc::OUTER_PURE_VAR) { s << "OUTER_PURE_VAR "; }
+    if (v & RecFilterFunc::OUTER_SCAN_VAR) { s << "OUTER_SCAN_VAR "; }
+    if (v & RecFilterFunc::TAIL_DIMENSION) { s << "TAIL_DIMENSION "; }
+    if (v & RecFilterFunc::PURE_DIMENSION) { s << "PURE_DIMENSION "; }
+    if (v & RecFilterFunc::SCAN_DIMENSION) { s << "SCAN_DIMENSION "; }
     return s;
 }
 
-ostream &operator<<(ostream &s, RecFilter& r) {
-    vector<Func> f = r.funcs();
-    for (int i=0; i<f.size(); i++) {
-        s << f[i] << endl;
-    }
-    return s;
-}
-
-ostream &operator<<(ostream &s, Func& f) {
+ostream &operator<<(ostream &s, const Func &f) {
     s << f.function();
     return s;
 }
 
-ostream &operator<<(ostream &s, Internal::Function& f) {
+ostream &operator<<(ostream &os, const Internal::Function &f) {
+    stringstream s;
+
     if (f.has_pure_definition()) {
-
         s << "{\n";
-
         s << "Func " << f.name() << "(\"" << f.name() << "\");\n";
 
+        // print the vars
+        if (!f.args().empty()) {
+            s << "Var ";
+            for (int i=0; i<f.args().size(); i++) {
+                s << f.args()[i] << "(\"" << f.args()[i] << "\")";
+                if (i<f.args().size()-1) {
+                    s << ", ";
+                }
+            }
+            s << ";\n";
+        }
+
+        // collect RDoms from all update defs and print them
+        vector<ReductionDomain> rdom;
+        for (int j=0; j<f.updates().size(); j++) {
+            if (f.updates()[j].domain.defined()) {
+                bool already_added = false;
+                for (int i=0; i<rdom.size(); i++) {
+                    already_added = f.updates()[j].domain.same_as(rdom[i]);
+                }
+                if (!already_added) {
+                    rdom.push_back(f.updates()[j].domain);
+                }
+            }
+        }
+        if (!rdom.empty()) {
+            for (int i=0; i<rdom.size(); i++) {
+                s << "Internal::ReductionDomain ";
+                for (int k=0; k<rdom[i].domain().size(); k++) {
+                    string r = rdom[i].domain()[k].var;
+                    s << r << "("
+                        << rdom[i].domain()[k].min    << ","
+                        << rdom[i].domain()[k].extent << ") ";
+                }
+                s << ";\n";
+            }
+            s << "\n";
+        }
+
+        // print the pure def
         for (int v=0; v<f.values().size(); v++) {
             vector<string> args = f.args();
             s << f.name() << "(";
             for (int i=0; i<args.size(); i++) {
                 s << args[i];
-                if (i<args.size()-1)
+                if (i<args.size()-1) {
                     s << ", ";
-            }
-            if (f.values().size()>1)
-                s << ")[" << v << "]";
-            else
-                s << ")";
-            s << " = " << f.values()[v] << ";\n";
-        }
-
-        // update definitions
-        for (int j=0; j<f.updates().size(); j++) {
-            vector<Expr> update_value = f.updates()[j].values;
-            for (int v=0; v<update_value.size(); v++) {
-                vector<Expr> args = f.updates()[j].args;
-                s << f.name() << "(";
-                for (int i=0; i<args.size(); i++) {
-                    s << args[i];
-                    if (i<args.size()-1)
-                        s << ", ";
                 }
-                if (update_value.size()>1)
-                    s << ")[" << v << "]";
-                else
-                    s << ")";
-                s << " = " << update_value[v] << ";";
-                if (f.updates()[j].domain.defined()) {
-                    s << " with  ";
-                    for (int k=0; k<f.updates()[j].domain.domain().size(); k++) {
-                        string r = f.updates()[j].domain.domain()[k].var;
-                        s << r << "("
-                            << f.updates()[j].domain.domain()[k].min   << ","
-                            << f.updates()[j].domain.domain()[k].extent<< ") ";
+            }
+            s << ") = ";
+            if (f.outputs()>1) {
+                s << "Tuple(";
+                for (int v=0; v<f.values().size(); v++) {
+                    s << f.values()[v];
+                    if (v<f.values().size()-1) {
+                        s << ", ";
                     }
                 }
-                s << "\n";
+                s << ");\n";
+            } else {
+                s << f.values()[0] << ";\n";
             }
         }
+
+        // print the update defs
+        for (int j=0; j<f.updates().size(); j++) {
+            vector<Expr> update_value = f.updates()[j].values;
+            vector<Expr> args = f.updates()[j].args;
+            s << f.name() << "(";
+            for (int i=0; i<args.size(); i++) {
+                s << args[i];
+                if (i<args.size()-1) {
+                    s << ", ";
+                }
+            }
+            s << ") = ";
+            if (update_value.size()>1) {
+                s << "Tuple(";
+                for (int v=0; v<update_value.size(); v++) {
+                    s << update_value[v];
+                    if (v<update_value.size()-1) {
+                        s << ", ";
+                    }
+                }
+                s << ");\n";
+            } else {
+                s << update_value[0] << ";\n";
+            }
+        }
+        s << "}\n";
     }
-    s << "\n}\n";
+
+    os << clean_var_names(s.str());
+    return os;
+}
+
+ostream &operator<<(ostream &s, const RecFilter &r) {
+    r.generate_hl_code(s);
     return s;
 }
 
-ostream& operator<<(std::ostream& s, const RecFilterFunc& f) {
-    s << "{\n";
-    s << "// Func " << f.func.name() << " scheduling tags \n";
+ostream &operator<<(std::ostream &os, const RecFilterFunc &f) {
+    stringstream s;
+
+    s << "// Func " << f.func.name() << " synopsis\n";
     s << "// Function tag: " << f.func_category << "\n";
 
-    if (!(f.func_category & RecFilterFunc::INLINE)) {
+    if (f.func_category != RecFilterFunc::INLINE) {
         map<string, RecFilterFunc::VarCategory>::const_iterator it;
         s << "// \n";
-        s << "// Pure def tags: \n";
+        s << "// Pure def tags \n";
         for (it=f.pure_var_category.begin(); it!=f.pure_var_category.end(); it++) {
-            s << "// \t Var " << it->first << ": " << it->second << "\n";
+            s << "//\t" << it->first << "\t: " << it->second << "\n";
         }
         if (!f.update_var_category.empty()) {
             s << "// \n";
-            s << "// Update def tags: \n";
             for (int i=0; i<f.update_var_category.size(); i++) {
+                s << "// Update def " << i << " tags \n";
                 for (it=f.update_var_category[i].begin(); it!=f.update_var_category[i].end(); it++) {
-                    s << "// \t Var " << it->first << ": " << it->second << "\n";
+                    s << "//\t" << it->first << "\t: " << it->second << "\n";
                 }
             }
         }
     }
-    s << "// \n";
-    s << f.func;
-    return s;
+
+    os << clean_var_names(s.str());
+    return os;
 }
 
 // -----------------------------------------------------------------------------

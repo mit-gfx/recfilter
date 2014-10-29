@@ -51,19 +51,15 @@ int main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nGenerated Halide functions ... " << endl;
-    map<string,Func> functions = filter.funcs();
-    map<string,Func>::iterator f    = functions.begin();
-    map<string,Func>::iterator fend = functions.end();
-    for (; f!=fend; f++) {
-        cerr << f->second << endl;
-        f->second.compute_root();
-    }
+    cerr << filter << endl;
 
-    Image<float> hl_out = filter.func().realize(width,height);
+    Buffer out(type_of<float>(),width,height);
+    filter.realize(out);
 
     // ----------------------------------------------------------------------------------------------
 
     cerr << "\nChecking difference ... " << endl;
+    Image<float> hl_out(out);
     Image<float> diff(width,height);
     Image<float> ref(width,height);
 

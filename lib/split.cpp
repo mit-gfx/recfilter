@@ -71,6 +71,11 @@ static RecFilterFunc::VarCategory operator&(const RecFilterFunc::VarCategory& a,
 
 // -----------------------------------------------------------------------------
 
+/** All recursive filter funcs created during splitting transformations */
+static map<string, RecFilterFunc> recfilter_func_list;
+
+// -----------------------------------------------------------------------------
+
 static vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> split_info) {
     vector<string> args = F.args();
     vector<Expr>  values = F.values();
@@ -498,6 +503,9 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
     rF_intra.pure_var_category  = pure_var_category;
     rF_intra.update_var_category= update_var_category;
 
+    // add the genertaed recfilter function to the global list
+    recfilter_func_list.insert(make_pair(rF_intra.func.name(), rF_intra));
+
     return rF_intra;
 }
 
@@ -530,6 +538,9 @@ static RecFilterFunc create_copy(RecFilterFunc rF, string func_name) {
     rB.func_category       = rF.func_category;
     rB.pure_var_category   = rF.pure_var_category;
     rB.update_var_category = rF.update_var_category;
+
+    // add the genertaed recfilter function to the global list
+    recfilter_func_list.insert(make_pair(rB.func.name(), rB));
 
     return rB;
 }
@@ -584,6 +595,9 @@ static vector<RecFilterFunc> create_intra_tail_term(
         rf.func_category     = rF_intra.func_category | RecFilterFunc::REINDEX_FOR_WRITE;
         rf.pure_var_category = rF_intra.pure_var_category;
         rf.pure_var_category[xi.name()] |= RecFilterFunc::TAIL_DIMENSION;
+
+        // add the genertaed recfilter function to the global list
+        recfilter_func_list.insert(make_pair(rf.func.name(), rf));
 
         tail_functions_list.push_back(rf);
     }
@@ -711,6 +725,10 @@ static vector<RecFilterFunc> create_complete_tail_term(
         rf.update_var_category[0].erase(xo.name());
         rf.update_var_category[0].insert(make_pair(rxo.x.name(), RecFilterFunc::INNER_SCAN_VAR | RecFilterFunc::TAIL_DIMENSION));
         rf.update_var_category[0].insert(make_pair(rxo.y.name(), RecFilterFunc::OUTER_SCAN_VAR));
+
+        // add the genertaed recfilter function to the global list
+        recfilter_func_list.insert(make_pair(rf.func.name(), rf));
+
         rF_ctail.push_back(rf);
     }
 
@@ -752,6 +770,9 @@ static vector<RecFilterFunc> wrap_complete_tail_term(
         rf.func = function;
         rf.func_category     = rF_ctail[k].func_category | RecFilterFunc::REINDEX_FOR_WRITE;
         rf.pure_var_category = rF_ctail[k].pure_var_category;
+
+        // add the genertaed recfilter function to the global list
+        recfilter_func_list.insert(make_pair(rf.func.name(), rf));
 
         rF_ctailw.push_back(rf);
     }
@@ -847,6 +868,9 @@ static vector<RecFilterFunc> create_tail_residual_term(
         rf.func = function;
         rf.func_category = RecFilterFunc::INLINE;
 
+        // add the genertaed recfilter function to the global list
+        recfilter_func_list.insert(make_pair(rf.func.name(), rf));
+
         rF_tdeps.push_back(rf);
     }
 
@@ -901,6 +925,9 @@ static vector<RecFilterFunc> create_final_residual_term(
         rf.func_category    |= RecFilterFunc::REINDEX_FOR_READ;
         rf.func_category    &= RecFilterFunc::REINDEX_FOR_WRITE;
         rf.pure_var_category = rF_ctail[j].pure_var_category;
+
+        // add the genertaed recfilter function to the global list
+        recfilter_func_list.insert(make_pair(rf.func.name(), rf));
 
         rF_deps.push_back(rf);
         F_deps.push_back(rf.func);
@@ -969,6 +996,9 @@ static vector<RecFilterFunc> create_final_residual_term(
         RecFilterFunc rf;
         rf.func = function;
         rf.func_category = RecFilterFunc::INLINE;
+
+        // add the genertaed recfilter function to the global list
+        recfilter_func_list.insert(make_pair(rf.func.name(), rf));
 
         rF_deps_sub.push_back(rf);
     }
@@ -1202,12 +1232,15 @@ static void add_prev_dimension_residual_to_tails(
                     pure_values[i] += simplify(select(first_tile, FLOAT_ZERO, wt*val));
                 }
             }
+
+            // add the genertaed recfilter function to the global list
+            recfilter_func_list.insert(make_pair(rF_tail_prev_scanned.func.name(), rF_tail_prev_scanned));
+            recfilter_func_list.insert(make_pair(rF_tail_prev_scanned_sub.func.name(), rF_tail_prev_scanned_sub));
         }
 
-        // update defs of the tail remain unaffected
+        // redefine the pure def to include residuals from prev dimensions
+        // update defs of the tail remain unaffected, copy them as they were
         vector<UpdateDefinition> updates = F_tail[j].updates();
-
-        // redefine tail
         F_tail[j].clear_all_definitions();
         F_tail[j].define(pure_args, pure_values);
         for (int i=0; i<updates.size(); i++) {
@@ -1319,6 +1352,8 @@ static vector< vector<RecFilterFunc> > split_scans(
         string s2 = F_intra.func.name() + DASH + COMPLETE_TAIL_RESIDUAL+ DASH + x;
         string s3 = F_intra.func.name() + DASH + FINAL_RESULT_RESIDUAL + DASH + x;
 
+        // all these recfilter func have already been added to the global list,
+        // no need to add again
         vector<RecFilterFunc> F_tail   = create_intra_tail_term    (F_intra,  split_info[i], s0);
         vector<RecFilterFunc> F_ctail  = create_complete_tail_term (F_tail,   split_info[i], s1);
         vector<RecFilterFunc> F_ctailw = wrap_complete_tail_term   (F_ctail,  split_info[i], s1);
@@ -1347,8 +1382,8 @@ static vector< vector<RecFilterFunc> > split_scans(
 // -----------------------------------------------------------------------------
 
 void RecFilter::split(map<string,Expr> dim_tile) {
-    RecFilterFunc rF = internal_function(contents.ptr->recfilter.name());
-    Function       F = rF.func;
+    RecFilterFunc& rF = internal_function(contents.ptr->recfilter.name());
+    Function        F = rF.func;
 
     // flush out any previous splitting info
     for (int i=0; i<contents.ptr->split_info.size(); i++) {
@@ -1514,6 +1549,10 @@ void RecFilter::split(map<string,Expr> dim_tile) {
     }
 
     contents.ptr->recfilter = Func(F);
+
+    // add all the generated RecFilterFuncs
+    contents.ptr->func.insert(recfilter_func_list.begin(), recfilter_func_list.end());
+    recfilter_func_list.clear();
 }
 
 void RecFilter::split(Expr tx) {

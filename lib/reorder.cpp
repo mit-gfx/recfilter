@@ -360,7 +360,7 @@ static bool check_duplicate(Function A, Function B) {
  * of both the functions in a Tuple; and replace calls to the two original
  * functions by the merged function in all calls in
  */
-static RecFilterFunc& merge_function(
+static RecFilterFunc merge_function(
         RecFilterFunc fA,        ///< first function to be merged
         RecFilterFunc fB,        ///< second function to be merged
         string merged_name,      ///< name of the merged function
@@ -489,7 +489,7 @@ static RecFilterFunc& merge_function(
 /** Interleave two functions to create a new function which interleaves the outputs
  * of both the functions; and replace calls to the two original functions by new function
  */
-static RecFilterFunc& interleave_function(
+static RecFilterFunc interleave_function(
         RecFilterFunc fA,       ///< first function to be interleaved
         RecFilterFunc fB,       ///< second function to be interleaved
         string   merged_name,   ///< name of the interleaved function

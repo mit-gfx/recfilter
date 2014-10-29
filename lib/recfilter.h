@@ -176,7 +176,7 @@ public:
 
     /** Compute the filter for a given output buffer for specified number of iterations
      * for timing purposes; last iteration copies the result to host */
-    void realize(Halide::Buffer out, int iterations);
+    void realize(Halide::Buffer out, int iterations=1);
     // @}
 
     /**@name Recursive filter specification
@@ -389,6 +389,13 @@ public:
             std::string func_name  ///< name of function
             );
 
+
+    /**@name Print Halide code for the recursive filter
+     */
+    // {@
+    void generate_hl_code(std::ostream &s) const;
+    // @}
+
 private:
     /** Recursive filter function */
     RecFilterFunc& internal_function(std::string func_name);
@@ -413,12 +420,12 @@ private:
 /** @name Printing utils for recursive filter, Halide functions, schedules and
  * difference between computed result and reference result  */
 // {@
-std::ostream &operator<<(std::ostream &s, const RecFilter& r);
-std::ostream &operator<<(std::ostream &s, const RecFilterFunc& f);
-std::ostream &operator<<(std::ostream &s, const Halide::Func& f);
-std::ostream &operator<<(std::ostream &s, const Halide::Internal::Function& f);
-std::ostream &operator<<(std::ostream &s, const CheckResult& v);
-std::ostream &operator<<(std::ostream &s, const CheckResultVerbose& v);
+std::ostream &operator<<(std::ostream &s, const RecFilter &r);
+std::ostream &operator<<(std::ostream &s, const RecFilterFunc &f);
+std::ostream &operator<<(std::ostream &s, const Halide::Func &f);
+std::ostream &operator<<(std::ostream &s, const Halide::Internal::Function &f);
+std::ostream &operator<<(std::ostream &s, const CheckResult &v);
+std::ostream &operator<<(std::ostream &s, const CheckResultVerbose &v);
 // @}
 
 // ----------------------------------------------------------------------------

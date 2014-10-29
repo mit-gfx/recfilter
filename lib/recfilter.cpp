@@ -42,7 +42,7 @@ void RecFilter::setArgs(Var x, Var y)       { setArgs(vec(x,y));    }
 void RecFilter::setArgs(Var x, Var y, Var z){ setArgs(vec(x,y,z));  }
 
 void RecFilter::setArgs(vector<Var> args) {
-    RecFilterFunc f = internal_function( contents.ptr->recfilter.name() );
+    RecFilterFunc& f = internal_function( contents.ptr->recfilter.name() );
 
     for (int i=0; i<args.size(); i++) {
         SplitInfo s;
@@ -105,8 +105,8 @@ void RecFilter::addScan(
         Border border_mode,
         Expr bexpr)
 {
-    RecFilterFunc rf = internal_function( contents.ptr->recfilter.name() );
-    Function       f = contents.ptr->recfilter.function();
+    RecFilterFunc& rf = internal_function( contents.ptr->recfilter.name() );
+    Function        f = contents.ptr->recfilter.function();
 
     if (!f.has_pure_definition()) {
         cerr << "Cannot add scans to recursive filter " << f.name()
@@ -377,4 +377,18 @@ void RecFilter::remove_pure_def(string func_name) {
     for (int i=0; i<updates.size(); i++) {
         f.define_update(updates[i].args, updates[i].values);
     }
+}
+
+// -----------------------------------------------------------------------------
+
+void RecFilter::generate_hl_code(ostream &s) const {
+    map<string,RecFilterFunc>::iterator f;
+    for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
+        s << f->second << "\n";
+    }
+    s << "\n";
+    for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
+        s << f->second.func << "\n";
+    }
+    s << "\n";
 }
