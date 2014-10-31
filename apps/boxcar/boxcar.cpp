@@ -70,7 +70,6 @@ int main(int argc, char **argv) {
 
     Buffer hl_out_buff(type_of<float>(), width,height);
     {
-        Timer t("Running ... ");
         for (int k=0; k<iterations; k++) {
             B.realize(hl_out_buff);
             if (k < iterations-1) {

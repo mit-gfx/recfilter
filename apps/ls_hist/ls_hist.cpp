@@ -90,7 +90,6 @@ int main(int argc, char **argv) {
 
     Buffer hl_out_buff(type_of<float>(), width,height);
     {
-        Timer t("Running ... ");
         Median.realize(hl_out_buff);
         hl_out_buff.free_dev_buffer();
     }

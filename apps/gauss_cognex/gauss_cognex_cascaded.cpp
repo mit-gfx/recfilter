@@ -104,7 +104,6 @@ int main(int argc, char **argv) {
 
     Buffer hl_out_buff(type_of<float>(), width,height);
     {
-        Timer t("Running ... ");
         filter.func().realize(hl_out_buff);
     }
     hl_out_buff.copy_to_host();
