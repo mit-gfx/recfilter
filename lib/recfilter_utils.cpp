@@ -1,4 +1,6 @@
 #include "recfilter.h"
+#include "recfilter_func.h"
+#include "recfilter_internals.h"
 
 using std::string;
 using std::vector;
@@ -348,61 +350,4 @@ ostream &operator<<(std::ostream &os, const RecFilterFunc &f) {
 
     os << clean_var_names(s.str());
     return os;
-}
-
-// -----------------------------------------------------------------------------
-
-
-Timer::Timer(string name) {
-    m_Name = name;
-    start();
-}
-
-Timer::~Timer(void) {
-    stop();
-}
-
-void Timer::start(void) {
-    m_TmStart = milliseconds();
-}
-
-Timer::t_time Timer::stop(void) {
-    Timer::t_time tm = elapsed();
-    Timer::t_time h  = ( tm/(1000*60*60));
-    Timer::t_time m  = ((tm/(1000*60)) % 60);
-    Timer::t_time s  = ((tm/1000)      % 60);
-    Timer::t_time ms = tm % 1000;
-    cerr << m_Name.c_str() << ": " << h << "h " << m
-        << "m " << s << "s " << ms << "ms" << endl;
-    return tm;
-}
-
-Timer::t_time Timer::elapsed(void) {
-    return (milliseconds() - m_TmStart);
-}
-
-Timer::t_time Timer::milliseconds(void) {
-    static bool init = false;
-#ifdef WIN32
-    static Timer::t_time freq;
-    if (!init) {
-        init = true;
-        LARGE_INTEGER lfreq;
-        assert(QueryPerformanceFrequency(&lfreq) != 0);
-        freq = Timer::t_time(lfreq.QuadPart);
-    }
-    LARGE_INTEGER tps;
-    QueryPerformanceCounter(&tps);
-    return (Timer::t_time(tps.QuadPart)*1000/freq);
-#else
-    struct timeval        now;
-    static struct timeval start;
-    if (!init) {
-        gettimeofday(&start, NULL);
-        init = true;
-    }
-    gettimeofday(&now, NULL);
-    uint ms = uint((now.tv_sec-start.tv_sec)*1000+(now.tv_usec-start.tv_usec)/1000);
-    return ms;
-#endif
 }

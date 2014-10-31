@@ -1,3 +1,5 @@
+#include "recfilter.h"
+#include "recfilter_internals.h"
 #include "modifiers.h"
 
 using namespace Halide;

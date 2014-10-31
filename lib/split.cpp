@@ -1,7 +1,6 @@
 #include "recfilter.h"
-#include "recfilter_utils.h"
+#include "recfilter_internals.h"
 #include "coefficients.h"
-#include "schedule.h"
 #include "modifiers.h"
 
 using namespace Halide;

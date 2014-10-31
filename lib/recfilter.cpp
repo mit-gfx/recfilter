@@ -1,6 +1,5 @@
 #include "recfilter.h"
-#include "recfilter_utils.h"
-#include "schedule.h"
+#include "recfilter_internals.h"
 #include "modifiers.h"
 
 using std::string;

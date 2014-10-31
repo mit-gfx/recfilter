@@ -1,3 +1,5 @@
+#include "recfilter.h"
+#include "recfilter_internals.h"
 #include "coefficients.h"
 #include "modifiers.h"
 
