@@ -181,7 +181,7 @@ ostream &operator<<(ostream &s, const CheckResultVerbose &v) {
     return s;
 }
 
-static ostream &operator<<(ostream &s, const FuncTag &f) {
+ostream &operator<<(ostream &s, const FuncTag &f) {
     if (f ==INLINE           ) { s << "INLINE "           ; }
     if (f & FULL_RESULT_SCAN ) { s << "FULL_RESULT_SCAN " ; }
     if (f & FULL_RESULT_PURE ) { s << "FULL_RESULT_PURE " ; }
@@ -192,7 +192,7 @@ static ostream &operator<<(ostream &s, const FuncTag &f) {
     return s;
 }
 
-static ostream &operator<<(ostream &s, const VarTag &v) {
+ostream &operator<<(ostream &s, const VarTag &v) {
     if (v & INNER_PURE_VAR) { s << "INNER_PURE_VAR "; }
     if (v & INNER_SCAN_VAR) { s << "INNER_SCAN_VAR "; }
     if (v & OUTER_PURE_VAR) { s << "OUTER_PURE_VAR "; }

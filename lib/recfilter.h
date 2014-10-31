@@ -90,6 +90,15 @@ class RecFilter {
         /** Data members of the recursive filter */
         Halide::Internal::IntrusivePtr<RecFilterContents> contents;
 
+        /** Get the recursive filter function by name */
+        RecFilterFunc& internal_function(std::string func_name);
+
+        /** Get all recursive filter funcs that have the given tag */
+        std::vector<RecFilterFunc> internal_functions(FuncTag ftag);
+
+        /** Get all the vars of a given recursive filter function with the given tag */
+        std::map< int,std::vector<Halide::Var> > internal_function_vars(RecFilterFunc f, VarTag vtag);
+
     public:
 
         /** Macros to indicate causal or anticausal scan */
@@ -388,10 +397,6 @@ class RecFilter {
         RecFilter& reorder_storage (FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
         RecFilter& reorder_storage (FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
         // @}
-
-    private:
-        /** Recursive filter function */
-        RecFilterFunc& internal_function(std::string func_name);
 };
 
 // -----------------------------------------------------------------------------
@@ -405,6 +410,8 @@ std::ostream &operator<<(std::ostream &s, const Halide::Func &f);
 std::ostream &operator<<(std::ostream &s, const Halide::Internal::Function &f);
 std::ostream &operator<<(std::ostream &s, const CheckResult &v);
 std::ostream &operator<<(std::ostream &s, const CheckResultVerbose &v);
+std::ostream &operator<<(std::ostream &s, const FuncTag &f);
+std::ostream &operator<<(std::ostream &s, const VarTag &v);
 // @}
 
 // ----------------------------------------------------------------------------
