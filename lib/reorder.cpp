@@ -147,7 +147,7 @@ static void transpose_function_dimensions(
     }
 
     // swap the scheduling tags of the dimensions
-    RecFilterFunc::VarCategory temp = rF.pure_var_category[a];
+    VarTag temp = rF.pure_var_category[a];
     rF.pure_var_category[a] = rF.pure_var_category[b];
     rF.pure_var_category[b] = temp;
 }
@@ -241,7 +241,7 @@ static bool check_scheduling_tags(
 
     vector<string> diff_vars;
 
-    map<string,RecFilterFunc::VarCategory>::iterator it;
+    map<string,VarTag>::iterator it;
 
     // A and B must have the same scheduling tags for the function itself
     same_func_tags &= (fA.func_category == fB.func_category);
@@ -267,12 +267,12 @@ static bool check_scheduling_tags(
             bool same_pure_def_tags_after_dummy_swap = true;
 
             // apply these swaps on dummy scheduling tags lists
-            map<string,RecFilterFunc::VarCategory> var_cat_A = fA.pure_var_category;
-            map<string,RecFilterFunc::VarCategory> var_cat_B = fB.pure_var_category;
+            map<string,VarTag> var_cat_A = fA.pure_var_category;
+            map<string,VarTag> var_cat_B = fB.pure_var_category;
             for (int i=0; i<var_swaps.size(); i++) {
                 string a = var_swaps[i].first;
                 string b = var_swaps[i].second;
-                RecFilterFunc::VarCategory temp = var_cat_B[a];
+                VarTag temp = var_cat_B[a];
                 var_cat_B[a] = var_cat_B[b];
                 var_cat_B[b] = temp;
             }

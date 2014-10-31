@@ -32,7 +32,7 @@ RecFilter::RecFilter(string n) {
 
     RecFilterFunc f;
     f.func = contents.ptr->recfilter.function();
-    f.func_category = RecFilterFunc::FULL_RESULT_PURE;
+    f.func_category = FULL_RESULT_PURE;
     contents.ptr->func.insert(make_pair(f.func.name(), f));
 }
 
@@ -63,7 +63,7 @@ void RecFilter::setArgs(vector<Var> args) {
         contents.ptr->split_info.push_back(s);
 
         // add tag the dimension as pure
-        f.pure_var_category.insert(make_pair(args[i].name(), RecFilterFunc::PURE_DIMENSION));
+        f.pure_var_category.insert(make_pair(args[i].name(), PURE_DIMENSION));
     }
 }
 
@@ -125,11 +125,11 @@ void RecFilter::addScan(
 
     // copy the dimension tags from pure def replacing x by rx
     // change the function tag from pure to scan
-    map<string, RecFilterFunc::VarCategory> update_var_category = rf.pure_var_category;
+    map<string, VarTag> update_var_category = rf.pure_var_category;
     update_var_category.erase(x.name());
-    update_var_category.insert(make_pair(rx.x.name(), RecFilterFunc::SCAN_DIMENSION));
+    update_var_category.insert(make_pair(rx.x.name(), SCAN_DIMENSION));
     rf.update_var_category.push_back(update_var_category);
-    rf.func_category = RecFilterFunc::FULL_RESULT_SCAN;
+    rf.func_category = FULL_RESULT_SCAN;
 
     // csausality
     bool causal = (causality == CAUSAL);

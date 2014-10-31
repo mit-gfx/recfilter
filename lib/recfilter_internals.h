@@ -39,39 +39,17 @@ struct SplitInfo {
 /** Recursive filter function with scheduling interface */
 class RecFilterFunc {
 public:
-    /** Function categories */
-    typedef enum {
-        INLINE             = 0x0000,
-        FULL_RESULT_SCAN   = 0x0001,
-        FULL_RESULT_PURE   = 0x0002,
-        INTRA_TILE_SCAN    = 0x0004,
-        INTER_TILE_SCAN    = 0x0008,
-        REINDEX_FOR_WRITE  = 0x0010,
-        REINDEX_FOR_READ   = 0x0020,
-    } FuncCategory;
-
-    /** Var categories */
-    typedef enum {
-        INNER_PURE_VAR = 0x0100,
-        INNER_SCAN_VAR = 0x0200,
-        OUTER_PURE_VAR = 0x0400,
-        OUTER_SCAN_VAR = 0x0800,
-        TAIL_DIMENSION = 0x1000,
-        PURE_DIMENSION = 0x2000,
-        SCAN_DIMENSION = 0x4000,
-    } VarCategory;
-
     /** Halide function */
     Halide::Internal::Function func;
 
     /** Category tag for the function */
-    FuncCategory func_category;
+    FuncTag func_category;
 
     /** Category tags for all the pure def vars  */
-    map<std::string, VarCategory> pure_var_category;
+    map<std::string, VarTag> pure_var_category;
 
     /** Category tags for all the vars in all the update defs */
-    vector<map<std::string,VarCategory> >  update_var_category;
+    vector<map<std::string,VarTag> >  update_var_category;
 
     /** Name of a function that calls this function; set if this function
      * has the REINDEX_FOR_READ tag set */

@@ -1,5 +1,4 @@
 #include "recfilter.h"
-#include "recfilter_func.h"
 #include "recfilter_internals.h"
 
 using std::string;
@@ -182,25 +181,25 @@ ostream &operator<<(ostream &s, const CheckResultVerbose &v) {
     return s;
 }
 
-static ostream &operator<<(ostream &s, const RecFilterFunc::FuncCategory &f) {
-    if (f ==RecFilterFunc::INLINE           ) { s << "INLINE "           ; }
-    if (f & RecFilterFunc::FULL_RESULT_SCAN ) { s << "FULL_RESULT_SCAN " ; }
-    if (f & RecFilterFunc::FULL_RESULT_PURE ) { s << "FULL_RESULT_PURE " ; }
-    if (f & RecFilterFunc::INTRA_TILE_SCAN  ) { s << "INTRA_TILE_SCAN "  ; }
-    if (f & RecFilterFunc::INTER_TILE_SCAN  ) { s << "INTER_TILE_SCAN "  ; }
-    if (f & RecFilterFunc::REINDEX_FOR_WRITE) { s << "REINDEX_FOR_WRITE "; }
-    if (f & RecFilterFunc::REINDEX_FOR_READ ) { s << "REINDEX_FOR_READ " ; }
+static ostream &operator<<(ostream &s, const FuncTag &f) {
+    if (f ==INLINE           ) { s << "INLINE "           ; }
+    if (f & FULL_RESULT_SCAN ) { s << "FULL_RESULT_SCAN " ; }
+    if (f & FULL_RESULT_PURE ) { s << "FULL_RESULT_PURE " ; }
+    if (f & INTRA_TILE_SCAN  ) { s << "INTRA_TILE_SCAN "  ; }
+    if (f & INTER_TILE_SCAN  ) { s << "INTER_TILE_SCAN "  ; }
+    if (f & REINDEX_FOR_WRITE) { s << "REINDEX_FOR_WRITE "; }
+    if (f & REINDEX_FOR_READ ) { s << "REINDEX_FOR_READ " ; }
     return s;
 }
 
-static ostream &operator<<(ostream &s, const RecFilterFunc::VarCategory &v) {
-    if (v & RecFilterFunc::INNER_PURE_VAR) { s << "INNER_PURE_VAR "; }
-    if (v & RecFilterFunc::INNER_SCAN_VAR) { s << "INNER_SCAN_VAR "; }
-    if (v & RecFilterFunc::OUTER_PURE_VAR) { s << "OUTER_PURE_VAR "; }
-    if (v & RecFilterFunc::OUTER_SCAN_VAR) { s << "OUTER_SCAN_VAR "; }
-    if (v & RecFilterFunc::TAIL_DIMENSION) { s << "TAIL_DIMENSION "; }
-    if (v & RecFilterFunc::PURE_DIMENSION) { s << "PURE_DIMENSION "; }
-    if (v & RecFilterFunc::SCAN_DIMENSION) { s << "SCAN_DIMENSION "; }
+static ostream &operator<<(ostream &s, const VarTag &v) {
+    if (v & INNER_PURE_VAR) { s << "INNER_PURE_VAR "; }
+    if (v & INNER_SCAN_VAR) { s << "INNER_SCAN_VAR "; }
+    if (v & OUTER_PURE_VAR) { s << "OUTER_PURE_VAR "; }
+    if (v & OUTER_SCAN_VAR) { s << "OUTER_SCAN_VAR "; }
+    if (v & TAIL_DIMENSION) { s << "TAIL_DIMENSION "; }
+    if (v & PURE_DIMENSION) { s << "PURE_DIMENSION "; }
+    if (v & SCAN_DIMENSION) { s << "SCAN_DIMENSION "; }
     return s;
 }
 
@@ -322,16 +321,16 @@ ostream &operator<<(std::ostream &os, const RecFilterFunc &f) {
 
     s << "// Func " << f.func.name() << " synopsis\n";
     s << "// Function tag: " << f.func_category;
-    if (f.func_category & RecFilterFunc::REINDEX_FOR_WRITE) {
+    if (f.func_category & REINDEX_FOR_WRITE) {
         s << " (calls " << f.callee_func <<  ")";
     }
-    if (f.func_category & RecFilterFunc::REINDEX_FOR_READ) {
+    if (f.func_category & REINDEX_FOR_READ) {
         s << " (called by " << f.caller_func <<  ")";
     }
     s << "\n";
 
-    if (f.func_category != RecFilterFunc::INLINE) {
-        map<string, RecFilterFunc::VarCategory>::const_iterator it;
+    if (f.func_category != INLINE) {
+        map<string, VarTag>::const_iterator it;
         s << "// \n";
         s << "// Pure def tags \n";
         for (it=f.pure_var_category.begin(); it!=f.pure_var_category.end(); it++) {
