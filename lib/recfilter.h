@@ -97,7 +97,7 @@ class RecFilter {
         std::vector<std::string> internal_functions(FuncTag ftag);
 
         /** Get all the vars of a given recursive filter function with the given tag */
-        std::map< int,std::vector<Halide::VarOrRVar> > internal_func_vars(RecFilterFunc f, VarTag vtag);
+        std::map< int,std::vector<Halide::Var> > internal_func_vars(RecFilterFunc f, VarTag vtag);
 
     public:
 
@@ -379,7 +379,7 @@ class RecFilter {
         RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z);
         RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
         RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
-        RecFilter& reorder_storgae(FuncTag f, std::vector<VarTag> x);
+        RecFilter& reorder_storage(FuncTag f, std::vector<VarTag> x);
 
         RecFilter& gpu_threads(FuncTag f, VarTag thread_x);
         RecFilter& gpu_threads(FuncTag f, VarTag thread_x, VarTag thread_y);

@@ -29,8 +29,8 @@ vector<string> RecFilter::internal_functions(FuncTag ftag) {
     return func_list;
 }
 
-map< int,vector<VarOrRVar> > RecFilter::internal_func_vars(RecFilterFunc f, VarTag vtag) {
-    map< int,vector<VarOrRVar> > var_list;
+map< int,vector<Var> > RecFilter::internal_func_vars(RecFilterFunc f, VarTag vtag) {
+    map< int,vector<Var> > var_list;
     map<string,VarTag>::iterator vit;
     for (vit = f.pure_var_category.begin(); vit!=f.pure_var_category.end(); vit++) {
         if (vit->second & vtag) {
@@ -110,12 +110,12 @@ RecFilter& RecFilter::parallel(FuncTag ftag, VarTag vtag) {
         RecFilterFunc& rF = internal_function(func_list[i]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<Var> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            vector<Var> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.parallel(var_list[i]);
@@ -142,12 +142,12 @@ RecFilter& RecFilter::parallel(FuncTag ftag, VarTag vtag, Expr task_size) {
         RecFilterFunc& rF = internal_function(func_list[i]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<Var> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            vector<Var> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.parallel(var_list[i], task_size);
@@ -174,12 +174,12 @@ RecFilter& RecFilter::unroll(FuncTag ftag, VarTag vtag) {
         RecFilterFunc& rF = internal_function(func_list[i]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<Var> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            vector<Var> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.unroll(var_list[i]);
@@ -205,12 +205,12 @@ RecFilter& RecFilter::unroll(FuncTag ftag, VarTag vtag, int factor) {
         RecFilterFunc& rF = internal_function(func_list[i]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<Var> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            vector<Var> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.unroll(var_list[i], factor);
@@ -237,12 +237,12 @@ RecFilter& RecFilter::vectorize(FuncTag ftag, VarTag vtag) {
         RecFilterFunc& rF = internal_function(func_list[i]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<Var> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            vector<Var> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.vectorize(var_list[i]);
@@ -269,12 +269,12 @@ RecFilter& RecFilter::vectorize(FuncTag ftag, VarTag vtag, int factor) {
         RecFilterFunc& rF = internal_function(func_list[i]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<Var> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            vector<Var> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.vectorize(var_list[i], factor);
@@ -301,12 +301,12 @@ RecFilter& RecFilter::bound(FuncTag ftag, VarTag vtag, Expr min, Expr extent) {
         RecFilterFunc& rF = internal_function(func_list[i]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<Var> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            vector<Var> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.bound(Var(var_list[i].name()), min, extent);
@@ -326,11 +326,11 @@ RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> x) {
         RecFilterFunc& rF = internal_function(func_list[i]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars;
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map< int,vector<Var> > vars;
+        map< int,vector<Var> >::iterator vit;
 
         for (int i=0; i<x.size(); i++) {
-            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, x[i]);
+            map< int,vector<Var> > vars_x = internal_func_vars(rF, x[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
                 for (int j=0; j<vit->second.size(); j++) {
                     vars[vit->first].push_back(vit->second[j]);
@@ -340,7 +340,7 @@ RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> x) {
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            vector<Var> var_list = vit->second;
             stringstream s;
 
             if (!var_list.empty()) {
@@ -352,10 +352,64 @@ RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> x) {
                     s << "Var(\"" << var_list[i].name() << "\")";
                 }
                 s << "))";
+
+                vector<VarOrRVar> var_or_rvar_list;
+                for (int i=0; i<var_list.size(); i++) {
+                    var_or_rvar_list.push_back(VarOrRVar(var_list[i].name()));
+                }
                 if (def==PURE_DEF) {
-                    F.reorder(var_list);
+                    F.reorder(var_or_rvar_list);
                 } else {
-                    F.update(def).reorder(var_list);
+                    F.update(def).reorder(var_or_rvar_list);
+                }
+                rF.schedule[def].push_back(s.str());
+            }
+        }
+    }
+    return *this;
+}
+
+RecFilter& RecFilter::reorder_storage(FuncTag ftag, vector<VarTag> x) {
+    vector<string> func_list = internal_functions(ftag);
+    for (int i=0; i<func_list.size(); i++) {
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
+
+        map< int,vector<Var> > vars;
+        map< int,vector<Var> >::iterator vit;
+
+        for (int i=0; i<x.size(); i++) {
+            map< int,vector<Var> > vars_x = internal_func_vars(rF, x[i]);
+            for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
+                for (int j=0; j<vit->second.size(); j++) {
+                    vars[vit->first].push_back(vit->second[j]);
+                }
+            }
+        }
+
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            int def = vit->first;
+            vector<Var> var_list = vit->second;
+            stringstream s;
+
+            if (!var_list.empty()) {
+                s << "reorder_storage(Internal::vec(";
+                for (int i=0; i<var_list.size(); i++) {
+                    if (i>0) {
+                        s << ",";
+                    }
+                    s << "Var(\"" << var_list[i].name() << "\")";
+                }
+                s << "))";
+
+                vector<VarOrRVar> var_or_rvar_list;
+                for (int i=0; i<var_list.size(); i++) {
+                    var_or_rvar_list.push_back(VarOrRVar(var_list[i].name()));
+                }
+                if (def==PURE_DEF) {
+                    F.reorder_storage(var_or_rvar_list);
+                } else {
+                    F.update(def).reorder_storage(var_or_rvar_list);
                 }
                 rF.schedule[def].push_back(s.str());
             }
@@ -378,6 +432,22 @@ RecFilter& RecFilter::reorder(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag
 
 RecFilter& RecFilter::reorder(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t) {
     return reorder(ftag, Internal::vec(x,y,z,w,t));
+}
+
+RecFilter& RecFilter::reorder_storage(FuncTag ftag, VarTag x, VarTag y) {
+    return reorder_storage(ftag, Internal::vec(x,y));
+}
+
+RecFilter& RecFilter::reorder_storage(FuncTag ftag, VarTag x, VarTag y, VarTag z) {
+    return reorder_storage(ftag, Internal::vec(x,y,z));
+}
+
+RecFilter& RecFilter::reorder_storage(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag w) {
+    return reorder(ftag, Internal::vec(x,y,z,w));
+}
+
+RecFilter& RecFilter::reorder_storage(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t) {
+    return reorder_storage(ftag, Internal::vec(x,y,z,w,t));
 }
 
 RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag thread_x) {
