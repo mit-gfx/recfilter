@@ -94,10 +94,10 @@ class RecFilter {
         RecFilterFunc& internal_function(std::string func_name);
 
         /** Get all recursive filter funcs that have the given tag */
-        std::vector<RecFilterFunc> internal_functions(FuncTag ftag);
+        std::vector<std::string> internal_functions(FuncTag ftag);
 
         /** Get all the vars of a given recursive filter function with the given tag */
-        std::map< int,std::vector<Halide::Var> > internal_function_vars(RecFilterFunc f, VarTag vtag);
+        std::map< int,std::vector<Halide::VarOrRVar> > internal_func_vars(RecFilterFunc f, VarTag vtag);
 
     public:
 
@@ -357,45 +357,41 @@ class RecFilter {
         /**@name Scheduling operations */
         // {@
 
-        RecFilter& compute_root(FuncTag f);
-        RecFilter& compute_at  (FuncTag f);
-        RecFilter& split       (FuncTag f, VarTag old, VarTag outer, VarTag inner, Halide::Expr factor);
-        RecFilter& fuse        (FuncTag f, VarTag inner, VarTag outer, VarTag fused);
-        RecFilter& serial      (FuncTag f, VarTag var);
-        RecFilter& parallel    (FuncTag f, VarTag var);
-        RecFilter& parallel    (FuncTag f, VarTag var, Halide::Expr task_size);
-        RecFilter& vectorize   (FuncTag f, VarTag var);
-        RecFilter& unroll      (FuncTag f, VarTag var);
-        RecFilter& vectorize   (FuncTag f, VarTag var, int factor);
-        RecFilter& unroll      (FuncTag f, VarTag var, int factor);
-        RecFilter& bound       (FuncTag f, VarTag var, Halide::Expr min, Halide::Expr extent);
-        RecFilter& tile        (FuncTag f, VarTag x, VarTag y, VarTag xo, VarTag yo, VarTag xi, VarTag yi, Halide::Expr xfactor, Halide::Expr yfactor);
-        RecFilter& tile        (FuncTag f, VarTag x, VarTag y, VarTag xi, VarTag yi, Halide::Expr xfactor, Halide::Expr yfactor);
-        RecFilter& reorder     (FuncTag f, VarTag x, VarTag y);
-        RecFilter& reorder     (FuncTag f, VarTag x, VarTag y, VarTag z);
-        RecFilter& reorder     (FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
-        RecFilter& reorder     (FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
-        RecFilter& reorder     (FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t1, VarTag t2);
-        RecFilter& reorder     (FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t1, VarTag t2, VarTag t3);
-        RecFilter& reorder     (FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t1, VarTag t2, VarTag t3, VarTag t4);
-        RecFilter& reorder     (FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t1, VarTag t2, VarTag t3, VarTag t4, VarTag t5);
-        RecFilter& reorder     (FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t1, VarTag t2, VarTag t3, VarTag t4, VarTag t5, VarTag t6);
-        RecFilter& gpu_threads (FuncTag f, VarTag thread_x);
-        RecFilter& gpu_threads (FuncTag f, VarTag thread_x, VarTag thread_y);
-        RecFilter& gpu_threads (FuncTag f, VarTag thread_x, VarTag thread_y, VarTag thread_z);
-        RecFilter& gpu_blocks  (FuncTag f, VarTag block_x);
-        RecFilter& gpu_blocks  (FuncTag f, VarTag block_x, VarTag block_y);
-        RecFilter& gpu_blocks  (FuncTag f, VarTag block_x, VarTag block_y, VarTag block_z);
-        RecFilter& gpu         (FuncTag f, VarTag block_x, VarTag thread_x);
-        RecFilter& gpu         (FuncTag f, VarTag block_x, VarTag block_y, VarTag thread_x, VarTag thread_y);
-        RecFilter& gpu         (FuncTag f, VarTag block_x, VarTag block_y, VarTag block_z, VarTag thread_x, VarTag thread_y, VarTag thread_z);
-        RecFilter& gpu_tile    (FuncTag f, VarTag x, int x_size);
-        RecFilter& gpu_tile    (FuncTag f, VarTag x, VarTag y, int x_size, int y_size);
-        RecFilter& gpu_tile    (FuncTag f, VarTag x, VarTag y, VarTag z, int x_size, int y_size, int z_size);
-        RecFilter& reorder_storage (FuncTag f, VarTag x, VarTag y);
-        RecFilter& reorder_storage (FuncTag f, VarTag x, VarTag y, VarTag z);
-        RecFilter& reorder_storage (FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
-        RecFilter& reorder_storage (FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
+        RecFilter& compute_in_global(FuncTag f);
+        RecFilter& compute_in_shared(FuncTag f);
+
+        RecFilter& parallel (FuncTag f, VarTag var);
+        RecFilter& parallel (FuncTag f, VarTag var, Halide::Expr task_size);
+        RecFilter& unroll   (FuncTag f, VarTag var);
+        RecFilter& unroll   (FuncTag f, VarTag var, int factor);
+        RecFilter& vectorize(FuncTag f, VarTag var);
+        RecFilter& vectorize(FuncTag f, VarTag var, int factor);
+        RecFilter& bound    (FuncTag f, VarTag var, Halide::Expr min, Halide::Expr extent);
+        RecFilter& split    (FuncTag f, VarTag old, Halide::Expr factor);
+
+        RecFilter& reorder(FuncTag f, VarTag x, VarTag y);
+        RecFilter& reorder(FuncTag f, VarTag x, VarTag y, VarTag z);
+        RecFilter& reorder(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
+        RecFilter& reorder(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
+        RecFilter& reorder(FuncTag f, std::vector<VarTag> x);
+
+        RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y);
+        RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z);
+        RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
+        RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
+        RecFilter& reorder_storgae(FuncTag f, std::vector<VarTag> x);
+
+        RecFilter& gpu_threads(FuncTag f, VarTag thread_x);
+        RecFilter& gpu_threads(FuncTag f, VarTag thread_x, VarTag thread_y);
+        RecFilter& gpu_threads(FuncTag f, VarTag thread_x, VarTag thread_y, VarTag thread_z);
+
+        RecFilter& gpu_blocks(FuncTag f, VarTag block_x);
+        RecFilter& gpu_blocks(FuncTag f, VarTag block_x, VarTag block_y);
+        RecFilter& gpu_blocks(FuncTag f, VarTag block_x, VarTag block_y, VarTag block_z);
+
+        RecFilter& gpu_tile(FuncTag f, VarTag x, int x_size);
+        RecFilter& gpu_tile(FuncTag f, VarTag x, VarTag y, int x_size, int y_size);
+        RecFilter& gpu_tile(FuncTag f, VarTag x, VarTag y, VarTag z, int x_size, int y_size, int z_size);
         // @}
 };
 

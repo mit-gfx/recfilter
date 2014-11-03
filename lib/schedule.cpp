@@ -5,17 +5,20 @@ using std::cerr;
 using std::endl;
 using std::vector;
 using std::map;
+using std::stringstream;
 using std::make_pair;
 
 using namespace Halide;
 
-vector<RecFilterFunc> RecFilter::internal_functions(FuncTag ftag) {
-    vector<RecFilterFunc> func_list;
+#define PURE_DEF  (-1)
+
+vector<string> RecFilter::internal_functions(FuncTag ftag) {
+    vector<string> func_list;
     map<string,RecFilterFunc>::iterator f_it  = contents.ptr->func.begin();
     map<string,RecFilterFunc>::iterator f_end = contents.ptr->func.end();
     while (f_it != f_end) {
         if (f_it->second.func_category & ftag) {
-            func_list.push_back(f_it->second);
+            func_list.push_back(f_it->second.func.name());
         }
         f_it++;
     }
@@ -26,25 +29,21 @@ vector<RecFilterFunc> RecFilter::internal_functions(FuncTag ftag) {
     return func_list;
 }
 
-map< int,vector<Var> > RecFilter::internal_function_vars(RecFilterFunc f, VarTag vtag) {
-    map< int,vector<Var> > var_list;
-
+map< int,vector<VarOrRVar> > RecFilter::internal_func_vars(RecFilterFunc f, VarTag vtag) {
+    map< int,vector<VarOrRVar> > var_list;
     map<string,VarTag>::iterator vit;
-
     for (vit = f.pure_var_category.begin(); vit!=f.pure_var_category.end(); vit++) {
         if (vit->second & vtag) {
-            var_list[-1].push_back(Var(vit->first)); // vars in pure defs are mapped to -1
+            var_list[PURE_DEF].push_back(Var(vit->first));
         }
     }
-
     for (int i=0; i<f.update_var_category.size(); i++) {
         for (vit=f.update_var_category[i].begin(); vit!=f.update_var_category[i].end(); vit++) {
             if (vit->second & vtag) {
-                var_list[i].push_back(Var(vit->first)); // vars in update defs are mapped to update def number
+                var_list[i].push_back(Var(vit->first));
             }
         }
     }
-
     if (var_list.empty()) {
         cerr << "No variables in function " << f.func.name() <<
             " have the given scheduling tag " << vtag << endl;
@@ -53,345 +52,402 @@ map< int,vector<Var> > RecFilter::internal_function_vars(RecFilterFunc f, VarTag
     return var_list;
 }
 
-RecFilter& RecFilter::compute_root(FuncTag ftag) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+RecFilter& RecFilter::compute_in_global(FuncTag ftag) {
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
+
+        F.compute_root();
+
+        string schedule_op_str = "compute_root()";
+        rF.schedule[PURE_DEF].push_back(schedule_op_str);
     }
     return *this;
 }
 
-RecFilter& RecFilter::compute_at  (FuncTag ftag) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+RecFilter& RecFilter::compute_in_shared(FuncTag ftag) {
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
+
+        // find the functions that is REINDEX_FOR_WRITE and calls this function
+        vector<Func> callee_funcs;
+        map<string,RecFilterFunc>::iterator f;
+        for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
+            if ((f->second.func_category & REINDEX_FOR_WRITE) && f->second.callee_func==F.name()) {
+                callee_funcs.push_back(Func(f->second.func));
+            }
+        }
+
+        // merge them if there are multiple such functions
+        if (callee_funcs.size()>1) {
+            cerr << "TODO: Merging required" << endl;
+            assert(false);
+        } else {
+            F.compute_at(callee_funcs[0], Var::gpu_blocks());
+            string schedule_op_str = "compute_at(" + callee_funcs[0].name() +
+                ", Var::gpu_blocks())";
+            rF.schedule[PURE_DEF].push_back(schedule_op_str);
+        }
     }
     return *this;
 }
 
-RecFilter& RecFilter::split(FuncTag ftag, VarTag old, VarTag outer, VarTag inner, Expr factor) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+RecFilter& RecFilter::split(FuncTag ftag, VarTag old, Expr factor) {
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
     }
     return *this;
 }
 
-RecFilter& RecFilter::fuse(FuncTag ftag, VarTag inner, VarTag outer, VarTag fused) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+RecFilter& RecFilter::parallel(FuncTag ftag, VarTag vtag) {
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
+
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
+
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            int def = vit->first;
+            vector<VarOrRVar> var_list = vit->second;
+            if (def==PURE_DEF) {
+                for (int i=0; i<var_list.size(); i++) {
+                    F.parallel(var_list[i]);
+                    stringstream s;
+                    s << "parallel(Var(\"" << var_list[i].name() << "\"))";
+                    rF.schedule[PURE_DEF].push_back(s.str());
+                }
+            } else {
+                for (int i=0; i<var_list.size(); i++) {
+                    F.update(def).parallel(var_list[i]);
+                    stringstream s;
+                    s << "parallel(Var(\"" << var_list[i].name() << "\"))";
+                    rF.schedule[def].push_back(s.str());
+                }
+            }
+        }
     }
     return *this;
 }
 
-RecFilter& RecFilter::parallel(FuncTag ftag, VarTag var) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+RecFilter& RecFilter::parallel(FuncTag ftag, VarTag vtag, Expr task_size) {
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
+
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
+
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            int def = vit->first;
+            vector<VarOrRVar> var_list = vit->second;
+            if (def==PURE_DEF) {
+                for (int i=0; i<var_list.size(); i++) {
+                    F.parallel(var_list[i], task_size);
+                    stringstream s;
+                    s << "parallel(Var(\"" << var_list[i].name() << "\")," << task_size << ")";
+                    rF.schedule[def].push_back(s.str());
+                }
+            } else {
+                for (int i=0; i<var_list.size(); i++) {
+                    F.update(def).parallel(var_list[i], task_size);
+                    stringstream s;
+                    s << "parallel(Var(\"" << var_list[i].name() << "\")," << task_size << ")";
+                    rF.schedule[def].push_back(s.str());
+                }
+            }
+        }
     }
     return *this;
 }
 
-RecFilter& RecFilter::parallel(FuncTag ftag, VarTag var, Expr task_size) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+RecFilter& RecFilter::unroll(FuncTag ftag, VarTag vtag) {
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
+
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
+
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            int def = vit->first;
+            vector<VarOrRVar> var_list = vit->second;
+            if (def==PURE_DEF) {
+                for (int i=0; i<var_list.size(); i++) {
+                    F.unroll(var_list[i]);
+                    stringstream s;
+                    s << "unroll(Var(\"" << var_list[i].name() << "\"))";
+                    rF.schedule[def].push_back(s.str());
+                }
+            } else {
+                for (int i=0; i<var_list.size(); i++) {
+                    F.update(def).unroll(var_list[i]);
+                    stringstream s;
+                    s << "unroll(Var(\"" << var_list[i].name() << "\"))";
+                    rF.schedule[def].push_back(s.str());
+                }
+            }
+        }}
+    return *this;
+}
+
+RecFilter& RecFilter::unroll(FuncTag ftag, VarTag vtag, int factor) {
+    vector<string> func_list = internal_functions(ftag);
+    for (int i=0; i<func_list.size(); i++) {
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
+
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
+
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            int def = vit->first;
+            vector<VarOrRVar> var_list = vit->second;
+            if (def==PURE_DEF) {
+                for (int i=0; i<var_list.size(); i++) {
+                    F.unroll(var_list[i], factor);
+                    stringstream s;
+                    s << "unroll(Var(\"" << var_list[i].name() << "\")," << factor << ")";
+                    rF.schedule[def].push_back(s.str());
+                }
+            } else {
+                for (int i=0; i<var_list.size(); i++) {
+                    F.update(def).unroll(var_list[i], factor);
+                    stringstream s;
+                    s << "unroll(Var(\"" << var_list[i].name() << "\")," << factor << ")";
+                    rF.schedule[def].push_back(s.str());
+                }
+            }
+        }
     }
     return *this;
 }
 
-RecFilter& RecFilter::vectorize(FuncTag ftag, VarTag var) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+RecFilter& RecFilter::vectorize(FuncTag ftag, VarTag vtag) {
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
+
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
+
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            int def = vit->first;
+            vector<VarOrRVar> var_list = vit->second;
+            if (def==PURE_DEF) {
+                for (int i=0; i<var_list.size(); i++) {
+                    F.vectorize(var_list[i]);
+                    stringstream s;
+                    s << "vectorize(Var(\"" << var_list[i].name() << "\"))";
+                    rF.schedule[def].push_back(s.str());
+                }
+            } else {
+                for (int i=0; i<var_list.size(); i++) {
+                    F.update(def).vectorize(var_list[i]);
+                    stringstream s;
+                    s << "vectorize(Var(\"" << var_list[i].name() << "\"))";
+                    rF.schedule[def].push_back(s.str());
+                }
+            }
+        }
     }
     return *this;
 }
 
-RecFilter& RecFilter::unroll(FuncTag ftag, VarTag var) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+RecFilter& RecFilter::vectorize(FuncTag ftag, VarTag vtag, int factor) {
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
+
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
+
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            int def = vit->first;
+            vector<VarOrRVar> var_list = vit->second;
+            if (def==PURE_DEF) {
+                for (int i=0; i<var_list.size(); i++) {
+                    F.vectorize(var_list[i], factor);
+                    stringstream s;
+                    s << "vectorize(Var(\"" << var_list[i].name() << "\")," << factor << ")";
+                    rF.schedule[def].push_back(s.str());
+                }
+            } else {
+                for (int i=0; i<var_list.size(); i++) {
+                    F.update(def).vectorize(var_list[i], factor);
+                    stringstream s;
+                    s << "vectorize(Var(\"" << var_list[i].name() << "\")," << factor << ")";
+                    rF.schedule[def].push_back(s.str());
+                }
+            }
+        }
     }
     return *this;
 }
 
-RecFilter& RecFilter::vectorize(FuncTag ftag, VarTag var, int factor) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+RecFilter& RecFilter::bound(FuncTag ftag, VarTag vtag, Expr min, Expr extent) {
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
+
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
+
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            int def = vit->first;
+            vector<VarOrRVar> var_list = vit->second;
+            if (def==PURE_DEF) {
+                for (int i=0; i<var_list.size(); i++) {
+                    F.bound(Var(var_list[i].name()), min, extent);
+                    stringstream s;
+                    s << "bound(Var(\"" << var_list[i].name() << "," << min << "," << extent << ")";
+                    rF.schedule[def].push_back(s.str());
+                }
+            }
+        }
     }
     return *this;
 }
 
-RecFilter& RecFilter::unroll(FuncTag ftag, VarTag var, int factor) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> x) {
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
 
-RecFilter& RecFilter::bound(FuncTag ftag, VarTag var, Expr min, Expr extent) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
+        map< int,vector<VarOrRVar> > vars;
+        map< int,vector<VarOrRVar> >::iterator vit;
 
-RecFilter& RecFilter::tile(FuncTag ftag, VarTag x, VarTag y, VarTag xo, VarTag yo, VarTag xi, VarTag yi, Expr xfactor, Expr yfactor) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
+        for (int i=0; i<x.size(); i++) {
+            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, x[i]);
+            for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
+                for (int j=0; j<vit->second.size(); j++) {
+                    vars[vit->first].push_back(vit->second[j]);
+                }
+            }
+        }
 
-RecFilter& RecFilter::tile(FuncTag ftag, VarTag x, VarTag y, VarTag xi, VarTag yi, Expr xfactor, Expr yfactor) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            int def = vit->first;
+            vector<VarOrRVar> var_list = vit->second;
+            stringstream s;
+
+            if (!var_list.empty()) {
+                s << "reorder(Internal::vec(";
+                for (int i=0; i<var_list.size(); i++) {
+                    if (i>0) {
+                        s << ",";
+                    }
+                    s << "Var(\"" << var_list[i].name() << "\")";
+                }
+                s << "))";
+                if (def==PURE_DEF) {
+                    F.reorder(var_list);
+                } else {
+                    F.update(def).reorder(var_list);
+                }
+                rF.schedule[def].push_back(s.str());
+            }
+        }
     }
     return *this;
 }
 
 RecFilter& RecFilter::reorder(FuncTag ftag, VarTag x, VarTag y) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
+    return reorder(ftag, Internal::vec(x,y));
 }
 
 RecFilter& RecFilter::reorder(FuncTag ftag, VarTag x, VarTag y, VarTag z) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
+    return reorder(ftag, Internal::vec(x,y,z));
 }
 
 RecFilter& RecFilter::reorder(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag w) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
+    return reorder(ftag, Internal::vec(x,y,z,w));
 }
 
 RecFilter& RecFilter::reorder(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
-
-RecFilter& RecFilter::reorder(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t1, VarTag t2) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
-
-RecFilter& RecFilter::reorder(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t1, VarTag t2, VarTag t3) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
-
-RecFilter& RecFilter::reorder(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t1, VarTag t2, VarTag t3, VarTag t4) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
-
-RecFilter& RecFilter::reorder(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t1, VarTag t2, VarTag t3, VarTag t4, VarTag t5) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
-
-RecFilter& RecFilter::reorder(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t1, VarTag t2, VarTag t3, VarTag t4, VarTag t5, VarTag t6) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
+    return reorder(ftag, Internal::vec(x,y,z,w,t));
 }
 
 RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag thread_x) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
     }
     return *this;
 }
 
 RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag thread_x, VarTag thread_y) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
     }
     return *this;
 }
 
 RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag thread_x, VarTag thread_y, VarTag thread_z) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
     }
     return *this;
 }
 
 RecFilter& RecFilter::gpu_blocks(FuncTag ftag, VarTag block_x) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
     }
     return *this;
 }
 
 RecFilter& RecFilter::gpu_blocks(FuncTag ftag, VarTag block_x, VarTag block_y) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
-
-RecFilter& RecFilter::gpu_blocks(FuncTag ftag, VarTag block_x, VarTag block_y, VarTag block_z) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
-
-RecFilter& RecFilter::gpu(FuncTag ftag, VarTag block_x, VarTag thread_x) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
-
-RecFilter& RecFilter::gpu(FuncTag ftag, VarTag block_x, VarTag block_y, VarTag thread_x, VarTag thread_y) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
-
-RecFilter& RecFilter::gpu(FuncTag ftag, VarTag block_x, VarTag block_y, VarTag block_z, VarTag thread_x, VarTag thread_y, VarTag thread_z) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
     }
     return *this;
 }
 
 RecFilter& RecFilter::gpu_tile(FuncTag ftag, VarTag x, int x_size) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
     }
     return *this;
 }
 
 RecFilter& RecFilter::gpu_tile(FuncTag ftag, VarTag x, VarTag y, int x_size, int y_size) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
     }
     return *this;
 }
 
 RecFilter& RecFilter::gpu_tile(FuncTag ftag, VarTag x, VarTag y, VarTag z, int x_size, int y_size, int z_size) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
+    vector<string> func_list = internal_functions(ftag);
     for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
-
-
-RecFilter& RecFilter::reorder_storage(FuncTag ftag, VarTag x, VarTag y) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
-
-RecFilter& RecFilter::reorder_storage(FuncTag ftag, VarTag x, VarTag y, VarTag z) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
-
-RecFilter& RecFilter::reorder_storage(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag w) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
-    }
-    return *this;
-}
-
-RecFilter& RecFilter::reorder_storage(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t) {
-    vector<RecFilterFunc> func_list = internal_functions(ftag);
-    for (int i=0; i<func_list.size(); i++) {
-        RecFilterFunc rF = func_list[i];
-        Func           F = Func(rF.func);
+        RecFilterFunc& rF = internal_function(func_list[i]);
+        Func            F = Func(rF.func);
     }
     return *this;
 }

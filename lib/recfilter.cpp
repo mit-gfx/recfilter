@@ -390,4 +390,24 @@ void RecFilter::generate_hl_code(ostream &s) const {
         s << f->second.func << "\n";
     }
     s << "\n";
+    for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
+        map<int,vector<string> >::iterator sit = f->second.schedule.begin();
+        map<int,vector<string> >::iterator se  = f->second.schedule.end();
+        while (sit!=se) {
+            int def = sit->first;
+            vector<string> str = sit->second;
+            if (!str.empty()) {
+                s << f->second.func.name();
+                if (def>=0) {
+                    s << ".update(" << def << ")";
+                }
+            }
+            for (int i=0; i<str.size(); i++) {
+                s << "." << str[i];
+            }
+            s << ";\n";
+            sit++;
+        }
+    }
+    s << "\n";
 }

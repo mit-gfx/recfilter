@@ -46,21 +46,22 @@ public:
     FuncTag func_category;
 
     /** Category tags for all the pure def vars  */
-    map<std::string, VarTag> pure_var_category;
+    std::map<std::string, VarTag> pure_var_category;
 
     /** Category tags for all the vars in all the update defs */
-    vector<map<std::string,VarTag> >  update_var_category;
+    std::vector<map<std::string,VarTag> >  update_var_category;
 
     /** Name of a function that calls this function; set if this function
      * has the REINDEX_FOR_READ tag set */
-    string caller_func;
+    std::string caller_func;
 
     /** Name of a function that this function calls; set if this function
      * has the REINDEX_FOR_WRITE tag set */
-    string callee_func;
+    std::string callee_func;
 
-    /** Function schedule as valid Halide code */
-    vector<std::string> as_string;
+    /** Function schedule as valid Halide code; first element is pure
+     * def schedule, subsequent entries are update def schedule */
+    std::map<int, std::vector<std::string> >  schedule;
 };
 
 // ----------------------------------------------------------------------------
