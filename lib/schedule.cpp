@@ -343,7 +343,7 @@ RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> x) {
             vector<Var> var_list = vit->second;
             stringstream s;
 
-            if (!var_list.empty()) {
+            if (var_list.size() > 2) {                 // at least 2 to reorder
                 s << "reorder(Internal::vec(";
                 for (int i=0; i<var_list.size(); i++) {
                     if (i>0) {
@@ -387,32 +387,29 @@ RecFilter& RecFilter::reorder_storage(FuncTag ftag, vector<VarTag> x) {
             }
         }
 
-        for (vit=vars.begin(); vit!=vars.end(); vit++) {
-            int def = vit->first;
-            vector<Var> var_list = vit->second;
-            stringstream s;
+        vector<Var> var_list = vars[PURE_DEF];
+        stringstream s;
 
-            if (!var_list.empty()) {
-                s << "reorder_storage(Internal::vec(";
-                for (int i=0; i<var_list.size(); i++) {
-                    if (i>0) {
-                        s << ",";
-                    }
-                    s << "Var(\"" << var_list[i].name() << "\")";
+        if (var_list.size() > 2) {                 // at least 2 to reorder
+            s << "reorder_storage(Internal::vec(";
+            for (int i=0; i<var_list.size(); i++) {
+                if (i>0) {
+                    s << ",";
                 }
-                s << "))";
-
-                vector<VarOrRVar> var_or_rvar_list;
-                for (int i=0; i<var_list.size(); i++) {
-                    var_or_rvar_list.push_back(VarOrRVar(var_list[i].name()));
-                }
-                if (def==PURE_DEF) {
-                    F.reorder_storage(var_or_rvar_list);
-                } else {
-                    F.update(def).reorder_storage(var_or_rvar_list);
-                }
-                rF.schedule[def].push_back(s.str());
+                s << "Var(\"" << var_list[i].name() << "\")";
             }
+            s << "))";
+
+            switch (var_list.size()) {
+                case 2: F.reorder_storage(var_list[0], var_list[1]); break;
+                case 3: F.reorder_storage(var_list[0], var_list[1], var_list[2]); break;
+                case 4: F.reorder_storage(var_list[0], var_list[1], var_list[2], var_list[3]); break;
+                case 5: F.reorder_storage(var_list[0], var_list[1], var_list[2], var_list[3], var_list[4]); break;
+                default:
+                    cerr << "Too many variables in reorder_storage" << endl;
+                    assert(false);
+            }
+            rF.schedule[PURE_DEF].push_back(s.str());
         }
     }
     return *this;
