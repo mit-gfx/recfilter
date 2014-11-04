@@ -361,7 +361,7 @@ RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> x) {
                         case 4: F.reorder(var_list[0], var_list[1], var_list[2], var_list[3]); break;
                         case 5: F.reorder(var_list[0], var_list[1], var_list[2], var_list[3], var_list[4]); break;
                         case 6: F.reorder(var_list[0], var_list[1], var_list[2], var_list[3], var_list[4], var_list[5]); break;
-                        default:cerr << "Too many variables in reorder_storage" << endl; assert(false); break;
+                        default:cerr << "Too many variables in reorder()" << endl; assert(false); break;
                     }
                 } else {
                     switch (var_list.size()) {
@@ -370,7 +370,7 @@ RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> x) {
                         case 4: F.update(def).reorder(var_list[0], var_list[1], var_list[2], var_list[3]); break;
                         case 5: F.update(def).reorder(var_list[0], var_list[1], var_list[2], var_list[3], var_list[4]); break;
                         case 6: F.update(def).reorder(var_list[0], var_list[1], var_list[2], var_list[3], var_list[4], var_list[5]); break;
-                        default:cerr << "Too many variables in reorder_storage" << endl; assert(false); break;
+                        default:cerr << "Too many variables in reorder()" << endl; assert(false); break;
                     }
                 }
                 rF.schedule[def].push_back(s.str());
@@ -416,7 +416,7 @@ RecFilter& RecFilter::reorder_storage(FuncTag ftag, vector<VarTag> x) {
                 case 3: F.reorder_storage(var_list[0], var_list[1], var_list[2]); break;
                 case 4: F.reorder_storage(var_list[0], var_list[1], var_list[2], var_list[3]); break;
                 case 5: F.reorder_storage(var_list[0], var_list[1], var_list[2], var_list[3], var_list[4]); break;
-                default:cerr << "Too many variables in reorder_storage" << endl; assert(false); break;
+                default:cerr << "Too many variables in reorder_storage()" << endl; assert(false); break;
             }
             rF.schedule[PURE_DEF].push_back(s.str());
         }
