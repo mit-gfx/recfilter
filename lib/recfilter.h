@@ -97,7 +97,7 @@ class RecFilter {
         std::vector<std::string> internal_functions(FuncTag ftag);
 
         /** Get all the vars of a given recursive filter function with the given tag */
-        std::map< int,std::vector<Halide::Var> > internal_func_vars(RecFilterFunc f, VarTag vtag);
+        std::map< int,std::vector<Halide::VarOrRVar> > internal_func_vars(RecFilterFunc f, VarTag vtag);
 
     public:
 

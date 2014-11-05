@@ -28,7 +28,7 @@ Halide::Expr gaussIntegral  (Halide::Expr x, float mu, float sigma);
  *
  * @return feedforward coeff and vector of feedback coeff
  */
-std::pair<float, vector<float> >
+std::pair<float, std::vector<float> >
 gaussian_weights(
         float sigma,   ///< Gaussian sigma
         int order      ///< recursive filter order for approximating Gaussian

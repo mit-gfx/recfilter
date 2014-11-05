@@ -25,10 +25,10 @@ struct SplitInfo {
     Halide::RDom outer_rdom;            ///< outer RDom of each scan
     Halide::RDom tail_rdom;             ///< RDom to extract the tail of each scan
 
-    vector<bool> scan_causal;           ///< causal or anticausal flag for each scan
-    vector<int>  scan_id;               ///< scan or update definition id of each scan
+    std::vector<bool> scan_causal;      ///< causal or anticausal flag for each scan
+    std::vector<int>  scan_id;          ///< scan or update definition id of each scan
 
-    vector<Halide::Expr> border_expr;   ///< image border value (can't contain the var or rdom)
+    std::vector<Halide::Expr> border_expr;   ///< image border value (can't contain the var or rdom)
 
     Halide::Image<float> feedfwd_coeff; ///< feedforward coeffs, only one for each scan
     Halide::Image<float> feedback_coeff;///< feedback coeffs (num_scans x max_order) order j-th coeff of i-th scan is (i+1,j) */
@@ -49,7 +49,7 @@ public:
     std::map<std::string, VarTag> pure_var_category;
 
     /** Category tags for all the vars in all the update defs */
-    std::vector<map<std::string,VarTag> >  update_var_category;
+    std::vector<std::map<std::string,VarTag> >  update_var_category;
 
     /** Name of a function that calls this function; set if this function
      * has the REINDEX_FOR_READ tag set */

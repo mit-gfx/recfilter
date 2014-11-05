@@ -2,6 +2,7 @@
 #include "recfilter_internals.h"
 
 using std::string;
+using std::map;
 using std::vector;
 using std::cerr;
 using std::endl;

@@ -5,6 +5,7 @@ using std::cerr;
 using std::endl;
 using std::vector;
 using std::map;
+using std::string;
 using std::stringstream;
 using std::pair;
 using std::make_pair;
@@ -73,12 +74,12 @@ RecFilter& RecFilter::parallel(FuncTag ftag, VarTag vtag) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<Var> >::iterator vit;
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<Var> var_list = vit->second;
+            vector<VarOrRVar> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.parallel(var_list[i]);
@@ -105,12 +106,12 @@ RecFilter& RecFilter::parallel(FuncTag ftag, VarTag vtag, Expr task_size) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<Var> >::iterator vit;
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<Var> var_list = vit->second;
+            vector<VarOrRVar> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.parallel(var_list[i], task_size);
@@ -137,12 +138,12 @@ RecFilter& RecFilter::unroll(FuncTag ftag, VarTag vtag) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<Var> >::iterator vit;
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<Var> var_list = vit->second;
+            vector<VarOrRVar> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.unroll(var_list[i]);
@@ -168,12 +169,12 @@ RecFilter& RecFilter::unroll(FuncTag ftag, VarTag vtag, int factor) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<Var> >::iterator vit;
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<Var> var_list = vit->second;
+            vector<VarOrRVar> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.unroll(var_list[i], factor);
@@ -200,12 +201,12 @@ RecFilter& RecFilter::vectorize(FuncTag ftag, VarTag vtag) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<Var> >::iterator vit;
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<Var> var_list = vit->second;
+            vector<VarOrRVar> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.vectorize(var_list[i]);
@@ -232,12 +233,12 @@ RecFilter& RecFilter::vectorize(FuncTag ftag, VarTag vtag, int factor) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<Var> >::iterator vit;
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<Var> var_list = vit->second;
+            vector<VarOrRVar> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.vectorize(var_list[i], factor);
@@ -264,12 +265,12 @@ RecFilter& RecFilter::bound(FuncTag ftag, VarTag vtag, Expr min, Expr extent) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<Var> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<Var> >::iterator vit;
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
+        map< int,vector<VarOrRVar> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<Var> var_list = vit->second;
+            vector<VarOrRVar> var_list = vit->second;
             if (def==PURE_DEF) {
                 for (int i=0; i<var_list.size(); i++) {
                     F.bound(Var(var_list[i].name()), min, extent);
@@ -357,11 +358,11 @@ RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> x) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<Var> > vars;
-        map< int,vector<Var> >::iterator vit;
+        map< int,vector<VarOrRVar> > vars;
+        map< int,vector<VarOrRVar> >::iterator vit;
 
         for (int i=0; i<x.size(); i++) {
-            map< int,vector<Var> > vars_x = internal_func_vars(rF, x[i]);
+            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, x[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
                 for (int k=0; k<vit->second.size(); k++) {
                     vars[vit->first].push_back(vit->second[k]);
@@ -371,7 +372,7 @@ RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> x) {
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<Var> var_list = vit->second;
+            vector<VarOrRVar> var_list = vit->second;
             stringstream s;
 
             if (var_list.size() > 2) {                 // at least 2 to reorder
@@ -384,25 +385,10 @@ RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> x) {
                 }
                 s << "))";
 
-                // only support up to 6 variables to reorder
                 if (def==PURE_DEF) {
-                    switch (var_list.size()) {
-                        case 2: F.reorder(var_list[0], var_list[1]); break;
-                        case 3: F.reorder(var_list[0], var_list[1], var_list[2]); break;
-                        case 4: F.reorder(var_list[0], var_list[1], var_list[2], var_list[3]); break;
-                        case 5: F.reorder(var_list[0], var_list[1], var_list[2], var_list[3], var_list[4]); break;
-                        case 6: F.reorder(var_list[0], var_list[1], var_list[2], var_list[3], var_list[4], var_list[5]); break;
-                        default:cerr << "Too many variables in reorder()" << endl; assert(false); break;
-                    }
+                    F.reorder(var_list); break;
                 } else {
-                    switch (var_list.size()) {
-                        case 2: F.update(def).reorder(var_list[0], var_list[1]); break;
-                        case 3: F.update(def).reorder(var_list[0], var_list[1], var_list[2]); break;
-                        case 4: F.update(def).reorder(var_list[0], var_list[1], var_list[2], var_list[3]); break;
-                        case 5: F.update(def).reorder(var_list[0], var_list[1], var_list[2], var_list[3], var_list[4]); break;
-                        case 6: F.update(def).reorder(var_list[0], var_list[1], var_list[2], var_list[3], var_list[4], var_list[5]); break;
-                        default:cerr << "Too many variables in reorder()" << endl; assert(false); break;
-                    }
+                    F.update(def).reorder(var_list); break;
                 }
                 rF.schedule[def].push_back(s.str());
             }
@@ -417,11 +403,11 @@ RecFilter& RecFilter::reorder_storage(FuncTag ftag, vector<VarTag> x) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<Var> > vars;
-        map< int,vector<Var> >::iterator vit;
+        map< int,vector<VarOrRVar> > vars;
+        map< int,vector<VarOrRVar> >::iterator vit;
 
         for (int i=0; i<x.size(); i++) {
-            map< int,vector<Var> > vars_x = internal_func_vars(rF, x[i]);
+            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, x[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
                 for (int k=0; k<vit->second.size(); k++) {
                     vars[vit->first].push_back(vit->second[k]);
@@ -429,7 +415,7 @@ RecFilter& RecFilter::reorder_storage(FuncTag ftag, vector<VarTag> x) {
             }
         }
 
-        vector<Var> var_list = vars[PURE_DEF];
+        vector<VarOrRVar> var_list = vars[PURE_DEF];
         stringstream s;
 
         if (var_list.size() > 2) {                 // at least 2 to reorder
@@ -443,10 +429,20 @@ RecFilter& RecFilter::reorder_storage(FuncTag ftag, vector<VarTag> x) {
             s << "))";
 
             switch (var_list.size()) {
-                case 2: F.reorder_storage(var_list[0], var_list[1]); break;
-                case 3: F.reorder_storage(var_list[0], var_list[1], var_list[2]); break;
-                case 4: F.reorder_storage(var_list[0], var_list[1], var_list[2], var_list[3]); break;
-                case 5: F.reorder_storage(var_list[0], var_list[1], var_list[2], var_list[3], var_list[4]); break;
+                case 2: F.reorder_storage(var_list[0].var,
+                                          var_list[1].var); break;
+                case 3: F.reorder_storage(var_list[0].var,
+                                          var_list[1].var,
+                                          var_list[2].var); break;
+                case 4: F.reorder_storage(var_list[0].var,
+                                          var_list[1].var,
+                                          var_list[2].var,
+                                          var_list[3].var); break;
+                case 5: F.reorder_storage(var_list[0].var,
+                                          var_list[1].var,
+                                          var_list[2].var,
+                                          var_list[3].var,
+                                          var_list[4].var); break;
                 default:cerr << "Too many variables in reorder_storage()" << endl; assert(false); break;
             }
             rF.schedule[PURE_DEF].push_back(s.str());
@@ -475,11 +471,11 @@ RecFilter& RecFilter::gpu_threads(FuncTag ftag, vector<VarTag> thread) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<Var> > vars;
-        map< int,vector<Var> >::iterator vit;
+        map< int,vector<VarOrRVar> > vars;
+        map< int,vector<VarOrRVar> >::iterator vit;
 
         for (int i=0; i<thread.size(); i++) {
-            map< int,vector<Var> > vars_x = internal_func_vars(rF, thread[i]);
+            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, thread[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
                 if (vit->second.size()>1) {
                     cerr << "Multiple vars found with same tag, "
@@ -494,7 +490,7 @@ RecFilter& RecFilter::gpu_threads(FuncTag ftag, vector<VarTag> thread) {
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<Var> var_list = vit->second;
+            vector<VarOrRVar> var_list = vit->second;
             stringstream s;
 
             if (var_list.size()) {
@@ -507,7 +503,7 @@ RecFilter& RecFilter::gpu_threads(FuncTag ftag, vector<VarTag> thread) {
                 }
                 s << ")";
 
-                // only support up to 6 variables to reorder
+                // only support up to 3 variables
                 if (def==PURE_DEF) {
                     switch (var_list.size()) {
                         case 1: F.gpu_threads(var_list[0]); break;
@@ -550,11 +546,11 @@ RecFilter& RecFilter::gpu_blocks(FuncTag ftag, vector<VarTag> block) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<Var> > vars;
-        map< int,vector<Var> >::iterator vit;
+        map< int,vector<VarOrRVar> > vars;
+        map< int,vector<VarOrRVar> >::iterator vit;
 
         for (int i=0; i<block.size(); i++) {
-            map< int,vector<Var> > vars_x = internal_func_vars(rF, block[i]);
+            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, block[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
                 if (vit->second.size()>1) {
                     cerr << "Multiple vars found with same tag, "
@@ -569,7 +565,7 @@ RecFilter& RecFilter::gpu_blocks(FuncTag ftag, vector<VarTag> block) {
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<Var> var_list = vit->second;
+            vector<VarOrRVar> var_list = vit->second;
             stringstream s;
 
             if (var_list.size()) {
@@ -582,7 +578,7 @@ RecFilter& RecFilter::gpu_blocks(FuncTag ftag, vector<VarTag> block) {
                 }
                 s << ")";
 
-                // only support up to 6 variables to reorder
+                // only support up to 3 variables
                 if (def==PURE_DEF) {
                     switch (var_list.size()) {
                         case 1: F.gpu_blocks(var_list[0]); break;
@@ -625,11 +621,11 @@ RecFilter& RecFilter::gpu_tile(FuncTag ftag, vector< pair<VarTag,int> > tile) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<pair<Var,int> > > vars;
+        map< int,vector<pair<VarOrRVar,int> > > vars;
 
         for (int i=0; i<tile.size(); i++) {
-            map< int,vector<Var> > vars_x = internal_func_vars(rF, tile[i].first);
-            map< int,vector<Var> >::iterator vit;
+            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, tile[i].first);
+            map< int,vector<VarOrRVar> >::iterator vit;
 
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
                 if (vit->second.size()>1) {
@@ -641,10 +637,10 @@ RecFilter& RecFilter::gpu_tile(FuncTag ftag, vector< pair<VarTag,int> > tile) {
             }
         }
 
-        map< int,vector< pair<Var,int> > >::iterator vit;
+        map< int,vector< pair<VarOrRVar,int> > >::iterator vit;
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector< pair<Var,int> > var_list = vit->second;
+            vector< pair<VarOrRVar,int> > var_list = vit->second;
             stringstream s;
 
             if (var_list.size()) {
@@ -660,7 +656,7 @@ RecFilter& RecFilter::gpu_tile(FuncTag ftag, vector< pair<VarTag,int> > tile) {
                 }
                 s << ")";
 
-                // only support up to 6 variables to reorder
+                // only support up to 3 variables
                 if (def==PURE_DEF) {
                     switch (var_list.size()) {
                         case 1: F.gpu_tile(var_list[0].first,
@@ -718,8 +714,8 @@ vector<string> RecFilter::internal_functions(FuncTag ftag) {
     return func_list;
 }
 
-map< int,vector<Var> > RecFilter::internal_func_vars(RecFilterFunc f, VarTag vtag) {
-    map< int,vector<Var> > var_list;
+map< int,vector<VarOrRVar> > RecFilter::internal_func_vars(RecFilterFunc f, VarTag vtag) {
+    map< int,vector<VarOrRVar> > var_list;
     map<string,VarTag>::iterator vit;
     for (vit = f.pure_var_category.begin(); vit!=f.pure_var_category.end(); vit++) {
         if (vit->second & vtag) {

@@ -7,6 +7,7 @@ using std::cerr;
 using std::endl;
 using std::vector;
 using std::map;
+using std::ostream;
 
 namespace Halide {
 namespace Internal {

@@ -2,6 +2,8 @@
 
 using namespace Halide;
 
+using std::vector;
+
 /// Compute the factorial of an integer
 static int factorial(int k) {
     assert(k>=0);
