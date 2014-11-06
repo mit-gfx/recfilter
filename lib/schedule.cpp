@@ -316,6 +316,46 @@ RecFilter& RecFilter::reorder_storage(FuncTag ftag, VarTag x, VarTag y, VarTag z
     return reorder_storage(ftag, Internal::vec(x,y,z,w,t));
 }
 
+RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag thread, Expr task_size) {
+    vector<string> func_list = internal_functions(ftag);
+    for (int j=0; j<func_list.size(); j++) {
+        RecFilterFunc& rF = internal_function(func_list[j]);
+        Func            F = Func(rF.func);
+
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, thread);
+        map< int,vector<VarOrRVar> >::iterator vit;
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            if (vit->second.size()>1) {
+                cerr << "Multiple vars found with same tag " << thread
+                    << " in function " << F.name()
+                    << ", cannot assign all to same GPU thread index" << endl;
+                assert(false);
+            }
+        }
+
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            int def = vit->first;
+            VarOrRVar v = vit->second[0].var;
+            stringstream s;
+
+            Var t(v.name()+".split");
+
+            s << "split(Var(\""   << v.name() << "\"), Var(\"" << v.name() << "\"), Var(\"" << t.name() << "\"), " << task_size << ").";
+            s << "reorder(Var(\"" << t.name() << "\"), Var(\"" << v.name() << "\")).";
+            s << "gpu_threads(Var(\"" << v.name() << "\")).";
+            s << "unroll(Var(\""      << t.name() << "\"))";
+
+            if (def==PURE_DEF) {
+                F.split(v,v,t,task_size).reorder(t,v).gpu_threads(v).unroll(t);
+            } else {
+                F.update(def).split(v,v,t,task_size).reorder(t,v).gpu_threads(v).unroll(t);
+            }
+            rF.schedule[def].push_back(s.str());
+        }
+    }
+    return *this;
+}
+
 RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag thread_x) {
     return gpu_threads(ftag, Internal::vec(thread_x));
 }
@@ -478,8 +518,9 @@ RecFilter& RecFilter::gpu_threads(FuncTag ftag, vector<VarTag> thread) {
             map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, thread[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
                 if (vit->second.size()>1) {
-                    cerr << "Multiple vars found with same tag, "
-                         << "cannot assign all to same GPU thread index" << endl;
+                    cerr << "Multiple vars found with same tag " << thread[i]
+                         << " in function " << F.name()
+                         << ", cannot assign all to same GPU thread index" << endl;
                     assert(false);
                 }
                 for (int k=0; k<vit->second.size(); j++) {
@@ -553,8 +594,9 @@ RecFilter& RecFilter::gpu_blocks(FuncTag ftag, vector<VarTag> block) {
             map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, block[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
                 if (vit->second.size()>1) {
-                    cerr << "Multiple vars found with same tag, "
-                         << "cannot assign all to same GPU block index" << endl;
+                    cerr << "Multiple vars found with same tag " << block[i]
+                         << " in function " << F.name()
+                         << ", cannot assign all to same GPU block" << endl;
                     assert(false);
                 }
                 for (int k=0; k<vit->second.size(); k++) {
@@ -629,8 +671,9 @@ RecFilter& RecFilter::gpu_tile(FuncTag ftag, vector< pair<VarTag,int> > tile) {
 
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
                 if (vit->second.size()>1) {
-                    cerr << "Multiple vars found with same tag, "
-                         << "cannot assign all to same GPU block/thread index" << endl;
+                    cerr << "Multiple vars found with same tag " << tile[i].first
+                         << " in function " << F.name()
+                         << ", cannot assign all to same GPU block/thread" << endl;
                     assert(false);
                 }
                 vars[vit->first].push_back(make_pair(vit->second[0], tile[i].second));

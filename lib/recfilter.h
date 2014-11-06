@@ -258,10 +258,6 @@ class RecFilter {
                 );
         // @}
 
-        /** @name Scheduling language: */
-        // {@
-        // @}
-
 
         /** @name  Inline all calls to a pure function (defined in reorder.cpp)
         */
@@ -382,6 +378,7 @@ class RecFilter {
         RecFilter& gpu_threads(FuncTag f, VarTag thread_x);
         RecFilter& gpu_threads(FuncTag f, VarTag thread_x, VarTag thread_y);
         RecFilter& gpu_threads(FuncTag f, VarTag thread_x, VarTag thread_y, VarTag thread_z);
+        RecFilter& gpu_threads(FuncTag f, VarTag thread_x, Halide::Expr task_size);
 
         RecFilter& gpu_blocks(FuncTag f, VarTag block_x);
         RecFilter& gpu_blocks(FuncTag f, VarTag block_x, VarTag block_y);
@@ -403,7 +400,7 @@ class RecFilter {
 // -----------------------------------------------------------------------------
 
 /** @name Printing utils for recursive filter, Halide functions, schedules and
- * difference between computed result and reference result  */
+ * difference between computed result and reference result */
 // {@
 std::ostream &operator<<(std::ostream &s, const RecFilter &r);
 std::ostream &operator<<(std::ostream &s, const RecFilterFunc &f);
