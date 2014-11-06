@@ -22,6 +22,12 @@ RecFilter& RecFilter::compute_in_global(FuncTag ftag) {
 
         F.compute_root();
 
+        // remove the initializations of all scans which are scheduled as compute_root
+        // to avoid extra kernel execution for initializing the output buffer
+        if (F.has_update_definition()) {
+            remove_pure_def(F.name());
+        }
+
         string schedule_op_str = "compute_root()";
         rF.schedule[PURE_DEF].push_back(schedule_op_str);
     }
@@ -34,25 +40,39 @@ RecFilter& RecFilter::compute_in_shared(FuncTag ftag) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        // find the functions that is REINDEX_FOR_WRITE and calls this function
-        vector<Func> callee_funcs;
+        // find the functions that are REINDEX_FOR_WRITE or REINDEX_FOR_READ
+        // and associated with this this function
+        Func         callee_func;
+        vector<Func> caller_funcs;
         map<string,RecFilterFunc>::iterator f;
         for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
             if ((f->second.func_category & REINDEX_FOR_WRITE) && f->second.callee_func==F.name()) {
-                callee_funcs.push_back(Func(f->second.func));
+                callee_func = Func(f->second.func);
+                if (callee_func.defined()) {
+                    cerr << "Function " << F.name() << " cannot be computed in shared mem "
+                        << "because it is called by multiple functions" << endl;
+                    assert(false);
+                }
+            }
+            if ((f->second.func_category & REINDEX_FOR_READ) && f->second.caller_func==F.name()) {
+                caller_funcs.push_back(Func(f->second.func));
             }
         }
 
-        // merge them if there are multiple such functions
-        if (callee_funcs.size()>1) {
-            cerr << "TODO: Merging required" << endl;
-            assert(false);
-        } else {
-            F.compute_at(callee_funcs[0], Var::gpu_blocks());
-            string schedule_op_str = "compute_at(" + callee_funcs[0].name() +
-                ", Var::gpu_blocks())";
-            rF.schedule[PURE_DEF].push_back(schedule_op_str);
+        // all the functions which are called in this function should also
+        // be computed at same level
+        for (int i=0; i<caller_funcs.size(); i++) {
+            Func f = caller_funcs[i];
+            f.compute_at(callee_func, Var::gpu_blocks());
+            stringstream s;
+            s << "compute_at(" << callee_func.name() << ", Var::gpu_blocks())";
+            internal_function(f.name()).schedule[PURE_DEF].push_back(s.str());
         }
+
+        F.compute_at(callee_func, Var::gpu_blocks());
+        stringstream s;
+        s << "compute_at(" << callee_func.name() << ", Var::gpu_blocks())";
+        rF.schedule[PURE_DEF].push_back(s.str());
     }
     return *this;
 }

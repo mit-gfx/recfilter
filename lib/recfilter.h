@@ -99,6 +99,17 @@ class RecFilter {
         /** Get all the vars of a given recursive filter function with the given tag */
         std::map< int,std::vector<Halide::VarOrRVar> > internal_func_vars(RecFilterFunc f, VarTag vtag);
 
+        /** Inline all calls to a given function */
+        void inline_func(std::string func_name);
+
+    public:
+        /** Reorder memory layout by swapping two dimensions of a function */
+        void transpose_dimensions(std::string func, std::string a, std::string b);
+
+        /** Remove the pure def of a Function and add it to the first update
+         * def; replacing the pure def with zero or undefined */
+        void remove_pure_def(std::string func_name);
+
     public:
 
         /** Macros to indicate causal or anticausal scan */
@@ -207,7 +218,7 @@ class RecFilter {
          * @brief Split a list of dimensions into their respective tile widths specified as
          * variable-tile width pairs. If a single tile width expression is provided, then all
          * specified dimensions are split by the same factor. If no variables are specified,
-         * then all the dimensions are split by the same tiling factor (defined in split.cpp).
+         * then all the dimensions are split by the same tiling factor
          *
          * Preconditions:
          * - dimension with specified variable name must exist
@@ -227,7 +238,6 @@ class RecFilter {
         /** @name Reorder scans in the filter or cascade them to produce multiple filters
          *  @brief uses list of list of scans as argument, producing a list of
          *  recursive filters each containing the respective list of scans
-         *  (defined in reorder.cpp)
          *
          *  Preconditions:
          *  - list of list of scans spans all the scans of the original filter
@@ -259,41 +269,11 @@ class RecFilter {
         // @}
 
 
-        /** @name  Inline all calls to a pure function (defined in reorder.cpp)
-        */
-        // {@
-        void inline_func(
-                std::string func_name   ///< name of function to be inlined
-                );
-
-        void inline_func(
-                Halide::Func a,         ///< function to be inlined
-                Halide::Func b          ///< function in which to inline
-                );
-        // @}
-
-
-        /** @name Reorder memory layout by swapping two dimensions of a function
-         * (defined in reorder.cpp) */
-        // {@
-        void transpose_dimensions(
-                std::string func,   ///< name of function whose dimensions must be swapped
-                Halide::Var a,      ///< pure arg of first dimension to swap
-                Halide::Var b       ///< pure arg of second dimension to swap
-                );
-        void transpose_dimensions(
-                std::string func,   ///< name of function whose dimensions must be swapped
-                std::string a,      ///< pure arg of first dimension to swap
-                std::string b       ///< pure arg of second dimension to swap
-                );
-        // @}
-
         /**@name Merging and interleaving routines
          *
          * @brief Interleave two functions into a single function with output that contains
          * the buffers of both the input functions.  The functions to be interleaved are
          * searched in the dependency graph of functions required to compute the recursive filter
-         * (defined in reorder.cpp)
          *
          * Preconditions: functions to be interleaved must
          * - have same args
@@ -311,12 +291,13 @@ class RecFilter {
         /**
          * @brief Merge multiple functions into a single function with mutiple outputs
          * The functions to be merged are searched in the dependency graph of functions
-         * required to compute the recursive filter (defined in reorder.cpp)
+         * required to compute the recursive filter
          *
          * Preconditions: functions to be merged must have
          * - same pure args
          * - scans with same update args and update domains in same order
          */
+        // {@
         void merge_func(
                 std::string func_a, ///< name of first function to merge
                 std::string func_b, ///< name of second function to merge
@@ -335,13 +316,11 @@ class RecFilter {
                 std::string func_d, ///< name of fourth function to merge
                 std::string merged  ///< name of merged function
                 );
-        // @}
-
-        /** Remove the pure def of a Function and add it to the first update
-         * def; replacing the pure def with zero or undefine */
-        void remove_pure_def(
-                std::string func_name  ///< name of function
+        void merge_func(
+                std::vector<std::string> func_list, ///< list of functions to merge
+                std::string merged                  ///< name of merged function
                 );
+        // @}
 
 
         /**@name Print Halide code for the recursive filter

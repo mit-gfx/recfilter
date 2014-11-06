@@ -1499,14 +1499,15 @@ void RecFilter::split(map<string,Expr> dim_tile) {
     // apply the actual splitting
     RecFilterFunc rF_final;
     {
-        // create a copy of the split info structs retaining only the
-        // dimensions to be split
-        vector<SplitInfo> split_info_current;
-        for (int i=0; i<contents.ptr->split_info.size(); i++) {
-            if (contents.ptr->split_info[i].tile_width.defined()) {
-                split_info_current.push_back(contents.ptr->split_info[i]);
-            }
-        }
+        // // create a copy of the split info structs retaining only the
+        // // dimensions to be split
+        // vector<SplitInfo> split_info_current;
+        // for (int i=0; i<contents.ptr->split_info.size(); i++) {
+        //     if (contents.ptr->split_info[i].tile_width.defined()) {
+        //         split_info_current.push_back(contents.ptr->split_info[i]);
+        //     }
+        // }
+        vector<SplitInfo> split_info_current = contents.ptr->split_info;
 
         // compute the intra tile result
         RecFilterFunc rF_intra = create_intra_tile_term(rF, split_info_current);
@@ -1613,45 +1614,75 @@ void RecFilter::split(vector<Var> vars, Expr t) {
 }
 
 void RecFilter::finalize(Target target) {
-//     // inline all functions not required any more
-//     for (map<string,RecFilterFunc> f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
-//         if (f->func_category == RecFilter::INLINE) {
-//             inline_function(f->func.name());
-//         }
-//     }
-//
-//     // remove the initializations of all scans which are scheduled as compute_root
-//     // to avoid extra kernel execution for initializing the output buffer
-//
-//     if (target.has_gpu_feature()) {     // GPU specific optimization
-//
-//         for (map<string,RecFilterFunc> f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
-//             FuncTag category = f->func_category;
-//
-//             if (category & INTRA_TILE_TAIL_TERM) {
-//
-//                 // move initialization to update def in intra tile computation stages
-//                 move_init_to_update_def(F_intra, split_info_current);
-//
-//                 // add padding to intra tile terms to avoid bank conflicts
-//                 add_padding_to_avoid_bank_conflicts(F_intra, split_info_current, true);
-//
-//                 // merge all the functions that reindex the tail from intra tile computation
-//                 vector<string> funcs_to_merge;
-//                 for (map<string,RecFilterFunc> g=contents.ptr->func.begin(); g!=contents.ptr->func.end(); g++) {
-//                     if (g->func_category & REINDEX_FOR_WRITE) {
-//                         funcs_to_merge.push_back(g->func.name());
-//                     }
-//                 }
-//                 for (int i=0; i<funcs_to_merge; i++) {
-//                     // find the funcs tail dimension
-//                     // transpose every other funcs tail with the first func's tail dimension
-//                 }
-//                 // merge all the funcs
-//
-//             }
-//         }
-//     } else {                            // CPU specific optimization
-//
-//     }
+     // inline all functions not required any more
+     map<string,RecFilterFunc>::iterator fit;
+     for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+         if (fit->second.func_category==INLINE) {
+             inline_func(fit->second.func.name());
+         }
+     }
+
+     if (target.has_gpu_feature()) {     // GPU specific optimization
+
+         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+             RecFilterFunc rF = fit->second;
+
+             if (rF.func_category & (INTRA_TILE_SCAN & ~REINDEX_FOR_WRITE)) {
+                 // move initialization to update def in intra tile computation stages
+                 move_init_to_update_def(rF, contents.ptr->split_info);
+
+                 // add padding to intra tile terms to avoid bank conflicts
+                 add_padding_to_avoid_bank_conflicts(rF, contents.ptr->split_info, true);
+
+                 // get all functions that reindex the tail from intra tile computation
+                 vector<string> funcs_to_merge;
+                 map<string,RecFilterFunc>::iterator git;
+                 for (git=contents.ptr->func.begin(); git!=contents.ptr->func.end(); git++) {
+                     if ((git->second.func_category & REINDEX_FOR_WRITE) &&
+                         (git->second.callee_func==rF.func.name())) {
+                         funcs_to_merge.push_back(git->second.func.name());
+                     }
+                 }
+                 if (funcs_to_merge.size()>2) {
+///                    // tail dimension of the first function
+///                    int ref_tail_dim = -1;
+///                    {
+///                        RecFilterFunc& rG = internal_function(funcs_to_merge[0]);
+///                        for (int i=0; ref_tail_dim<0 && i<rG.func.args().size(); i++) {
+///                            if (rG.pure_var_category[rG.func.args()[i]] & TAIL_DIMENSION) {
+///                                ref_tail_dim = i;
+///                            }
+///                        }
+///                    }
+///                    assert(ref_tail_dim>=0);
+///
+///                    // transpose every func's storage so that its tail is the same
+///                    // dimension as the tail of the first function
+///                    for (int i=1; i<funcs_to_merge.size(); i++) {
+///                        RecFilterFunc& rG = internal_function(funcs_to_merge[i]);
+///                        Function g = rG.func;
+///
+///                        // find the funcs tail dimension
+///                        int tail_dim = -1;
+///                        for (int i=0; tail_dim<0 && i<g.args().size(); i++) {
+///                            if (rG.pure_var_category[g.args()[i]] & TAIL_DIMENSION) {
+///                                tail_dim = i;
+///                            }
+///                        }
+///                        assert(tail_dim>=0);
+///
+///                        // transpose this functions memory
+///                        string var_a = g.args()[tail_dim];
+///                        string var_b = g.args()[ref_tail_dim];
+///                        transpose_dimensions(g.name(), var_a, var_b);
+///                    }
+
+                    string merged_name = funcs_to_merge[0] + "_merged";
+                    merge_func(funcs_to_merge, merged_name);
+                 }
+             }
+         }
+     } else {                            // CPU specific optimization
+         // TODO
+     }
 }

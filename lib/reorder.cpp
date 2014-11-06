@@ -305,27 +305,11 @@ static bool check_scheduling_tags(
 static RecFilterFunc merge_function(
         RecFilterFunc fA,        ///< first function to be merged
         RecFilterFunc fB,        ///< second function to be merged
-        string merged_name,      ///< name of the merged function
-        vector<Func> func_list   ///< list of functions where A and B must be replaced by the merged function
+        string merged_name       ///< name of the merged function
         )
 {
     Function A = fA.func;
     Function B = fB.func;
-
-    // check if merge is feasible
-    {
-        string merge_error;
-        if (!merge_feasible(fA.func, fB.func, merge_error)) {
-            cerr << merge_error << endl;
-            assert(false);
-        }
-
-        if (!check_scheduling_tags(fA, fB, func_list)) {
-            cerr << "Functions to be merged have different dimensions as " <<
-                "inferred from scheduling tags; could not be fixed by dimension transpose" << endl;
-            assert(false);
-        }
-    }
 
     int num_outputs_A = A.outputs();
     int num_outputs_B = B.outputs();
@@ -388,12 +372,6 @@ static RecFilterFunc merge_function(
         B.define(args, values);
     }
 
-    // inline A and B
-    if (!func_list.empty()) {
-        inline_function(A, func_list);
-        inline_function(B, func_list);
-    }
-
     // copy the scheduling tags of either of the two functions
     // since tags are identical
     RecFilterFunc fAB;
@@ -413,27 +391,11 @@ static RecFilterFunc interleave_function(
         RecFilterFunc fB,       ///< second function to be interleaved
         string   merged_name,   ///< name of the interleaved function
         Var      var,           ///< var to the used for interleaving
-        Expr     offset,        ///< interleaving offset
-        vector<Func> func_list  ///< list of functions where A and B must be replaced by the merged function
+        Expr     offset         ///< interleaving offset
         )
 {
     Function A = fA.func;
     Function B = fB.func;
-
-    // check if interleaving is possible
-    {
-        string merge_error;
-        if (!merge_feasible(fA.func, fB.func, merge_error)) {
-            cerr << merge_error << endl;
-            assert(false);
-        }
-
-        if (!check_scheduling_tags(fA, fB, func_list)) {
-            cerr << "Functions to be interleaved have different dimensions as " <<
-                "inferred from scheduling tags; could not be fixed by dimension transpose" << endl;
-            assert(false);
-        }
-    }
 
     Function AB(merged_name);
 
@@ -525,12 +487,6 @@ static RecFilterFunc interleave_function(
         }
     }
 
-    // inline A and B
-    if (!func_list.empty()) {
-        inline_function(A, func_list);
-        inline_function(B, func_list);
-    }
-
     // copy the scheduling tags of either of the two functions
     // since tags are identical
     RecFilterFunc fAB;
@@ -544,33 +500,78 @@ static RecFilterFunc interleave_function(
 
 // -----------------------------------------------------------------------------
 
+void RecFilter::transpose_dimensions(string func_name, string a, string b) {
+    RecFilterFunc& rF = internal_function(func_name);
+    transpose_function_dimensions(rF, a, b, funcs());
+}
+
 void RecFilter::inline_func(string func_name) {
     if (contents.ptr->recfilter.name() == func_name) {
         return;
     }
     Function F = internal_function(func_name).func;
     inline_function(F, funcs());
+    contents.ptr->func.erase(func_name);
 }
-
-void RecFilter::inline_func(Func a, Func b) {
-    inline_function(a.function(), Internal::vec(b));
-}
-
-// -----------------------------------------------------------------------------
 
 void RecFilter::interleave_func(string func_a, string func_b, string merged_name, string var, Expr offset) {
-    RecFilterFunc FA = internal_function(func_a);
-    RecFilterFunc FB = internal_function(func_b);
-    RecFilterFunc F  = interleave_function(FA, FB, merged_name, Var(var), offset, funcs());
+    RecFilterFunc fA = internal_function(func_a);
+    RecFilterFunc fB = internal_function(func_b);
+
+    Function FA = fA.func;
+    Function FB = fB.func;
+
+    // check if interleaving is possible
+    string error;
+    if (!merge_feasible(fA.func, fB.func, error)) {
+        cerr << error << endl;
+        assert(false);
+    }
+
+    // check the scheduling tags, transposing dimensions if needed
+    if (!check_scheduling_tags(fA, fB, funcs())) {
+        cerr << "Functions to be interleaved have different dimensions as " <<
+            "inferred from scheduling tags; could not be fixed by dimension transpose" << endl;
+        assert(false);
+    }
+
+    RecFilterFunc F = interleave_function(fA, fB, merged_name, Var(var), offset);
+
     contents.ptr->func.insert(make_pair(F.func.name(), F));
+
+    inline_func(FA.name());
+    inline_func(FB.name());
 }
 
 void RecFilter::merge_func(string func_a, string func_b, string merged_name) {
-    RecFilterFunc FA = internal_function(func_a);
-    RecFilterFunc FB = internal_function(func_b);
-    RecFilterFunc F  = merge_function(FA, FB, merged_name, funcs());
+    RecFilterFunc fA = internal_function(func_a);
+    RecFilterFunc fB = internal_function(func_b);
+
+    Function FA = fA.func;
+    Function FB = fB.func;
+
+    // check if merge is feasible
+    string error;
+    if (!merge_feasible(fA.func, fB.func, error)) {
+        cerr << error << endl;
+        assert(false);
+    }
+
+    // check the scheduling tags, transposing dimensions if needed
+    if (!check_scheduling_tags(fA, fB, funcs())) {
+        cerr << "Functions to be merged have different dimensions as " <<
+            "inferred from scheduling tags; could not be fixed by dimension transpose" << endl;
+        assert(false);
+    }
+
+    RecFilterFunc F = merge_function(fA, fB, merged_name);
+
     contents.ptr->func.insert(make_pair(F.func.name(), F));
+
+    inline_func(FA.name());
+    inline_func(FB.name());
 }
+
 
 void RecFilter::merge_func(string func_a, string func_b, string func_c, string merged_name) {
     string func_ab = "Merged_%d" + int_to_string(rand());
@@ -586,14 +587,15 @@ void RecFilter::merge_func(string func_a, string func_b, string func_c, string f
     merge_func(func_ab,func_cd,merged_name);
 }
 
-// -----------------------------------------------------------------------------
-
-void RecFilter::transpose_dimensions(string func_name, Var a, Var b) {
-    transpose_dimensions(func_name, a.name(), b.name());
-}
-
-void RecFilter::transpose_dimensions(string func_name, string a, string b) {
-    RecFilterFunc& rF = internal_function(func_name);
+void RecFilter::merge_func(vector<string> func_list, string merged_name) {
+    if (!func_list.empty()) {
+        string temp_old = func_list[0];
+        for (int i=1; i<func_list.size(); i++) {
+            string temp_curr = "Merged_%d" + int_to_string(rand());
+            merge_func(temp_old, func_list[i], temp_curr);
+            temp_curr = temp_old;
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------
