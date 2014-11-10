@@ -40,26 +40,35 @@ class RecFilterFunc;
 
 /** Scheduling tags for Functions */
 typedef enum {
-    INLINE             = 0x0000,
-    FULL_RESULT_SCAN   = 0x0001,
-    FULL_RESULT_PURE   = 0x0002,
-    INTRA_TILE_SCAN    = 0x0004,
-    INTER_TILE_SCAN    = 0x0008,
-    REINDEX_FOR_WRITE  = 0x0010,
-    REINDEX_FOR_READ   = 0x0020,
+    INLINE             = 0x00, ///< function that does not need a schedule because it can be inlined (to be obscured from programmer)
+    FULL_RESULT_SCAN   = 0x01, ///< initial definition of the filter specifying scans over the whole image (to be obscured from programmer)
+    FULL_RESULT_PURE   = 0x02, ///< pure function that touches the full non-split image (to be obscured from programmer)
+    INTRA_TILE_SCAN    = 0x04, ///< scan within tile (multiple scans in multiple dimensions)
+    INTER_TILE_SCAN    = 0x08, ///< scan over tail elements across tiles (single 1D scan)
+    REINDEX_FOR_WRITE  = 0x10, ///< function that reindexes a subset of another function to write to global mem (to be obscured from programmer)
+    REINDEX_FOR_READ   = 0x20, ///< function that reindexes a subset of another function to write to global mem (to be obscured from programmer)
 } FuncTag;
 
 /** Scheduling tags for Function dimensions */
 typedef enum {
-    INNER_PURE_VAR = 0x0100,
-    INNER_SCAN_VAR = 0x0200,
-    OUTER_PURE_VAR = 0x0400,
-    OUTER_SCAN_VAR = 0x0800,
-    TAIL_DIMENSION = 0x1000,
-    PURE_DIMENSION = 0x2000,
-    SCAN_DIMENSION = 0x4000,
+    INNER_PURE_VAR = 0x01, ///< inner pure dimension
+    INNER_SCAN_VAR = 0x02, ///< inner scan dimension
+    OUTER_PURE_VAR = 0x04, ///< outer pure dimension
+    OUTER_SCAN_VAR = 0x08, ///< outer scan dimension
+    TAIL_DIMENSION = 0x10, ///< inner dimension which only stores tails (smaller granularity)
+    PURE_DIMENSION = 0x20, ///< pure dimension which is not split
+    SCAN_DIMENSION = 0x40, ///< scan dimension which is not split
+    SCHEDULE_INNER = 0x80, ///< inner dimension created when the programmer uses the RecFilter::split()
 } VarTag;
 
+/** Tags to differentiate between Function dimensions that have the same scheduling tag  */
+typedef enum {
+    FIRST  = 0x01, ///< first  dimension with a specific tag (lexicographic order)
+    SECOND = 0x02, ///< second dimension with a specific tag (lexicographic order)
+    THIRD  = 0x04, ///< third  dimension with a specific tag (lexicographic order)
+    FOURTH = 0x08, ///< fourth dimension with a specific tag (lexicographic order)
+    FIFTH  = 0x10, ///< fifth  dimension with a specific tag (lexicographic order)
+} VarIndex;
 
 /** Compare ref and Halide solutions and print the mean square error */
 struct CheckResult {
@@ -85,295 +94,302 @@ struct CheckResultVerbose {
 
 /** Recursive filter class */
 class RecFilter {
-    private:
+private:
 
-        /** Data members of the recursive filter */
-        Halide::Internal::IntrusivePtr<RecFilterContents> contents;
+    /** Data members of the recursive filter */
+    Halide::Internal::IntrusivePtr<RecFilterContents> contents;
 
-        /** Get the recursive filter function by name */
-        RecFilterFunc& internal_function(std::string func_name);
+    /** Get the recursive filter function by name */
+    RecFilterFunc& internal_function(std::string func_name);
 
-        /** Get all recursive filter funcs that have the given tag */
-        std::vector<std::string> internal_functions(FuncTag ftag);
+    /** Get all recursive filter funcs that have the given tag */
+    std::vector<std::string> internal_functions(FuncTag ftag);
 
-        /** Get all the vars of a given recursive filter function with the given tag */
-        std::map< int,std::vector<Halide::VarOrRVar> > internal_func_vars(RecFilterFunc f, VarTag vtag);
+    /** Get all the vars of a given recursive filter function with the given tag */
+    std::map< int,std::vector<Halide::VarOrRVar> > internal_func_vars(RecFilterFunc f, VarTag vtag);
 
-        /** Inline all calls to a given function */
-        void inline_func(std::string func_name);
+    /** Get one of the vars of a given recursive filter function with the given tag
+     * indicated by the */
+    std::map<int,Halide::VarOrRVar> internal_func_vars(RecFilterFunc f, VarTag vtag, VarIndex vidx);
 
-    public:
-        /** Reorder memory layout by swapping two dimensions of a function */
-        void transpose_dimensions(std::string func, std::string a, std::string b);
+    /** Inline all calls to a given function */
+    void inline_func(std::string func_name);
 
-        /** Remove the pure def of a Function and add it to the first update
-         * def; replacing the pure def with zero or undefined */
-        void remove_pure_def(std::string func_name);
+public:
+    /** Reorder memory layout by swapping two dimensions of a function */
+    void transpose_dimensions(std::string func, std::string a, std::string b);
 
-    public:
+    /** Remove the pure def of a Function and add it to the first update
+     * def; replacing the pure def with zero or undefined */
+    void remove_pure_def(std::string func_name);
 
-        /** Macros to indicate causal or anticausal scan */
-        typedef enum {
-            CAUSAL,     ///< causal scan
-            ANTICAUSAL  ///< anticausal scan
-        } Causality;
+public:
 
-        /** Macros to determine the values of pixels before the first pixel of the scan
-         * for example, all pixels with negative x indices for causal x scans
-         * and all pixels with indices more than image height for anticausal y scans */
-        typedef enum {
-            CLAMP_TO_ZERO,  ///< pixels set to 0
-            CLAMP_TO_SELF,  ///< pixels clamped to filter output
-            CLAMP_TO_EXPR,  ///< pixels set to a given expression
-        } Border;
+    /** Macros to indicate causal or anticausal scan */
+    typedef enum {
+        CAUSAL,     ///< causal scan
+        ANTICAUSAL  ///< anticausal scan
+    } Causality;
 
-        /** Construct an empty named recursive filter */
-        RecFilter(std::string name = "RecFilter");
+    /** Macros to determine the values of pixels before the first pixel of the scan
+     * for example, all pixels with negative x indices for causal x scans
+     * and all pixels with indices more than image height for anticausal y scans */
+    typedef enum {
+        CLAMP_TO_ZERO,  ///< pixels set to 0
+        CLAMP_TO_SELF,  ///< pixels clamped to filter output
+        CLAMP_TO_EXPR,  ///< pixels set to a given expression
+    } Border;
 
-        /** Reconstruct a recursive filter from its contents */
-        RecFilter(const Halide::Internal::IntrusivePtr<RecFilterContents> &c) : contents(c) {}
+    /** Construct an empty named recursive filter */
+    RecFilter(std::string name = "RecFilter");
 
-        /**@name Compile and run
-        */
-        // {@
-        /** Finalize the filter; triggers automatic function transformations and cleanup */
-        void finalize(Halide::Target target);
+    /** Reconstruct a recursive filter from its contents */
+    RecFilter(const Halide::Internal::IntrusivePtr<RecFilterContents> &c) : contents(c) {}
 
-        /** Trigger JIT compilation for specified hardware-platform target; dumps the generated
-         * codegen in human readable HTML format if filename is specified */
-        void compile_jit(Halide::Target target, std::string filename="");
+    /**@name Compile and run
+    */
+    // {@
+    /** Finalize the filter; triggers automatic function transformations and cleanup */
+    void finalize(Halide::Target target);
 
-        /** Compute the filter for a given output buffer for specified number of iterations
-         * for timing purposes; last iteration copies the result to host */
-        void realize(Halide::Buffer out, int iterations=1);
-        // @}
+    /** Trigger JIT compilation for specified hardware-platform target; dumps the generated
+     * codegen in human readable HTML format if filename is specified */
+    void compile_jit(Halide::Target target, std::string filename="");
 
-        /**@name Recursive filter specification
-         * @brief Set the dimensions of the output of the recursive filter
-         */
-        // {@
-        void setArgs(Halide::Var x);
-        void setArgs(Halide::Var x, Halide::Var y);
-        void setArgs(Halide::Var x, Halide::Var y, Halide::Var z);
-        void setArgs(std::vector<Halide::Var> args);
-        // @}
+    /** Compute the filter for a given output buffer for specified number of iterations
+     * for timing purposes; last iteration copies the result to host */
+    void realize(Halide::Buffer out, int iterations=1);
+    // @}
 
-        /** @name Recursive filter definition
-         * @brief Add a pure definition to the recursive filter, can be Tuple
-         * All Vars in the pure definition should be args of the filter
-         */
-        // {@
-        void define(Halide::Expr  pure_def);
-        void define(Halide::Tuple pure_def);
-        void define(std::vector<Halide::Expr> pure_def);
-        // @}
+    /**@name Recursive filter specification
+     * @brief Set the dimensions of the output of the recursive filter
+     */
+    // {@
+    void setArgs(Halide::Var x);
+    void setArgs(Halide::Var x, Halide::Var y);
+    void setArgs(Halide::Var x, Halide::Var y, Halide::Var z);
+    void setArgs(std::vector<Halide::Var> args);
+    // @}
 
-        /** @name Routines to add scans to a recursive filter
-         *  @brief Add a scan to the recursive filter given parameters
-         *  defaults filter order = 1, feedforward/feedback coefficient = 1.0,
-         *  causalilty = CAUSAL, border clamping = zero
-         */
-        // {@
-        void addScan(
-                Halide::Var x,              ///< dimension to a update
-                Halide::RDom rx,            ///< domain of the scan
-                float feedfwd,              ///< single feedforward coeff
-                std::vector<float> feedback,///< n feedback coeffs, where n is filter order
-                Causality c=CAUSAL,         ///< causal or anticausal scan
-                Border b=CLAMP_TO_ZERO,     ///< value for pixels before first pixel of scan
-                Halide::Expr border_expr=FLOAT_ZERO ///< user defined value if CLAMP_TO_EXPR is used (must not involve x or rx)
-                );
-        void addScan(
-                Halide::Var x,              ///< dimension to a update
-                Halide::RDom rx,            ///< domain of the scan
-                Causality c=CAUSAL,         ///< causal or anticausal scan
-                Border b=CLAMP_TO_ZERO,     ///< value for pixels before first pixel of scan
-                Halide::Expr border_expr=FLOAT_ZERO ///< user defined value if CLAMP_TO_EXPR is used (must not involve x or rx)
-                );
-        void addScan(
-                Halide::Var x,              ///< dimension to a update
-                Halide::RDom rx,            ///< domain of the scan
-                std::vector<float> feedback,///< n feedback coeffs, where n is filter order
-                Causality c=CAUSAL,         ///< causal or anticausal scan
-                Border b=CLAMP_TO_ZERO,     ///< value for pixels before first pixel of scan
-                Halide::Expr border_expr=FLOAT_ZERO ///< user defined value if CLAMP_TO_EXPR is used (must not involve x or rx)
-                );
-        // @}
+    /** @name Recursive filter definition
+     * @brief Add a pure definition to the recursive filter, can be Tuple
+     * All Vars in the pure definition should be args of the filter
+     */
+    // {@
+    void define(Halide::Expr  pure_def);
+    void define(Halide::Tuple pure_def);
+    void define(std::vector<Halide::Expr> pure_def);
+    // @}
 
-
-        /**@name Dependency graph of the recursive filter
-         * @brief Return only the final recursive filter as Halide function,
-         * or any function in required to compute the complete filter (searches
-         * the dependency graph by function name) or all the functions in the
-         * dependency graph
-         */
-        // {@
-        Halide::Func func(void);
-        Halide::Func func(std::string func_name);
-        std::vector<Halide::Func> funcs(void);
-        // @}
+    /** @name Routines to add scans to a recursive filter
+     *  @brief Add a scan to the recursive filter given parameters
+     *  defaults filter order = 1, feedforward/feedback coefficient = 1.0,
+     *  causalilty = CAUSAL, border clamping = zero
+     */
+    // {@
+    void addScan(
+            Halide::Var x,              ///< dimension to a update
+            Halide::RDom rx,            ///< domain of the scan
+            float feedfwd,              ///< single feedforward coeff
+            std::vector<float> feedback,///< n feedback coeffs, where n is filter order
+            Causality c=CAUSAL,         ///< causal or anticausal scan
+            Border b=CLAMP_TO_ZERO,     ///< value for pixels before first pixel of scan
+            Halide::Expr border_expr=FLOAT_ZERO ///< user defined value if CLAMP_TO_EXPR is used (must not involve x or rx)
+            );
+    void addScan(
+            Halide::Var x,              ///< dimension to a update
+            Halide::RDom rx,            ///< domain of the scan
+            Causality c=CAUSAL,         ///< causal or anticausal scan
+            Border b=CLAMP_TO_ZERO,     ///< value for pixels before first pixel of scan
+            Halide::Expr border_expr=FLOAT_ZERO ///< user defined value if CLAMP_TO_EXPR is used (must not involve x or rx)
+            );
+    void addScan(
+            Halide::Var x,              ///< dimension to a update
+            Halide::RDom rx,            ///< domain of the scan
+            std::vector<float> feedback,///< n feedback coeffs, where n is filter order
+            Causality c=CAUSAL,         ///< causal or anticausal scan
+            Border b=CLAMP_TO_ZERO,     ///< value for pixels before first pixel of scan
+            Halide::Expr border_expr=FLOAT_ZERO ///< user defined value if CLAMP_TO_EXPR is used (must not involve x or rx)
+            );
+    // @}
 
 
-        /**@name Splitting routines
-         * @brief Split a list of dimensions into their respective tile widths specified as
-         * variable-tile width pairs. If a single tile width expression is provided, then all
-         * specified dimensions are split by the same factor. If no variables are specified,
-         * then all the dimensions are split by the same tiling factor
-         *
-         * Preconditions:
-         * - dimension with specified variable name must exist
-         * - tile width must be a multiple of image width for each dimension
-         */
-        // {@
-        void split(Halide::Expr tx);
-        void split(Halide::Var x, Halide::Expr tx);
-        void split(Halide::Var x, Halide::Expr tx, Halide::Var y, Halide::Expr ty);
-        void split(Halide::Var x, Halide::Var y, Halide::Expr t);
-        void split(Halide::Var x, Halide::Var y, Halide::Var z, Halide::Expr t);
-        void split(std::vector<Halide::Var> vars, Halide::Expr t);
-        void split(std::map<std::string, Halide::Expr> dims);
-        // @}
+    /**@name Dependency graph of the recursive filter
+     * @brief Return only the final recursive filter as Halide function,
+     * or any function in required to compute the complete filter (searches
+     * the dependency graph by function name) or all the functions in the
+     * dependency graph
+     */
+    // {@
+    Halide::Func func(void);
+    Halide::Func func(std::string func_name);
+    std::vector<Halide::Func> funcs(void);
+    // @}
 
 
-        /** @name Reorder scans in the filter or cascade them to produce multiple filters
-         *  @brief uses list of list of scans as argument, producing a list of
-         *  recursive filters each containing the respective list of scans
-         *
-         *  Preconditions:
-         *  - list of list of scans spans all the scans of the original filter
-         *  - no scan is repeated in the list of list of scans
-         *  - the relative order of reverse causality scans in same dimension remains same
-         */
-        // {@
-        RecFilter cascade(
-                std::vector<int> a      ///< reordered list of scans of the filter
-                );
-        std::vector<RecFilter> cascade(
-                std::vector<int> a,     ///< list of scans for first filter
-                std::vector<int> b      ///< list of scans for second filter
-                );
-        std::vector<RecFilter> cascade(
-                std::vector<int> a,     ///< list of scans for first filter
-                std::vector<int> b,     ///< list of scans for second filter
-                std::vector<int> c      ///< list of scans for third filter
-                );
-        std::vector<RecFilter> cascade(
-                std::vector<int> a,     ///< list of scans for first filter
-                std::vector<int> b,     ///< list of scans for second filter
-                std::vector<int> c,     ///< list of scans for third filter
-                std::vector<int> d      ///< list of scans for fourth filter
-                );
-        std::vector<RecFilter> cascade(
-                std::vector<std::vector<int> > scan ///< list of scans for list of filters
-                );
-        // @}
+    /**@name Splitting routines
+     * @brief Split a list of dimensions into their respective tile widths specified as
+     * variable-tile width pairs. If a single tile width expression is provided, then all
+     * specified dimensions are split by the same factor. If no variables are specified,
+     * then all the dimensions are split by the same tiling factor
+     *
+     * Preconditions:
+     * - dimension with specified variable name must exist
+     * - tile width must be a multiple of image width for each dimension
+     */
+    // {@
+    void split(Halide::Expr tx);
+    void split(Halide::Var x, Halide::Expr tx);
+    void split(Halide::Var x, Halide::Expr tx, Halide::Var y, Halide::Expr ty);
+    void split(Halide::Var x, Halide::Var y, Halide::Expr t);
+    void split(Halide::Var x, Halide::Var y, Halide::Var z, Halide::Expr t);
+    void split(std::vector<Halide::Var> vars, Halide::Expr t);
+    void split(std::map<std::string, Halide::Expr> dims);
+    // @}
 
 
-        /**@name Merging and interleaving routines
-         *
-         * @brief Interleave two functions into a single function with output that contains
-         * the buffers of both the input functions.  The functions to be interleaved are
-         * searched in the dependency graph of functions required to compute the recursive filter
-         *
-         * Preconditions: functions to be interleaved must
-         * - have same args
-         * - be pure functions (no update defs)
-         */
-        // {@
-        void interleave_func(
-                std::string  func_a,    ///< name of first function to interleave
-                std::string  func_b,    ///< name of second function to interleave
-                std::string  merged,    ///< name of interleaved function
-                std::string  var,       ///< var to the used for interleaving
-                Halide::Expr stride     ///< interleaving stride
-                );
-
-        /**
-         * @brief Merge multiple functions into a single function with mutiple outputs
-         * The functions to be merged are searched in the dependency graph of functions
-         * required to compute the recursive filter
-         *
-         * Preconditions: functions to be merged must have
-         * - same pure args
-         * - scans with same update args and update domains in same order
-         */
-        // {@
-        void merge_func(
-                std::string func_a, ///< name of first function to merge
-                std::string func_b, ///< name of second function to merge
-                std::string merged  ///< name of merged function
-                );
-        void merge_func(
-                std::string func_a, ///< name of first function to merge
-                std::string func_b, ///< name of second function to merge
-                std::string func_c, ///< name of third function to merge
-                std::string merged  ///< name of merged function
-                );
-        void merge_func(
-                std::string func_a, ///< name of first function to merge
-                std::string func_b, ///< name of second function to merge
-                std::string func_c, ///< name of third function to merge
-                std::string func_d, ///< name of fourth function to merge
-                std::string merged  ///< name of merged function
-                );
-        void merge_func(
-                std::vector<std::string> func_list, ///< list of functions to merge
-                std::string merged                  ///< name of merged function
-                );
-        // @}
+    /** @name Reorder scans in the filter or cascade them to produce multiple filters
+     *  @brief uses list of list of scans as argument, producing a list of
+     *  recursive filters each containing the respective list of scans
+     *
+     *  Preconditions:
+     *  - list of list of scans spans all the scans of the original filter
+     *  - no scan is repeated in the list of list of scans
+     *  - the relative order of reverse causality scans in same dimension remains same
+     */
+    // {@
+    RecFilter cascade(
+            std::vector<int> a      ///< reordered list of scans of the filter
+            );
+    std::vector<RecFilter> cascade(
+            std::vector<int> a,     ///< list of scans for first filter
+            std::vector<int> b      ///< list of scans for second filter
+            );
+    std::vector<RecFilter> cascade(
+            std::vector<int> a,     ///< list of scans for first filter
+            std::vector<int> b,     ///< list of scans for second filter
+            std::vector<int> c      ///< list of scans for third filter
+            );
+    std::vector<RecFilter> cascade(
+            std::vector<int> a,     ///< list of scans for first filter
+            std::vector<int> b,     ///< list of scans for second filter
+            std::vector<int> c,     ///< list of scans for third filter
+            std::vector<int> d      ///< list of scans for fourth filter
+            );
+    std::vector<RecFilter> cascade(
+            std::vector<std::vector<int> > scan ///< list of scans for list of filters
+            );
+    // @}
 
 
-        /**@name Print Halide code for the recursive filter
-        */
-        // {@
-        void generate_hl_code(std::ostream &s) const;
-        // @}
+    /**@name Merging and interleaving routines
+     *
+     * @brief Interleave two functions into a single function with output that contains
+     * the buffers of both the input functions.  The functions to be interleaved are
+     * searched in the dependency graph of functions required to compute the recursive filter
+     *
+     * Preconditions: functions to be interleaved must
+     * - have same args
+     * - be pure functions (no update defs)
+     */
+    // {@
+    void interleave_func(
+            std::string  func_a,    ///< name of first function to interleave
+            std::string  func_b,    ///< name of second function to interleave
+            std::string  merged,    ///< name of interleaved function
+            std::string  var,       ///< var to the used for interleaving
+            Halide::Expr stride     ///< interleaving stride
+            );
 
-        /**@name Scheduling operations */
-        // {@
+    /**
+     * @brief Merge multiple functions into a single function with mutiple outputs
+     * The functions to be merged are searched in the dependency graph of functions
+     * required to compute the recursive filter
+     *
+     * Preconditions: functions to be merged must have
+     * - same pure args
+     * - scans with same update args and update domains in same order
+     */
+    // {@
+    void merge_func(
+            std::string func_a, ///< name of first function to merge
+            std::string func_b, ///< name of second function to merge
+            std::string merged  ///< name of merged function
+            );
+    void merge_func(
+            std::string func_a, ///< name of first function to merge
+            std::string func_b, ///< name of second function to merge
+            std::string func_c, ///< name of third function to merge
+            std::string merged  ///< name of merged function
+            );
+    void merge_func(
+            std::string func_a, ///< name of first function to merge
+            std::string func_b, ///< name of second function to merge
+            std::string func_c, ///< name of third function to merge
+            std::string func_d, ///< name of fourth function to merge
+            std::string merged  ///< name of merged function
+            );
+    void merge_func(
+            std::vector<std::string> func_list, ///< list of functions to merge
+            std::string merged                  ///< name of merged function
+            );
+    // @}
 
-        RecFilter& compute_in_global(FuncTag f);
-        RecFilter& compute_in_shared(FuncTag f);
 
-        RecFilter& parallel (FuncTag f, VarTag var);
-        RecFilter& parallel (FuncTag f, VarTag var, Halide::Expr task_size);
-        RecFilter& unroll   (FuncTag f, VarTag var);
-        RecFilter& unroll   (FuncTag f, VarTag var, int factor);
-        RecFilter& vectorize(FuncTag f, VarTag var);
-        RecFilter& vectorize(FuncTag f, VarTag var, int factor);
-        RecFilter& bound    (FuncTag f, VarTag var, Halide::Expr min, Halide::Expr extent);
-        RecFilter& split    (FuncTag f, VarTag old, Halide::Expr factor);
+    /**@name Print Halide code for the recursive filter
+    */
+    // {@
+    void generate_hl_code(std::ostream &s) const;
+    // @}
 
-        RecFilter& reorder(FuncTag f, VarTag x, VarTag y);
-        RecFilter& reorder(FuncTag f, VarTag x, VarTag y, VarTag z);
-        RecFilter& reorder(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
-        RecFilter& reorder(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
+    /**@name Scheduling operations */
+    // {@
 
-        RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y);
-        RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z);
-        RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
-        RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
+    RecFilter& compute_in_global(FuncTag f);
+    RecFilter& compute_in_shared(FuncTag f);
 
-        RecFilter& gpu_threads(FuncTag f, VarTag thread_x);
-        RecFilter& gpu_threads(FuncTag f, VarTag thread_x, VarTag thread_y);
-        RecFilter& gpu_threads(FuncTag f, VarTag thread_x, VarTag thread_y, VarTag thread_z);
-        RecFilter& gpu_threads(FuncTag f, VarTag thread_x, Halide::Expr task_size);
+    RecFilter& parallel (FuncTag f, VarTag v, VarIndex vidx=FIRST);
+    RecFilter& parallel (FuncTag f, VarTag v, Halide::Expr task_size, VarIndex vidx=FIRST);
+    RecFilter& unroll   (FuncTag f, VarTag v, VarIndex vidx=FIRST);
+    RecFilter& unroll   (FuncTag f, VarTag v, int factor, VarIndex vidx=FIRST);
+    RecFilter& vectorize(FuncTag f, VarTag v, VarIndex vidx=FIRST);
+    RecFilter& vectorize(FuncTag f, VarTag v, int factor, VarIndex vidx=FIRST);
+    RecFilter& bound    (FuncTag f, VarTag v, Halide::Expr min, Halide::Expr extent, VarIndex vidx=FIRST);
 
-        RecFilter& gpu_blocks(FuncTag f, VarTag block_x);
-        RecFilter& gpu_blocks(FuncTag f, VarTag block_x, VarTag block_y);
-        RecFilter& gpu_blocks(FuncTag f, VarTag block_x, VarTag block_y, VarTag block_z);
+    RecFilter& inner_split(FuncTag f, VarTag v, Halide::Expr factor, VarIndex vidx=FIRST);
+    RecFilter& outer_split(FuncTag f, VarTag v, Halide::Expr factor, VarIndex vidx=FIRST);
 
-        RecFilter& gpu_tile(FuncTag f, VarTag x, int x_size);
-        RecFilter& gpu_tile(FuncTag f, VarTag x, VarTag y, int x_size, int y_size);
-        RecFilter& gpu_tile(FuncTag f, VarTag x, VarTag y, VarTag z, int x_size, int y_size, int z_size);
+    RecFilter& reorder(FuncTag f, VarTag x, VarTag y);
+    RecFilter& reorder(FuncTag f, VarTag x, VarTag y, VarTag z);
+    RecFilter& reorder(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
+    RecFilter& reorder(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
 
-        RecFilter& reorder        (FuncTag f, std::vector<VarTag> x);
-        RecFilter& reorder_storage(FuncTag f, std::vector<VarTag> x);
-        RecFilter& gpu_threads    (FuncTag f, std::vector<VarTag> x);
-        RecFilter& gpu_blocks     (FuncTag f, std::vector<VarTag> x);
-        RecFilter& gpu_tile       (FuncTag f, std::vector<std::pair<VarTag,int> > x);
+    RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y);
+    RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z);
+    RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
+    RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
 
-        // @}
+    RecFilter& gpu_threads(FuncTag f, VarTag thread_x);
+    RecFilter& gpu_threads(FuncTag f, VarTag thread_x, VarTag thread_y);
+    RecFilter& gpu_threads(FuncTag f, VarTag thread_x, VarTag thread_y, VarTag thread_z);
+    RecFilter& gpu_threads(FuncTag f, VarTag thread_x, Halide::Expr task_size, VarIndex vidx=FIRST);
+
+    RecFilter& gpu_blocks(FuncTag f, VarTag block_x);
+    RecFilter& gpu_blocks(FuncTag f, VarTag block_x, VarTag block_y);
+    RecFilter& gpu_blocks(FuncTag f, VarTag block_x, VarTag block_y, VarTag block_z);
+
+    RecFilter& gpu_tile(FuncTag f, VarTag x, int xs);
+    RecFilter& gpu_tile(FuncTag f, VarTag x, VarTag y, int xs, int ys);
+    RecFilter& gpu_tile(FuncTag f, VarTag x, VarTag y, VarTag z, int xs, int ys, int zs);
+
+    RecFilter& split          (FuncTag f, VarTag v, Halide::Expr factor, VarIndex vidx, bool do_reorder);
+    RecFilter& reorder        (FuncTag f, std::vector<VarTag> x);
+    RecFilter& reorder_storage(FuncTag f, std::vector<VarTag> x);
+    RecFilter& gpu_threads    (FuncTag f, std::vector<VarTag> x);
+    RecFilter& gpu_blocks     (FuncTag f, std::vector<VarTag> x);
+    RecFilter& gpu_tile       (FuncTag f, std::vector<std::pair<VarTag,int> > x);
+
+    // @}
 };
 
 // -----------------------------------------------------------------------------
@@ -389,6 +405,22 @@ std::ostream &operator<<(std::ostream &s, const CheckResult &v);
 std::ostream &operator<<(std::ostream &s, const CheckResultVerbose &v);
 std::ostream &operator<<(std::ostream &s, const FuncTag &f);
 std::ostream &operator<<(std::ostream &s, const VarTag &v);
+// @}
+
+// -----------------------------------------------------------------------------
+
+/** @name Logical operators for manipulating function and variable scheduling tags */
+// {@
+FuncTag  operator ~ (const FuncTag& a);
+VarTag   operator ~ (const VarTag&  a);
+FuncTag& operator |=(FuncTag& a, const FuncTag& b);
+VarTag&  operator |=(VarTag&  a, const VarTag& b);
+FuncTag  operator | (const FuncTag& a, const FuncTag& b);
+VarTag   operator | (const VarTag&  a, const VarTag& b);
+FuncTag& operator &=(FuncTag& a, const FuncTag& b);
+VarTag&  operator &=(VarTag&  a, const VarTag& b);
+FuncTag  operator & (const FuncTag& a, const FuncTag& b);
+VarTag   operator & (const VarTag&  a, const VarTag& b);
 // @}
 
 // ----------------------------------------------------------------------------

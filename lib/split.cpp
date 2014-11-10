@@ -28,56 +28,6 @@ using std::make_pair;
 
 // -----------------------------------------------------------------------------
 
-static FuncTag& operator|=(FuncTag& a, const FuncTag& b) {
-    a = static_cast<FuncTag>(static_cast<int>(a) | static_cast<int>(b));
-    return a;
-}
-
-static FuncTag& operator&=(FuncTag& a, const FuncTag& b) {
-    a = static_cast<FuncTag>(static_cast<int>(a) & static_cast<int>(b));
-    return a;
-}
-
-static VarTag& operator|=(VarTag& a, const VarTag& b) {
-    a = static_cast<VarTag>(static_cast<int>(a) | static_cast<int>(b));
-    return a;
-}
-
-static VarTag& operator&=(VarTag& a, const VarTag& b) {
-    a = static_cast<VarTag>(static_cast<int>(a) & static_cast<int>(b));
-    return a;
-}
-
-static FuncTag operator~(const FuncTag& a) {
-    return static_cast<FuncTag>(~ static_cast<int>(a));
-}
-
-static FuncTag operator|(const FuncTag& a, const FuncTag& b) {
-
-    return static_cast<FuncTag>(static_cast<int>(a) | static_cast<int>(b));
-}
-
-static FuncTag operator&(const FuncTag& a, const FuncTag& b) {
-
-    return static_cast<FuncTag>(static_cast<int>(a) & static_cast<int>(b));
-}
-
-static VarTag operator~(const VarTag& a) {
-    return static_cast<VarTag>(~ static_cast<int>(a));
-}
-
-static VarTag operator|(const VarTag& a, const VarTag& b) {
-
-    return static_cast<VarTag>(static_cast<int>(a) | static_cast<int>(b));
-}
-
-static VarTag operator&(const VarTag& a, const VarTag& b) {
-
-    return static_cast<VarTag>(static_cast<int>(a) & static_cast<int>(b));
-}
-
-// -----------------------------------------------------------------------------
-
 /** All recursive filter funcs created during splitting transformations */
 static map<string, RecFilterFunc> recfilter_func_list;
 

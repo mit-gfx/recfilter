@@ -107,6 +107,52 @@ Arguments::Arguments(int argc, char** argv) :
 
 // -----------------------------------------------------------------------------
 
+FuncTag& operator|=(FuncTag& a, const FuncTag& b) {
+    a = static_cast<FuncTag>(static_cast<int>(a) | static_cast<int>(b));
+    return a;
+}
+
+FuncTag& operator&=(FuncTag& a, const FuncTag& b) {
+    a = static_cast<FuncTag>(static_cast<int>(a) & static_cast<int>(b));
+    return a;
+}
+
+VarTag& operator|=(VarTag& a, const VarTag& b) {
+    a = static_cast<VarTag>(static_cast<int>(a) | static_cast<int>(b));
+    return a;
+}
+
+VarTag& operator&=(VarTag& a, const VarTag& b) {
+    a = static_cast<VarTag>(static_cast<int>(a) & static_cast<int>(b));
+    return a;
+}
+
+FuncTag operator~(const FuncTag& a) {
+    return static_cast<FuncTag>(~ static_cast<int>(a));
+}
+
+FuncTag operator|(const FuncTag& a, const FuncTag& b) {
+    return static_cast<FuncTag>(static_cast<int>(a) | static_cast<int>(b));
+}
+
+FuncTag operator&(const FuncTag& a, const FuncTag& b) {
+    return static_cast<FuncTag>(static_cast<int>(a) & static_cast<int>(b));
+}
+
+VarTag operator~(const VarTag& a) {
+    return static_cast<VarTag>(~ static_cast<int>(a));
+}
+
+VarTag operator|(const VarTag& a, const VarTag& b) {
+    return static_cast<VarTag>(static_cast<int>(a) | static_cast<int>(b));
+}
+
+VarTag operator&(const VarTag& a, const VarTag& b) {
+    return static_cast<VarTag>(static_cast<int>(a) & static_cast<int>(b));
+}
+
+// -----------------------------------------------------------------------------
+
 ostream &operator<<(ostream &s, const CheckResult& v) {
     Image<float> ref = v.ref;
     Image<float> out = v.out;

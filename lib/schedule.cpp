@@ -49,7 +49,7 @@ RecFilter& RecFilter::compute_in_shared(FuncTag ftag) {
             if ((f->second.func_category & REINDEX_FOR_WRITE) && f->second.callee_func==F.name()) {
                 callee_func = Func(f->second.func);
                 if (callee_func.defined()) {
-                    cerr << "Function " << F.name() << " cannot be computed in shared mem "
+                    cerr << F.name() << " cannot be computed in shared mem "
                         << "because it is called by multiple functions" << endl;
                     assert(false);
                 }
@@ -77,231 +77,254 @@ RecFilter& RecFilter::compute_in_shared(FuncTag ftag) {
     return *this;
 }
 
-RecFilter& RecFilter::split(FuncTag ftag, VarTag old, Expr factor) {
-    vector<string> func_list = internal_functions(ftag);
-    for (int j=0; j<func_list.size(); j++) {
-        RecFilterFunc& rF = internal_function(func_list[j]);
-        Func            F = Func(rF.func);
-
-        // TODO
+RecFilter& RecFilter::parallel(FuncTag ftag, VarTag vtag, VarIndex vidx) {
+    if (vtag & SCAN_DIMENSION ||
+        vtag & INNER_SCAN_VAR ||
+        vtag & OUTER_SCAN_VAR) {
+        cerr << "Cannot create parallel threads from scan variable" << endl;
+        assert(false);
     }
-    return *this;
-}
 
-RecFilter& RecFilter::parallel(FuncTag ftag, VarTag vtag) {
     vector<string> func_list = internal_functions(ftag);
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map<int,VarOrRVar> vars = internal_func_vars(rF, vtag, vidx);
+        map<int,VarOrRVar>::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            VarOrRVar v = vit->second;
             if (def==PURE_DEF) {
-                for (int i=0; i<var_list.size(); i++) {
-                    F.parallel(var_list[i]);
-                    stringstream s;
-                    s << "parallel(Var(\"" << var_list[i].name() << "\"))";
-                    rF.schedule[PURE_DEF].push_back(s.str());
-                }
+                F.parallel(v);
+                stringstream s;
+                s << "parallel(Var(\"" << v.name() << "\"))";
+                rF.schedule[PURE_DEF].push_back(s.str());
             } else {
-                for (int i=0; i<var_list.size(); i++) {
-                    F.update(def).parallel(var_list[i]);
-                    stringstream s;
-                    s << "parallel(Var(\"" << var_list[i].name() << "\"))";
-                    rF.schedule[def].push_back(s.str());
-                }
+                F.update(def).parallel(v);
+                stringstream s;
+                s << "parallel(Var(\"" << v.name() << "\"))";
+                rF.schedule[def].push_back(s.str());
             }
         }
     }
     return *this;
 }
 
-RecFilter& RecFilter::parallel(FuncTag ftag, VarTag vtag, Expr task_size) {
+RecFilter& RecFilter::parallel(FuncTag ftag, VarTag vtag, Expr task_size, VarIndex vidx) {
+    if (vtag & SCAN_DIMENSION ||
+        vtag & INNER_SCAN_VAR ||
+        vtag & OUTER_SCAN_VAR) {
+        cerr << "Cannot create parallel threads from scan variable" << endl;
+        assert(false);
+    }
+
     vector<string> func_list = internal_functions(ftag);
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map<int,VarOrRVar> vars = internal_func_vars(rF, vtag, vidx);
+        map<int,VarOrRVar>::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            VarOrRVar v = vit->second;
             if (def==PURE_DEF) {
-                for (int i=0; i<var_list.size(); i++) {
-                    F.parallel(var_list[i], task_size);
-                    stringstream s;
-                    s << "parallel(Var(\"" << var_list[i].name() << "\")," << task_size << ")";
-                    rF.schedule[def].push_back(s.str());
-                }
+                F.parallel(v, task_size);
+                stringstream s;
+                s << "parallel(Var(\"" << v.name() << "\")," << task_size << ")";
+                rF.schedule[def].push_back(s.str());
             } else {
-                for (int i=0; i<var_list.size(); i++) {
-                    F.update(def).parallel(var_list[i], task_size);
-                    stringstream s;
-                    s << "parallel(Var(\"" << var_list[i].name() << "\")," << task_size << ")";
-                    rF.schedule[def].push_back(s.str());
-                }
+                F.update(def).parallel(v, task_size);
+                stringstream s;
+                s << "parallel(Var(\"" << v.name() << "\")," << task_size << ")";
+                rF.schedule[def].push_back(s.str());
             }
         }
     }
     return *this;
 }
 
-RecFilter& RecFilter::unroll(FuncTag ftag, VarTag vtag) {
+RecFilter& RecFilter::unroll(FuncTag ftag, VarTag vtag, VarIndex vidx) {
     vector<string> func_list = internal_functions(ftag);
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map<int,VarOrRVar> vars = internal_func_vars(rF, vtag, vidx);
+        map<int,VarOrRVar>::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            VarOrRVar v = vit->second;
             if (def==PURE_DEF) {
-                for (int i=0; i<var_list.size(); i++) {
-                    F.unroll(var_list[i]);
-                    stringstream s;
-                    s << "unroll(Var(\"" << var_list[i].name() << "\"))";
-                    rF.schedule[def].push_back(s.str());
-                }
+                F.unroll(v);
+                stringstream s;
+                s << "unroll(Var(\"" << v.name() << "\"))";
+                rF.schedule[def].push_back(s.str());
             } else {
-                for (int i=0; i<var_list.size(); i++) {
-                    F.update(def).unroll(var_list[i]);
-                    stringstream s;
-                    s << "unroll(Var(\"" << var_list[i].name() << "\"))";
-                    rF.schedule[def].push_back(s.str());
-                }
-            }
-        }}
-    return *this;
-}
-
-RecFilter& RecFilter::unroll(FuncTag ftag, VarTag vtag, int factor) {
-    vector<string> func_list = internal_functions(ftag);
-    for (int j=0; j<func_list.size(); j++) {
-        RecFilterFunc& rF = internal_function(func_list[j]);
-        Func            F = Func(rF.func);
-
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
-
-        for (vit=vars.begin(); vit!=vars.end(); vit++) {
-            int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
-            if (def==PURE_DEF) {
-                for (int i=0; i<var_list.size(); i++) {
-                    F.unroll(var_list[i], factor);
-                    stringstream s;
-                    s << "unroll(Var(\"" << var_list[i].name() << "\")," << factor << ")";
-                    rF.schedule[def].push_back(s.str());
-                }
-            } else {
-                for (int i=0; i<var_list.size(); i++) {
-                    F.update(def).unroll(var_list[i], factor);
-                    stringstream s;
-                    s << "unroll(Var(\"" << var_list[i].name() << "\")," << factor << ")";
-                    rF.schedule[def].push_back(s.str());
-                }
+                F.update(def).unroll(v);
+                stringstream s;
+                s << "unroll(Var(\"" << v.name() << "\"))";
+                rF.schedule[def].push_back(s.str());
             }
         }
     }
     return *this;
 }
 
-RecFilter& RecFilter::vectorize(FuncTag ftag, VarTag vtag) {
+RecFilter& RecFilter::unroll(FuncTag ftag, VarTag vtag, int factor, VarIndex vidx) {
     vector<string> func_list = internal_functions(ftag);
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map<int,VarOrRVar> vars = internal_func_vars(rF, vtag, vidx);
+        map<int,VarOrRVar>::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            VarOrRVar v = vit->second;
             if (def==PURE_DEF) {
-                for (int i=0; i<var_list.size(); i++) {
-                    F.vectorize(var_list[i]);
-                    stringstream s;
-                    s << "vectorize(Var(\"" << var_list[i].name() << "\"))";
-                    rF.schedule[def].push_back(s.str());
-                }
+                F.unroll(v, factor);
+                stringstream s;
+                s << "unroll(Var(\"" << v.name() << "\")," << factor << ")";
+                rF.schedule[def].push_back(s.str());
             } else {
-                for (int i=0; i<var_list.size(); i++) {
-                    F.update(def).vectorize(var_list[i]);
-                    stringstream s;
-                    s << "vectorize(Var(\"" << var_list[i].name() << "\"))";
-                    rF.schedule[def].push_back(s.str());
-                }
+                F.update(def).unroll(v, factor);
+                stringstream s;
+                s << "unroll(Var(\"" << v.name() << "\")," << factor << ")";
+                rF.schedule[def].push_back(s.str());
             }
         }
     }
     return *this;
 }
 
-RecFilter& RecFilter::vectorize(FuncTag ftag, VarTag vtag, int factor) {
+RecFilter& RecFilter::vectorize(FuncTag ftag, VarTag vtag, VarIndex vidx) {
     vector<string> func_list = internal_functions(ftag);
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map<int,VarOrRVar> vars = internal_func_vars(rF, vtag, vidx);
+        map<int,VarOrRVar>::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            VarOrRVar v = vit->second;
             if (def==PURE_DEF) {
-                for (int i=0; i<var_list.size(); i++) {
-                    F.vectorize(var_list[i], factor);
-                    stringstream s;
-                    s << "vectorize(Var(\"" << var_list[i].name() << "\")," << factor << ")";
-                    rF.schedule[def].push_back(s.str());
-                }
+                F.vectorize(v);
+                stringstream s;
+                s << "vectorize(Var(\"" << v.name() << "\"))";
+                rF.schedule[def].push_back(s.str());
             } else {
-                for (int i=0; i<var_list.size(); i++) {
-                    F.update(def).vectorize(var_list[i], factor);
-                    stringstream s;
-                    s << "vectorize(Var(\"" << var_list[i].name() << "\")," << factor << ")";
-                    rF.schedule[def].push_back(s.str());
-                }
+                F.update(def).vectorize(v);
+                stringstream s;
+                s << "vectorize(Var(\"" << v.name() << "\"))";
+                rF.schedule[def].push_back(s.str());
             }
         }
     }
     return *this;
 }
 
-RecFilter& RecFilter::bound(FuncTag ftag, VarTag vtag, Expr min, Expr extent) {
+RecFilter& RecFilter::vectorize(FuncTag ftag, VarTag vtag, int factor, VarIndex vidx) {
     vector<string> func_list = internal_functions(ftag);
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
-        map< int,vector<VarOrRVar> >::iterator vit;
+        map<int,VarOrRVar> vars = internal_func_vars(rF, vtag, vidx);
+        map<int,VarOrRVar>::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
+            VarOrRVar v = vit->second;
             if (def==PURE_DEF) {
-                for (int i=0; i<var_list.size(); i++) {
-                    F.bound(Var(var_list[i].name()), min, extent);
-                    stringstream s;
-                    s << "bound(Var(\"" << var_list[i].name() << "," << min << "," << extent << ")";
-                    rF.schedule[def].push_back(s.str());
-                }
+                F.vectorize(v, factor);
+                stringstream s;
+                s << "vectorize(Var(\"" << v.name() << "\")," << factor << ")";
+                rF.schedule[def].push_back(s.str());
+            } else {
+                F.update(def).vectorize(v, factor);
+                stringstream s;
+                s << "vectorize(Var(\"" << v.name() << "\")," << factor << ")";
+                rF.schedule[def].push_back(s.str());
             }
         }
     }
     return *this;
+}
+
+RecFilter& RecFilter::bound(FuncTag ftag, VarTag vtag, Expr min, Expr extent, VarIndex vidx) {
+    vector<string> func_list = internal_functions(ftag);
+    for (int j=0; j<func_list.size(); j++) {
+        RecFilterFunc& rF = internal_function(func_list[j]);
+        Func            F = Func(rF.func);
+
+        map<int,VarOrRVar> vars = internal_func_vars(rF, vtag, vidx);
+        map<int,VarOrRVar>::iterator vit;
+
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            int def = vit->first;
+            VarOrRVar v = vit->second;
+            if (def==PURE_DEF) {
+                F.bound(Var(v.name()), min, extent);
+                stringstream s;
+                s << "bound(Var(\"" << v.name() << "," << min << "," << extent << ")";
+                rF.schedule[def].push_back(s.str());
+            }
+        }
+    }
+    return *this;
+}
+
+RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag vtag, Expr task_size, VarIndex vidx) {
+    if (vtag & SCAN_DIMENSION || vtag & INNER_SCAN_VAR || vtag & OUTER_SCAN_VAR) {
+        cerr << "Cannot map a scan variable to parallel threads" << endl;
+        assert(false);
+    }
+
+    vector<string> func_list = internal_functions(ftag);
+    for (int j=0; j<func_list.size(); j++) {
+        RecFilterFunc& rF = internal_function(func_list[j]);
+        Func            F = Func(rF.func);
+
+        map<int,VarOrRVar> vars = internal_func_vars(rF, vtag, vidx);
+        map<int,VarOrRVar>::iterator vit;
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            int def = vit->first;
+            VarOrRVar v = vit->second.var;
+            stringstream s;
+
+            Var t(v.name()+".split");
+
+            s << "split(Var(\""   << v.name() << "\"), Var(\"" << v.name() << "\"), Var(\"" << t.name() << "\"), " << task_size << ").";
+            s << "reorder(Var(\"" << t.name() << "\"), Var(\"" << v.name() << "\")).";
+            s << "gpu_threads(Var(\"" << v.name() << "\"))";
+
+            if (def==PURE_DEF) {
+                F.split(v,v,t,task_size).reorder(t,v).gpu_threads(v);
+                rF.pure_var_category.insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
+            } else {
+                F.update(def).split(v,v,t,task_size).reorder(t,v).gpu_threads(v);
+                rF.update_var_category[def].insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
+            }
+            rF.schedule[def].push_back(s.str());
+        }
+    }
+    return *this;
+}
+
+RecFilter& RecFilter::inner_split(FuncTag ftag, VarTag vtag, Expr factor, VarIndex vidx) {
+    return split(ftag, vtag, factor, vidx, true);
+}
+
+RecFilter& RecFilter::outer_split(FuncTag ftag, VarTag vtag, Expr factor, VarIndex vidx) {
+    return split(ftag, vtag, factor, vidx, false);
 }
 
 RecFilter& RecFilter::reorder(FuncTag ftag, VarTag x, VarTag y) {
@@ -336,39 +359,81 @@ RecFilter& RecFilter::reorder_storage(FuncTag ftag, VarTag x, VarTag y, VarTag z
     return reorder_storage(ftag, Internal::vec(x,y,z,w,t));
 }
 
-RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag thread, Expr task_size) {
+RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag vtag_x) {
+    return gpu_threads(ftag, Internal::vec(vtag_x));
+}
+
+RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag vtag_x, VarTag vtag_y) {
+    return gpu_threads(ftag, Internal::vec(vtag_x,vtag_y));
+}
+
+RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag vtag_x, VarTag vtag_y, VarTag vtag_z) {
+    return gpu_threads(ftag, Internal::vec(vtag_x,vtag_y,vtag_z));
+}
+
+RecFilter& RecFilter::gpu_blocks(FuncTag ftag, VarTag vtag_x) {
+    return gpu_blocks(ftag, Internal::vec(vtag_x));
+}
+
+RecFilter& RecFilter::gpu_blocks(FuncTag ftag, VarTag vtag_x, VarTag vtag_y) {
+    return gpu_blocks(ftag, Internal::vec(vtag_x,vtag_y));
+}
+
+RecFilter& RecFilter::gpu_blocks(FuncTag ftag, VarTag vtag_x, VarTag vtag_y, VarTag vtag_z) {
+    return gpu_blocks(ftag, Internal::vec(vtag_x,vtag_y,vtag_z));
+}
+
+RecFilter& RecFilter::gpu_tile(FuncTag ftag, VarTag vtag_x, int x) {
+    return gpu_tile(ftag, Internal::vec(make_pair(vtag_x,x)));
+}
+
+RecFilter& RecFilter::gpu_tile(FuncTag ftag, VarTag vtag_x, VarTag vtag_y, int x, int y) {
+    return gpu_tile(ftag, Internal::vec(make_pair(vtag_x,x), make_pair(vtag_y,y)));
+}
+
+RecFilter& RecFilter::gpu_tile(FuncTag ftag, VarTag vtag_x, VarTag vtag_y, VarTag vtag_z, int x, int y, int z) {
+    return gpu_tile(ftag, Internal::vec(make_pair(vtag_x,x), make_pair(vtag_y,y), make_pair(vtag_z,z)));
+}
+
+RecFilter& RecFilter::split(FuncTag ftag, VarTag vtag, Expr factor, VarIndex vidx, bool do_reorder) {
+    if (vtag & SCHEDULE_INNER) {
+        cerr << "Cannot split a variable which was previously split by scheduling ops" << endl;
+        assert(false);
+    }
+
     vector<string> func_list = internal_functions(ftag);
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, thread);
-        map< int,vector<VarOrRVar> >::iterator vit;
-        for (vit=vars.begin(); vit!=vars.end(); vit++) {
-            if (vit->second.size()>1) {
-                cerr << "Multiple vars found with same tag " << thread
-                    << " in function " << F.name()
-                    << ", cannot assign all to same GPU thread index" << endl;
-                assert(false);
-            }
-        }
+        map<int,VarOrRVar> vars = internal_func_vars(rF, vtag, vidx);
+        map<int,VarOrRVar>::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            VarOrRVar v = vit->second[0].var;
+            VarOrRVar v = vit->second.var;
             stringstream s;
 
             Var t(v.name()+".split");
 
-            s << "split(Var(\""   << v.name() << "\"), Var(\"" << v.name() << "\"), Var(\"" << t.name() << "\"), " << task_size << ").";
-            s << "reorder(Var(\"" << t.name() << "\"), Var(\"" << v.name() << "\")).";
-            s << "gpu_threads(Var(\"" << v.name() << "\")).";
-            s << "unroll(Var(\""      << t.name() << "\"))";
+            s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name()
+              << "\"), Var(\"" << t.name() << "\"), " << factor << ")";
+            if (do_reorder) {
+                s << ".reorder(Var(\"" << t.name() << "\"), Var(\"" << v.name() << "\"))";
+            }
 
             if (def==PURE_DEF) {
-                F.split(v,v,t,task_size).reorder(t,v).gpu_threads(v).unroll(t);
+                F.split(v,v,t,factor);
+                if (do_reorder) {
+                    F.reorder(t,v);
+                }
+                rF.pure_var_category.insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
             } else {
-                F.update(def).split(v,v,t,task_size).reorder(t,v).gpu_threads(v).unroll(t);
+                F.update(def).split(v,v,t,factor);
+                if (do_reorder) {
+                    F.update(def).reorder(t,v);
+                }
+                rF.update_var_category[def].insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
             }
             rF.schedule[def].push_back(s.str());
         }
@@ -376,43 +441,7 @@ RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag thread, Expr task_size) {
     return *this;
 }
 
-RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag thread_x) {
-    return gpu_threads(ftag, Internal::vec(thread_x));
-}
-
-RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag thread_x, VarTag thread_y) {
-    return gpu_threads(ftag, Internal::vec(thread_x,thread_y));
-}
-
-RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag thread_x, VarTag thread_y, VarTag thread_z) {
-    return gpu_threads(ftag, Internal::vec(thread_x,thread_y,thread_z));
-}
-
-RecFilter& RecFilter::gpu_blocks(FuncTag ftag, VarTag block_x) {
-    return gpu_blocks(ftag, Internal::vec(block_x));
-}
-
-RecFilter& RecFilter::gpu_blocks(FuncTag ftag, VarTag block_x, VarTag block_y) {
-    return gpu_blocks(ftag, Internal::vec(block_x, block_y));
-}
-
-RecFilter& RecFilter::gpu_blocks(FuncTag ftag, VarTag block_x, VarTag block_y, VarTag block_z) {
-    return gpu_blocks(ftag, Internal::vec(block_x, block_y, block_z));
-}
-
-RecFilter& RecFilter::gpu_tile(FuncTag ftag, VarTag x, int x_size) {
-    return gpu_tile(ftag, Internal::vec(make_pair(x,x_size)));
-}
-
-RecFilter& RecFilter::gpu_tile(FuncTag ftag, VarTag x, VarTag y, int x_size, int y_size) {
-    return gpu_tile(ftag, Internal::vec(make_pair(x,x_size), make_pair(y,y_size)));
-}
-
-RecFilter& RecFilter::gpu_tile(FuncTag ftag, VarTag x, VarTag y, VarTag z, int x_size, int y_size, int z_size) {
-    return gpu_tile(ftag, Internal::vec(make_pair(x,x_size), make_pair(y,y_size), make_pair(z,z_size)));
-}
-
-RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> x) {
+RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> vtag) {
     vector<string> func_list = internal_functions(ftag);
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = internal_function(func_list[j]);
@@ -421,8 +450,8 @@ RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> x) {
         map< int,vector<VarOrRVar> > vars;
         map< int,vector<VarOrRVar> >::iterator vit;
 
-        for (int i=0; i<x.size(); i++) {
-            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, x[i]);
+        for (int i=0; i<vtag.size(); i++) {
+            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, vtag[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
                 for (int k=0; k<vit->second.size(); k++) {
                     vars[vit->first].push_back(vit->second[k]);
@@ -457,7 +486,7 @@ RecFilter& RecFilter::reorder(FuncTag ftag, vector<VarTag> x) {
     return *this;
 }
 
-RecFilter& RecFilter::reorder_storage(FuncTag ftag, vector<VarTag> x) {
+RecFilter& RecFilter::reorder_storage(FuncTag ftag, vector<VarTag> vtag) {
     vector<string> func_list = internal_functions(ftag);
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = internal_function(func_list[j]);
@@ -466,8 +495,8 @@ RecFilter& RecFilter::reorder_storage(FuncTag ftag, vector<VarTag> x) {
         map< int,vector<VarOrRVar> > vars;
         map< int,vector<VarOrRVar> >::iterator vit;
 
-        for (int i=0; i<x.size(); i++) {
-            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, x[i]);
+        for (int i=0; i<vtag.size(); i++) {
+            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, vtag[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
                 for (int k=0; k<vit->second.size(); k++) {
                     vars[vit->first].push_back(vit->second[k]);
@@ -511,16 +540,23 @@ RecFilter& RecFilter::reorder_storage(FuncTag ftag, vector<VarTag> x) {
     return *this;
 }
 
-RecFilter& RecFilter::gpu_threads(FuncTag ftag, vector<VarTag> thread) {
-    if (thread.empty() || thread.size()>3) {
+RecFilter& RecFilter::gpu_threads(FuncTag ftag, vector<VarTag> vtag) {
+    if (vtag.empty() || vtag.size()>3) {
         cerr << "GPU thread grid dimensions must be between 1 and 3" << endl;
         assert(false);
     }
 
-    for (int i=0; i<thread.size(); i++) {
-        for (int j=i+1; j<thread.size(); j++) {
-            if (thread[i] == thread[j]) {
-                cerr << "Same variable tag mapped to multiple GPU thread" << endl;
+    for (int i=0; i<vtag.size(); i++) {
+        if (vtag[i] & SCAN_DIMENSION ||
+            vtag[i] & INNER_SCAN_VAR ||
+            vtag[i] & OUTER_SCAN_VAR) {
+            cerr << "Cannot create parallel GPU threads from scan variable" << endl;
+            assert(false);
+        }
+
+        for (int j=i+1; j<vtag.size(); j++) {
+            if (vtag[i] == vtag[j]) {
+                cerr << "Same variable tag mapped to multiple GPU thread indices" << endl;
                 assert(false);
             }
         }
@@ -534,16 +570,10 @@ RecFilter& RecFilter::gpu_threads(FuncTag ftag, vector<VarTag> thread) {
         map< int,vector<VarOrRVar> > vars;
         map< int,vector<VarOrRVar> >::iterator vit;
 
-        for (int i=0; i<thread.size(); i++) {
-            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, thread[i]);
+        for (int i=0; i<vtag.size(); i++) {
+            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, vtag[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
-                if (vit->second.size()>1) {
-                    cerr << "Multiple vars found with same tag " << thread[i]
-                         << " in function " << F.name()
-                         << ", cannot assign all to same GPU thread index" << endl;
-                    assert(false);
-                }
-                for (int k=0; k<vit->second.size(); j++) {
+                for (int k=0; k<vit->second.size(); k++) {
                     vars[vit->first].push_back(vit->second[k]);
                 }
             }
@@ -587,15 +617,22 @@ RecFilter& RecFilter::gpu_threads(FuncTag ftag, vector<VarTag> thread) {
     return *this;
 }
 
-RecFilter& RecFilter::gpu_blocks(FuncTag ftag, vector<VarTag> block) {
-    if (block.empty() || block.size()>3) {
+RecFilter& RecFilter::gpu_blocks(FuncTag ftag, vector<VarTag> vtag) {
+    if (vtag.empty() || vtag.size()>3) {
         cerr << "GPU block grid dimensions must be between 1 and 3" << endl;
         assert(false);
     }
 
-    for (int i=0; i<block.size(); i++) {
-        for (int j=i+1; j<block.size(); j++) {
-            if (block[i] == block[j]) {
+    for (int i=0; i<vtag.size(); i++) {
+        if (vtag[i] & SCAN_DIMENSION ||
+            vtag[i] & INNER_SCAN_VAR ||
+            vtag[i] & OUTER_SCAN_VAR) {
+            cerr << "Cannot create parallel GPU blocks from scan variable" << endl;
+            assert(false);
+        }
+
+        for (int j=i+1; j<vtag.size(); j++) {
+            if (vtag[i] == vtag[j]) {
                 cerr << "Same variable tag mapped to multiple GPU blocks" << endl;
                 assert(false);
             }
@@ -610,15 +647,9 @@ RecFilter& RecFilter::gpu_blocks(FuncTag ftag, vector<VarTag> block) {
         map< int,vector<VarOrRVar> > vars;
         map< int,vector<VarOrRVar> >::iterator vit;
 
-        for (int i=0; i<block.size(); i++) {
-            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, block[i]);
+        for (int i=0; i<vtag.size(); i++) {
+            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, vtag[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
-                if (vit->second.size()>1) {
-                    cerr << "Multiple vars found with same tag " << block[i]
-                         << " in function " << F.name()
-                         << ", cannot assign all to same GPU block" << endl;
-                    assert(false);
-                }
                 for (int k=0; k<vit->second.size(); k++) {
                     vars[vit->first].push_back(vit->second[k]);
                 }
@@ -663,15 +694,22 @@ RecFilter& RecFilter::gpu_blocks(FuncTag ftag, vector<VarTag> block) {
     return *this;
 }
 
-RecFilter& RecFilter::gpu_tile(FuncTag ftag, vector< pair<VarTag,int> > tile) {
-    if (tile.empty() || tile.size()>3) {
+RecFilter& RecFilter::gpu_tile(FuncTag ftag, vector< pair<VarTag,int> > vtag) {
+    if (vtag.empty() || vtag.size()>3) {
         cerr << "GPU thread/block grid dimensions must be between 1 and 3" << endl;
         assert(false);
     }
 
-    for (int i=0; i<tile.size(); i++) {
-        for (int j=i+1; j<tile.size(); j++) {
-            if (tile[i].first == tile[j].first) {
+    for (int i=0; i<vtag.size(); i++) {
+        if (vtag[i].first & SCAN_DIMENSION ||
+            vtag[i].first & INNER_SCAN_VAR ||
+            vtag[i].first & OUTER_SCAN_VAR) {
+            cerr << "Cannot create parallel GPU tiles from a scan variable" << endl;
+            assert(false);
+        }
+
+        for (int j=i+1; j<vtag.size(); j++) {
+            if (vtag[i].first == vtag[j].first) {
                 cerr << "Same variable tag mapped to multiple GPU block/thread tiling factors" << endl;
                 assert(false);
             }
@@ -685,18 +723,13 @@ RecFilter& RecFilter::gpu_tile(FuncTag ftag, vector< pair<VarTag,int> > tile) {
 
         map< int,vector<pair<VarOrRVar,int> > > vars;
 
-        for (int i=0; i<tile.size(); i++) {
-            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, tile[i].first);
-            map< int,vector<VarOrRVar> >::iterator vit;
-
+        for (int i=0; i<vtag.size(); i++) {
+            map<int, vector<VarOrRVar> > vars_x = internal_func_vars(rF, vtag[i].first);
+            map<int, vector<VarOrRVar> >::iterator vit;
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
-                if (vit->second.size()>1) {
-                    cerr << "Multiple vars found with same tag " << tile[i].first
-                         << " in function " << F.name()
-                         << ", cannot assign all to same GPU block/thread" << endl;
-                    assert(false);
+                for (int k=0; k<vit->second.size(); k++) {
+                    vars[vit->first].push_back(make_pair(vit->second[k], vtag[i].second));
                 }
-                vars[vit->first].push_back(make_pair(vit->second[0], tile[i].second));
             }
         }
 
@@ -781,13 +814,13 @@ map< int,vector<VarOrRVar> > RecFilter::internal_func_vars(RecFilterFunc f, VarT
     map< int,vector<VarOrRVar> > var_list;
     map<string,VarTag>::iterator vit;
     for (vit = f.pure_var_category.begin(); vit!=f.pure_var_category.end(); vit++) {
-        if (vit->second & vtag) {
+        if (vit->second == vtag) {
             var_list[PURE_DEF].push_back(Var(vit->first));
         }
     }
     for (int i=0; i<f.update_var_category.size(); i++) {
         for (vit=f.update_var_category[i].begin(); vit!=f.update_var_category[i].end(); vit++) {
-            if (vit->second & vtag) {
+            if (vit->second == vtag) {
                 var_list[i].push_back(Var(vit->first));
             }
         }
@@ -800,4 +833,40 @@ map< int,vector<VarOrRVar> > RecFilter::internal_func_vars(RecFilterFunc f, VarT
     return var_list;
 }
 
+map<int,VarOrRVar> RecFilter::internal_func_vars(RecFilterFunc f, VarTag vtag, VarIndex vidx) {
+    map< int,vector<VarOrRVar> > var_list;
+    map<string,VarTag>::iterator vit;
+    for (vit = f.pure_var_category.begin(); vit!=f.pure_var_category.end(); vit++) {
+        if (vit->second == vtag) {
+            var_list[PURE_DEF].push_back(Var(vit->first));
+        }
+    }
+    for (int i=0; i<f.update_var_category.size(); i++) {
+        for (vit=f.update_var_category[i].begin(); vit!=f.update_var_category[i].end(); vit++) {
+            if (vit->second == vtag) {
+                var_list[i].push_back(Var(vit->first));
+            }
+        }
+    }
+    if (var_list.empty()) {
+        cerr << "No variables in function " << f.func.name() <<
+            " have the given scheduling tag " << vtag << endl;
+        assert(false);
+    }
 
+    map<int,VarOrRVar> vlist;
+    map<int,vector<VarOrRVar> >::iterator var_list_it;
+    for (var_list_it=var_list.begin(); var_list_it!=var_list.end(); var_list_it++) {
+        int x               = var_list_it->first;
+        vector<VarOrRVar> v = var_list_it->second;
+        switch (vidx) {
+            case FIRST : if (v.size()>0) { vlist.insert(make_pair(x,v[0])); } break;
+            case SECOND: if (v.size()>1) { vlist.insert(make_pair(x,v[1])); } break;
+            case THIRD : if (v.size()>2) { vlist.insert(make_pair(x,v[2])); } break;
+            case FOURTH: if (v.size()>3) { vlist.insert(make_pair(x,v[3])); } break;
+            case FIFTH : if (v.size()>4) { vlist.insert(make_pair(x,v[4])); } break;
+            default    : cerr << "Incorrect dimension index" << endl; assert(false);
+        }
+    }
+    return vlist;
+}
