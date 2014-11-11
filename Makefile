@@ -3,7 +3,7 @@ all:
 	make -C apps
 
 doc:
-	doxygen Doxyfile
+	doxygen
 
 clean:
 	make -C lib clean
