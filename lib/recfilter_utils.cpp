@@ -230,8 +230,7 @@ ostream &operator<<(ostream &s, const CheckResultVerbose &v) {
 
 ostream &operator<<(ostream &s, const FuncTag &f) {
     if (f ==INLINE           ) { s << "INLINE "           ; }
-    if (f & FULL_RESULT_SCAN ) { s << "FULL_RESULT_SCAN " ; }
-    if (f & FULL_RESULT_PURE ) { s << "FULL_RESULT_PURE " ; }
+    if (f & FULL_RESULT      ) { s << "FULL_RESULT"       ; }
     if (f & INTRA_TILE_SCAN  ) { s << "INTRA_TILE_SCAN "  ; }
     if (f & INTER_TILE_SCAN  ) { s << "INTER_TILE_SCAN "  ; }
     if (f & REINDEX_FOR_WRITE) { s << "REINDEX_FOR_WRITE "; }
@@ -302,7 +301,7 @@ ostream &operator<<(ostream &os, const Internal::Function &f) {
         }
 
         // print the pure def
-        for (int v=0; v<f.values().size(); v++) {
+        {
             vector<string> args = f.args();
             s << f.name() << "(";
             for (int i=0; i<args.size(); i++) {

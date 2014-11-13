@@ -69,6 +69,15 @@ RecFilter& RecFilter::compute_in_shared(FuncTag ftag) {
             internal_function(f.name()).schedule[PURE_DEF].push_back(s.str());
         }
 
+        // function that calls this function must be computed in global mem
+        {
+            Func f = callee_func;
+            f.compute_root();
+            stringstream s;
+            s << "compute_root()";
+            internal_function(f.name()).schedule[PURE_DEF].push_back(s.str());
+        }
+
         F.compute_at(callee_func, Var::gpu_blocks());
         stringstream s;
         s << "compute_at(" << callee_func.name() << ", Var::gpu_blocks())";

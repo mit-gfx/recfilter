@@ -40,13 +40,12 @@ class RecFilterFunc;
 
 /** Scheduling tags for Functions */
 typedef enum {
-    INLINE             = 0x00, ///< function that does not need a schedule because it can be inlined (to be obscured from programmer)
-    FULL_RESULT_SCAN   = 0x01, ///< initial definition of the filter specifying scans over the whole image (to be obscured from programmer)
-    FULL_RESULT_PURE   = 0x02, ///< pure function that touches the full non-split image (to be obscured from programmer)
-    INTRA_TILE_SCAN    = 0x04, ///< scan within tile (multiple scans in multiple dimensions)
-    INTER_TILE_SCAN    = 0x08, ///< scan over tail elements across tiles (single 1D scan)
-    REINDEX_FOR_WRITE  = 0x10, ///< function that reindexes a subset of another function to write to global mem (to be obscured from programmer)
-    REINDEX_FOR_READ   = 0x20, ///< function that reindexes a subset of another function to write to global mem (to be obscured from programmer)
+    INLINE             = 0x00, ///< function to be removed
+    FULL_RESULT        = 0x01, ///< final result
+    INTRA_TILE_SCAN    = 0x02, ///< scan within tile (multiple scans in multiple dimensions)
+    INTER_TILE_SCAN    = 0x04, ///< scan over tail elements across tiles (single 1D scan)
+    REINDEX_FOR_WRITE  = 0x08, ///< function that reindexes a subset of another function to write to global mem (to be obscured from programmer)
+    REINDEX_FOR_READ   = 0x10, ///< function that reindexes a subset of another function to write to global mem (to be obscured from programmer)
 } FuncTag;
 
 /** Scheduling tags for Function dimensions */
@@ -112,15 +111,47 @@ private:
      * indicated by the */
     std::map<int,Halide::VarOrRVar> internal_func_vars(RecFilterFunc f, VarTag vtag, VarIndex vidx);
 
-    /** Inline all calls to a given function */
+    /** @brief Inline all calls to a given function
+     *
+     * Preconditions:
+     * - function must not have any update definitions
+     *
+     * Side effects: function is completely removed from the filters depedency graph
+     * */
     void inline_func(std::string func_name);
 
+
 public:
-    /** Reorder memory layout by swapping two dimensions of a function */
+    /**
+     * Merge multiple functions into a single function with mutiple outputs
+     * \param func_list list of functions to merge
+     * \param merged name of merged function
+     *
+     * Preconditions: functions to be merged must have
+     * - same pure args
+     * - scans with same update args and update domains in same order
+     *
+     * Side effects: all calls to the functions to be merged are replaced by the merged function
+     */
+    void merge_func(std::vector<std::string> func_list, std::string merged);
+
+    /** Reorder memory layout by swapping two dimensions of a function
+     *  \param func name of function whose dimensions have to be transposed
+     *  \param a variable name of the first dimension to be transposed
+     *  \param b variable name of the second dimension to be transposed
+     *
+     * Preconditions: none
+     *
+     * Side effects: dimensions are also transposed in all calls to the function
+     */
     void transpose_dimensions(std::string func, std::string a, std::string b);
 
-    /** Remove the pure def of a Function and add it to the first update
-     * def; replacing the pure def with zero or undefined */
+    /** Remove the pure def of a Function and add it as the first update
+     * def; leaving the pure def undefined
+     *
+     * Preconditions: none
+     * Side effects: none
+     */
     void remove_pure_def(std::string func_name);
 
 public:
@@ -301,38 +332,6 @@ public:
             Halide::Expr stride     ///< interleaving stride
             );
 
-    /**
-     * @brief Merge multiple functions into a single function with mutiple outputs
-     * The functions to be merged are searched in the dependency graph of functions
-     * required to compute the recursive filter
-     *
-     * Preconditions: functions to be merged must have
-     * - same pure args
-     * - scans with same update args and update domains in same order
-     */
-    // {@
-    void merge_func(
-            std::string func_a, ///< name of first function to merge
-            std::string func_b, ///< name of second function to merge
-            std::string merged  ///< name of merged function
-            );
-    void merge_func(
-            std::string func_a, ///< name of first function to merge
-            std::string func_b, ///< name of second function to merge
-            std::string func_c, ///< name of third function to merge
-            std::string merged  ///< name of merged function
-            );
-    void merge_func(
-            std::string func_a, ///< name of first function to merge
-            std::string func_b, ///< name of second function to merge
-            std::string func_c, ///< name of third function to merge
-            std::string func_d, ///< name of fourth function to merge
-            std::string merged  ///< name of merged function
-            );
-    void merge_func(
-            std::vector<std::string> func_list, ///< list of functions to merge
-            std::string merged                  ///< name of merged function
-            );
     // @}
 
 

@@ -33,13 +33,13 @@ RecFilter::RecFilter(string n) {
 
     RecFilterFunc f;
     f.func = contents.ptr->recfilter.function();
-    f.func_category = FULL_RESULT_PURE;
+    f.func_category = FULL_RESULT;
     contents.ptr->func.insert(make_pair(f.func.name(), f));
 }
 
-void RecFilter::setArgs(Var x)              { setArgs(vec(x));      }
-void RecFilter::setArgs(Var x, Var y)       { setArgs(vec(x,y));    }
-void RecFilter::setArgs(Var x, Var y, Var z){ setArgs(vec(x,y,z));  }
+void RecFilter::setArgs(Var x)              { setArgs(vec(x));     }
+void RecFilter::setArgs(Var x, Var y)       { setArgs(vec(x,y));   }
+void RecFilter::setArgs(Var x, Var y, Var z){ setArgs(vec(x,y,z)); }
 
 void RecFilter::setArgs(vector<Var> args) {
     RecFilterFunc& f = internal_function( contents.ptr->recfilter.name() );
@@ -130,7 +130,6 @@ void RecFilter::addScan(
     update_var_category.erase(x.name());
     update_var_category.insert(make_pair(rx.x.name(), SCAN_DIMENSION));
     rf.update_var_category.push_back(update_var_category);
-    rf.func_category = FULL_RESULT_SCAN;
 
     // csausality
     bool causal = (causality == CAUSAL);

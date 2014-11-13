@@ -388,7 +388,7 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
                         args.push_back(var);
 
                         update_var_category[i].erase(a);
-                        update_var_category[i].insert(make_pair(rvar.name(),INNER_SCAN_VAR));
+                        update_var_category[i].insert(make_pair(rvar.name(),INNER_PURE_VAR));
                         update_var_category[i].insert(make_pair(var.name(), OUTER_PURE_VAR));
 
                         found = true;
@@ -681,7 +681,7 @@ static vector<RecFilterFunc> create_complete_tail_term(
         rf.pure_var_category = rF_tail[k].pure_var_category;
         rf.update_var_category.push_back(rF_tail[k].pure_var_category);
         rf.update_var_category[0].erase(xo.name());
-        rf.update_var_category[0].insert(make_pair(rxo.x.name(), INNER_SCAN_VAR | TAIL_DIMENSION));
+        rf.update_var_category[0].insert(make_pair(rxo.x.name(), OUTER_SCAN_VAR));
         rf.update_var_category[0].insert(make_pair(rxo.y.name(), OUTER_SCAN_VAR));
 
         // add the genertaed recfilter function to the global list
@@ -843,6 +843,7 @@ static vector<RecFilterFunc> create_tail_residual_term(
 static vector<RecFilterFunc> create_final_residual_term(
         vector<RecFilterFunc> rF_ctail,
         SplitInfo split_info,
+        string final_result_func_name,
         string func_name)
 {
     int order      = split_info.filter_order;
@@ -880,10 +881,9 @@ static vector<RecFilterFunc> create_final_residual_term(
         // since this is useful for reading into shared mem
         RecFilterFunc rf;
         rf.func = function;
-        rf.func_category  = rF_ctail[j].func_category;
-        rf.func_category |= REINDEX_FOR_READ;
-        rf.func_category &= ~REINDEX_FOR_WRITE;
+        rf.func_category = INTRA_TILE_SCAN | REINDEX_FOR_READ;
         rf.pure_var_category = rF_ctail[j].pure_var_category;
+        rf.caller_func = final_result_func_name;
 
         // add the genertaed recfilter function to the global list
         recfilter_func_list.insert(make_pair(rf.func.name(), rf));
@@ -1295,6 +1295,7 @@ static void add_all_residuals_to_final_result(
 
 static vector< vector<RecFilterFunc> > split_scans(
         RecFilterFunc F_intra,
+        string final_result_func_name,
         vector<SplitInfo> &split_info)
 {
     vector< vector<RecFilterFunc> > F_ctail_list;
@@ -1318,7 +1319,7 @@ static vector< vector<RecFilterFunc> > split_scans(
         vector<RecFilterFunc> F_ctail  = create_complete_tail_term (F_tail,   split_info[i], s1);
         vector<RecFilterFunc> F_ctailw = wrap_complete_tail_term   (F_ctail,  split_info[i], s1);
         vector<RecFilterFunc> F_tdeps  = create_tail_residual_term (F_ctail,  split_info[i], s2);
-        vector<RecFilterFunc> F_deps   = create_final_residual_term(F_ctailw, split_info[i], s3);
+        vector<RecFilterFunc> F_deps   = create_final_residual_term(F_ctailw, split_info[i], final_result_func_name, s3);
 
         // add the dependency from each scan to the tail of the next scan
         // this ensures that the tail of each scan includes the complete
@@ -1466,7 +1467,8 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         rF_final = create_copy(rF_intra, F.name() + DASH + FINAL_TERM);
 
         // compute the residuals from splits in each dimension
-        vector< vector<RecFilterFunc> > rF_deps = split_scans(rF_intra, split_info_current);
+        vector< vector<RecFilterFunc> > rF_deps = split_scans(rF_intra, rF_final.func.name(),
+                split_info_current);
 
         // transfer the tail of each scan to another buffer
         extract_tails_from_each_scan(rF_intra, split_info_current);
@@ -1505,8 +1507,9 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         F.define(args, values);
 
         // remove the scheduling tags of the update defs
-        rF.func_category = FULL_RESULT_PURE;
+        rF.func_category = FULL_RESULT;
         rF.update_var_category.clear();
+        recfilter_func_list.insert(make_pair(rF.func.name(), rF));
     }
 
     contents.ptr->recfilter = Func(F);
@@ -1563,76 +1566,58 @@ void RecFilter::split(vector<Var> vars, Expr t) {
     split(dim_tile);
 }
 
+// -----------------------------------------------------------------------------
+
 void RecFilter::finalize(Target target) {
      // inline all functions not required any more
      map<string,RecFilterFunc>::iterator fit;
      for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-         if (fit->second.func_category==INLINE) {
+         if (fit->second.func_category == INLINE) {
              inline_func(fit->second.func.name());
+             fit = contents.ptr->func.begin();            // list changed, start all over again
          }
      }
 
-     if (target.has_gpu_feature()) {     // GPU specific optimization
+     // merging functions that reindex same previous result - useful for all architectures
+     for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+         RecFilterFunc rF = fit->second;
 
+         if ((rF.func_category & INTRA_TILE_SCAN) && (rF.func.has_update_definition())) {
+             // get all functions that reindex the tail from intra tile computation
+             vector<string> funcs_to_merge;
+             map<string,RecFilterFunc>::iterator git;
+             for (git=contents.ptr->func.begin(); git!=contents.ptr->func.end(); git++) {
+                 if ((git->second.func_category & REINDEX_FOR_WRITE) &&
+                     (git->second.callee_func==rF.func.name())) {
+                     funcs_to_merge.push_back(git->second.func.name());
+                 }
+             }
+
+            // merge these functions
+            // memory layout reshaping done inside merge routine
+             if (funcs_to_merge.size()>1) {
+                string merged_name = funcs_to_merge[0] + "_merged";
+                merge_func(funcs_to_merge, merged_name);
+                fit = contents.ptr->func.begin();            // list changed, start all over again
+             }
+         }
+     }
+
+    // platform specific optimization
+    if (target.has_gpu_feature()) {
          for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
              RecFilterFunc rF = fit->second;
 
-             if (rF.func_category & (INTRA_TILE_SCAN & ~REINDEX_FOR_WRITE)) {
+             if ((rF.func_category & INTRA_TILE_SCAN) && (rF.func.has_update_definition())) {
                  // move initialization to update def in intra tile computation stages
                  move_init_to_update_def(rF, contents.ptr->split_info);
 
                  // add padding to intra tile terms to avoid bank conflicts
                  add_padding_to_avoid_bank_conflicts(rF, contents.ptr->split_info, true);
-
-                 // get all functions that reindex the tail from intra tile computation
-                 vector<string> funcs_to_merge;
-                 map<string,RecFilterFunc>::iterator git;
-                 for (git=contents.ptr->func.begin(); git!=contents.ptr->func.end(); git++) {
-                     if ((git->second.func_category & REINDEX_FOR_WRITE) &&
-                         (git->second.callee_func==rF.func.name())) {
-                         funcs_to_merge.push_back(git->second.func.name());
-                     }
-                 }
-                 if (funcs_to_merge.size()>2) {
-///                    // tail dimension of the first function
-///                    int ref_tail_dim = -1;
-///                    {
-///                        RecFilterFunc& rG = internal_function(funcs_to_merge[0]);
-///                        for (int i=0; ref_tail_dim<0 && i<rG.func.args().size(); i++) {
-///                            if (rG.pure_var_category[rG.func.args()[i]] & TAIL_DIMENSION) {
-///                                ref_tail_dim = i;
-///                            }
-///                        }
-///                    }
-///                    assert(ref_tail_dim>=0);
-///
-///                    // transpose every func's storage so that its tail is the same
-///                    // dimension as the tail of the first function
-///                    for (int i=1; i<funcs_to_merge.size(); i++) {
-///                        RecFilterFunc& rG = internal_function(funcs_to_merge[i]);
-///                        Function g = rG.func;
-///
-///                        // find the funcs tail dimension
-///                        int tail_dim = -1;
-///                        for (int i=0; tail_dim<0 && i<g.args().size(); i++) {
-///                            if (rG.pure_var_category[g.args()[i]] & TAIL_DIMENSION) {
-///                                tail_dim = i;
-///                            }
-///                        }
-///                        assert(tail_dim>=0);
-///
-///                        // transpose this functions memory
-///                        string var_a = g.args()[tail_dim];
-///                        string var_b = g.args()[ref_tail_dim];
-///                        transpose_dimensions(g.name(), var_a, var_b);
-///                    }
-
-                    string merged_name = funcs_to_merge[0] + "_merged";
-                    merge_func(funcs_to_merge, merged_name);
-                 }
              }
          }
-     } else {                            // CPU specific optimization
+     } else {
          // TODO
      }
 }
+
