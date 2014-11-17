@@ -291,7 +291,7 @@ RecFilter& RecFilter::bound(FuncTag ftag, VarTag vtag, Expr min, Expr extent, Va
     return *this;
 }
 
-RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag vtag, Expr task_size, VarIndex vidx) {
+RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag vtag, map<VarIndex,Expr> vidx_tsize) {
     if (vtag & SCAN_DIMENSION || vtag & INNER_SCAN_VAR || vtag & OUTER_SCAN_VAR) {
         cerr << "Cannot map a scan variable to parallel threads" << endl;
         assert(false);
@@ -302,28 +302,47 @@ RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag vtag, Expr task_size, Var
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map<int,VarOrRVar> vars = internal_func_vars(rF, vtag, vidx);
+        VarIndex vidx  = FIRST;
+        Expr     tsize = INT_ONE;
+
+        map<VarIndex,Expr>::iterator it = vidx_tsize.begin();
         map<int,VarOrRVar>::iterator vit;
-        for (vit=vars.begin(); vit!=vars.end(); vit++) {
-            int def = vit->first;
-            VarOrRVar v = vit->second.var;
-            stringstream s;
 
-            Var t(v.name()+".split");
+        map< int,vector<VarOrRVar> > parallel_vars;
 
-            s << "split(Var(\""   << v.name() << "\"), Var(\"" << v.name() << "\"), Var(\"" << t.name() << "\"), " << task_size << ").";
-            s << "reorder(Var(\"" << t.name() << "\"), Var(\"" << v.name() << "\")).";
-            s << "gpu_threads(Var(\"" << v.name() << "\"))";
-
-            if (def==PURE_DEF) {
-                F.split(v,v,t,task_size).reorder(t,v).gpu_threads(v);
-                rF.pure_var_category.insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
-            } else {
-                F.update(def).split(v,v,t,task_size).reorder(t,v).gpu_threads(v);
-                rF.update_var_category[def].insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
+        do {
+            if (it != vidx_tsize.end()) {
+                vidx  = it->first;
+                tsize = it->second;
             }
-            rF.schedule[def].push_back(s.str());
-        }
+
+            map<int,VarOrRVar> vars = internal_func_vars(rF, vtag, vidx);
+            for (vit=vars.begin(); vit!=vars.end(); vit++) {
+                int def = vit->first;
+                VarOrRVar v = vit->second.var;
+                stringstream s;
+
+                Var t(v.name()+".split");
+
+                s << "split(Var(\""   << v.name() << "\"), Var(\"" << v.name() << "\"), Var(\"" << t.name() << "\"), " << tsize << ").";
+                s << "reorder(Var(\"" << t.name() << "\"), Var(\"" << v.name() << "\")).";
+                s << "parallel(Var(\"" << v.name() << "\"))";
+                s << "rename(Var(\"" << v.name() << "\"), Var::gpu_threads())";
+
+                if (def==PURE_DEF) {
+                    F.split(v,v,t,tsize).reorder(t,v);
+                    F.parallel(v).rename(v, Var::gpu_threads());
+                    rF.pure_var_category.insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
+                } else {
+                    F.update(def).split(v,v,t,tsize).reorder(t,v).gpu_threads(v);
+                    F.update(def).parallel(v).rename(v, Var::gpu_threads());;
+                    rF.update_var_category[def].insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
+                }
+                rF.schedule[def].push_back(s.str());
+            }
+        } while(++it != vidx_tsize.end());
+
+
     }
     return *this;
 }
@@ -842,7 +861,7 @@ map< int,vector<VarOrRVar> > RecFilter::internal_func_vars(RecFilterFunc f, VarT
     return var_list;
 }
 
-map<int,VarOrRVar> RecFilter::internal_func_vars(RecFilterFunc f, VarTag vtag, VarIndex vidx) {
+pair<int,VarOrRVar> RecFilter::internal_func_vars(RecFilterFunc f, VarTag vtag, VarIndex vidx) {
     map< int,vector<VarOrRVar> > var_list;
     map<string,VarTag>::iterator vit;
     for (vit = f.pure_var_category.begin(); vit!=f.pure_var_category.end(); vit++) {
@@ -866,14 +885,14 @@ map<int,VarOrRVar> RecFilter::internal_func_vars(RecFilterFunc f, VarTag vtag, V
     map<int,VarOrRVar> vlist;
     map<int,vector<VarOrRVar> >::iterator var_list_it;
     for (var_list_it=var_list.begin(); var_list_it!=var_list.end(); var_list_it++) {
-        int x               = var_list_it->first;
+        int def             = var_list_it->first;
         vector<VarOrRVar> v = var_list_it->second;
         switch (vidx) {
-            case FIRST : if (v.size()>0) { vlist.insert(make_pair(x,v[0])); } break;
-            case SECOND: if (v.size()>1) { vlist.insert(make_pair(x,v[1])); } break;
-            case THIRD : if (v.size()>2) { vlist.insert(make_pair(x,v[2])); } break;
-            case FOURTH: if (v.size()>3) { vlist.insert(make_pair(x,v[3])); } break;
-            case FIFTH : if (v.size()>4) { vlist.insert(make_pair(x,v[4])); } break;
+            case FIRST : if (v.size()>0) { vlist.insert(make_pair(def,v[0])); } break;
+            case SECOND: if (v.size()>1) { vlist.insert(make_pair(def,v[1])); } break;
+            case THIRD : if (v.size()>2) { vlist.insert(make_pair(def,v[2])); } break;
+            case FOURTH: if (v.size()>3) { vlist.insert(make_pair(def,v[3])); } break;
+            case FIFTH : if (v.size()>4) { vlist.insert(make_pair(def,v[4])); } break;
             default    : cerr << "Incorrect dimension index" << endl; assert(false);
         }
     }
