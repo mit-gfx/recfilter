@@ -14,6 +14,20 @@ using namespace Halide;
 
 #define PURE_DEF  (-1)
 
+static const VarOrRVar GPU_THREAD[] = {
+    VarOrRVar("__thread_id_x",false),
+    VarOrRVar("__thread_id_y",false),
+    VarOrRVar("__thread_id_z",false),
+};
+
+static const VarOrRVar GPU_BLOCK[] = {
+    VarOrRVar("__block_id_x",false),
+    VarOrRVar("__block_id_y",false),
+    VarOrRVar("__block_id_z",false),
+};
+
+// -----------------------------------------------------------------------------
+
 RecFilter& RecFilter::compute_in_global(FuncTag ftag) {
     vector<string> func_list = internal_functions(ftag);
     for (int j=0; j<func_list.size(); j++) {
@@ -316,33 +330,43 @@ RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag vtag, map<VarIndex,Expr> 
                 tsize = it->second;
             }
 
+            map<int,int> next_gpu_thread;
+
             map<int,VarOrRVar> vars = internal_func_vars(rF, vtag, vidx);
             for (vit=vars.begin(); vit!=vars.end(); vit++) {
                 int def = vit->first;
                 VarOrRVar v = vit->second.var;
                 stringstream s;
 
-                Var t(v.name()+".split");
+                Var t(v.name()+".1");
 
-                s << "split(Var(\""   << v.name() << "\"), Var(\"" << v.name() << "\"), Var(\"" << t.name() << "\"), " << tsize << ").";
-                s << "reorder(Var(\"" << t.name() << "\"), Var(\"" << v.name() << "\")).";
-                s << "parallel(Var(\"" << v.name() << "\"))";
-                s << "rename(Var(\"" << v.name() << "\"), Var::gpu_threads())";
+                int thread_id_x = 0;
+                if (next_gpu_thread.find(def) != next_gpu_thread.end()) {
+                    thread_id_x = next_gpu_thread[def];
+                    next_gpu_thread[def] = thread_id_x+1;
+                }
+                next_gpu_thread[def] = thread_id_x+1;
+
+                if (thread_id_x<0 || thread_id_x>2) {
+                    cerr << "Cannot map more than three vars to GP threads" << endl;
+                    assert(false);
+                }
+
+                s << "split(Var(\""    << v.name() << "\"), Var(\"" << v.name() << "\"), Var(\"" << t.name() << "\"), " << tsize << ").";
+                s << "reorder(Var(\""  << t.name() << "\"), Var(\"" << v.name() << "\")).";
+                s << "parallel(Var(\"" << v.name() << "\")).";
+                s << "rename(Var(\""   << v.name() << "\"), Var(\"" << GPU_THREAD[thread_id_x].name() << "\"))";
 
                 if (def==PURE_DEF) {
-                    F.split(v,v,t,tsize).reorder(t,v);
-                    F.parallel(v).rename(v, Var::gpu_threads());
+                    F.split(v,v,t,tsize).reorder(t,v).parallel(v).rename(v, GPU_THREAD[thread_id_x]);
                     rF.pure_var_category.insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
                 } else {
-                    F.update(def).split(v,v,t,tsize).reorder(t,v).gpu_threads(v);
-                    F.update(def).parallel(v).rename(v, Var::gpu_threads());;
+                    F.update(def).split(v,v,t,tsize).reorder(t,v).parallel(v).rename(v, GPU_THREAD[thread_id_x]);
                     rF.update_var_category[def].insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
                 }
                 rF.schedule[def].push_back(s.str());
             }
         } while(++it != vidx_tsize.end());
-
-
     }
     return *this;
 }
@@ -385,30 +409,6 @@ RecFilter& RecFilter::reorder_storage(FuncTag ftag, VarTag x, VarTag y, VarTag z
 
 RecFilter& RecFilter::reorder_storage(FuncTag ftag, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t) {
     return reorder_storage(ftag, Internal::vec(x,y,z,w,t));
-}
-
-RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag vtag_x) {
-    return gpu_threads(ftag, Internal::vec(vtag_x));
-}
-
-RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag vtag_x, VarTag vtag_y) {
-    return gpu_threads(ftag, Internal::vec(vtag_x,vtag_y));
-}
-
-RecFilter& RecFilter::gpu_threads(FuncTag ftag, VarTag vtag_x, VarTag vtag_y, VarTag vtag_z) {
-    return gpu_threads(ftag, Internal::vec(vtag_x,vtag_y,vtag_z));
-}
-
-RecFilter& RecFilter::gpu_blocks(FuncTag ftag, VarTag vtag_x) {
-    return gpu_blocks(ftag, Internal::vec(vtag_x));
-}
-
-RecFilter& RecFilter::gpu_blocks(FuncTag ftag, VarTag vtag_x, VarTag vtag_y) {
-    return gpu_blocks(ftag, Internal::vec(vtag_x,vtag_y));
-}
-
-RecFilter& RecFilter::gpu_blocks(FuncTag ftag, VarTag vtag_x, VarTag vtag_y, VarTag vtag_z) {
-    return gpu_blocks(ftag, Internal::vec(vtag_x,vtag_y,vtag_z));
 }
 
 RecFilter& RecFilter::gpu_tile(FuncTag ftag, VarTag vtag_x, int x) {
@@ -568,26 +568,10 @@ RecFilter& RecFilter::reorder_storage(FuncTag ftag, vector<VarTag> vtag) {
     return *this;
 }
 
-RecFilter& RecFilter::gpu_threads(FuncTag ftag, vector<VarTag> vtag) {
-    if (vtag.empty() || vtag.size()>3) {
-        cerr << "GPU thread grid dimensions must be between 1 and 3" << endl;
+RecFilter& RecFilter::gpu_blocks(FuncTag ftag, VarTag vtag) {
+    if (vtag & SCAN_DIMENSION || vtag & INNER_SCAN_VAR || vtag & OUTER_SCAN_VAR) {
+        cerr << "Cannot create parallel GPU blocks from scan variable" << endl;
         assert(false);
-    }
-
-    for (int i=0; i<vtag.size(); i++) {
-        if (vtag[i] & SCAN_DIMENSION ||
-            vtag[i] & INNER_SCAN_VAR ||
-            vtag[i] & OUTER_SCAN_VAR) {
-            cerr << "Cannot create parallel GPU threads from scan variable" << endl;
-            assert(false);
-        }
-
-        for (int j=i+1; j<vtag.size(); j++) {
-            if (vtag[i] == vtag[j]) {
-                cerr << "Same variable tag mapped to multiple GPU thread indices" << endl;
-                assert(false);
-            }
-        }
     }
 
     vector<string> func_list = internal_functions(ftag);
@@ -595,94 +579,8 @@ RecFilter& RecFilter::gpu_threads(FuncTag ftag, vector<VarTag> vtag) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map< int,vector<VarOrRVar> > vars;
+        map< int,vector<VarOrRVar> > vars = internal_func_vars(rF, vtag);
         map< int,vector<VarOrRVar> >::iterator vit;
-
-        for (int i=0; i<vtag.size(); i++) {
-            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, vtag[i]);
-            for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
-                for (int k=0; k<vit->second.size(); k++) {
-                    vars[vit->first].push_back(vit->second[k]);
-                }
-            }
-        }
-
-        for (vit=vars.begin(); vit!=vars.end(); vit++) {
-            int def = vit->first;
-            vector<VarOrRVar> var_list = vit->second;
-            stringstream s;
-
-            if (var_list.size()) {
-                s << "gpu_threads(";
-                for (int i=0; i<var_list.size(); i++) {
-                    if (i>0) {
-                        s << ",";
-                    }
-                    s << "Var(\"" << var_list[i].name() << "\")";
-                }
-                s << ")";
-
-                // only support up to 3 variables
-                if (def==PURE_DEF) {
-                    switch (var_list.size()) {
-                        case 1: F.gpu_threads(var_list[0]); break;
-                        case 2: F.gpu_threads(var_list[0], var_list[1]); break;
-                        case 3: F.gpu_threads(var_list[0], var_list[1], var_list[2]); break;
-                        default:cerr << "Too many variables in gpu_threads()" << endl; assert(false); break;
-                    }
-                } else {
-                    switch (var_list.size()) {
-                        case 1: F.update(def).gpu_threads(var_list[0]); break;
-                        case 2: F.update(def).gpu_threads(var_list[0], var_list[1]); break;
-                        case 3: F.update(def).gpu_threads(var_list[0], var_list[1], var_list[2]); break;
-                        default:cerr << "Too many variables in gpu_threads()" << endl; assert(false); break;
-                    }
-                }
-                rF.schedule[def].push_back(s.str());
-            }
-        }
-    }
-    return *this;
-}
-
-RecFilter& RecFilter::gpu_blocks(FuncTag ftag, vector<VarTag> vtag) {
-    if (vtag.empty() || vtag.size()>3) {
-        cerr << "GPU block grid dimensions must be between 1 and 3" << endl;
-        assert(false);
-    }
-
-    for (int i=0; i<vtag.size(); i++) {
-        if (vtag[i] & SCAN_DIMENSION ||
-            vtag[i] & INNER_SCAN_VAR ||
-            vtag[i] & OUTER_SCAN_VAR) {
-            cerr << "Cannot create parallel GPU blocks from scan variable" << endl;
-            assert(false);
-        }
-
-        for (int j=i+1; j<vtag.size(); j++) {
-            if (vtag[i] == vtag[j]) {
-                cerr << "Same variable tag mapped to multiple GPU blocks" << endl;
-                assert(false);
-            }
-        }
-    }
-
-    vector<string> func_list = internal_functions(ftag);
-    for (int j=0; j<func_list.size(); j++) {
-        RecFilterFunc& rF = internal_function(func_list[j]);
-        Func            F = Func(rF.func);
-
-        map< int,vector<VarOrRVar> > vars;
-        map< int,vector<VarOrRVar> >::iterator vit;
-
-        for (int i=0; i<vtag.size(); i++) {
-            map< int,vector<VarOrRVar> > vars_x = internal_func_vars(rF, vtag[i]);
-            for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
-                for (int k=0; k<vit->second.size(); k++) {
-                    vars[vit->first].push_back(vit->second[k]);
-                }
-            }
-        }
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
@@ -861,7 +759,7 @@ map< int,vector<VarOrRVar> > RecFilter::internal_func_vars(RecFilterFunc f, VarT
     return var_list;
 }
 
-pair<int,VarOrRVar> RecFilter::internal_func_vars(RecFilterFunc f, VarTag vtag, VarIndex vidx) {
+map<int,VarOrRVar> RecFilter::internal_func_vars(RecFilterFunc f, VarTag vtag, VarIndex vidx) {
     map< int,vector<VarOrRVar> > var_list;
     map<string,VarTag>::iterator vit;
     for (vit = f.pure_var_category.begin(); vit!=f.pure_var_category.end(); vit++) {

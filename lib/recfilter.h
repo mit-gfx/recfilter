@@ -368,14 +368,9 @@ public:
     RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
     RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
 
-    RecFilter& gpu_threads(FuncTag f, VarTag thread_x);
-    RecFilter& gpu_threads(FuncTag f, VarTag thread_x, VarTag thread_y);
-    RecFilter& gpu_threads(FuncTag f, VarTag thread_x, VarTag thread_y, VarTag thread_z);
-    RecFilter& gpu_threads(FuncTag f, VarTag thread_x, Halide::Expr task_size, VarIndex vidx=FIRST);
+    RecFilter& gpu_threads(FuncTag ftag, VarTag vtag, std::map<VarIndex,Halide::Expr> vidx_tsize);
 
     RecFilter& gpu_blocks(FuncTag f, VarTag block_x);
-    RecFilter& gpu_blocks(FuncTag f, VarTag block_x, VarTag block_y);
-    RecFilter& gpu_blocks(FuncTag f, VarTag block_x, VarTag block_y, VarTag block_z);
 
     RecFilter& gpu_tile(FuncTag f, VarTag x, int xs);
     RecFilter& gpu_tile(FuncTag f, VarTag x, VarTag y, int xs, int ys);
@@ -384,10 +379,7 @@ public:
     RecFilter& split          (FuncTag f, VarTag v, Halide::Expr factor, VarIndex vidx, bool do_reorder);
     RecFilter& reorder        (FuncTag f, std::vector<VarTag> x);
     RecFilter& reorder_storage(FuncTag f, std::vector<VarTag> x);
-    RecFilter& gpu_threads    (FuncTag f, std::vector<VarTag> x);
-    RecFilter& gpu_blocks     (FuncTag f, std::vector<VarTag> x);
     RecFilter& gpu_tile       (FuncTag f, std::vector<std::pair<VarTag,int> > x);
-
     // @}
 };
 
