@@ -282,10 +282,28 @@ RecFilter& RecFilter::vectorize(FuncTag ftag, VarTag vtag, int factor, VarIndex 
     return *this;
 }
 
-RecFilter& RecFilter::bound(FuncTag ftag, VarTag vtag, Expr min, Expr extent, VarIndex vidx) {
-    vector<string> func_list = internal_functions(ftag);
+RecFilter& RecFilter::bound(Var v, Halide::Expr min, Halide::Expr extent) {
+    vector<Func> func_list = funcs();
     for (int j=0; j<func_list.size(); j++) {
-        RecFilterFunc& rF = internal_function(func_list[j]);
+        RecFilterFunc& rF = internal_function(func_list[j].name());
+        Func            F = Func(rF.func);
+
+        for (int i=0; i<F.args().size(); i++) {
+            if (v.name() == F.args()[i].name()) {
+                F.bound(v, min, extent);
+                stringstream s;
+                s << "bound(Var(\"" << v.name() << "," << min << "," << extent << ")";
+                rF.schedule[PURE_DEF].push_back(s.str());
+            }
+        }
+    }
+    return *this;
+}
+
+RecFilter& RecFilter::bound(VarTag vtag, Expr min, Expr extent, VarIndex vidx) {
+    vector<Func> func_list = funcs();
+    for (int j=0; j<func_list.size(); j++) {
+        RecFilterFunc& rF = internal_function(func_list[j].name());
         Func            F = Func(rF.func);
 
         map<int,VarOrRVar> vars = internal_func_vars(rF, vtag, vidx);

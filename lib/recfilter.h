@@ -353,7 +353,8 @@ public:
     RecFilter& unroll   (FuncTag f, VarTag v, int factor, VarIndex vidx=FIRST);
     RecFilter& vectorize(FuncTag f, VarTag v, VarIndex vidx=FIRST);
     RecFilter& vectorize(FuncTag f, VarTag v, int factor, VarIndex vidx=FIRST);
-    RecFilter& bound    (FuncTag f, VarTag v, Halide::Expr min, Halide::Expr extent, VarIndex vidx=FIRST);
+    RecFilter& bound    (VarTag v, Halide::Expr min, Halide::Expr extent, VarIndex vidx=FIRST);
+    RecFilter& bound    (Halide::Var v, Halide::Expr min, Halide::Expr extent);
 
     RecFilter& inner_split(FuncTag f, VarTag v, Halide::Expr factor, VarIndex vidx=FIRST);
     RecFilter& outer_split(FuncTag f, VarTag v, Halide::Expr factor, VarIndex vidx=FIRST);
