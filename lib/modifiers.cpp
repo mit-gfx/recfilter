@@ -113,33 +113,6 @@ public:
 
 // -----------------------------------------------------------------------------
 
-// Extract variables referenced in Expr
-class ExtractVarsInExpr : public IRVisitor {
-private:
-    using IRVisitor::visit;
-    void visit(const Variable *op) {
-        if (op->reduction_domain.defined()) {
-            rvar_list.push_back(op->name);
-            var_or_rvar_list.push_back(op->name);
-        }
-        else if (op->param.defined()) {
-            param_list.push_back(op->name);
-        }
-        else {
-            var_list.push_back(op->name);
-            var_or_rvar_list.push_back(op->name);
-        }
-    }
-public:
-    vector<string> var_list;
-    vector<string> rvar_list;
-    vector<string> var_or_rvar_list;
-    vector<string> param_list;
-    ExtractVarsInExpr(void) {}
-};
-
-// -----------------------------------------------------------------------------
-
 class RemoveLets : public IRMutator {
 private:
     Expr canonicalize(Expr e) {
@@ -779,11 +752,6 @@ Expr increment_value_index_in_func_call(string func_name, int increment, Expr or
     return s.mutate(original);
 }
 
-//Expr inline_func_calls(Function func, Expr original) {
-//    InlineAllFuncCalls s(func);
-//    return s.mutate(original);
-//}
-
 Expr swap_vars_in_expr(string a, string b, Expr original) {
     Expr value = original;
     string t = "temp_var_" + int_to_string(rand());
@@ -791,37 +759,6 @@ Expr swap_vars_in_expr(string a, string b, Expr original) {
     value = substitute(b, Var(a), value);
     value = substitute(t, Var(b), value);
     return value;
-}
-
-
-vector<string> extract_vars_or_rvars_in_expr(Expr expr) {
-    ExtractVarsInExpr extract;
-    expr.accept(&extract);
-    return extract.var_or_rvar_list;
-}
-
-vector<string> extract_rvars_in_expr(Expr expr) {
-    ExtractVarsInExpr extract;
-    expr.accept(&extract);
-    return extract.rvar_list;
-}
-
-vector<string> extract_params_in_expr(Expr expr) {
-    ExtractVarsInExpr extract;
-    expr.accept(&extract);
-    return extract.param_list;
-}
-
-map<string, Func> extract_func_calls(Func func) {
-    map<string, Func> func_list;
-    map<string, Function> func_map = find_transitive_calls(func.function());
-    map<string, Function>::iterator f_it  = func_map.begin();
-    map<string, Function>::iterator f_end = func_map.end();
-    while (f_it != f_end) {
-        func_list.insert(make_pair(f_it->first, Func(f_it->second)));
-        f_it++;
-    }
-    return func_list;
 }
 
 map<string, Buffer> extract_buffer_calls(Func func) {
