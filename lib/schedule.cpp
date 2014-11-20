@@ -460,7 +460,7 @@ RecFilter& RecFilter::split(FuncTag ftag, VarTag vtag, Expr factor, VarIndex vid
             VarOrRVar v = vit->second.var;
             stringstream s;
 
-            Var t(v.name()+".split");
+            Var t(v.name()+".1");
 
             s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name()
               << "\"), Var(\"" << t.name() << "\"), " << factor << ")";
