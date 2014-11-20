@@ -1,3 +1,4 @@
+MKDIR=mkdir -p
 BIN_DIR=bin/
 
 all: scripts
@@ -22,7 +23,9 @@ clean:
 scripts: $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh
 
 $(BIN_DIR)/opencl_profile.sh: opencl_profile.sh
+	@$(MKDIR) $(BIN_DIR)
 	cp opencl_profile.sh $(BIN_DIR)/
 
 $(BIN_DIR)/cuda_profile.sh: cuda_profile.sh
+	@$(MKDIR) $(BIN_DIR)
 	cp cuda_profile.sh $(BIN_DIR)/
