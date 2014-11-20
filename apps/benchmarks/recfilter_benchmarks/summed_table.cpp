@@ -1,7 +1,7 @@
 #include <iostream>
 #include <Halide.h>
 
-#include "../../lib/recfilter.h"
+#include "recfilter.h"
 
 #define MAX_THREADS    192
 #define UNROLL         8
