@@ -131,6 +131,21 @@ int main(int argc, char **argv) {
     Target target = get_jit_target_from_environment();
 
     filter.finalize(target);
+    cerr << filter << endl;
+
+    {
+        FuncTag ft1 = INTRA_TILE_SCAN;
+        FuncTag ft2 = INTER_TILE_SCAN;
+
+        filter.compute_in_shared(ft1);
+
+        //filter.unroll(ft1, INTRA_SCAN_VAR);
+
+        filter.compute_in_global(ft2);
+        //filter.unroll(ft2, INTER_SCAN_VAR);
+
+        filter.bound(x,0,width).bound(y,0,height);
+    }
 
     cerr << filter << endl;
 

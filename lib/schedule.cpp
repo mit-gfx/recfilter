@@ -45,6 +45,7 @@ RecFilter& RecFilter::compute_in_global(FuncTag ftag) {
         string schedule_op_str = "compute_root()";
         rF.schedule[PURE_DEF].push_back(schedule_op_str);
     }
+    cerr << "compute in flobal done" << endl;
     return *this;
 }
 
@@ -53,6 +54,8 @@ RecFilter& RecFilter::compute_in_shared(FuncTag ftag) {
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
+
+        cerr << "Trying " <<  F.name() << endl;
 
         // find the functions that are REINDEX_FOR_WRITE or REINDEX_FOR_READ
         // and associated with this this function
@@ -73,23 +76,29 @@ RecFilter& RecFilter::compute_in_shared(FuncTag ftag) {
             }
         }
 
+        // function that calls this function must be computed in the global mem
+        if (callee_func.defined()) {
+            callee_func.compute_root();
+            internal_function(callee_func.name()).
+                schedule[PURE_DEF].push_back("compute_root()");
+        } else {
+            cerr << F.name() << " cannot be computed in shared mem "
+                << "because it is not called by any function" << endl;
+            assert(false);
+        }
+        cerr << "1" << endl;
+
+
         // all the functions which are called in this function should also
         // be computed at same level
         for (int i=0; i<caller_funcs.size(); i++) {
             Func f = caller_funcs[i];
-            f.compute_at(callee_func, Var::gpu_blocks());
-            stringstream s;
-            s << "compute_at(" << callee_func.name() << ", Var::gpu_blocks())";
-            internal_function(f.name()).schedule[PURE_DEF].push_back(s.str());
-        }
-
-        // function that calls this function must be computed in global mem
-        {
-            Func f = callee_func;
-            f.compute_root();
-            stringstream s;
-            s << "compute_root()";
-            internal_function(f.name()).schedule[PURE_DEF].push_back(s.str());
+            if (f.defined()) {
+                f.compute_at(callee_func, Var::gpu_blocks());
+                stringstream s;
+                s << "compute_at(" << callee_func.name() << ", Var::gpu_blocks())";
+                internal_function(f.name()).schedule[PURE_DEF].push_back(s.str());
+            }
         }
 
         F.compute_at(callee_func, Var::gpu_blocks());
@@ -97,13 +106,14 @@ RecFilter& RecFilter::compute_in_shared(FuncTag ftag) {
         s << "compute_at(" << callee_func.name() << ", Var::gpu_blocks())";
         rF.schedule[PURE_DEF].push_back(s.str());
     }
+    cerr << "compute in shared done" << endl;
     return *this;
 }
 
 RecFilter& RecFilter::parallel(FuncTag ftag, VarTag vtag, VarIndex vidx) {
     if (vtag & SCAN_DIMENSION ||
-        vtag & INNER_SCAN_VAR ||
-        vtag & OUTER_SCAN_VAR) {
+            vtag & INNER_SCAN_VAR ||
+            vtag & OUTER_SCAN_VAR) {
         cerr << "Cannot create parallel threads from scan variable" << endl;
         assert(false);
     }
@@ -137,8 +147,8 @@ RecFilter& RecFilter::parallel(FuncTag ftag, VarTag vtag, VarIndex vidx) {
 
 RecFilter& RecFilter::parallel(FuncTag ftag, VarTag vtag, Expr task_size, VarIndex vidx) {
     if (vtag & SCAN_DIMENSION ||
-        vtag & INNER_SCAN_VAR ||
-        vtag & OUTER_SCAN_VAR) {
+            vtag & INNER_SCAN_VAR ||
+            vtag & OUTER_SCAN_VAR) {
         cerr << "Cannot create parallel threads from scan variable" << endl;
         assert(false);
     }
@@ -292,7 +302,7 @@ RecFilter& RecFilter::bound(Var v, Halide::Expr min, Halide::Expr extent) {
             if (v.name() == F.args()[i].name()) {
                 F.bound(v, min, extent);
                 stringstream s;
-                s << "bound(Var(\"" << v.name() << "," << min << "," << extent << ")";
+                s << "bound(Var(\"" << v.name() << "\")," << min << "," << extent << ")";
                 rF.schedule[PURE_DEF].push_back(s.str());
             }
         }
@@ -315,7 +325,7 @@ RecFilter& RecFilter::bound(VarTag vtag, Expr min, Expr extent, VarIndex vidx) {
             if (def==PURE_DEF) {
                 F.bound(Var(v.name()), min, extent);
                 stringstream s;
-                s << "bound(Var(\"" << v.name() << "," << min << "," << extent << ")";
+                s << "bound(Var(\"" << v.name() << "\")," << min << "," << extent << ")";
                 rF.schedule[def].push_back(s.str());
             }
         }
