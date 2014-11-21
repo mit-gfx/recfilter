@@ -71,8 +71,9 @@ struct RecFilterContents {
     /** Smart pointer */
     mutable Halide::Internal::RefCount ref_count;
 
-    /** Function that contains the definition of the filter  */
-    Halide::Func recfilter;
+    /** Name of recursive filter as well as function that contains the
+     * definition of the filter  */
+    std::string name;
 
     /** Splitting info for each dimension of the filter */
     std::vector<SplitInfo> split_info;

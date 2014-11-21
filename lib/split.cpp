@@ -549,7 +549,7 @@ static vector<RecFilterFunc> create_intra_tail_term(
         // and add the tag for the tail vars
         RecFilterFunc rf;
         rf.func = function;
-        rf.func_category     = rF_intra.func_category | REINDEX_FOR_WRITE;
+        rf.func_category     = REINDEX_FOR_WRITE;
         rf.pure_var_category = rF_intra.pure_var_category;
         rf.pure_var_category[xi.name()] |= TAIL_DIMENSION;
         rf.callee_func       = rF_intra.func.name();
@@ -881,7 +881,7 @@ static vector<RecFilterFunc> create_final_residual_term(
         // since this is useful for reading into shared mem
         RecFilterFunc rf;
         rf.func = function;
-        rf.func_category = INTRA_TILE_SCAN | REINDEX_FOR_READ;
+        rf.func_category = REINDEX_FOR_READ;
         rf.pure_var_category = rF_ctail[j].pure_var_category;
         rf.caller_func = final_result_func_name;
 
@@ -1301,10 +1301,6 @@ static vector< vector<RecFilterFunc> > split_scans(
     vector< vector<RecFilterFunc> > F_ctail_list;
     vector< vector<RecFilterFunc> > F_deps_list;
 
-    /// TODO: this order of Function generation requires that F_ctail are
-    /// redefined after they are called in F_tdeps, change the order of
-    /// Function generation to fix this.
-
     for (int i=0; i<split_info.size(); i++) {
         string x = split_info[i].var.name();
 
@@ -1343,7 +1339,7 @@ static vector< vector<RecFilterFunc> > split_scans(
 // -----------------------------------------------------------------------------
 
 void RecFilter::split(map<string,Expr> dim_tile) {
-    RecFilterFunc& rF = internal_function(contents.ptr->recfilter.name());
+    RecFilterFunc& rF = internal_function(contents.ptr->name);
     Function        F = rF.func;
 
     // flush out any previous splitting info
@@ -1450,14 +1446,14 @@ void RecFilter::split(map<string,Expr> dim_tile) {
     // apply the actual splitting
     RecFilterFunc rF_final;
     {
-        // // create a copy of the split info structs retaining only the
-        // // dimensions to be split
-        // vector<SplitInfo> split_info_current;
-        // for (int i=0; i<contents.ptr->split_info.size(); i++) {
-        //     if (contents.ptr->split_info[i].tile_width.defined()) {
-        //         split_info_current.push_back(contents.ptr->split_info[i]);
-        //     }
-        // }
+        /// // create a copy of the split info structs retaining only the
+        /// // dimensions to be split
+        /// vector<SplitInfo> split_info_current;
+        /// for (int i=0; i<contents.ptr->split_info.size(); i++) {
+        ///     if (contents.ptr->split_info[i].tile_width.defined()) {
+        ///         split_info_current.push_back(contents.ptr->split_info[i]);
+        ///     }
+        /// }
         vector<SplitInfo> split_info_current = contents.ptr->split_info;
 
         // compute the intra tile result
@@ -1507,12 +1503,11 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         F.define(args, values);
 
         // remove the scheduling tags of the update defs
-        rF.func_category = FULL_RESULT;
+        rF.func_category = FULL_RESULT | REINDEX_FOR_WRITE;
+        rF.callee_func = F_final.name();
         rF.update_var_category.clear();
         recfilter_func_list.insert(make_pair(rF.func.name(), rF));
     }
-
-    contents.ptr->recfilter = Func(F);
 
     // add all the generated RecFilterFuncs
     contents.ptr->func.insert(recfilter_func_list.begin(), recfilter_func_list.end());

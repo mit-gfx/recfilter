@@ -506,7 +506,7 @@ void RecFilter::transpose_dimensions(string func_name, string a, string b) {
 }
 
 void RecFilter::inline_func(string func_name) {
-    if (contents.ptr->recfilter.name() == func_name) {
+    if (contents.ptr->name == func_name) {
         return;
     }
     Function F = internal_function(func_name).func;

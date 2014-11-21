@@ -29,10 +29,10 @@ using namespace Halide::Internal;
 
 RecFilter::RecFilter(string n) {
     contents = new RecFilterContents;
-    contents.ptr->recfilter = Func(n);
+    contents.ptr->name = n;
 
     RecFilterFunc f;
-    f.func = contents.ptr->recfilter.function();
+    f.func = Function(n);
     f.func_category = FULL_RESULT;
     contents.ptr->func.insert(make_pair(f.func.name(), f));
 }
@@ -42,7 +42,7 @@ void RecFilter::setArgs(Var x, Var y)       { setArgs(vec(x,y));   }
 void RecFilter::setArgs(Var x, Var y, Var z){ setArgs(vec(x,y,z)); }
 
 void RecFilter::setArgs(vector<Var> args) {
-    RecFilterFunc& f = internal_function( contents.ptr->recfilter.name() );
+    RecFilterFunc& f = internal_function(contents.ptr->name);
 
     for (int i=0; i<args.size(); i++) {
         SplitInfo s;
@@ -71,27 +71,30 @@ void RecFilter::setArgs(vector<Var> args) {
 // -----------------------------------------------------------------------------
 
 void RecFilter::define(Expr pure_def) {
+    Function f = internal_function(contents.ptr->name).func;
     vector<string> args;
     for (int i=0; i<contents.ptr->split_info.size(); i++) {
         args.push_back(contents.ptr->split_info[i].var.name());
     }
-    contents.ptr->recfilter.function().define(args, vec(pure_def));
+    f.define(args, vec(pure_def));
 }
 
 void RecFilter::define(Tuple pure_def) {
+    Function f = internal_function(contents.ptr->name).func;
     vector<string> args;
     for (int i=0; i<contents.ptr->split_info.size(); i++) {
         args.push_back(contents.ptr->split_info[i].var.name());
     }
-    contents.ptr->recfilter.function().define(args, pure_def.as_vector());
+    f.define(args, pure_def.as_vector());
 }
 
 void RecFilter::define(vector<Expr> pure_def) {
+    Function f = internal_function(contents.ptr->name).func;
     vector<string> args;
     for (int i=0; i<contents.ptr->split_info.size(); i++) {
         args.push_back(contents.ptr->split_info[i].var.name());
     }
-    contents.ptr->recfilter.function().define(args, pure_def);
+    f.define(args, pure_def);
 }
 
 // -----------------------------------------------------------------------------
@@ -105,8 +108,8 @@ void RecFilter::addScan(
         Border border_mode,
         Expr bexpr)
 {
-    RecFilterFunc& rf = internal_function( contents.ptr->recfilter.name() );
-    Function        f = contents.ptr->recfilter.function();
+    RecFilterFunc& rf = internal_function(contents.ptr->name);
+    Function        f = rf.func;
 
     if (!f.has_pure_definition()) {
         cerr << "Cannot add scans to recursive filter " << f.name()
@@ -270,7 +273,7 @@ void RecFilter::addScan(Var x, RDom rx, vector<float> fb, Causality c, Border b,
 // -----------------------------------------------------------------------------
 
 Func RecFilter::func(void) {
-    return contents.ptr->recfilter;
+    return Func(internal_function(contents.ptr->name).func);
 }
 
 Func RecFilter::func(string func_name) {
@@ -279,7 +282,7 @@ Func RecFilter::func(string func_name) {
         return Func(f->second.func);
     } else {
         cerr << "Function " << func_name << " not found as a dependency of ";
-        cerr << "recursive filter " << contents.ptr->recfilter.name() << endl;
+        cerr << "recursive filter " << contents.ptr->name << endl;
         assert(false);
     }
 }
@@ -301,7 +304,7 @@ RecFilterFunc& RecFilter::internal_function(string func_name) {
         return f->second;
     } else {
         cerr << "Function " << func_name << " not found as a dependency of ";
-        cerr << "recursive filter " << contents.ptr->recfilter.name() << endl;
+        cerr << "recursive filter " << contents.ptr->name << endl;
         assert(false);
     }
 }
@@ -309,26 +312,29 @@ RecFilterFunc& RecFilter::internal_function(string func_name) {
 // -----------------------------------------------------------------------------
 
 void RecFilter::compile_jit(Target target, string filename) {
+    Func F(internal_function(contents.ptr->name).func);
     if (!filename.empty()) {
-        contents.ptr->recfilter.compile_to_lowered_stmt(filename, HTML, target);
+        F.compile_to_lowered_stmt(filename, HTML, target);
     }
-    contents.ptr->recfilter.compile_jit(target);
+    F.compile_jit(target);
 }
 
 void RecFilter::realize(Buffer out, int iterations) {
+    Func F(internal_function(contents.ptr->name).func);
+
     // upload all buffers to device
-    map<string,Buffer> buff = extract_buffer_calls(contents.ptr->recfilter);
+    map<string,Buffer> buff = extract_buffer_calls(F);
     for (map<string,Buffer>::iterator b=buff.begin(); b!=buff.end(); b++) {
         b->second.copy_to_dev();
     }
 
     // profiling realizations without copying result back to host
     for (int i=0; i<iterations-1; i++) {
-        contents.ptr->recfilter.realize(out);
+        F.realize(out);
     }
 
     // last realization copies result back to host
-    contents.ptr->recfilter.realize(out);
+    F.realize(out);
     out.copy_to_host();
     out.free_dev_buffer();
 }
@@ -336,7 +342,7 @@ void RecFilter::realize(Buffer out, int iterations) {
 // -----------------------------------------------------------------------------
 
 void RecFilter::remove_pure_def(string func_name) {
-    Function f = func(func_name).function();
+    Function f = internal_function(func_name).func;
 
     vector<string> args   = f.args();
     vector<Expr>   values = f.values();

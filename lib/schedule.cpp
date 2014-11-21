@@ -42,10 +42,8 @@ RecFilter& RecFilter::compute_in_global(FuncTag ftag) {
             remove_pure_def(F.name());
         }
 
-        string schedule_op_str = "compute_root()";
-        rF.schedule[PURE_DEF].push_back(schedule_op_str);
+        rF.schedule[PURE_DEF].push_back("compute_root()");
     }
-    cerr << "compute in flobal done" << endl;
     return *this;
 }
 
@@ -55,8 +53,6 @@ RecFilter& RecFilter::compute_in_shared(FuncTag ftag) {
         RecFilterFunc& rF = internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        cerr << "Trying " <<  F.name() << endl;
-
         // find the functions that are REINDEX_FOR_WRITE or REINDEX_FOR_READ
         // and associated with this this function
         Func         callee_func;
@@ -64,12 +60,12 @@ RecFilter& RecFilter::compute_in_shared(FuncTag ftag) {
         map<string,RecFilterFunc>::iterator f;
         for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
             if ((f->second.func_category & REINDEX_FOR_WRITE) && f->second.callee_func==F.name()) {
-                callee_func = Func(f->second.func);
                 if (callee_func.defined()) {
                     cerr << F.name() << " cannot be computed in shared mem "
                         << "because it is called by multiple functions" << endl;
                     assert(false);
                 }
+                callee_func = Func(f->second.func);
             }
             if ((f->second.func_category & REINDEX_FOR_READ) && f->second.caller_func==F.name()) {
                 caller_funcs.push_back(Func(f->second.func));
@@ -86,8 +82,6 @@ RecFilter& RecFilter::compute_in_shared(FuncTag ftag) {
                 << "because it is not called by any function" << endl;
             assert(false);
         }
-        cerr << "1" << endl;
-
 
         // all the functions which are called in this function should also
         // be computed at same level
@@ -106,7 +100,6 @@ RecFilter& RecFilter::compute_in_shared(FuncTag ftag) {
         s << "compute_at(" << callee_func.name() << ", Var::gpu_blocks())";
         rF.schedule[PURE_DEF].push_back(s.str());
     }
-    cerr << "compute in shared done" << endl;
     return *this;
 }
 
