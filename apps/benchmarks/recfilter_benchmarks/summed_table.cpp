@@ -137,12 +137,26 @@ int main(int argc, char **argv) {
         FuncTag ft1 = INTRA_TILE_SCAN;
         FuncTag ft2 = INTER_TILE_SCAN;
 
-        filter.compute_in_shared(ft1);
+        VarTag x   = PURE_DIMENSION;
+        VarTag t   = SCHEDULE_INNER;
+        VarTag xi  = INNER_PURE_VAR, xit  = INNER_PURE_VAR | TAIL_DIMENSION;
+        VarTag xo  = OUTER_PURE_VAR, xot  = OUTER_PURE_VAR | TAIL_DIMENSION;
+        VarTag rxi = INNER_SCAN_VAR, rxit = INNER_SCAN_VAR | TAIL_DIMENSION;
+        VarTag rxo = OUTER_SCAN_VAR, rxot = OUTER_SCAN_VAR | TAIL_DIMENSION;
 
-        //filter.unroll(ft1, INTRA_SCAN_VAR);
+        filter.compute_in_shared(ft1);
+        filter.reorder(ft1, xit, rxit, xi, rxi, xo);
+        filter.unroll (ft1, rxi).unroll(ft1, rxit);
+//        filter.gpu_threads(ft1, xi, 1, 6);
+        filter.gpu_blocks (ft1, xo);
+        filter.reorder_storage(ft1, xit, xi, xo);
 
         filter.compute_in_global(ft2);
-        //filter.unroll(ft2, INTER_SCAN_VAR);
+//        filter.reorder(ft2, rxo, , , , );
+//        filter.unroll     (ft2, );
+//        filter.gpu_threads(ft2, )
+//        filter.gpu_blocks (ft2, );
+//        filter.reorder_storage(ft2, xot, xi, xo);
 
         filter.bound(x,0,width).bound(y,0,height);
     }

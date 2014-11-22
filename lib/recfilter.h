@@ -60,15 +60,6 @@ typedef enum {
     SCHEDULE_INNER = 0x80, ///< inner dimension created when the programmer uses the RecFilter::split()
 } VarTag;
 
-/** Tags to differentiate between Function dimensions that have the same scheduling tag  */
-typedef enum {
-    FIRST  = 0x01, ///< first  dimension with a specific tag (lexicographic order)
-    SECOND = 0x02, ///< second dimension with a specific tag (lexicographic order)
-    THIRD  = 0x04, ///< third  dimension with a specific tag (lexicographic order)
-    FOURTH = 0x08, ///< fourth dimension with a specific tag (lexicographic order)
-    FIFTH  = 0x10, ///< fifth  dimension with a specific tag (lexicographic order)
-} VarIndex;
-
 /** Compare ref and Halide solutions and print the mean square error */
 struct CheckResult {
     Halide::Image<float> ref;   ///< reference solution
@@ -109,7 +100,7 @@ private:
 
     /** Get one of the vars of a given recursive filter function with the given tag
      * indicated by the */
-    std::map<int,Halide::VarOrRVar> internal_func_vars(RecFilterFunc f, VarTag vtag, VarIndex vidx);
+    std::map<int,Halide::VarOrRVar> internal_func_vars(RecFilterFunc f, VarTag vtag, uint vidx);
 
     /** @brief Inline all calls to a given function
      *
@@ -347,17 +338,17 @@ public:
     RecFilter& compute_in_global(FuncTag f);
     RecFilter& compute_in_shared(FuncTag f);
 
-    RecFilter& parallel (FuncTag f, VarTag v, VarIndex vidx=FIRST);
-    RecFilter& parallel (FuncTag f, VarTag v, Halide::Expr task_size, VarIndex vidx=FIRST);
-    RecFilter& unroll   (FuncTag f, VarTag v, VarIndex vidx=FIRST);
-    RecFilter& unroll   (FuncTag f, VarTag v, int factor, VarIndex vidx=FIRST);
-    RecFilter& vectorize(FuncTag f, VarTag v, VarIndex vidx=FIRST);
-    RecFilter& vectorize(FuncTag f, VarTag v, int factor, VarIndex vidx=FIRST);
-    RecFilter& bound    (VarTag v, Halide::Expr min, Halide::Expr extent, VarIndex vidx=FIRST);
-    RecFilter& bound    (Halide::Var v, Halide::Expr min, Halide::Expr extent);
+    RecFilter& unroll(FuncTag f, VarTag v, uint vidx=0);
+    RecFilter& unroll(FuncTag f, VarTag v, uint factor, uint vidx=0);
 
-    RecFilter& inner_split(FuncTag f, VarTag v, Halide::Expr factor, VarIndex vidx=FIRST);
-    RecFilter& outer_split(FuncTag f, VarTag v, Halide::Expr factor, VarIndex vidx=FIRST);
+    RecFilter& vectorize(FuncTag f, VarTag v, uint vidx=0);
+    RecFilter& vectorize(FuncTag f, VarTag v, uint factor, uint vidx=0);
+
+    RecFilter& bound(VarTag v, Halide::Expr min, Halide::Expr extent, uint vidx=0);
+    RecFilter& bound(Halide::Var v, Halide::Expr min, Halide::Expr extent);
+
+    RecFilter& inner_split(FuncTag f, VarTag v, Halide::Expr factor, uint vidx=0);
+    RecFilter& outer_split(FuncTag f, VarTag v, Halide::Expr factor, uint vidx=0);
 
     RecFilter& reorder(FuncTag f, VarTag x, VarTag y);
     RecFilter& reorder(FuncTag f, VarTag x, VarTag y, VarTag z);
@@ -369,18 +360,24 @@ public:
     RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
     RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
 
-    RecFilter& gpu_threads(FuncTag ftag, VarTag vtag, std::map<VarIndex,Halide::Expr> vidx_tsize);
+    RecFilter& parallel(FuncTag f, VarTag v, uint vidx=0);
+    RecFilter& parallel(FuncTag f, VarTag v, Halide::Expr task_size, uint vidx=0);
+
+    RecFilter& gpu_threads(FuncTag ftag, VarTag vtag, uint t1);
+    RecFilter& gpu_threads(FuncTag ftag, VarTag vtag, uint t1, uint t2);
+    RecFilter& gpu_threads(FuncTag ftag, VarTag vtag, uint t1, uint t2, uint t3);
+    RecFilter& gpu_threads(FuncTag f, VarTag v, std::vector<uint> task_size);
 
     RecFilter& gpu_blocks(FuncTag f, VarTag block_x);
 
-    RecFilter& gpu_tile(FuncTag f, VarTag x, int xs);
-    RecFilter& gpu_tile(FuncTag f, VarTag x, VarTag y, int xs, int ys);
-    RecFilter& gpu_tile(FuncTag f, VarTag x, VarTag y, VarTag z, int xs, int ys, int zs);
+    RecFilter& gpu_tile(FuncTag f, VarTag x, uint xs);
+    RecFilter& gpu_tile(FuncTag f, VarTag x, VarTag y, uint xs, uint ys);
+    RecFilter& gpu_tile(FuncTag f, VarTag x, VarTag y, VarTag z, uint xs, uint ys, uint zs);
 
-    RecFilter& split          (FuncTag f, VarTag v, Halide::Expr factor, VarIndex vidx, bool do_reorder);
+    RecFilter& split          (FuncTag f, VarTag v, Halide::Expr factor, uint vidx, bool do_reorder);
     RecFilter& reorder        (FuncTag f, std::vector<VarTag> x);
     RecFilter& reorder_storage(FuncTag f, std::vector<VarTag> x);
-    RecFilter& gpu_tile       (FuncTag f, std::vector<std::pair<VarTag,int> > x);
+    RecFilter& gpu_tile       (FuncTag f, std::vector<std::pair<VarTag,uint> > x);
     // @}
 };
 
