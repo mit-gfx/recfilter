@@ -139,16 +139,13 @@ int main(int argc, char **argv) {
         VarTag rxi = INNER_SCAN_VAR, rxit = INNER_SCAN_VAR | TAIL_DIMENSION;
         VarTag rxo = OUTER_SCAN_VAR, rxot = OUTER_SCAN_VAR | TAIL_DIMENSION;
 
-        RecFilterSchedule s_handle_inner = filter.schedule_handle(INTRA_TILE_SCAN);
-        RecFilterSchedule s_handle_outer = filter.schedule_handle(INTER_TILE_SCAN);
-
-        s_handle_inner.compute_in_shared(ft1)
-            .reorder_storage(ft1, xit, xi, xo)
+        filter.intra_handle().compute_in_shared()
+            .reorder_storage(xit, xi, xo)
             .reorder(xit, rxit, xi, rxi, xo)
             .unroll(rxi).unroll(rxit)
             .gpu_threads(xi, 1, 6).gpu_blocks(xo);
 
-        s_handle_outer.compute_in_global()
+        filter.inter_handle().compute_in_global()
             .reorder_storage(xi, xit, xo)
             .reorder(xot, xi, xo)
             .unroll(rxo).unroll(rxot)
