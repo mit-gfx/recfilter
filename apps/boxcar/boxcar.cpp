@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
     bool  nocheck = args.nocheck;
     int   width   = args.width;
     int   height  = args.width;
-    int   tile    = args.block;
+    int   tile_width = args.block;
     int   iterations = args.iterations;
 
     Image<float> random_image = generate_random_image<float>(width,height);
@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
            - select(y-box-1<0, 0, S(min(x+box,image.width()-1), max(y-box-1,0)))
            - select(x-box-1<0, 0, S(max(x-box-1,0), min(y+box,image.height()-1)));
 
-    filter.split(x, y, tile);
+    filter.split(x, tile_width, y, tile_width);
 
     cerr << filter << endl;
 

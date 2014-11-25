@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
     bool  nocheck = args.nocheck;
     int   width   = args.width;
     int   height  = args.width;
-    int   tile    = args.block;
+    int   tile_width = args.block;
     int   iter    = args.iterations;
 
     Image<float> random_image = generate_random_image<float>(width,height);
@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
     filter.add_filter(x, 1.0, Internal::vec(1.0f), RecFilter::CAUSAL);
     filter.add_filter(y, 1.0, Internal::vec(1.0f), RecFilter::CAUSAL);
 
-    filter.split(x, y, tile);
+    filter.split(x, tile_width, y, tile_width);
 
 ///     filter.transpose_dimensions ("SAT_Intra_Tail_y_1", "xi", "yi");
 ///     filter.interleave_func("SAT_Intra_Tail_x_0", "SAT_Intra_Tail_y_1", "SAT_Intra_Tail", "xi", 1);

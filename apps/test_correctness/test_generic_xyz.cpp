@@ -12,7 +12,7 @@ int main(int argc, char **argv) {
     int width    = 16;
     int height   = 16;
     int channels = 16;
-    int tile     = 4;
+    int tile_width= 4;
 
     Image<float> random_image = generate_random_image<float>(width,height,channels);
 
@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
     filter.add_filter(z, 1.0f, Internal::vec(W(4,0), W(4,1)), RecFilter::CAUSAL);
     filter.add_filter(z, 1.0f, Internal::vec(W(5,0), W(5,1)), RecFilter::ANTICAUSAL);
 
-    filter.split(x, y, z, tile);
+    filter.split(x, tile_width, y, tile_width, z, tile_width);
 
     // ----------------------------------------------------------------------------------------------
 

@@ -5,33 +5,16 @@
 #include <string>
 #include <Halide.h>
 
-/** Info required to split a particular dimension of the recursive filter */
-struct SplitInfo {
-    int filter_order;                   ///< order of recursive filter in a given dimension
-    int filter_dim;                     ///< dimension id
-    int num_splits;                     ///< number of scans in the dimension that must be tiled
-
-    Halide::Expr tile_width;            ///< tile width for splitting
-    Halide::Expr image_width;           ///< image width in this dimension
-    Halide::Expr num_tiles;             ///< number of tile in this dimension
-
-    Halide::Var  var;                   ///< variable that represents this dimension
-    Halide::Var  inner_var;             ///< inner variable after splitting
-    Halide::Var  outer_var;             ///< outer variable or tile index after splitting
-
-    Halide::RDom rdom;                  ///< RDom update domain of each scan
-    Halide::RDom inner_rdom;            ///< inner RDom of each scan
-    Halide::RDom truncated_inner_rdom;  ///< inner RDom width a truncated
-    Halide::RDom outer_rdom;            ///< outer RDom of each scan
-    Halide::RDom tail_rdom;             ///< RDom to extract the tail of each scan
-
-    std::vector<bool> scan_causal;      ///< causal or anticausal flag for each scan
-    std::vector<int>  scan_id;          ///< scan or update definition id of each scan
-
-    std::vector<Halide::Expr> border_expr;   ///< image border value (can't contain the var or rdom)
-
-    Halide::Image<float> feedfwd_coeff; ///< feedforward coeffs, only one for each scan
-    Halide::Image<float> feedback_coeff;///< feedback coeffs (num_scans x max_order) order j-th coeff of i-th scan is (i+1,j) */
+/** Info about scans in a particular dimension */
+struct FilterInfo {
+    int                  filter_order;  ///< order of recursive filter in a given dimension
+    int                  filter_dim;    ///< dimension id
+    int                  num_scans;     ///< number of scans in the dimension that must be tiled
+    Halide::Expr         image_width;   ///< image width in this dimension
+    Halide::Var          var;           ///< variable that represents this dimension
+    Halide::RDom         rdom;          ///< RDom update domain of each scan
+    std::vector<bool>    scan_causal;   ///< causal or anticausal flag for each scan
+    std::vector<int>     scan_id;       ///< scan or update definition id of each scan
 };
 
 // ----------------------------------------------------------------------------
@@ -71,15 +54,30 @@ struct RecFilterContents {
     /** Smart pointer */
     mutable Halide::Internal::RefCount ref_count;
 
+    /** Flag to indicate if the filter has been tiled  */
+    bool tiled;
+
+    /** Flag to indicate if the filter has been finalized, which performs platform specific optimizations */
+    bool finalized;
+
     /** Name of recursive filter as well as function that contains the
      * definition of the filter  */
     std::string name;
 
-    /** Splitting info for each dimension of the filter */
-    std::vector<SplitInfo> split_info;
+    /** Info about all the scans in the recursive filter */
+    std::vector<FilterInfo> filter_info;
 
     /** List of functions along with their names and their schedules */
     std::map<std::string, RecFilterFunc> func;
+
+    /** Image border expression */
+    Halide::Expr border_expr;
+
+    /** Feed forward coeffs, only one for each scan */
+    Halide::Image<float> feedfwd_coeff;
+
+    /** Feedback coeffs (num_scans x max_order) order j-th coeff of i-th scan is (i+1,j) */
+    Halide::Image<float> feedback_coeff;
 };
 
 #endif // _RECURSIVE_FILTER_INTERNALS_H_

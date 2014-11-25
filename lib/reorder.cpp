@@ -202,21 +202,18 @@ static bool merge_feasible(Function A, Function B, string& error) {
         can_merge = false;
     }
 
-    // same number of outputs
-    if (A.outputs() != B.outputs()) {
-        error = "Function to be merged must have same number of outputs";
-        can_merge = false;
-    }
-
     // A must not depend upon B and B must not depend upon A
     for (int i=0; can_merge && i<A.values().size(); i++) {
         can_merge &= (!expr_depends_on_func(A.values()[i], B.name()));
+        if (!can_merge) {
+            error = "Functions to be merged must not call each other";
+        }
     }
     for (int i=0; can_merge && i<B.values().size(); i++) {
         can_merge &= (!expr_depends_on_func(B.values()[i], A.name()));
-    }
-    if (!can_merge) {
-        error = "Functions to be merged must not call each other";
+        if (!can_merge) {
+            error = "Functions to be merged must not call each other";
+        }
     }
 
     return can_merge;
@@ -596,11 +593,11 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
                 reordered_scans.push_back(scans[i][j]);
             }
         }
-        for (int i=0; i<contents.ptr->split_info.size(); i++) {
-            int scan_dim = contents.ptr->split_info[i].filter_dim;
-            for (int j=0; j<contents.ptr->split_info[i].num_splits; j++) {
-                int scan_id = contents.ptr->split_info[i].scan_id[j];
-                bool causal = contents.ptr->split_info[i].scan_causal[j];
+        for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+            int scan_dim = contents.ptr->filter_info[i].filter_dim;
+            for (int j=0; j<contents.ptr->filter_info[i].num_scans; j++) {
+                int scan_id = contents.ptr->filter_info[i].scan_id[j];
+                bool causal = contents.ptr->filter_info[i].scan_causal[j];
                 scan_causal[scan_id] = causal;
                 scan_dimension[scan_id] = scan_dim;
             }
@@ -653,9 +650,9 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
     // create the cascaded recursive filters
     vector<Var> args;
     vector<Expr> widths;
-    for (int i=0; i<contents.ptr->split_info.size(); i++) {
-        args.push_back(contents.ptr->split_info[i].var);
-        widths.push_back(contents.ptr->split_info[i].image_width);
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        args.push_back(contents.ptr->filter_info[i].var);
+        widths.push_back(contents.ptr->filter_info[i].image_width);
     }
 
     vector<RecFilter> recfilters;
@@ -692,9 +689,9 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
             // to this scan
             int dim = -1;
             int idx = -1;
-            for (int u=0; dim<0 && u<contents.ptr->split_info.size(); u++) {
-                for (int v=0; idx<0 && v<contents.ptr->split_info[u].num_splits; v++) {
-                    if (scan_id == contents.ptr->split_info[u].scan_id[v]) {
+            for (int u=0; dim<0 && u<contents.ptr->filter_info.size(); u++) {
+                for (int v=0; idx<0 && v<contents.ptr->filter_info[u].num_scans; v++) {
+                    if (scan_id == contents.ptr->filter_info[u].scan_id[v]) {
                         dim = u;
                         idx = v;
                     }
@@ -706,17 +703,16 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
                 assert(false);
             }
 
-            Var x           = contents.ptr->split_info[dim].var;
-            RDom rx         = contents.ptr->split_info[dim].rdom;
-            bool c          = contents.ptr->split_info[dim].scan_causal[idx];
-            int order       = contents.ptr->split_info[dim].filter_order;
-            float feedfwd   = contents.ptr->split_info[dim].feedfwd_coeff(scan_id);
-            Expr border_expr= contents.ptr->split_info[dim].border_expr[idx];
+            Var x           = contents.ptr->filter_info[dim].var;
+            RDom rx         = contents.ptr->filter_info[dim].rdom;
+            bool c          = contents.ptr->filter_info[dim].scan_causal[idx];
+            int order       = contents.ptr->filter_info[dim].filter_order;
+            float feedfwd   = contents.ptr->feedfwd_coeff(scan_id);
+            Expr border_expr= contents.ptr->border_expr;
 
             vector<float> feedback;
             for (int u=0; u<order; u++) {
-                feedback.push_back(contents.ptr->split_info[dim].
-                        feedback_coeff(scan_id,u));
+                feedback.push_back(contents.ptr->feedback_coeff(scan_id,u));
             }
 
             Causality causal = (c ? CAUSAL : ANTICAUSAL);

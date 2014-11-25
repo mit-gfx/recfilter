@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
     bool nocheck = args.nocheck;
     int  width   = args.width;
     int  height  = args.width;
-    int  tile    = args.block;
+    int  tile_width = args.block;
 
     float sigma = 16.0f;
 
@@ -40,9 +40,6 @@ int main(int argc, char **argv) {
 
     Var x("x");
     Var y("y");
-
-    RDom rx(0, image.width(), "rx");
-    RDom ry(0, image.height(),"ry");
 
     RecFilter filter("Gauss");
     filter.set_args(x, y, width, height);
@@ -64,8 +61,8 @@ int main(int argc, char **argv) {
     RecFilter filter1 = cascaded_filters[0];
     RecFilter filter2 = cascaded_filters[1];
 
-    filter1.split(x, y, tile);
-    filter2.split(x, y, tile);
+    filter1.split(x, tile_width, y, tile_width);
+    filter2.split(x, tile_width, y, tile_width);
 
     cerr << filter2 << endl;
 

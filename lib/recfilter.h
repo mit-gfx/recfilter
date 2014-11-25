@@ -32,7 +32,7 @@
 
 // Forward declarations of internal structures
 
-struct SplitInfo;
+struct FilterInfo;
 struct RecFilterContents;
 class RecFilterFunc;
 class RecFilterSchedule;
@@ -247,9 +247,7 @@ public:
     void split(Halide::Expr tx);
     void split(Halide::Var x, Halide::Expr tx);
     void split(Halide::Var x, Halide::Expr tx, Halide::Var y, Halide::Expr ty);
-    void split(Halide::Var x, Halide::Var y, Halide::Expr t);
-    void split(Halide::Var x, Halide::Var y, Halide::Var z, Halide::Expr t);
-    void split(std::vector<Halide::Var> vars, Halide::Expr t);
+    void split(Halide::Var x, Halide::Expr tx, Halide::Var y, Halide::Expr ty, Halide::Var z, Halide::Expr tz);
     void split(std::map<std::string, Halide::Expr> dims);
     // @}
 

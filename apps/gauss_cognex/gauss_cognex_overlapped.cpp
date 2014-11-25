@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
     bool nocheck = args.nocheck;
     int  width  = args.width;
     int  height = args.width;
-    int  tile   = args.block;
+    int  tile_width   = args.block;
 
     Image<float> random_image = generate_random_image<float>(width,height);
 
@@ -47,9 +47,6 @@ int main(int argc, char **argv) {
 
     Var x("x");
     Var y("y");
-
-    RDom rx(0, image.width(), "rx");
-    RDom ry(0, image.height(),"ry");
 
     I(x,y) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1));
 
@@ -80,7 +77,7 @@ int main(int argc, char **argv) {
     filter.add_filter(y, 1.0f, W2, RecFilter::CAUSAL);
     filter.add_filter(y, 1.0f, W2, RecFilter::CAUSAL);
 
-    filter.split(x, y, tile);
+    filter.split(x, tile_width, y, tile_width);
 
     cerr << filter << endl;
 

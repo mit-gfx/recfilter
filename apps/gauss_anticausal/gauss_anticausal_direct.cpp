@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
     bool nocheck = args.nocheck;
     int  width   = args.width;
     int  height  = args.width;
-    int  tile    = args.block;
+    int  tile_width = args.block;
 
     float sigma = 16.0f;
 
@@ -39,9 +39,6 @@ int main(int argc, char **argv) {
     Var x("x");
     Var y("y");
 
-    RDom rx(0, image.width(), "rx");
-    RDom ry(0, image.height(),"ry");
-
     RecFilter filter("Gauss");
     filter.set_args(x, y, width, height);
     filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
@@ -50,7 +47,7 @@ int main(int argc, char **argv) {
     filter.add_filter(y, B3, W3, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
     filter.add_filter(y, B3, W3, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
 
-    filter.split(tile);
+    filter.split(x, tile_width, y, tile_width);
 
     cerr << filter << endl;
 

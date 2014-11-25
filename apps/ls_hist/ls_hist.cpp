@@ -22,7 +22,7 @@ using std::endl;
 #define GAUSS_SIGMA   (5.0f)
 
 
-Func gaussian_blur(Func I, float sigma, Expr width, Expr height, int tile, string name);
+Func gaussian_blur(Func I, float sigma, Expr width, Expr height, int tile_width, string name);
 
 int main(int argc, char **argv) {
     Arguments args(argc, argv);
@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
     bool nocheck = args.nocheck;
     int  width   = args.width;
     int  height  = args.width;
-    int  tile    = args.block;
+    int  tile_width = args.block;
 
     Image<float> random_image = generate_random_image<float>(width,height);
     ImageParam image(type_of<float>(), 2);
@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
 
         // Gaussian filter using direct cognex blur
         Func G = gaussian_blur(L, GAUSS_SIGMA,
-                image.width(), image.height(), tile, "G_"+name);
+                image.width(), image.height(), tile_width, "G_"+name);
 
         // add to the overall list
         Gauss.push_back(G);
@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
 }
 
 
-Func gaussian_blur(Func I, float sigma, Expr width, Expr height, int tile, string name) {
+Func gaussian_blur(Func I, float sigma, Expr width, Expr height, int tile_width, string name) {
     int   box  = gaussian_box_filter(3, sigma); // approx Gaussian with 3 box filters
     float norm = std::pow(box, 3*2);            // normalizing factor
 

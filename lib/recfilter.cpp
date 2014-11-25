@@ -30,7 +30,13 @@ using namespace Halide::Internal;
 
 RecFilter::RecFilter(string n) {
     contents = new RecFilterContents;
+
     contents.ptr->name = n;
+    contents.ptr->tiled          = false;
+    contents.ptr->finalized      = false;
+    contents.ptr->border_expr    = FLOAT_ZERO;
+    contents.ptr->feedfwd_coeff  = Image<float>(0);
+    contents.ptr->feedback_coeff = Image<float>(0,0);
 
     RecFilterFunc f;
     f.func = Function(n);
@@ -53,13 +59,13 @@ void RecFilter::set_args(Var x, Var y, Var z, Expr wx, Expr wy, Expr wz) {
 void RecFilter::set_args(vector<Var> args, vector<Expr> widths) {
     RecFilterFunc& f = internal_function(contents.ptr->name);
 
-    if (contents.ptr->split_info.empty()) {
+    if (!contents.ptr->filter_info.empty()) {
         cerr << "Recursive filter dimensions already set" << endl;
         assert(false);
     }
 
     for (int i=0; i<args.size(); i++) {
-        SplitInfo s;
+        FilterInfo s;
 
         // set the variable and filter dimension
         s.var          = args[i];
@@ -68,20 +74,12 @@ void RecFilter::set_args(vector<Var> args, vector<Expr> widths) {
         // extent and domain of all scans in this dimension
         s.image_width  = widths[i];
         s.rdom         = RDom(0, s.image_width, unique_name("r"+s.var.name()));
-        s.tile_width   = s.image_width;
-        s.num_tiles    = 1;
 
         // default values for now
-        s.num_splits   = 0;
-        s.filter_order = 0;
+        s.num_scans      = 0;
+        s.filter_order   = 0;
 
-        s.feedfwd_coeff  = Image<float>(0);
-        s.feedback_coeff = Image<float>(0,0);
-
-        contents.ptr->split_info.push_back(s);
-
-        // bound the output buffer for each dimension
-        Func(f.func).bound(s.var, 0, s.image_width);
+        contents.ptr->filter_info.push_back(s);
 
         // add tag the dimension as pure
         f.pure_var_category.insert(make_pair(args[i].name(), PURE_DIMENSION));
@@ -93,62 +91,79 @@ void RecFilter::set_args(vector<Var> args, vector<Expr> widths) {
 void RecFilter::define(Expr pure_def) {
     Function f = internal_function(contents.ptr->name).func;
     vector<string> args;
-    for (int i=0; i<contents.ptr->split_info.size(); i++) {
-        args.push_back(contents.ptr->split_info[i].var.name());
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        args.push_back(contents.ptr->filter_info[i].var.name());
     }
     f.define(args, vec(pure_def));
+
+    // bound the output buffer for each dimension
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        Var  v      = contents.ptr->filter_info[i].var;
+        Expr extent = contents.ptr->filter_info[i].image_width;
+        Func(f).bound(v, 0, extent);
+    }
 }
 
 void RecFilter::define(Tuple pure_def) {
     Function f = internal_function(contents.ptr->name).func;
     vector<string> args;
-    for (int i=0; i<contents.ptr->split_info.size(); i++) {
-        args.push_back(contents.ptr->split_info[i].var.name());
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        args.push_back(contents.ptr->filter_info[i].var.name());
     }
     f.define(args, pure_def.as_vector());
+
+    // bound the output buffer for each dimension
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        Var  v      = contents.ptr->filter_info[i].var;
+        Expr extent = contents.ptr->filter_info[i].image_width;
+        Func(f).bound(v, 0, extent);
+    }
 }
 
 void RecFilter::define(vector<Expr> pure_def) {
     Function f = internal_function(contents.ptr->name).func;
     vector<string> args;
-    for (int i=0; i<contents.ptr->split_info.size(); i++) {
-        args.push_back(contents.ptr->split_info[i].var.name());
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        args.push_back(contents.ptr->filter_info[i].var.name());
     }
     f.define(args, pure_def);
+
+    // bound the output buffer for each dimension
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        Var  v      = contents.ptr->filter_info[i].var;
+        Expr extent = contents.ptr->filter_info[i].image_width;
+        Func(f).bound(v, 0, extent);
+    }
 }
 
 // -----------------------------------------------------------------------------
 
-void RecFilter::set_image_border(Border b, Halide::Expr expr) {
-//    Expr border_expr;
-//    switch (border_mode) {
-//        case CLAMP_TO_ZERO:
-//            border_expr = FLOAT_ZERO;
-//            break;
-//
-//        case CLAMP_TO_EXPR:
-//            border_expr = bexpr;
-//            if (expr_depends_on_var(border_expr, x.name())) {
-//                cerr << "Image border expression for scan along " << x.name()
-//                    << " must not depend upon " << x.name() << endl;
-//            }
-//            if (expr_depends_on_var(border_expr, rx.x.name())) {
-//                cerr << "Image border expression for scan along " << rx.x.name()
-//                    << " must not depend upon " << rx.x.name() << endl;
-//            }
-//            break;
-//
-//        case CLAMP_TO_SELF:
-//        default:
-//            border_expr = Expr();
-//            break;
-//    }
-//
-//    for (int i=0; i<contents.ptr->split_info.size(); i++) {
-//        SplitInfo s = contents.ptr->split_info[i];
-//        s.border_expr.insert(s.border_expr.begin(), border_expr);
-//        contents.ptr->split_info[i] = s;
-//    }
+void RecFilter::set_image_border(Border border_mode, Halide::Expr expr) {
+    Expr border_expr;
+    switch (border_mode) {
+        case CLAMP_TO_ZERO:
+            border_expr = FLOAT_ZERO;
+            break;
+
+///        case CLAMP_TO_EXPR:
+///            border_expr = bexpr;
+///            if (expr_depends_on_var(border_expr, x.name())) {
+///                cerr << "Image border expression for scan along " << x.name()
+///                    << " must not depend upon " << x.name() << endl;
+///            }
+///            if (expr_depends_on_var(border_expr, rx.x.name())) {
+///                cerr << "Image border expression for scan along " << rx.x.name()
+///                    << " must not depend upon " << rx.x.name() << endl;
+///            }
+///            break;
+
+        case CLAMP_TO_SELF:
+        default:
+            border_expr = Expr();
+            break;
+    }
+
+    contents.ptr->border_expr = border_expr;
 }
 
 void RecFilter::add_filter(
@@ -208,25 +223,9 @@ void RecFilter::add_filter(
         }
     }
 
-    // add details to the split info struct
-    SplitInfo s = contents.ptr->split_info[dimension];
-    s.scan_id    .insert(s.scan_id.begin(), f.updates().size()-1);
-    s.scan_causal.insert(s.scan_causal.begin(), causal);
-    s.border_expr.insert(s.border_expr.begin(), border_expr);
-    s.num_splits   = s.num_splits+1;
-    s.filter_order = std::max(s.filter_order, scan_order);
-    contents.ptr->split_info[dimension] = s;
-
     // reduction domain for the scan
-    RDom rx    = contents.ptr->split_info[dimension].rdom;
-    Expr width = contents.ptr->split_info[dimension].image_width;
-
-    // copy the dimension tags from pure def replacing x by rx
-    // change the function tag from pure to scan
-    map<string, VarTag> update_var_category = rf.pure_var_category;
-    update_var_category.erase(x.name());
-    update_var_category.insert(make_pair(rx.x.name(), SCAN_DIMENSION));
-    rf.update_var_category.push_back(update_var_category);
+    RDom rx    = contents.ptr->filter_info[dimension].rdom;
+    Expr width = contents.ptr->filter_info[dimension].image_width;
 
     // create the LHS args, replace x by rx for causal and
     // x by w-1-rx for anticausal
@@ -267,16 +266,24 @@ void RecFilter::add_filter(
     }
     f.define_update(args, values);
 
+    // add details to the split info struct
+    FilterInfo s = contents.ptr->filter_info[dimension];
+    s.scan_id    .insert(s.scan_id.begin(), f.updates().size()-1);
+    s.scan_causal.insert(s.scan_causal.begin(), causal);
+    s.num_scans   = s.num_scans+1;
+    s.filter_order = std::max(s.filter_order, scan_order);
+    contents.ptr->filter_info[dimension] = s;
+
     // copy all the existing feedback/feedfwd coeff to the new arrays
     // add the coeff of the newly added scan as the last row of coeff
     int num_scans = f.updates().size();
-    int max_order = s.feedback_coeff.height();
+    int max_order = contents.ptr->feedback_coeff.height();
     Image<float> feedfwd_coeff(num_scans);
     Image<float> feedback_coeff(num_scans, std::max(max_order,scan_order));
     for (int j=0; j<num_scans-1; j++) {
-        feedfwd_coeff(j) = s.feedfwd_coeff(j);
-        for (int i=0; i<s.feedback_coeff.height(); i++) {
-            feedback_coeff(j,i) = s.feedback_coeff(j,i);
+        feedfwd_coeff(j) = contents.ptr->feedfwd_coeff(j);
+        for (int i=0; i<contents.ptr->feedback_coeff.height(); i++) {
+            feedback_coeff(j,i) = contents.ptr->feedback_coeff(j,i);
         }
     }
     feedfwd_coeff(num_scans-1) = feedfwd;
@@ -284,13 +291,16 @@ void RecFilter::add_filter(
         feedback_coeff(num_scans-1, i) = feedback[i];
     }
 
-    // update the feedback and feedforward coeff matrices in all split info
-    // structs for all dimensions (even though updating other dimensions is
-    // redundant, but still performed for consistency)
-    for (int i=0; i<contents.ptr->split_info.size(); i++) {
-        contents.ptr->split_info[i].feedfwd_coeff  = feedfwd_coeff;
-        contents.ptr->split_info[i].feedback_coeff = feedback_coeff;
-    }
+    // update the feedback and feedforward coeff matrices in all filter info
+    contents.ptr->feedfwd_coeff  = feedfwd_coeff;
+    contents.ptr->feedback_coeff = feedback_coeff;
+
+    // copy the dimension tags from pure def replacing x by rx
+    // change the function tag from pure to scan
+    map<string, VarTag> update_var_category = rf.pure_var_category;
+    update_var_category.erase(x.name());
+    update_var_category.insert(make_pair(rx.x.name(), SCAN_DIMENSION));
+    rf.update_var_category.push_back(update_var_category);
 }
 
 // -----------------------------------------------------------------------------
@@ -373,6 +383,10 @@ RecFilterFunc& RecFilter::internal_function(string func_name) {
 // -----------------------------------------------------------------------------
 
 void RecFilter::compile_jit(Target target, string filename) {
+    if (!contents.ptr->finalized) {
+        finalize(target);
+    }
+
     Func F(internal_function(contents.ptr->name).func);
     if (!filename.empty()) {
         F.compile_to_lowered_stmt(filename, HTML, target);
@@ -381,6 +395,10 @@ void RecFilter::compile_jit(Target target, string filename) {
 }
 
 void RecFilter::realize(Buffer out, int iterations) {
+    if (!contents.ptr->finalized) {
+        finalize(get_jit_target_from_environment());
+    }
+
     Func F(internal_function(contents.ptr->name).func);
 
     // upload all buffers to device

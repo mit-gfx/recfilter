@@ -28,8 +28,91 @@ using std::make_pair;
 
 // -----------------------------------------------------------------------------
 
+/** Info required to split a particular dimension of the recursive filter */
+struct SplitInfo {
+    int filter_order;                   ///< order of recursive filter in a given dimension
+    int filter_dim;                     ///< dimension id
+    int num_scans;                      ///< number of scans in the dimension that must be tiled
+
+    Halide::Expr tile_width;            ///< tile width for splitting
+    Halide::Expr image_width;           ///< image width in this dimension
+    Halide::Expr num_tiles;             ///< number of tile in this dimension
+
+    Halide::Var  var;                   ///< variable that represents this dimension
+    Halide::Var  inner_var;             ///< inner variable after splitting
+    Halide::Var  outer_var;             ///< outer variable or tile index after splitting
+
+    Halide::RDom rdom;                  ///< RDom update domain of each scan
+    Halide::RDom inner_rdom;            ///< inner RDom of each scan
+    Halide::RDom truncated_inner_rdom;  ///< inner RDom width a truncated
+    Halide::RDom outer_rdom;            ///< outer RDom of each scan
+    Halide::RDom tail_rdom;             ///< RDom to extract the tail of each scan
+
+    std::vector<bool> scan_causal;      ///< causal or anticausal flag for each scan
+    std::vector<int>  scan_id;          ///< scan or update definition id of each scan
+
+    Halide::Expr border_expr;            ///< Image border expression (from RecFilterContents)
+    Halide::Image<float> feedfwd_coeff;  ///< Feedforward coeffs (from RecFilterContents)
+    Halide::Image<float> feedback_coeff; ///< Feedback coeffs  (from RecFilterContents)
+};
+
+/** Tiling info for each dimension of the filter */
+static vector<SplitInfo> recfilter_split_info;
+
 /** All recursive filter funcs created during splitting transformations */
 static map<string, RecFilterFunc> recfilter_func_list;
+
+// -----------------------------------------------------------------------------
+
+/** @brief Weight coefficients (tail_size x tile_width) for
+ * applying scans corresponding to split indices split_id1 to
+ * split_id2 in the SplitInfo struct (defined in coefficients.cpp).
+ * It is meaningful to apply subsequent scans on the tail of any scan
+ * as it undergoes other scans only if they happen after the first
+ * scan. The SpliInfo object stores the scans in reverse order, hence indices
+ * into the SplitInfo object split_id1 and split_id2 must be decreasing
+ */
+Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2, bool clamp_border=false) {
+    assert(split_id1 >= split_id2);
+
+    const int* tile_width_ptr = as_const_int(s.tile_width);
+    assert(tile_width_ptr &&
+            "Could not convert tile width expression to integer");
+
+    int  tile_width  = *tile_width_ptr;
+    int  scan_id     = s.scan_id[split_id1];
+    bool scan_causal = s.scan_causal[split_id1];
+
+    Image<float> R = matrix_R(s.feedback_coeff, scan_id, tile_width);
+
+    // accummulate weight coefficients because of all subsequent scans
+    // traversal is backwards because SplitInfo contains scans in the
+    // reverse order
+    for (int j=split_id1-1; j>=split_id2; j--) {
+        if (scan_causal != s.scan_causal[j]) {
+            Image<float> B = matrix_B(s.feedfwd_coeff,
+                    s.feedback_coeff, s.scan_id[j], tile_width, clamp_border);
+            Image<float> I = matrix_antidiagonal(R.height());
+            R = matrix_mult(I, R);
+            R = matrix_mult(B, R);
+            R = matrix_mult(I, R);
+        }
+        else {
+            Image<float> B = matrix_B(s.feedfwd_coeff,
+                    s.feedback_coeff, s.scan_id[j], tile_width, false);
+            R = matrix_mult(B, R);
+        }
+    }
+
+    return matrix_transpose(R);
+}
+
+/** @brief Weight coefficients (tail_size x tile_width) for
+ * applying scan's corresponding to split indices split_id1
+ */
+Image<float> tail_weights(SplitInfo s, int split_id1, bool clamp_border=false) {
+    return tail_weights(s, split_id1, split_id1, clamp_border);
+}
 
 // -----------------------------------------------------------------------------
 
@@ -46,8 +129,8 @@ static vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> 
 
     // use all scans with dimension 0 first, then 1 and so on
     for (int i=0; i<split_info.size(); i++) {
-        for (int j=0; j<split_info[i].num_splits; j++) {
-            int curr = split_info[i].num_splits-1-j;
+        for (int j=0; j<split_info[i].num_scans; j++) {
+            int curr = split_info[i].num_scans-1-j;
             int scan = split_info[i].scan_id[curr];
             new_updates.push_back(updates[scan]);
             new_split_info[i].scan_id[curr] = new_updates.size()-1;
@@ -163,7 +246,7 @@ static void extract_tails_from_each_scan(RecFilterFunc rF_intra, vector<SplitInf
         Expr tile  = split_info[i].tile_width;
 
         // new update to extract the tail of each split scan
-        for (int j=0; j<split_info[i].num_splits; j++) {
+        for (int j=0; j<split_info[i].num_scans; j++) {
             int  scan_id     = split_info[i].scan_id[j];
             bool scan_causal = split_info[i].scan_causal[j];
 
@@ -246,12 +329,12 @@ static void add_padding_to_avoid_bank_conflicts(RecFilterFunc rF, vector<SplitIn
     // map inner vars of all other dimensions to 0
     map<string,Expr> var_val;
     for (int i=0; i<split_info.size(); i++) {
-        if (split_info[i].num_splits>0) {
+        if (split_info[i].num_scans>0) {
             string x = split_info[i].inner_var.name();
             if (var_val.empty()) {
                 var_val[x] = split_info[i].tile_width;
                 if (flag) {
-                    var_val[x] += split_info[i].filter_order*split_info[i].num_splits+1;
+                    var_val[x] += split_info[i].filter_order*split_info[i].num_scans+1;
                 }
             } else {
                 var_val[x] = 0;
@@ -329,7 +412,7 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
     // split info object and split id for each scan
     vector< pair<int,int> > scan(F.updates().size());
     for (int i=0; i<split_info.size(); i++) {
-        for (int j=0; j<split_info[i].num_splits; j++) {
+        for (int j=0; j<split_info[i].num_scans; j++) {
             scan[ split_info[i].scan_id[j] ] = make_pair(i,j);
         }
     }
@@ -347,7 +430,7 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
         Expr tile_width  = s.tile_width;
         Expr num_tiles   = s.num_tiles;
         Expr image_width = s.image_width;
-        Expr border_expr = s.border_expr[ scan[i].second ];
+        Expr border_expr = s.border_expr;
 
         int filter_dim   = s.filter_dim;
         int filter_order = s.filter_order;
@@ -516,7 +599,7 @@ static vector<RecFilterFunc> create_intra_tail_term(
 
     vector<RecFilterFunc> tail_functions_list;
 
-    for (int k=0; k<split_info.num_splits; k++) {
+    for (int k=0; k<split_info.num_scans; k++) {
         Function function(func_name + DASH + int_to_string(split_info.scan_id[k]));
 
         int scan_id = split_info.scan_id[k];
@@ -560,7 +643,7 @@ static vector<RecFilterFunc> create_intra_tail_term(
         tail_functions_list.push_back(rf);
     }
 
-    assert(tail_functions_list.size() == split_info.num_splits);
+    assert(tail_functions_list.size() == split_info.num_scans);
 
     return tail_functions_list;
 }
@@ -577,7 +660,7 @@ static vector<RecFilterFunc> create_complete_tail_term(
         F_tail.push_back(rF_tail[i].func);
     }
 
-    assert(split_info.num_splits == F_tail.size());
+    assert(split_info.num_scans == F_tail.size());
 
     Var  x    = split_info.var;
     Var  xi   = split_info.inner_var;
@@ -590,7 +673,7 @@ static vector<RecFilterFunc> create_complete_tail_term(
 
     vector<RecFilterFunc> rF_ctail;
 
-    for (int k=0; k<split_info.num_splits; k++) {
+    for (int k=0; k<split_info.num_scans; k++) {
         Function function(func_name + DASH + int_to_string(split_info.scan_id[k])
                 + DASH + SUB);
 
@@ -690,7 +773,7 @@ static vector<RecFilterFunc> create_complete_tail_term(
         rF_ctail.push_back(rf);
     }
 
-    assert(rF_ctail.size() == split_info.num_splits);
+    assert(rF_ctail.size() == split_info.num_scans);
 
     return rF_ctail;
 }
@@ -760,11 +843,11 @@ static vector<RecFilterFunc> create_tail_residual_term(
     int num_args    = F_ctail[0].args().size();
     int num_outputs = F_ctail[0].outputs();
 
-    assert(split_info.num_splits == F_ctail.size());
+    assert(split_info.num_scans == F_ctail.size());
 
     vector<RecFilterFunc> rF_tdeps;
 
-    for (int u=0; u<split_info.num_splits; u++) {
+    for (int u=0; u<split_info.num_scans; u++) {
         Function function(func_name + DASH + int_to_string(split_info.scan_id[u]));
 
         // args are same as completed tail terms
@@ -781,7 +864,7 @@ static vector<RecFilterFunc> create_tail_residual_term(
             // weight matrix for accumulating completed tail elements from scan u to scan j
             // for a tile that is clamped on all borders
             Image<float> c_weight = weight;
-            if (!equal(split_info.border_expr[j], FLOAT_ZERO)) {
+            if (!equal(split_info.border_expr, FLOAT_ZERO)) {
                 c_weight = tail_weights(split_info, j, u, true);
             }
 
@@ -857,7 +940,7 @@ static vector<RecFilterFunc> create_final_residual_term(
         F_ctail.push_back(rF_ctail[i].func);
     }
 
-    assert(split_info.num_splits == F_ctail.size());
+    assert(split_info.num_scans == F_ctail.size());
 
     // create functions that just reindex the completed tails
     // this seemingly redundant reindexing allows the application to
@@ -865,7 +948,7 @@ static vector<RecFilterFunc> create_final_residual_term(
     vector<Function>       F_deps;
     vector<RecFilterFunc> rF_deps;
 
-    for (int j=0; j<split_info.num_splits; j++) {
+    for (int j=0; j<split_info.num_scans; j++) {
         Function function(func_name + DASH + int_to_string(split_info.scan_id[j]));
         vector<Expr> values;
         vector<Expr> call_args;
@@ -896,7 +979,7 @@ static vector<RecFilterFunc> create_final_residual_term(
     vector<RecFilterFunc> rF_deps_sub;
 
     // accumulate contribution from each completed tail
-    for (int j=0; j<split_info.num_splits; j++) {
+    for (int j=0; j<split_info.num_scans; j++) {
         Function function(func_name + DASH + int_to_string(split_info.scan_id[j]) + DASH + SUB);
 
         int num_args    = F_deps[j].args().size();
@@ -986,7 +1069,7 @@ static void add_residual_to_tails(
 
     // add the dependency term of each scan to the preceeding scan
     // the first scan does not have any residuals
-    for (int j=0; j<split_info.num_splits-1; j++) {
+    for (int j=0; j<split_info.num_scans-1; j++) {
         vector<string> args = F_tail[j].args();
         vector<Expr> values = F_tail[j].values();
         vector<Expr> call_args;
@@ -1142,7 +1225,7 @@ static void add_prev_dimension_residual_to_tails(
             // of scan after applying all subsequent scans
             // for a tile that is clamped on all borders
             Image<float> c_weight = weight;
-            if (!equal(split_info_prev.border_expr[k], FLOAT_ZERO)) {
+            if (!equal(split_info_prev.border_expr, FLOAT_ZERO)) {
                 c_weight= tail_weights(split_info_prev, k, 0, true);
             }
 
@@ -1343,14 +1426,33 @@ void RecFilter::split(map<string,Expr> dim_tile) {
     Function        F = rF.func;
 
     // flush out any previous splitting info
-    for (int i=0; i<contents.ptr->split_info.size(); i++) {
-        contents.ptr->split_info[i].tile_width = Expr();
-        contents.ptr->split_info[i].num_tiles  = Expr();
-        contents.ptr->split_info[i].inner_var  = Var();
-        contents.ptr->split_info[i].outer_var  = Var();
-        contents.ptr->split_info[i].inner_rdom = RDom();
-        contents.ptr->split_info[i].outer_rdom = RDom();
-        contents.ptr->split_info[i].tail_rdom  = RDom();
+    if (!contents.ptr->tiled && !recfilter_split_info.empty()) {
+        cerr << "Recursive filter cannot be split twice" << endl;
+        assert(false);
+    }
+
+    // copy split_info data from the filter_info and initialize all splitting data to empty
+    recfilter_split_info.resize(contents.ptr->filter_info.size());
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        recfilter_split_info[i].filter_order    = contents.ptr->filter_info[i].filter_order;
+        recfilter_split_info[i].filter_dim      = contents.ptr->filter_info[i].filter_dim;
+        recfilter_split_info[i].num_scans       = contents.ptr->filter_info[i].num_scans;
+        recfilter_split_info[i].image_width     = contents.ptr->filter_info[i].image_width;
+        recfilter_split_info[i].var             = contents.ptr->filter_info[i].var;
+        recfilter_split_info[i].rdom            = contents.ptr->filter_info[i].rdom;
+        recfilter_split_info[i].scan_causal     = contents.ptr->filter_info[i].scan_causal;
+        recfilter_split_info[i].scan_id         = contents.ptr->filter_info[i].scan_id;
+        recfilter_split_info[i].feedfwd_coeff   = contents.ptr->feedfwd_coeff;
+        recfilter_split_info[i].feedback_coeff  = contents.ptr->feedback_coeff;
+        recfilter_split_info[i].border_expr     = contents.ptr->border_expr;
+        recfilter_split_info[i].tile_width      = Expr();
+        recfilter_split_info[i].num_tiles       = Expr();
+        recfilter_split_info[i].inner_var       = Var();
+        recfilter_split_info[i].outer_var       = Var();
+        recfilter_split_info[i].inner_rdom      = RDom();
+        recfilter_split_info[i].outer_rdom      = RDom();
+        recfilter_split_info[i].tail_rdom       = RDom();
+        recfilter_split_info[i].truncated_inner_rdom = RDom();
     }
 
     // populate tile size and number of tiles for each dimension
@@ -1360,16 +1462,16 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         Expr tile_width = it->second;
         for (int j=0; !found && j<F.args().size(); j++) {
             if (F.args()[j] == x) {
-                string name       = contents.ptr->split_info[j].var.name();
-                Expr image_width  = contents.ptr->split_info[j].image_width;
+                string name       = recfilter_split_info[j].var.name();
+                Expr image_width  = recfilter_split_info[j].image_width;
 
                 // set tile width and number of tiles
-                contents.ptr->split_info[j].tile_width = tile_width;
-                contents.ptr->split_info[j].num_tiles  = image_width / tile_width;
+                recfilter_split_info[j].tile_width = tile_width;
+                recfilter_split_info[j].num_tiles  = image_width / tile_width;
 
                 // set inner var and outer var
-                contents.ptr->split_info[j].inner_var = Var(name + "i");
-                contents.ptr->split_info[j].outer_var = Var(name + "o");
+                recfilter_split_info[j].inner_var = Var(name + "i");
+                recfilter_split_info[j].outer_var = Var(name + "o");
 
                 found = true;
             }
@@ -1384,17 +1486,17 @@ void RecFilter::split(map<string,Expr> dim_tile) {
     // inner RDom - has dimensionality equal to dimensions of the image
     // each dimension runs from 0 to tile width of the respective dimension
     vector<ReductionVariable> inner_scan_rvars;
-    for (int i=0; i<contents.ptr->split_info.size(); i++) {
+    for (int i=0; i<recfilter_split_info.size(); i++) {
         Expr extent;
-        if (contents.ptr->split_info[i].tile_width.defined()) {
-            extent = contents.ptr->split_info[i].tile_width;
+        if (recfilter_split_info[i].tile_width.defined()) {
+            extent = recfilter_split_info[i].tile_width;
         } else {
             extent = 1;     // for non split dimensions
         }
         ReductionVariable r;
         r.min    = 0;
         r.extent = extent;
-        r.var    = "r" + contents.ptr->split_info[i].var.name() + "i";
+        r.var    = "r" + recfilter_split_info[i].var.name() + "i";
         inner_scan_rvars.push_back(r);
     }
     RDom inner_rdom = RDom(ReductionDomain(inner_scan_rvars));
@@ -1406,12 +1508,12 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         Expr tile_width = it->second;
         for (int j=0; !found && j<F.args().size(); j++) {
             if (F.args()[j] == x) {
-                string name       = contents.ptr->split_info[j].var.name();
-                Expr num_tiles    = contents.ptr->split_info[j].num_tiles;
-                int  filter_order = contents.ptr->split_info[j].filter_order;
+                string name       = recfilter_split_info[j].var.name();
+                Expr num_tiles    = recfilter_split_info[j].num_tiles;
+                int  filter_order = recfilter_split_info[j].filter_order;
 
                 // set inner rdom, same for all dimensions
-                contents.ptr->split_info[j].inner_rdom = inner_rdom;
+                recfilter_split_info[j].inner_rdom = inner_rdom;
 
                 // same as inner rdom except that the extent of scan dimension
                 // is filter order rather than tile width
@@ -1419,7 +1521,7 @@ void RecFilter::split(map<string,Expr> dim_tile) {
                 inner_tail_rvars[j].var    = "r"+name+"t";
                 inner_tail_rvars[j].min    = 0;
                 inner_tail_rvars[j].extent = filter_order;
-                contents.ptr->split_info[j].tail_rdom = RDom(ReductionDomain(inner_tail_rvars));
+                recfilter_split_info[j].tail_rdom = RDom(ReductionDomain(inner_tail_rvars));
 
                 // same as inner rdom except that the domain is from filter_order to tile_width-1
                 // instead of 0 to tile_width-1
@@ -1427,11 +1529,11 @@ void RecFilter::split(map<string,Expr> dim_tile) {
                 inner_truncated_rvars[j].var    = "r"+name+"f";
                 inner_truncated_rvars[j].min    = filter_order;
                 inner_truncated_rvars[j].extent = simplify(max(inner_truncated_rvars[j].extent-filter_order,0));
-                contents.ptr->split_info[j].truncated_inner_rdom = RDom(ReductionDomain(inner_truncated_rvars));
+                recfilter_split_info[j].truncated_inner_rdom = RDom(ReductionDomain(inner_truncated_rvars));
 
                 // outer_rdom.x: over all tail elements of current tile
                 // outer_rdom.y: over all tiles
-                contents.ptr->split_info[j].outer_rdom = RDom(0, filter_order,
+                recfilter_split_info[j].outer_rdom = RDom(0, filter_order,
                         0, num_tiles, "r"+name+"o");
 
                 found = true;
@@ -1441,36 +1543,36 @@ void RecFilter::split(map<string,Expr> dim_tile) {
     }
 
     // group scans in same dimension together and change the order of splits accordingly
-    contents.ptr->split_info = group_scans_by_dimension(F, contents.ptr->split_info);
+    recfilter_split_info = group_scans_by_dimension(F, recfilter_split_info);
 
     // apply the actual splitting
     RecFilterFunc rF_final;
     {
-        /// // create a copy of the split info structs retaining only the
-        /// // dimensions to be split
-        /// vector<SplitInfo> split_info_current;
-        /// for (int i=0; i<contents.ptr->split_info.size(); i++) {
-        ///     if (contents.ptr->split_info[i].tile_width.defined()) {
-        ///         split_info_current.push_back(contents.ptr->split_info[i]);
-        ///     }
-        /// }
-        vector<SplitInfo> split_info_current = contents.ptr->split_info;
+        // remove split_info structs for dimensions which must not be split
+        for (int i=0; i<recfilter_split_info.size();) {
+            if (!recfilter_split_info[i].tile_width.defined() ||
+                 equal(recfilter_split_info[i].num_tiles, INT_ONE)) {
+                recfilter_split_info.erase(recfilter_split_info.begin()+i);
+            } else {
+                i++;
+            }
+        }
 
         // compute the intra tile result
-        RecFilterFunc rF_intra = create_intra_tile_term(rF, split_info_current);
+        RecFilterFunc rF_intra = create_intra_tile_term(rF, recfilter_split_info);
 
         // create a function will hold the final result, copy of the intra tile term
         rF_final = create_copy(rF_intra, F.name() + DASH + FINAL_TERM);
 
         // compute the residuals from splits in each dimension
         vector< vector<RecFilterFunc> > rF_deps = split_scans(rF_intra, rF_final.func.name(),
-                split_info_current);
+                recfilter_split_info);
 
         // transfer the tail of each scan to another buffer
-        extract_tails_from_each_scan(rF_intra, split_info_current);
+        extract_tails_from_each_scan(rF_intra, recfilter_split_info);
 
         // add all the residuals to the final term
-        add_all_residuals_to_final_result(rF_final, rF_deps, split_info_current);
+        add_all_residuals_to_final_result(rF_final, rF_deps, recfilter_split_info);
     }
 
     // change the original function to index into the final term
@@ -1483,11 +1585,11 @@ void RecFilter::split(map<string,Expr> dim_tile) {
             string arg = F_final.args()[i];
             call_args.push_back(Var(arg));
 
-            for (int j=0; j<contents.ptr->split_info.size(); j++) {
-                Var var         = contents.ptr->split_info[j].var;
-                Var inner_var   = contents.ptr->split_info[j].inner_var;
-                Var outer_var   = contents.ptr->split_info[j].outer_var;
-                Expr tile_width = contents.ptr->split_info[j].tile_width;
+            for (int j=0; j<recfilter_split_info.size(); j++) {
+                Var var         = recfilter_split_info[j].var;
+                Var inner_var   = recfilter_split_info[j].inner_var;
+                Var outer_var   = recfilter_split_info[j].outer_var;
+                Expr tile_width = recfilter_split_info[j].tile_width;
                 if (arg == inner_var.name()) {
                     call_args[i] = substitute(arg, var%tile_width, call_args[i]);
                 } else if (arg == outer_var.name()) {
@@ -1511,18 +1613,11 @@ void RecFilter::split(map<string,Expr> dim_tile) {
 
     // add all the generated RecFilterFuncs
     contents.ptr->func.insert(recfilter_func_list.begin(), recfilter_func_list.end());
-    recfilter_func_list.clear();
-}
 
-void RecFilter::split(Expr tx) {
-    map<string,Expr> dim_tile;
-    for (int i=0; i<contents.ptr->split_info.size(); i++) {
-        if (contents.ptr->split_info[i].num_splits>0) {
-            Var x = contents.ptr->split_info[i].var;
-            dim_tile[x.name()] = tx;
-        }
-    }
-    split(dim_tile);
+    recfilter_func_list.clear();
+    recfilter_split_info.clear();
+
+    contents.ptr->tiled = true;
 }
 
 void RecFilter::split(Var x, Expr tx) {
@@ -1538,85 +1633,75 @@ void RecFilter::split(Var x, Expr tx, Var y, Expr ty) {
     split(dim_tile);
 }
 
-void RecFilter::split(Var x, Var y, Expr t) {
+void RecFilter::split(Var x, Expr tx, Var y, Expr ty, Var z, Expr tz) {
     map<string,Expr> dim_tile;
-    dim_tile[x.name()] = t;
-    dim_tile[y.name()] = t;
-    split(dim_tile);
-}
-
-void RecFilter::split(Var x, Var y, Var z, Expr t) {
-    map<string,Expr> dim_tile;
-    dim_tile[x.name()] = t;
-    dim_tile[y.name()] = t;
-    dim_tile[z.name()] = t;
-    split(dim_tile);
-}
-
-void RecFilter::split(vector<Var> vars, Expr t) {
-    map<string,Expr> dim_tile;
-    for (int i=0; i<vars.size(); i++) {
-        dim_tile[vars[i].name()] = t;
-    }
+    dim_tile[x.name()] = tx;
+    dim_tile[y.name()] = ty;
+    dim_tile[z.name()] = tz;
     split(dim_tile);
 }
 
 // -----------------------------------------------------------------------------
 
 void RecFilter::finalize(Target target) {
-    // inline all functions not required any more
-    map<string,RecFilterFunc>::iterator fit;
-    for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-        if (fit->second.func_category == INLINE) {
-            inline_func(fit->second.func.name());
-            fit = contents.ptr->func.begin();            // list changed, start all over again
-        }
-    }
+    if (contents.ptr->tiled) {
 
-    // merge functions that reindex same previous result
-    // useful for all architectures
-    for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-        RecFilterFunc rF = fit->second;
-
-        if ((rF.func_category & INTRA_TILE_SCAN) && (rF.func.has_update_definition())) {
-            // get all functions that reindex the tail from intra tile computation
-            vector<string> funcs_to_merge;
-            map<string,RecFilterFunc>::iterator git;
-            for (git=contents.ptr->func.begin(); git!=contents.ptr->func.end(); git++) {
-                if ((git->second.func_category & REINDEX_FOR_WRITE) &&
-                        (git->second.callee_func==rF.func.name())) {
-                    funcs_to_merge.push_back(git->second.func.name());
-                }
-            }
-
-            // merge these functions
-            // memory layout reshaping done inside merge routine
-            if (funcs_to_merge.size()>1) {
-                string merged_name = funcs_to_merge[0] + "_merged";
-                merge_func(funcs_to_merge, merged_name);
+        // inline all functions not required any more
+        map<string,RecFilterFunc>::iterator fit;
+        for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+            if (fit->second.func_category == INLINE) {
+                inline_func(fit->second.func.name());
                 fit = contents.ptr->func.begin();            // list changed, start all over again
             }
         }
-    }
 
-    // platform specific optimization
-    if (target.has_gpu_feature()) {
+        // merge functions that reindex same previous result
+        // useful for all architectures
         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
             RecFilterFunc rF = fit->second;
 
             if ((rF.func_category & INTRA_TILE_SCAN) && (rF.func.has_update_definition())) {
-                // move initialization to update def in intra tile computation stages
-                move_init_to_update_def(rF, contents.ptr->split_info);
+                // get all functions that reindex the tail from intra tile computation
+                vector<string> funcs_to_merge;
+                map<string,RecFilterFunc>::iterator git;
+                for (git=contents.ptr->func.begin(); git!=contents.ptr->func.end(); git++) {
+                    if ((git->second.func_category & REINDEX_FOR_WRITE) &&
+                            (git->second.callee_func==rF.func.name())) {
+                        funcs_to_merge.push_back(git->second.func.name());
+                    }
+                }
 
-                // add padding to intra tile terms to avoid bank conflicts
-                add_padding_to_avoid_bank_conflicts(rF, contents.ptr->split_info, true);
+                // merge these functions
+                // memory layout reshaping done inside merge routine
+                if (funcs_to_merge.size()>1) {
+                    string merged_name = funcs_to_merge[0] + "_merged";
+                    merge_func(funcs_to_merge, merged_name);
+                    fit = contents.ptr->func.begin();            // list changed, start all over again
+                }
+            }
+        }
+
+        // platform specific optimization
+        if (target.has_gpu_feature()) {
+            for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+                RecFilterFunc rF = fit->second;
+
+                if ((rF.func_category & INTRA_TILE_SCAN) && (rF.func.has_update_definition())) {
+                    // move initialization to update def in intra tile computation stages
+                    move_init_to_update_def(rF, recfilter_split_info);
+
+                    // add padding to intra tile terms to avoid bank conflicts
+                    add_padding_to_avoid_bank_conflicts(rF, recfilter_split_info, true);
+                }
+            }
+        }
+        else {
+            for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+                RecFilterFunc rF = fit->second;
+                Func(rF.func).compute_root();
             }
         }
     }
-    else {
-        for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-            RecFilterFunc rF = fit->second;
-            Func(rF.func).compute_root();
-        }
-    }
+
+    contents.ptr->finalized = true;
 }

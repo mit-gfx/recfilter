@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
     bool nocheck = args.nocheck;
     int  width   = args.width;
     int  height  = args.width;
-    int  tile    = args.block;
+    int  tile_width = args.block;
     int  iter    = args.iterations;
 
     Image<float> random_image = generate_random_image<float>(width,height);
@@ -41,9 +41,6 @@ int main(int argc, char **argv) {
 
     Var x("x");
     Var y("y");
-
-    RDom rx(0, image.width(), "rx");
-    RDom ry(0, image.height(),"ry");
 
     RecFilter filterx;
     RecFilter filtery;
@@ -64,8 +61,8 @@ int main(int argc, char **argv) {
         filtery = cascaded_filters[1];
     }
 
-    filterx.split(x, tile);
-    filtery.split(y, tile);
+    filterx.split(x, tile_width);
+    filtery.split(y, tile_width);
 
     cerr << filtery << endl;
 
@@ -100,47 +97,47 @@ int main(int argc, char **argv) {
 
 #if 0
             Func P("P");
-            P(xi, xo, yi, yo) = select(yi<tile, Sx_Final(xi, xo, yo*tile+yi), Sy_Tail(xo*tile+xi, yi-tile, yo));
+            P(xi, xo, yi, yo) = select(yi<tile_width, Sx_Final(xi, xo, yo*tile_width+yi), Sy_Tail(xo*tile_width+xi, yi-tile_width, yo));
 
             Sx_Intra.compute_at(Sx_Tail, Var::gpu_blocks());
-            Sx_Intra.update(0).split(y,yo,yi,tile).split(yi,yi,t,UNROLL).reorder(t,rxi,yi,xo,yo).gpu_threads(rxi,yi).unroll(t);
-            Sx_Intra.update(1).split(y,yo,yi,tile).reorder(rxi,yi,xo,yo).gpu_threads(yi).unroll(rxi);
-            Sx_Intra.update(2).split(y,yo,yi,tile).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
-            Sx_Intra.update(3).split(y,yo,yi,tile).reorder(rxi,yi,xo,yo).gpu_threads(yi).unroll(rxi);
-            Sx_Intra.update(4).split(y,yo,yi,tile).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
+            Sx_Intra.update(0).split(y,yo,yi,tile_width).split(yi,yi,t,UNROLL).reorder(t,rxi,yi,xo,yo).gpu_threads(rxi,yi).unroll(t);
+            Sx_Intra.update(1).split(y,yo,yi,tile_width).reorder(rxi,yi,xo,yo).gpu_threads(yi).unroll(rxi);
+            Sx_Intra.update(2).split(y,yo,yi,tile_width).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
+            Sx_Intra.update(3).split(y,yo,yi,tile_width).reorder(rxi,yi,xo,yo).gpu_threads(yi).unroll(rxi);
+            Sx_Intra.update(4).split(y,yo,yi,tile_width).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
 
             Sx_Tail.compute_root().reorder_storage(y,xi,xo);
-            Sx_Tail.split(y,yo,yi,tile).split(yi,yi,t,UNROLL).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
+            Sx_Tail.split(y,yo,yi,tile_width).split(yi,yi,t,UNROLL).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
 
             Sx_CTail_0.compute_root().update().reorder(rxox,rxoy,y).vectorize(rxox).split(y,yo,yi,MAX_THREADS).gpu(yo,yi);
             Sx_CTail_1.compute_root().update().reorder(rxox,rxoy,y).vectorize(rxox).split(y,yo,yi,MAX_THREADS).gpu(yo,yi);
 
-            Sx_Deps_0.compute_at(P, Var::gpu_blocks()).split(y,yo,yi,tile).reorder(xi,yi,xo,yo).gpu_threads(yi,xi);
-            Sx_Deps_1.compute_at(P, Var::gpu_blocks()).split(y,yo,yi,tile).reorder(xi,yi,xo,yo).gpu_threads(yi,xi);
+            Sx_Deps_0.compute_at(P, Var::gpu_blocks()).split(y,yo,yi,tile_width).reorder(xi,yi,xo,yo).gpu_threads(yi,xi);
+            Sx_Deps_1.compute_at(P, Var::gpu_blocks()).split(y,yo,yi,tile_width).reorder(xi,yi,xo,yo).gpu_threads(yi,xi);
 
             Sx_Final.compute_at(P, Var::gpu_blocks());
-            Sx_Final.update(0).split(y,yo,yi,tile).split(yi,yi,t,UNROLL).reorder(t,rxi,yi,xo,yo).gpu_threads(rxi,yi).unroll(t);
-            Sx_Final.update(1).split(y,yo,yi,tile).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
-            Sx_Final.update(2).split(y,yo,yi,tile).reorder(rxf,yi,xo,yo).gpu_threads(yi).unroll(rxf);
-            Sx_Final.update(3).split(y,yo,yi,tile).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
-            Sx_Final.update(4).split(y,yo,yi,tile).reorder(rxf,yi,xo,yo).gpu_threads(yi).unroll(rxf);
+            Sx_Final.update(0).split(y,yo,yi,tile_width).split(yi,yi,t,UNROLL).reorder(t,rxi,yi,xo,yo).gpu_threads(rxi,yi).unroll(t);
+            Sx_Final.update(1).split(y,yo,yi,tile_width).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
+            Sx_Final.update(2).split(y,yo,yi,tile_width).reorder(rxf,yi,xo,yo).gpu_threads(yi).unroll(rxf);
+            Sx_Final.update(3).split(y,yo,yi,tile_width).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
+            Sx_Final.update(4).split(y,yo,yi,tile_width).reorder(rxf,yi,xo,yo).gpu_threads(yi).unroll(rxf);
 
             Sy_Intra.compute_at(P, Var::gpu_blocks());
-            Sy_Intra.update(0).split(x,xo,xi,tile).split(xi,xi,t,UNROLL).reorder(t,ryi,xi,yo,xo).gpu_threads(ryi,xi).unroll(t);
-            Sy_Intra.update(1).split(x,xo,xi,tile).reorder(ryi,xi,yo,xo).gpu_threads(xi).unroll(ryi);
-            Sy_Intra.update(2).split(x,xo,xi,tile).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
-            Sy_Intra.update(3).split(x,xo,xi,tile).reorder(ryi,xi,yo,xo).gpu_threads(xi).unroll(ryi);
-            Sy_Intra.update(4).split(x,xo,xi,tile).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
+            Sy_Intra.update(0).split(x,xo,xi,tile_width).split(xi,xi,t,UNROLL).reorder(t,ryi,xi,yo,xo).gpu_threads(ryi,xi).unroll(t);
+            Sy_Intra.update(1).split(x,xo,xi,tile_width).reorder(ryi,xi,yo,xo).gpu_threads(xi).unroll(ryi);
+            Sy_Intra.update(2).split(x,xo,xi,tile_width).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
+            Sy_Intra.update(3).split(x,xo,xi,tile_width).reorder(ryi,xi,yo,xo).gpu_threads(xi).unroll(ryi);
+            Sy_Intra.update(4).split(x,xo,xi,tile_width).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
 
             P.compute_root();
             P.split(xi,xi,t,UNROLL).reorder(t,yi,xi,yo,xo).gpu(yo,xo,yi,xi).unroll(t);
 
-            P.bound(xo, 0, width/tile).bound(yo, 0, height/tile).bound(xi, 0, tile).bound(yi, 0, tile+2*filter_order);
+            P.bound(xo, 0, width/tile_width).bound(yo, 0, height/tile_width).bound(xi, 0, tile_width).bound(yi, 0, tile_width+2*filter_order);
 
 
             Target target = get_jit_target_from_environment();
             for (int i=0; i<iter; i++) {
-                P.realize(tile, width/tile, tile+2*filter_order, height/tile);
+                P.realize(tile_width, width/tile_width, tile_width+2*filter_order, height/tile_width);
             }
 
             return 0;
@@ -151,14 +148,14 @@ int main(int argc, char **argv) {
             // stage 1: x filtering
 
             Sx_Intra.compute_at(Sx_Tail, Var::gpu_blocks());
-            Sx_Intra.update(0).split(y,yo,yi,tile).split(yi,yi,t,UNROLL).reorder(t,rxi,yi,xo,yo).gpu_threads(rxi,yi).unroll(t);
-            Sx_Intra.update(1).split(y,yo,yi,tile).reorder(rxi,yi,xo,yo).gpu_threads(yi).unroll(rxi);
-            Sx_Intra.update(2).split(y,yo,yi,tile).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
-            Sx_Intra.update(3).split(y,yo,yi,tile).reorder(rxi,yi,xo,yo).gpu_threads(yi).unroll(rxi);
-            Sx_Intra.update(4).split(y,yo,yi,tile).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
+            Sx_Intra.update(0).split(y,yo,yi,tile_width).split(yi,yi,t,UNROLL).reorder(t,rxi,yi,xo,yo).gpu_threads(rxi,yi).unroll(t);
+            Sx_Intra.update(1).split(y,yo,yi,tile_width).reorder(rxi,yi,xo,yo).gpu_threads(yi).unroll(rxi);
+            Sx_Intra.update(2).split(y,yo,yi,tile_width).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
+            Sx_Intra.update(3).split(y,yo,yi,tile_width).reorder(rxi,yi,xo,yo).gpu_threads(yi).unroll(rxi);
+            Sx_Intra.update(4).split(y,yo,yi,tile_width).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
 
             Sx_Tail.compute_root().reorder_storage(y,xi,xo);
-            Sx_Tail.split(y,yo,yi,tile).split(yi,yi,t,UNROLL).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
+            Sx_Tail.split(y,yo,yi,tile_width).split(yi,yi,t,UNROLL).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
 
             // stage 2 and 3
 
@@ -167,30 +164,30 @@ int main(int argc, char **argv) {
 
             // stage 4
 
-            Sx_Deps_0.compute_at(Sx, Var::gpu_blocks()).split(y,yo,yi,tile).reorder(xi,yi,xo,yo).gpu_threads(yi,xi);
-            Sx_Deps_1.compute_at(Sx, Var::gpu_blocks()).split(y,yo,yi,tile).reorder(xi,yi,xo,yo).gpu_threads(yi,xi);
+            Sx_Deps_0.compute_at(Sx, Var::gpu_blocks()).split(y,yo,yi,tile_width).reorder(xi,yi,xo,yo).gpu_threads(yi,xi);
+            Sx_Deps_1.compute_at(Sx, Var::gpu_blocks()).split(y,yo,yi,tile_width).reorder(xi,yi,xo,yo).gpu_threads(yi,xi);
 
             Sx_Final.compute_at(Sx, Var::gpu_blocks());
-            Sx_Final.update(0).split(y,yo,yi,tile).split(yi,yi,t,UNROLL).reorder(t,rxi,yi,xo,yo).gpu_threads(rxi,yi).unroll(t);
-            Sx_Final.update(1).split(y,yo,yi,tile).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
-            Sx_Final.update(2).split(y,yo,yi,tile).reorder(rxf,yi,xo,yo).gpu_threads(yi).unroll(rxf);
-            Sx_Final.update(3).split(y,yo,yi,tile).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
-            Sx_Final.update(4).split(y,yo,yi,tile).reorder(rxf,yi,xo,yo).gpu_threads(yi).unroll(rxf);
+            Sx_Final.update(0).split(y,yo,yi,tile_width).split(yi,yi,t,UNROLL).reorder(t,rxi,yi,xo,yo).gpu_threads(rxi,yi).unroll(t);
+            Sx_Final.update(1).split(y,yo,yi,tile_width).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
+            Sx_Final.update(2).split(y,yo,yi,tile_width).reorder(rxf,yi,xo,yo).gpu_threads(yi).unroll(rxf);
+            Sx_Final.update(3).split(y,yo,yi,tile_width).reorder(rxt,yi,xo,yo).gpu_threads(yi).unroll(rxt);
+            Sx_Final.update(4).split(y,yo,yi,tile_width).reorder(rxf,yi,xo,yo).gpu_threads(yi).unroll(rxf);
 
-            Sx.compute_root().reorder_storage(y,x).split(x,xo,xi,tile).split(y,yo,yi,tile);
+            Sx.compute_root().reorder_storage(y,x).split(x,xo,xi,tile_width).split(y,yo,yi,tile_width);
             Sx.split(yi,yi,t,UNROLL).reorder(t,xi,yi,xo,yo).gpu(xo,yo,xi,yi).unroll(t);
 
             // stage 5: y filtering
 
             Sy_Intra.compute_at(Sy_Tail, Var::gpu_blocks());
-            Sy_Intra.update(0).split(x,xo,xi,tile).split(xi,xi,t,UNROLL).reorder(t,ryi,xi,yo,xo).gpu_threads(ryi,xi).unroll(t);
-            Sy_Intra.update(1).split(x,xo,xi,tile).reorder(ryi,xi,yo,xo).gpu_threads(xi).unroll(ryi);
-            Sy_Intra.update(2).split(x,xo,xi,tile).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
-            Sy_Intra.update(3).split(x,xo,xi,tile).reorder(ryi,xi,yo,xo).gpu_threads(xi).unroll(ryi);
-            Sy_Intra.update(4).split(x,xo,xi,tile).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
+            Sy_Intra.update(0).split(x,xo,xi,tile_width).split(xi,xi,t,UNROLL).reorder(t,ryi,xi,yo,xo).gpu_threads(ryi,xi).unroll(t);
+            Sy_Intra.update(1).split(x,xo,xi,tile_width).reorder(ryi,xi,yo,xo).gpu_threads(xi).unroll(ryi);
+            Sy_Intra.update(2).split(x,xo,xi,tile_width).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
+            Sy_Intra.update(3).split(x,xo,xi,tile_width).reorder(ryi,xi,yo,xo).gpu_threads(xi).unroll(ryi);
+            Sy_Intra.update(4).split(x,xo,xi,tile_width).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
 
             Sy_Tail.compute_root().reorder_storage(x,yi,yo);
-            Sy_Tail.split(x,xo,xi,tile).split(xi,xi,t,UNROLL).reorder(t,yi,xi,yo,xo).gpu(yo,xo,yi,xi).unroll(t);
+            Sy_Tail.split(x,xo,xi,tile_width).split(xi,xi,t,UNROLL).reorder(t,yi,xi,yo,xo).gpu(yo,xo,yi,xi).unroll(t);
 
             // stage 6 and 7
 
@@ -199,30 +196,30 @@ int main(int argc, char **argv) {
 
             // stage 8
 
-            Sy_Deps_0.compute_at(Sy, Var::gpu_blocks()).split(x,xo,xi,tile).reorder(yi,xi,yo,xo).gpu_threads(xi);
-            Sy_Deps_1.compute_at(Sy, Var::gpu_blocks()).split(x,xo,xi,tile).reorder(yi,xi,yo,xo).gpu_threads(xi);
+            Sy_Deps_0.compute_at(Sy, Var::gpu_blocks()).split(x,xo,xi,tile_width).reorder(yi,xi,yo,xo).gpu_threads(xi);
+            Sy_Deps_1.compute_at(Sy, Var::gpu_blocks()).split(x,xo,xi,tile_width).reorder(yi,xi,yo,xo).gpu_threads(xi);
 
             Sy_Final.compute_at(Sy, Var::gpu_blocks());
-            Sy_Final.update(0).split(x,xo,xi,tile).split(xi,xi,t,UNROLL).reorder(t,ryi,xi,yo,xo).gpu_threads(ryi,xi).unroll(t);
-            Sy_Final.update(1).split(x,xo,xi,tile).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
-            Sy_Final.update(2).split(x,xo,xi,tile).reorder(ryf,xi,yo,xo).gpu_threads(xi).unroll(ryf);
-            Sy_Final.update(3).split(x,xo,xi,tile).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
-            Sy_Final.update(4).split(x,xo,xi,tile).reorder(ryf,xi,yo,xo).gpu_threads(xi).unroll(ryf);
+            Sy_Final.update(0).split(x,xo,xi,tile_width).split(xi,xi,t,UNROLL).reorder(t,ryi,xi,yo,xo).gpu_threads(ryi,xi).unroll(t);
+            Sy_Final.update(1).split(x,xo,xi,tile_width).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
+            Sy_Final.update(2).split(x,xo,xi,tile_width).reorder(ryf,xi,yo,xo).gpu_threads(xi).unroll(ryf);
+            Sy_Final.update(3).split(x,xo,xi,tile_width).reorder(ryt,xi,yo,xo).gpu_threads(xi).unroll(ryt);
+            Sy_Final.update(4).split(x,xo,xi,tile_width).reorder(ryf,xi,yo,xo).gpu_threads(xi).unroll(ryf);
 
-            Sy.compute_root().reorder_storage(x,y).split(x,xo,xi,tile).split(y,yo,yi,tile);
+            Sy.compute_root().reorder_storage(x,y).split(x,xo,xi,tile_width).split(y,yo,yi,tile_width);
             Sy.split(xi,xi,t,UNROLL).reorder(t,yi,xi,yo,xo).gpu(yo,xo,yi,xi).unroll(t);
 
 
             // bounds
 
-            Sx_Tail.bound(xo,0,width/tile).bound(y,0,height).bound(xi,0,2*filter_order);
-            Sy_Tail.bound(yo,0,width/tile).bound(x,0,height).bound(yi,0,2*filter_order);
+            Sx_Tail.bound(xo,0,width/tile_width).bound(y,0,height).bound(xi,0,2*filter_order);
+            Sy_Tail.bound(yo,0,width/tile_width).bound(x,0,height).bound(yi,0,2*filter_order);
 
-            Sx_CTail_0.bound(xo,0,width/tile).bound(y,0,height).bound(xi,0,filter_order);
-            Sx_CTail_1.bound(xo,0,width/tile).bound(y,0,height).bound(xi,0,filter_order);
+            Sx_CTail_0.bound(xo,0,width/tile_width).bound(y,0,height).bound(xi,0,filter_order);
+            Sx_CTail_1.bound(xo,0,width/tile_width).bound(y,0,height).bound(xi,0,filter_order);
 
-            Sy_CTail_0.bound(yo,0,width/tile).bound(x,0,height).bound(yi,0,filter_order);
-            Sy_CTail_1.bound(yo,0,width/tile).bound(x,0,height).bound(yi,0,filter_order);
+            Sy_CTail_0.bound(yo,0,width/tile_width).bound(x,0,height).bound(yi,0,filter_order);
+            Sy_CTail_1.bound(yo,0,width/tile_width).bound(x,0,height).bound(yi,0,filter_order);
 
             Sx.bound(y,0,height).bound(x,0,width);
             Sy.bound(y,0,height).bound(x,0,width);
