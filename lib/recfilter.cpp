@@ -8,6 +8,7 @@ using std::endl;
 using std::vector;
 using std::map;
 using std::ostream;
+using std::stringstream;
 
 namespace Halide {
 namespace Internal {
@@ -272,6 +273,44 @@ void RecFilter::addScan(Var x, RDom rx, vector<float> fb, Causality c, Border b,
 
 // -----------------------------------------------------------------------------
 
+RecFilterSchedule RecFilter::intra_schedule(void) {
+    FuncTag ftag = INTRA_TILE_SCAN;
+    vector<string> func_list;
+    map<string,RecFilterFunc>::iterator f_it  = contents.ptr->func.begin();
+    map<string,RecFilterFunc>::iterator f_end = contents.ptr->func.end();
+    while (f_it != f_end) {
+        if (f_it->second.func_category & ftag) {
+            func_list.push_back(f_it->second.func.name());
+        }
+        f_it++;
+    }
+    if (func_list.empty()) {
+        cerr << "No function has the scheduling tag " << ftag << endl;
+        assert(false);
+    }
+    return RecFilterSchedule(*this, func_list);
+}
+
+RecFilterSchedule RecFilter::inter_schedule(void) {
+    FuncTag ftag = INTER_TILE_SCAN;
+    vector<string> func_list;
+    map<string,RecFilterFunc>::iterator f_it  = contents.ptr->func.begin();
+    map<string,RecFilterFunc>::iterator f_end = contents.ptr->func.end();
+    while (f_it != f_end) {
+        if (f_it->second.func_category & ftag) {
+            func_list.push_back(f_it->second.func.name());
+        }
+        f_it++;
+    }
+    if (func_list.empty()) {
+        cerr << "No function has the scheduling tag " << ftag << endl;
+        assert(false);
+    }
+    return RecFilterSchedule(*this, func_list);
+}
+
+// -----------------------------------------------------------------------------
+
 Func RecFilter::func(void) {
     return Func(internal_function(contents.ptr->name).func);
 }
@@ -341,61 +380,19 @@ void RecFilter::realize(Buffer out, int iterations) {
 
 // -----------------------------------------------------------------------------
 
-void RecFilter::remove_pure_def(string func_name) {
-    Function f = internal_function(func_name).func;
-
-    vector<string> args   = f.args();
-    vector<Expr>   values = f.values();
-    vector<UpdateDefinition> updates = f.updates();
-
-    // nothing to do if function has not update defs
-    if (updates.empty()) {
-        return;
-    }
-
-    // add pure def to the first update def
-    {
-        for (int j=0; j<updates[0].values.size(); j++) {
-            // replace pure args by update def args in the pure value
-            Expr val = values[j];
-            for (int k=0; k<args.size(); k++) {
-                val = substitute(args[k], updates[0].args[k], val);
-            }
-
-            // remove let statements in the expression because we need to
-            // compare calling args
-            updates[0].values[j] = remove_lets(updates[0].values[j]);
-
-            // remove call to current pixel of the function
-            updates[0].values[j] = substitute_func_call_with_args(f.name(),
-                    updates[0].args, val, updates[0].values[j]);
-        }
-    }
-
-    // set all pure defs to zero or undef
-    for (int i=0; i<values.size(); i++) {
-        values[i] = FLOAT_UNDEF;
-    }
-
-    f.clear_all_definitions();
-    f.define(args, values);
-    for (int i=0; i<updates.size(); i++) {
-        f.define_update(updates[i].args, updates[i].values);
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-void RecFilter::generate_hl_code(ostream &s) const {
+string RecFilter::print_synopsis(void) const {
+    stringstream s;
     map<string,RecFilterFunc>::iterator f;
     for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
         s << f->second << "\n";
     }
     s << "\n";
-    for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
-        s << f->second.func << "\n";
-    }
-    s << "\n";
+    return s.str();
+}
+
+string RecFilter::print_schedule(void) const {
+    stringstream s;
+    map<string,RecFilterFunc>::iterator f;
     for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
         map<int,vector<string> >::iterator sit = f->second.schedule.begin();
         map<int,vector<string> >::iterator se  = f->second.schedule.end();
@@ -416,4 +413,22 @@ void RecFilter::generate_hl_code(ostream &s) const {
         }
     }
     s << "\n";
+    return s.str();
+}
+
+string RecFilter::print_functions(void) const {
+    stringstream s;
+    map<string,RecFilterFunc>::iterator f;
+    for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
+        s << f->second.func << "\n";
+    }
+    s << "\n";
+    return s.str();
+}
+
+string RecFilter::print_hl_code(void) const {
+    string a = print_synopsis();
+    string b = print_functions();
+    string c = print_schedule();
+    return a+b+c;
 }

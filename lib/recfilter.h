@@ -35,6 +35,7 @@
 struct SplitInfo;
 struct RecFilterContents;
 class RecFilterFunc;
+class RecFilterSchedule;
 
 // ----------------------------------------------------------------------------
 
@@ -111,7 +112,6 @@ private:
      * */
     void inline_func(std::string func_name);
 
-
 public:
     /**
      * Merge multiple functions into a single function with mutiple outputs
@@ -127,7 +127,7 @@ public:
     void merge_func(std::vector<std::string> func_list, std::string merged);
 
     /** Reorder memory layout by swapping two dimensions of a function
-     *  \param func name of function whose dimensions have to be transposed
+     *  \param func_name name of function whose dimensions have to be transposed
      *  \param a variable name of the first dimension to be transposed
      *  \param b variable name of the second dimension to be transposed
      *
@@ -136,14 +136,6 @@ public:
      * Side effects: dimensions are also transposed in all calls to the function
      */
     void transpose_dimensions(std::string func, std::string a, std::string b);
-
-    /** Remove the pure def of a Function and add it as the first update
-     * def; leaving the pure def undefined
-     *
-     * Preconditions: none
-     * Side effects: none
-     */
-    void remove_pure_def(std::string func_name);
 
 public:
 
@@ -326,59 +318,84 @@ public:
     // @}
 
 
-    /**@name Print Halide code for the recursive filter
-    */
+    /**@name Print Halide code for the recursive filter */
     // {@
-    void generate_hl_code(std::ostream &s) const;
+    std::string print_functions(void) const;
+    std::string print_synopsis (void) const;
+    std::string print_schedule (void) const;
+    std::string print_hl_code  (void) const;
     // @}
 
-    /**@name Scheduling operations */
+    /**@name Generic handles to write schedules for internal functions */
     // {@
 
-    RecFilter& compute_in_global(FuncTag f);
-    RecFilter& compute_in_shared(FuncTag f);
+    /** Extract a handle to schedule intra-tile functions */
+    RecFilterSchedule intra_schedule(void);
 
-    RecFilter& unroll(FuncTag f, VarTag v, uint vidx=0);
-    RecFilter& unroll(FuncTag f, VarTag v, uint factor, uint vidx=0);
-
-    RecFilter& vectorize(FuncTag f, VarTag v, uint vidx=0);
-    RecFilter& vectorize(FuncTag f, VarTag v, uint factor, uint vidx=0);
-
-    RecFilter& bound(VarTag v, Halide::Expr min, Halide::Expr extent, uint vidx=0);
-    RecFilter& bound(Halide::Var v, Halide::Expr min, Halide::Expr extent);
-
-    RecFilter& inner_split(FuncTag f, VarTag v, Halide::Expr factor, uint vidx=0);
-    RecFilter& outer_split(FuncTag f, VarTag v, Halide::Expr factor, uint vidx=0);
-
-    RecFilter& reorder(FuncTag f, VarTag x, VarTag y);
-    RecFilter& reorder(FuncTag f, VarTag x, VarTag y, VarTag z);
-    RecFilter& reorder(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
-    RecFilter& reorder(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
-
-    RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y);
-    RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z);
-    RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w);
-    RecFilter& reorder_storage(FuncTag f, VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
-
-    RecFilter& parallel(FuncTag f, VarTag v, uint vidx=0);
-    RecFilter& parallel(FuncTag f, VarTag v, Halide::Expr task_size, uint vidx=0);
-
-    RecFilter& gpu_threads(FuncTag ftag, VarTag vtag, uint t1);
-    RecFilter& gpu_threads(FuncTag ftag, VarTag vtag, uint t1, uint t2);
-    RecFilter& gpu_threads(FuncTag ftag, VarTag vtag, uint t1, uint t2, uint t3);
-    RecFilter& gpu_threads(FuncTag f, VarTag v, std::vector<uint> task_size);
-
-    RecFilter& gpu_blocks(FuncTag f, VarTag block_x);
-
-    RecFilter& gpu_tile(FuncTag f, VarTag x, uint xs);
-    RecFilter& gpu_tile(FuncTag f, VarTag x, VarTag y, uint xs, uint ys);
-    RecFilter& gpu_tile(FuncTag f, VarTag x, VarTag y, VarTag z, uint xs, uint ys, uint zs);
-
-    RecFilter& split          (FuncTag f, VarTag v, Halide::Expr factor, uint vidx, bool do_reorder);
-    RecFilter& reorder        (FuncTag f, std::vector<VarTag> x);
-    RecFilter& reorder_storage(FuncTag f, std::vector<VarTag> x);
-    RecFilter& gpu_tile       (FuncTag f, std::vector<std::pair<VarTag,uint> > x);
+    /** Extract a handle to schedule intra-tile functions */
+    RecFilterSchedule inter_schedule(void);
     // @}
+
+
+protected:
+    /** Allow scheduler access to internal functions; only needed to append the
+     * scheduling commands to each RecFilterFunc::schedule */
+    friend class RecFilterSchedule;
+};
+
+// -----------------------------------------------------------------------------
+
+/** Handle to schedule internal Halide functions that constitute the
+ * recursive filter */
+class RecFilterSchedule {
+private:
+    RecFilter                recfilter;
+    std::vector<std::string> func_list;
+
+    std::map<int,std::vector<Halide::VarOrRVar> > internal_func_vars(RecFilterFunc f, VarTag vtag);
+    std::map<int,Halide::VarOrRVar> internal_func_vars(RecFilterFunc f, VarTag vtag, uint vidx);
+
+public:
+    RecFilterSchedule(RecFilter& r, std::vector<std::string> fl);
+
+    RecFilterSchedule& compute_in_global();
+    RecFilterSchedule& compute_in_shared();
+
+    RecFilterSchedule& unroll(VarTag v, uint vidx=0);
+    RecFilterSchedule& unroll(VarTag v, uint factor, uint vidx=0);
+
+    RecFilterSchedule& vectorize(VarTag v, uint vidx=0);
+    RecFilterSchedule& vectorize(VarTag v, uint factor, uint vidx=0);
+
+    RecFilterSchedule& inner_split(VarTag v, Halide::Expr factor, uint vidx=0);
+    RecFilterSchedule& outer_split(VarTag v, Halide::Expr factor, uint vidx=0);
+
+    RecFilterSchedule& reorder(VarTag x, VarTag y);
+    RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z);
+    RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z, VarTag w);
+    RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
+
+    RecFilterSchedule& reorder_storage(VarTag x, VarTag y);
+    RecFilterSchedule& reorder_storage(VarTag x, VarTag y, VarTag z);
+    RecFilterSchedule& reorder_storage(VarTag x, VarTag y, VarTag z, VarTag w);
+    RecFilterSchedule& reorder_storage(VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
+
+    RecFilterSchedule& parallel(VarTag v, uint vidx=0);
+    RecFilterSchedule& parallel(VarTag v, Halide::Expr task_size, uint vidx=0);
+
+    RecFilterSchedule& gpu_threads(VarTag v, uint t1=1, uint t2=1, uint t3=1);
+    RecFilterSchedule& gpu_threads(VarTag v, std::vector<uint> task_size);
+
+    RecFilterSchedule& gpu_blocks(VarTag block_x);
+
+    RecFilterSchedule& gpu_tile(VarTag x, uint xs);
+    RecFilterSchedule& gpu_tile(VarTag x, VarTag y, uint xs, uint ys);
+    RecFilterSchedule& gpu_tile(VarTag x, VarTag y, VarTag z, uint xs, uint ys, uint zs);
+
+    RecFilterSchedule& split   (VarTag v, Halide::Expr factor, uint vidx, bool do_reorder);
+    RecFilterSchedule& reorder (std::vector<VarTag> x);
+    RecFilterSchedule& gpu_tile(std::vector<std::pair<VarTag,uint> > x);
+    RecFilterSchedule& reorder_storage(std::vector<VarTag> x);
 };
 
 // -----------------------------------------------------------------------------

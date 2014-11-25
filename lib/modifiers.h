@@ -3,6 +3,10 @@
 
 #include <Halide.h>
 
+/** Remove the pure def of a Function and add it as the first update
+ * def; leaving the pure def undefined */
+void move_pure_def_to_update(Halide::Internal::Function f);
+
 /** Check if a given expression depends upon a variable */
 bool expr_depends_on_var(
         Halide::Expr expr,      ///< expression to be checked

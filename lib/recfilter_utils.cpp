@@ -358,7 +358,7 @@ ostream &operator<<(ostream &os, const Internal::Function &f) {
 }
 
 ostream &operator<<(ostream &s, const RecFilter &r) {
-    r.generate_hl_code(s);
+    s << r.print_hl_code();
     return s;
 }
 
