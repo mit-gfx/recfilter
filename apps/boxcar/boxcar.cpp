@@ -35,14 +35,11 @@ int main(int argc, char **argv) {
     Var x("x");
     Var y("y");
 
-    RDom rx(0, image.width(), "rx");
-    RDom ry(0, image.height(),"ry");
-
     RecFilter filter("S");
-    filter.setArgs(x, y);
+    filter.set_args(x, y, width, height);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-    filter.addScan(x, rx);
-    filter.addScan(y, ry);
+    filter.add_filter(x, 1.0, Internal::vec(1.0f), RecFilter::CAUSAL);
+    filter.add_filter(y, 1.0, Internal::vec(1.0f), RecFilter::CAUSAL);
 
     Func S = filter.func();
 

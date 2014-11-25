@@ -38,12 +38,25 @@ RecFilter::RecFilter(string n) {
     contents.ptr->func.insert(make_pair(f.func.name(), f));
 }
 
-void RecFilter::setArgs(Var x)              { setArgs(vec(x));     }
-void RecFilter::setArgs(Var x, Var y)       { setArgs(vec(x,y));   }
-void RecFilter::setArgs(Var x, Var y, Var z){ setArgs(vec(x,y,z)); }
+void RecFilter::set_args(Var x, Expr wx) {
+    set_args(vec(x), vec(wx));
+}
 
-void RecFilter::setArgs(vector<Var> args) {
+void RecFilter::set_args(Var x, Var y, Expr wx, Expr wy) {
+    set_args(vec(x,y), vec(wx,wy));
+}
+
+void RecFilter::set_args(Var x, Var y, Var z, Expr wx, Expr wy, Expr wz) {
+    set_args(vec(x,y,z), vec(wx,wy,wz));
+}
+
+void RecFilter::set_args(vector<Var> args, vector<Expr> widths) {
     RecFilterFunc& f = internal_function(contents.ptr->name);
+
+    if (contents.ptr->split_info.empty()) {
+        cerr << "Recursive filter dimensions already set" << endl;
+        assert(false);
+    }
 
     for (int i=0; i<args.size(); i++) {
         SplitInfo s;
@@ -52,17 +65,23 @@ void RecFilter::setArgs(vector<Var> args) {
         s.var          = args[i];
         s.filter_dim   = i;
 
+        // extent and domain of all scans in this dimension
+        s.image_width  = widths[i];
+        s.rdom         = RDom(0, s.image_width, unique_name("r"+s.var.name()));
+        s.tile_width   = s.image_width;
+        s.num_tiles    = 1;
+
         // default values for now
         s.num_splits   = 0;
         s.filter_order = 0;
-        s.image_width  = 0;
-        s.tile_width   = 0;
-        s.num_tiles    = 0;
 
-        s.feedfwd_coeff = Image<float>(0);
+        s.feedfwd_coeff  = Image<float>(0);
         s.feedback_coeff = Image<float>(0,0);
 
         contents.ptr->split_info.push_back(s);
+
+        // bound the output buffer for each dimension
+        Func(f.func).bound(s.var, 0, s.image_width);
 
         // add tag the dimension as pure
         f.pure_var_category.insert(make_pair(args[i].name(), PURE_DIMENSION));
@@ -100,14 +119,45 @@ void RecFilter::define(vector<Expr> pure_def) {
 
 // -----------------------------------------------------------------------------
 
-void RecFilter::addScan(
+void RecFilter::set_image_border(Border b, Halide::Expr expr) {
+//    Expr border_expr;
+//    switch (border_mode) {
+//        case CLAMP_TO_ZERO:
+//            border_expr = FLOAT_ZERO;
+//            break;
+//
+//        case CLAMP_TO_EXPR:
+//            border_expr = bexpr;
+//            if (expr_depends_on_var(border_expr, x.name())) {
+//                cerr << "Image border expression for scan along " << x.name()
+//                    << " must not depend upon " << x.name() << endl;
+//            }
+//            if (expr_depends_on_var(border_expr, rx.x.name())) {
+//                cerr << "Image border expression for scan along " << rx.x.name()
+//                    << " must not depend upon " << rx.x.name() << endl;
+//            }
+//            break;
+//
+//        case CLAMP_TO_SELF:
+//        default:
+//            border_expr = Expr();
+//            break;
+//    }
+//
+//    for (int i=0; i<contents.ptr->split_info.size(); i++) {
+//        SplitInfo s = contents.ptr->split_info[i];
+//        s.border_expr.insert(s.border_expr.begin(), border_expr);
+//        contents.ptr->split_info[i] = s;
+//    }
+}
+
+void RecFilter::add_filter(
         Var x,
-        RDom rx,
         float feedfwd,
         vector<float> feedback,
         Causality causality,
         Border border_mode,
-        Expr bexpr)
+        Halide::Expr bexpr)
 {
     RecFilterFunc& rf = internal_function(contents.ptr->name);
     Function        f = rf.func;
@@ -118,56 +168,13 @@ void RecFilter::addScan(
         assert(false);
     }
 
-    if (rx.dimensions() != 1) {
-        cerr << "Each scan variable must be a 1D RDom" << endl;
-        assert(false);
-    }
-
-    if (!equal(rx.x.min(), INT_ZERO)) {
-        cerr << "Scan variables must have 0 as lower limit" << endl;
-        assert(false);
-    }
-
-    // copy the dimension tags from pure def replacing x by rx
-    // change the function tag from pure to scan
-    map<string, VarTag> update_var_category = rf.pure_var_category;
-    update_var_category.erase(x.name());
-    update_var_category.insert(make_pair(rx.x.name(), SCAN_DIMENSION));
-    rf.update_var_category.push_back(update_var_category);
-
-    // csausality
+    // filter order and csausality
+    int scan_order = feedback.size();
     bool causal = (causality == CAUSAL);
-
-    // border pixels
-    Expr border_expr;
-    switch (border_mode) {
-        case CLAMP_TO_ZERO:
-            border_expr = FLOAT_ZERO;
-            break;
-
-        case CLAMP_TO_EXPR:
-            border_expr = bexpr;
-            if (expr_depends_on_var(border_expr, x.name())) {
-                cerr << "Image border expression for scan along " << x.name()
-                    << " must not depend upon " << x.name() << endl;
-            }
-            if (expr_depends_on_var(border_expr, rx.x.name())) {
-                cerr << "Image border expression for scan along " << rx.x.name()
-                    << " must not depend upon " << rx.x.name() << endl;
-            }
-            break;
-
-        case CLAMP_TO_SELF:
-        default:
-            border_expr = Expr();
-            break;
-    }
 
     // image dimension for the scan
     int dimension = -1;
-    Expr width = rx.x.extent();
-
-    for (int i=0; i<f.args().size(); i++) {
+    for (int i=0; dimension<0 && i<f.args().size(); i++) {
         if (f.args()[i] == x.name()) {
             dimension = i;
         }
@@ -178,11 +185,48 @@ void RecFilter::addScan(
         assert(false);
     }
 
-    if (contents.ptr->split_info[dimension].rdom.defined() &&
-            !rx.same_as(contents.ptr->split_info[dimension].rdom)) {
-        cerr << "All scans in the same dimension must use the same RDom" << endl;
-        assert(false);
+    // check the border expression
+    Expr border_expr;
+    {
+        switch (border_mode) {
+            case CLAMP_TO_ZERO:
+                border_expr = FLOAT_ZERO;
+                break;
+
+            case CLAMP_TO_EXPR:
+                border_expr = bexpr;
+                if (expr_depends_on_var(border_expr, x.name())) {
+                    cerr << "Image border expression for scan along " << x.name()
+                        << " must not depend upon " << x.name() << endl;
+                }
+                break;
+
+            case CLAMP_TO_SELF:
+            default:
+                border_expr = Expr();
+                break;
+        }
     }
+
+    // add details to the split info struct
+    SplitInfo s = contents.ptr->split_info[dimension];
+    s.scan_id    .insert(s.scan_id.begin(), f.updates().size()-1);
+    s.scan_causal.insert(s.scan_causal.begin(), causal);
+    s.border_expr.insert(s.border_expr.begin(), border_expr);
+    s.num_splits   = s.num_splits+1;
+    s.filter_order = std::max(s.filter_order, scan_order);
+    contents.ptr->split_info[dimension] = s;
+
+    // reduction domain for the scan
+    RDom rx    = contents.ptr->split_info[dimension].rdom;
+    Expr width = contents.ptr->split_info[dimension].image_width;
+
+    // copy the dimension tags from pure def replacing x by rx
+    // change the function tag from pure to scan
+    map<string, VarTag> update_var_category = rf.pure_var_category;
+    update_var_category.erase(x.name());
+    update_var_category.insert(make_pair(rx.x.name(), SCAN_DIMENSION));
+    rf.update_var_category.push_back(update_var_category);
 
     // create the LHS args, replace x by rx for causal and
     // x by w-1-rx for anticausal
@@ -223,20 +267,6 @@ void RecFilter::addScan(
     }
     f.define_update(args, values);
 
-    int scan_order = feedback.size();
-
-    // add details to the split info struct
-    SplitInfo s = contents.ptr->split_info[dimension];
-    s.scan_id    .insert(s.scan_id.begin(), f.updates().size()-1);
-    s.scan_causal.insert(s.scan_causal.begin(), causal);
-    s.border_expr.insert(s.border_expr.begin(), border_expr);
-    s.rdom         = rx;
-    s.num_splits   = s.num_splits+1;
-    s.image_width  = width;
-    s.filter_order = std::max(s.filter_order, scan_order);
-    contents.ptr->split_info[dimension] = s;
-
-
     // copy all the existing feedback/feedfwd coeff to the new arrays
     // add the coeff of the newly added scan as the last row of coeff
     int num_scans = f.updates().size();
@@ -261,14 +291,6 @@ void RecFilter::addScan(
         contents.ptr->split_info[i].feedfwd_coeff  = feedfwd_coeff;
         contents.ptr->split_info[i].feedback_coeff = feedback_coeff;
     }
-}
-
-void RecFilter::addScan(Var x, RDom rx, Causality c, Border b, Expr bexpr) {
-    addScan(x, rx, 1.0f, vec(1.0f), c, b, bexpr);
-}
-
-void RecFilter::addScan(Var x, RDom rx, vector<float> fb, Causality c, Border b, Expr bexpr) {
-    addScan(x, rx, 1.0f, fb, c, b, bexpr);
 }
 
 // -----------------------------------------------------------------------------

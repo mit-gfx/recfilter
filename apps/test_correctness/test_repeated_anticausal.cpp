@@ -30,12 +30,12 @@ int main(int argc, char **argv) {
     RDom rx(0, image.width(),"rx");
 
     RecFilter filter("S");
-    filter.setArgs(x, y);
+    filter.set_args(x, y, width, height);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-    filter.addScan(x, rx, Internal::vec(W(0,0), W(0,1)), RecFilter::ANTICAUSAL);
-    filter.addScan(x, rx, Internal::vec(W(1,0), W(1,1)), RecFilter::ANTICAUSAL);
-    filter.addScan(x, rx, Internal::vec(W(2,0), W(2,1)), RecFilter::ANTICAUSAL);
-    filter.addScan(x, rx, Internal::vec(W(3,0), W(3,1)), RecFilter::ANTICAUSAL);
+    filter.add_filter(x, 1.0f, Internal::vec(W(0,0), W(0,1)), RecFilter::ANTICAUSAL);
+    filter.add_filter(x, 1.0f, Internal::vec(W(1,0), W(1,1)), RecFilter::ANTICAUSAL);
+    filter.add_filter(x, 1.0f, Internal::vec(W(2,0), W(2,1)), RecFilter::ANTICAUSAL);
+    filter.add_filter(x, 1.0f, Internal::vec(W(3,0), W(3,1)), RecFilter::ANTICAUSAL);
 
     filter.split(x, tile);
 

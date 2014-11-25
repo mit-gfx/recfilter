@@ -43,12 +43,12 @@ int main(int argc, char **argv) {
     RDom ry(0, image.height(),"ry");
 
     RecFilter filter("Gauss");
-    filter.setArgs(x, y);
+    filter.set_args(x, y, width, height);
     filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
-    filter.addScan(x, rx, B3, W3, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-    filter.addScan(x, rx, B3, W3, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
-    filter.addScan(y, ry, B3, W3, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-    filter.addScan(y, ry, B3, W3, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(x, B3, W3, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(x, B3, W3, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(y, B3, W3, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(y, B3, W3, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
 
     filter.split(tile);
 

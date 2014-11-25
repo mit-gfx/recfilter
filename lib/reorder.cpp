@@ -651,7 +651,12 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
     }
 
     // create the cascaded recursive filters
-    vector<Var> args = func().args();
+    vector<Var> args;
+    vector<Expr> widths;
+    for (int i=0; i<contents.ptr->split_info.size(); i++) {
+        args.push_back(contents.ptr->split_info[i].var);
+        widths.push_back(contents.ptr->split_info[i].image_width);
+    }
 
     vector<RecFilter> recfilters;
 
@@ -659,7 +664,7 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
         RecFilter rf(func().name() + "_" + int_to_string(i));
 
         // dimensions same as original filter
-        rf.setArgs(args);
+        rf.set_args(args, widths);
 
         // same pure def as original filter for the first
         // subsequent filters call the result of prev recfilter
@@ -725,7 +730,7 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
                 border_mode = CLAMP_TO_EXPR;
             }
 
-            rf.addScan(x, rx, feedfwd, feedback, causal, border_mode, border_expr);
+            rf.add_filter(x, feedfwd, feedback, causal, border_mode, border_expr);
         }
 
         recfilters.push_back(rf);

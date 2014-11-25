@@ -11,8 +11,8 @@ struct SplitInfo {
     int filter_dim;                     ///< dimension id
     int num_splits;                     ///< number of scans in the dimension that must be tiled
 
-    Halide::Expr tile_width;            ///< width of each tile after splitting the dimension
-    Halide::Expr image_width;           ///< width of the image in this dimension
+    Halide::Expr tile_width;            ///< tile width for splitting
+    Halide::Expr image_width;           ///< image width in this dimension
     Halide::Expr num_tiles;             ///< number of tile in this dimension
 
     Halide::Var  var;                   ///< variable that represents this dimension

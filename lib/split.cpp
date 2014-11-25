@@ -1564,55 +1564,59 @@ void RecFilter::split(vector<Var> vars, Expr t) {
 // -----------------------------------------------------------------------------
 
 void RecFilter::finalize(Target target) {
-     // inline all functions not required any more
-     map<string,RecFilterFunc>::iterator fit;
-     for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-         if (fit->second.func_category == INLINE) {
-             inline_func(fit->second.func.name());
-             fit = contents.ptr->func.begin();            // list changed, start all over again
-         }
-     }
+    // inline all functions not required any more
+    map<string,RecFilterFunc>::iterator fit;
+    for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+        if (fit->second.func_category == INLINE) {
+            inline_func(fit->second.func.name());
+            fit = contents.ptr->func.begin();            // list changed, start all over again
+        }
+    }
 
-     // merging functions that reindex same previous result - useful for all architectures
-     for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-         RecFilterFunc rF = fit->second;
+    // merge functions that reindex same previous result
+    // useful for all architectures
+    for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+        RecFilterFunc rF = fit->second;
 
-         if ((rF.func_category & INTRA_TILE_SCAN) && (rF.func.has_update_definition())) {
-             // get all functions that reindex the tail from intra tile computation
-             vector<string> funcs_to_merge;
-             map<string,RecFilterFunc>::iterator git;
-             for (git=contents.ptr->func.begin(); git!=contents.ptr->func.end(); git++) {
-                 if ((git->second.func_category & REINDEX_FOR_WRITE) &&
-                     (git->second.callee_func==rF.func.name())) {
-                     funcs_to_merge.push_back(git->second.func.name());
-                 }
-             }
+        if ((rF.func_category & INTRA_TILE_SCAN) && (rF.func.has_update_definition())) {
+            // get all functions that reindex the tail from intra tile computation
+            vector<string> funcs_to_merge;
+            map<string,RecFilterFunc>::iterator git;
+            for (git=contents.ptr->func.begin(); git!=contents.ptr->func.end(); git++) {
+                if ((git->second.func_category & REINDEX_FOR_WRITE) &&
+                        (git->second.callee_func==rF.func.name())) {
+                    funcs_to_merge.push_back(git->second.func.name());
+                }
+            }
 
             // merge these functions
             // memory layout reshaping done inside merge routine
-             if (funcs_to_merge.size()>1) {
+            if (funcs_to_merge.size()>1) {
                 string merged_name = funcs_to_merge[0] + "_merged";
                 merge_func(funcs_to_merge, merged_name);
                 fit = contents.ptr->func.begin();            // list changed, start all over again
-             }
-         }
-     }
+            }
+        }
+    }
 
     // platform specific optimization
     if (target.has_gpu_feature()) {
-         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-             RecFilterFunc rF = fit->second;
+        for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+            RecFilterFunc rF = fit->second;
 
-             if ((rF.func_category & INTRA_TILE_SCAN) && (rF.func.has_update_definition())) {
-                 // move initialization to update def in intra tile computation stages
-                 move_init_to_update_def(rF, contents.ptr->split_info);
+            if ((rF.func_category & INTRA_TILE_SCAN) && (rF.func.has_update_definition())) {
+                // move initialization to update def in intra tile computation stages
+                move_init_to_update_def(rF, contents.ptr->split_info);
 
-                 // add padding to intra tile terms to avoid bank conflicts
-                 add_padding_to_avoid_bank_conflicts(rF, contents.ptr->split_info, true);
-             }
-         }
-     } else {
-         // TODO
-     }
+                // add padding to intra tile terms to avoid bank conflicts
+                add_padding_to_avoid_bank_conflicts(rF, contents.ptr->split_info, true);
+            }
+        }
+    }
+    else {
+        for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+            RecFilterFunc rF = fit->second;
+            Func(rF.func).compute_root();
+        }
+    }
 }
-

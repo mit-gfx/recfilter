@@ -45,16 +45,16 @@ int main(int argc, char **argv) {
     RDom ry(0, image.height(),"ry");
 
     RecFilter filter("Gauss");
-    filter.setArgs(x, y);
+    filter.set_args(x, y, width, height);
     filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
-    filter.addScan(x, rx, B1, W1, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-    filter.addScan(x, rx, B1, W1, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
-    filter.addScan(y, ry, B1, W1, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-    filter.addScan(y, ry, B1, W1, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
-    filter.addScan(x, rx, B2, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-    filter.addScan(x, rx, B2, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
-    filter.addScan(y, ry, B2, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-    filter.addScan(y, ry, B2, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(x, B1, W1, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(x, B1, W1, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(y, B1, W1, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(y, B1, W1, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(x, B2, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(x, B2, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(y, B2, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(y, B2, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
 
     // cascade the scans
     vector<RecFilter> cascaded_filters = filter.cascade(

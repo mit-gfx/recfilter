@@ -176,13 +176,13 @@ public:
     // @}
 
     /**@name Recursive filter specification
-     * @brief Set the dimensions of the output of the recursive filter
+     * @brief Set the dimensions and width of the output buffer of the recursive filter
      */
     // {@
-    void setArgs(Halide::Var x);
-    void setArgs(Halide::Var x, Halide::Var y);
-    void setArgs(Halide::Var x, Halide::Var y, Halide::Var z);
-    void setArgs(std::vector<Halide::Var> args);
+    void set_args(Halide::Var x, Halide::Expr wx);
+    void set_args(Halide::Var x, Halide::Var y, Halide::Expr wx, Halide::Expr wy);
+    void set_args(Halide::Var x, Halide::Var y, Halide::Var z, Halide::Expr wx, Halide::Expr wy, Halide::Expr wz);
+    void set_args(std::vector<Halide::Var> args, std::vector<Halide::Expr> widths);
     // @}
 
     /** @name Recursive filter definition
@@ -198,32 +198,24 @@ public:
     /** @name Routines to add scans to a recursive filter
      *  @brief Add a scan to the recursive filter given parameters
      *  defaults filter order = 1, feedforward/feedback coefficient = 1.0,
-     *  causalilty = CAUSAL, border clamping = zero
+     *  causalilty = CAUSAL
      */
     // {@
-    void addScan(
+    void add_filter(
             Halide::Var x,              ///< dimension to a update
-            Halide::RDom rx,            ///< domain of the scan
             float feedfwd,              ///< single feedforward coeff
             std::vector<float> feedback,///< n feedback coeffs, where n is filter order
             Causality c=CAUSAL,         ///< causal or anticausal scan
             Border b=CLAMP_TO_ZERO,     ///< value for pixels before first pixel of scan
-            Halide::Expr border_expr=FLOAT_ZERO ///< user defined value if CLAMP_TO_EXPR is used (must not involve x or rx)
+            Halide::Expr expr=FLOAT_ZERO ///< user defined value that does not depend upon x (if CLAMP_TO_EXPR is used)
             );
-    void addScan(
-            Halide::Var x,              ///< dimension to a update
-            Halide::RDom rx,            ///< domain of the scan
-            Causality c=CAUSAL,         ///< causal or anticausal scan
-            Border b=CLAMP_TO_ZERO,     ///< value for pixels before first pixel of scan
-            Halide::Expr border_expr=FLOAT_ZERO ///< user defined value if CLAMP_TO_EXPR is used (must not involve x or rx)
-            );
-    void addScan(
-            Halide::Var x,              ///< dimension to a update
-            Halide::RDom rx,            ///< domain of the scan
-            std::vector<float> feedback,///< n feedback coeffs, where n is filter order
-            Causality c=CAUSAL,         ///< causal or anticausal scan
-            Border b=CLAMP_TO_ZERO,     ///< value for pixels before first pixel of scan
-            Halide::Expr border_expr=FLOAT_ZERO ///< user defined value if CLAMP_TO_EXPR is used (must not involve x or rx)
+    // @}
+
+    /** @name Image boundary conditions */
+    // {@
+    void set_image_border(
+            Border b,                    ///< value for pixels before first pixel of scan
+            Halide::Expr expr=FLOAT_ZERO ///< user defined const value if CLAMP_TO_EXPR is used
             );
     // @}
 

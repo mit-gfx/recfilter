@@ -45,19 +45,14 @@ int main(int argc, char **argv) {
     RDom ry(0, image.height(),"ry");
 
     RecFilter filter("S");
-    filter.setArgs(x, y);
+    filter.set_args(x, y, width, height);
     filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
-    filter.addScan(x, rx, b0, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-    filter.addScan(x, rx, b0, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
-    filter.addScan(y, ry, b0, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-    filter.addScan(y, ry, b0, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(x, b0, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(x, b0, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(y, b0, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
+    filter.add_filter(y, b0, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
 
-    filter.split(tile);
-
-    filter.transpose_dimensions("S_Intra_Tail_y_2", "xi", "yi");
-    filter.transpose_dimensions("S_Intra_Tail_y_3", "xi", "yi");
-//    filter.merge_func(Internal::vec("S_Intra_Tail_x_0", "S_Intra_Tail_x_1",
-//                 "S_Intra_Tail_y_2", "S_Intra_Tail_y_3"), "S_Intra_Tail");
+    filter.split(x, y, tile);
 
     cerr << filter << endl;
 

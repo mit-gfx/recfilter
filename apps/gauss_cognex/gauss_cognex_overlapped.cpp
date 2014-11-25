@@ -73,12 +73,12 @@ int main(int argc, char **argv) {
               1.0f * I(x+3*box,y+3*box)) / norm;
 
     RecFilter filter("Gauss");
-    filter.setArgs(x, y);
+    filter.set_args(x, y, width, height);
     filter.define(Expr(S(x, y)));
-    filter.addScan(x, rx, W1);
-    filter.addScan(x, rx, W1);
-    filter.addScan(y, ry, W2);
-    filter.addScan(y, ry, W2);
+    filter.add_filter(x, 1.0f, W1, RecFilter::CAUSAL);
+    filter.add_filter(x, 1.0f, W1, RecFilter::CAUSAL);
+    filter.add_filter(y, 1.0f, W2, RecFilter::CAUSAL);
+    filter.add_filter(y, 1.0f, W2, RecFilter::CAUSAL);
 
     filter.split(x, y, tile);
 

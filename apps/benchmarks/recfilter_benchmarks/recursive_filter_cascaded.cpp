@@ -49,12 +49,12 @@ int main(int argc, char **argv) {
     RecFilter filtery;
     {
         RecFilter filter("S");
-        filter.setArgs(x, y);
+        filter.set_args(x, y, width, height);
         filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
-        filter.addScan(x, rx, b0, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-        filter.addScan(x, rx, b0, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
-        filter.addScan(y, ry, b0, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-        filter.addScan(y, ry, b0, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
+        filter.add_filter(x, b0, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
+        filter.add_filter(x, b0, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
+        filter.add_filter(y, b0, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
+        filter.add_filter(y, b0, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
 
         // cascade the scans
         vector<RecFilter> cascaded_filters = filter.cascade(
@@ -64,16 +64,8 @@ int main(int argc, char **argv) {
         filtery = cascaded_filters[1];
     }
 
-    filterx.split(tile);
-    filtery.split(tile);
-
-    filterx.interleave_func("S_0_Intra_Tail_x_0", "S_0_Intra_Tail_x_1", "S_0_Intra_Tail", "xi", filter_order);
-    filtery.interleave_func("S_1_Intra_Tail_y_0", "S_1_Intra_Tail_y_1", "S_1_Intra_Tail", "yi", filter_order);
-
-    filterx.remove_pure_def("S_0_Intra_CTail_x_0_Sub");
-    filterx.remove_pure_def("S_0_Intra_CTail_x_1_Sub");
-    filtery.remove_pure_def("S_1_Intra_CTail_y_0_Sub");
-    filtery.remove_pure_def("S_1_Intra_CTail_y_1_Sub");
+    filterx.split(x, tile);
+    filtery.split(y, tile);
 
     cerr << filtery << endl;
 

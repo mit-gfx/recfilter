@@ -73,10 +73,10 @@ int main(int argc, char **argv) {
               1.0f * I(x+3*box,y+3*box)) / norm;
 
     RecFilter filter;
-    filter.setArgs(x, y);
+    filter.set_args(x, y, width, height);
     filter.define(Expr(S(x, y)));
-    filter.addScan(x, rx, W);
-    filter.addScan(y, ry, W);
+    filter.add_filter(x, 1.0f, W, RecFilter::CAUSAL);
+    filter.add_filter(y, 1.0f, W, RecFilter::CAUSAL);
 
     filter.split(x, y, tile);
 

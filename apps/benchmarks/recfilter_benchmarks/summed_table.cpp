@@ -36,15 +36,13 @@ int main(int argc, char **argv) {
     Var x("x");
     Var y("y");
 
-    RDom rx(0, image.width(), "rx");
-    RDom ry(0, image.height(),"ry");
-
     RecFilter filter("SAT");
-    filter.setArgs(x, y);
+    filter.set_args(x, y, width, height);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-    filter.addScan(x, rx);
-    filter.addScan(y, ry);
-    filter.split(tile);
+    filter.add_filter(x, 1.0, Internal::vec(1.0f), RecFilter::CAUSAL);
+    filter.add_filter(y, 1.0, Internal::vec(1.0f), RecFilter::CAUSAL);
+
+    filter.split(x, y, tile);
 
 ///     filter.transpose_dimensions ("SAT_Intra_Tail_y_1", "xi", "yi");
 ///     filter.interleave_func("SAT_Intra_Tail_x_0", "SAT_Intra_Tail_y_1", "SAT_Intra_Tail", "xi", 1);
@@ -139,19 +137,17 @@ int main(int argc, char **argv) {
         VarTag rxi = INNER_SCAN_VAR, rxit = INNER_SCAN_VAR | TAIL_DIMENSION;
         VarTag rxo = OUTER_SCAN_VAR, rxot = OUTER_SCAN_VAR | TAIL_DIMENSION;
 
-        filter.intra_handle().compute_in_shared()
+        filter.intra_schedule().compute_in_shared()
             .reorder_storage(xit, xi, xo)
             .reorder(xit, rxit, xi, rxi, xo)
             .unroll(rxi).unroll(rxit)
             .gpu_threads(xi, 1, 6).gpu_blocks(xo);
 
-        filter.inter_handle().compute_in_global()
+        filter.inter_schedule().compute_in_global()
             .reorder_storage(xi, xit, xo)
             .reorder(xot, xi, xo)
             .unroll(rxo).unroll(rxot)
             .gpu_threads(xi).gpu_blocks(xo);
-
-        filter.bound(x,0,width).bound(y,0,height);
     }
 
     cerr << filter << endl;
