@@ -314,7 +314,6 @@ public:
             std::string  var,       ///< var to the used for interleaving
             Halide::Expr stride     ///< interleaving stride
             );
-
     // @}
 
 
