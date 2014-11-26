@@ -33,10 +33,10 @@ int main(int argc, char **argv) {
     filter.set_args(x, y, width, height);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
-    filter.add_anticausal_filter(x, 1.0f, Internal::vec(W(0,0), W(0,1)));
-    filter.add_anticausal_filter(x, 1.0f, Internal::vec(W(1,0), W(1,1)));
-    filter.add_anticausal_filter(x, 1.0f, Internal::vec(W(2,0), W(2,1)));
-    filter.add_anticausal_filter(x, 1.0f, Internal::vec(W(3,0), W(3,1)));
+    filter.add_anticausal_filter(x, 1.0f, make_vec(W(0,0), W(0,1)));
+    filter.add_anticausal_filter(x, 1.0f, make_vec(W(1,0), W(1,1)));
+    filter.add_anticausal_filter(x, 1.0f, make_vec(W(2,0), W(2,1)));
+    filter.add_anticausal_filter(x, 1.0f, make_vec(W(3,0), W(3,1)));
 
     filter.split(x, tile);
 

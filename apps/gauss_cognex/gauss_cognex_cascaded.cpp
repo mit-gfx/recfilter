@@ -78,8 +78,8 @@ int main(int argc, char **argv) {
 
     // cascade the scans
     vector<RecFilter> cascaded_filters = filter.cascade(
-            Internal::vec(0,1),
-            Internal::vec(2,3));
+            make_vec(0,1),
+            make_vec(2,3));
     RecFilter filter1 = cascaded_filters[0];
     RecFilter filter2 = cascaded_filters[1];
     filter1.split(x, tile_width);

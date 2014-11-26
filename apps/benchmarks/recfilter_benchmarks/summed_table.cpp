@@ -41,8 +41,8 @@ int main(int argc, char **argv) {
     filter.set_args(x, y, width, height);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
-    filter.add_causal_filter(x, 1.0, Internal::vec(1.0f));
-    filter.add_causal_filter(y, 1.0, Internal::vec(1.0f));
+    filter.add_causal_filter(x, 1.0, make_vec(1.0f));
+    filter.add_causal_filter(y, 1.0, make_vec(1.0f));
 
     filter.split(x, tile_width, y, tile_width);
 

@@ -387,6 +387,18 @@ public:
 
 // -----------------------------------------------------------------------------
 
+/**@name Vector creation utils */
+// {@
+template<typename T> std::vector<T> make_vec(T a)                         { return Halide::Internal::vec(a); }
+template<typename T> std::vector<T> make_vec(T a, T b)                    { return Halide::Internal::vec(a,b); }
+template<typename T> std::vector<T> make_vec(T a, T b, T c)               { return Halide::Internal::vec(a,b,c); }
+template<typename T> std::vector<T> make_vec(T a, T b, T c, T d)          { return Halide::Internal::vec(a,b,c,d); }
+template<typename T> std::vector<T> make_vec(T a, T b, T c, T d, T e)     { return Halide::Internal::vec(a,b,c,d,e); }
+template<typename T> std::vector<T> make_vec(T a, T b, T c, T d, T e, T f){ return Halide::Internal::vec(a,b,c,d,e,f); }
+// @}
+
+// -----------------------------------------------------------------------------
+
 /** @name Printing utils for recursive filter, Halide functions, schedules and
  * difference between computed result and reference result */
 // {@
