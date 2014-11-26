@@ -38,13 +38,13 @@ int main(int argc, char **argv) {
     RecFilter filter("S");
     filter.set_args(x, y, width, height);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-    filter.add_filter(x, 1.0f, Internal::vec(W(0,0), W(0,1)), RecFilter::CAUSAL);
-    filter.add_filter(x, 1.0f, Internal::vec(W(1,0), W(1,1)), RecFilter::ANTICAUSAL);
-    filter.add_filter(x, 1.0f, Internal::vec(W(2,0), W(2,1)), RecFilter::CAUSAL);
-    filter.add_filter(x, 1.0f, Internal::vec(W(3,0), W(3,1)), RecFilter::ANTICAUSAL);
-    filter.add_filter(y, 1.0f, Internal::vec(W(4,0), W(4,1)), RecFilter::CAUSAL);
-    filter.add_filter(y, 1.0f, Internal::vec(W(5,0), W(5,1)), RecFilter::ANTICAUSAL);
-    filter.add_filter(y, 1.0f, Internal::vec(W(6,0), W(6,1)), RecFilter::ANTICAUSAL);
+    filter.add_causal_filter    (x, 1.0f, Internal::vec(W(0,0), W(0,1)));
+    filter.add_anticausal_filter(x, 1.0f, Internal::vec(W(1,0), W(1,1)));
+    filter.add_causal_filter    (x, 1.0f, Internal::vec(W(2,0), W(2,1)));
+    filter.add_anticausal_filter(x, 1.0f, Internal::vec(W(3,0), W(3,1)));
+    filter.add_causal_filter    (y, 1.0f, Internal::vec(W(4,0), W(4,1)));
+    filter.add_anticausal_filter(y, 1.0f, Internal::vec(W(5,0), W(5,1)));
+    filter.add_anticausal_filter(y, 1.0f, Internal::vec(W(6,0), W(6,1)));
 
     filter.split(x, tile, y, tile);
 

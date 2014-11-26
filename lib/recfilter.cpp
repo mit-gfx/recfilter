@@ -138,54 +138,41 @@ void RecFilter::define(vector<Expr> pure_def) {
 
 // -----------------------------------------------------------------------------
 
-void RecFilter::set_image_border(Border border_mode, Halide::Expr expr) {
-    Expr border_expr;
-    switch (border_mode) {
-        case CLAMP_TO_ZERO:
-            border_expr = FLOAT_ZERO;
-            break;
-
-///        case CLAMP_TO_EXPR:
-///            border_expr = bexpr;
-///            if (expr_depends_on_var(border_expr, x.name())) {
-///                cerr << "Image border expression for scan along " << x.name()
-///                    << " must not depend upon " << x.name() << endl;
-///            }
-///            if (expr_depends_on_var(border_expr, rx.x.name())) {
-///                cerr << "Image border expression for scan along " << rx.x.name()
-///                    << " must not depend upon " << rx.x.name() << endl;
-///            }
-///            break;
-
-        case CLAMP_TO_SELF:
-        default:
-            border_expr = Expr();
-            break;
+void RecFilter::set_clamped_image_border(void) {
+    Function f = internal_function(contents.ptr->name).func;
+    if (f.has_pure_definition()) {
+        cerr << "Border clamping must be set before calling RecFilter::define()" << endl;
+        assert(false);
     }
-
-    contents.ptr->border_expr = border_expr;
+    contents.ptr->border_expr = Expr();
 }
 
-void RecFilter::add_filter(
-        Var x,
-        float feedfwd,
-        vector<float> feedback,
-        Causality causality,
-        Border border_mode,
-        Halide::Expr bexpr)
-{
+void RecFilter::add_causal_filter(Var x, float feedfwd, vector<float> feedback) {
+    add_filter(x, feedfwd, feedback, true);
+}
+
+void RecFilter::add_anticausal_filter(Var x, float feedfwd, vector<float> feedback) {
+    add_filter(x, feedfwd, feedback, false);
+}
+
+void RecFilter::add_filter(Var x, float feedfwd, vector<float> feedback, bool causal) {
     RecFilterFunc& rf = internal_function(contents.ptr->name);
     Function        f = rf.func;
 
     if (!f.has_pure_definition()) {
         cerr << "Cannot add scans to recursive filter " << f.name()
-            << " before specifying a pure definition" << endl;
+            << " before specifying an initial definition using RecFilter::define()" << endl;
+        assert(false);
+    }
+
+    if (feedback.empty()) {
+        cerr << "Cannot add scan to recursive filter " << f.name()
+            << " without feedback coefficients" << endl;
         assert(false);
     }
 
     // filter order and csausality
     int scan_order = feedback.size();
-    bool causal = (causality == CAUSAL);
 
     // image dimension for the scan
     int dimension = -1;
@@ -198,29 +185,6 @@ void RecFilter::add_filter(
         cerr << "Variable " << x << " is not one of the dimensions of the "
             << "recursive filter " << f.name() << endl;
         assert(false);
-    }
-
-    // check the border expression
-    Expr border_expr;
-    {
-        switch (border_mode) {
-            case CLAMP_TO_ZERO:
-                border_expr = FLOAT_ZERO;
-                break;
-
-            case CLAMP_TO_EXPR:
-                border_expr = bexpr;
-                if (expr_depends_on_var(border_expr, x.name())) {
-                    cerr << "Image border expression for scan along " << x.name()
-                        << " must not depend upon " << x.name() << endl;
-                }
-                break;
-
-            case CLAMP_TO_SELF:
-            default:
-                border_expr = Expr();
-                break;
-        }
     }
 
     // reduction domain for the scan
@@ -255,8 +219,8 @@ void RecFilter::add_filter(
                 } else {
                     call_args[dimension] = min(call_args[dimension]+(j+1),width-1);
                 }
-                if (border_expr.defined()) {
-                    values[i] += feedback[j] * select(rx>j, Call::make(f,call_args,i), border_expr);
+                if (contents.ptr->border_expr.defined()) {
+                    values[i] += feedback[j] * select(rx>j, Call::make(f,call_args,i), contents.ptr->border_expr);
                 } else {
                     values[i] += feedback[j] * Call::make(f,call_args,i);
                 }

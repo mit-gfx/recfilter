@@ -139,29 +139,13 @@ public:
 
 public:
 
-    /** Macros to indicate causal or anticausal scan */
-    typedef enum {
-        CAUSAL,     ///< causal scan
-        ANTICAUSAL  ///< anticausal scan
-    } Causality;
-
-    /** Macros to determine the values of pixels before the first pixel of the scan
-     * for example, all pixels with negative x indices for causal x scans
-     * and all pixels with indices more than image height for anticausal y scans */
-    typedef enum {
-        CLAMP_TO_ZERO,  ///< pixels set to 0
-        CLAMP_TO_SELF,  ///< pixels clamped to filter output
-        CLAMP_TO_EXPR,  ///< pixels set to a given expression
-    } Border;
-
     /** Construct an empty named recursive filter */
     RecFilter(std::string name = "RecFilter");
 
     /** Reconstruct a recursive filter from its contents */
     RecFilter(const Halide::Internal::IntrusivePtr<RecFilterContents> &c) : contents(c) {}
 
-    /**@name Compile and run
-    */
+    /**@name Compile and run */
     // {@
     /** Finalize the filter; triggers automatic function transformations and cleanup */
     void finalize(Halide::Target target);
@@ -187,7 +171,9 @@ public:
 
     /** @name Recursive filter definition
      * @brief Add a pure definition to the recursive filter, can be Tuple
-     * All Vars in the pure definition should be args of the filter
+     *
+     * Preconditions:
+     * - all Halide::Vars in the pure definition must be args of the filter
      */
     // {@
     void define(Halide::Expr  pure_def);
@@ -195,28 +181,42 @@ public:
     void define(std::vector<Halide::Expr> pure_def);
     // @}
 
-    /** @name Routines to add scans to a recursive filter
-     *  @brief Add a scan to the recursive filter given parameters
-     *  defaults filter order = 1, feedforward/feedback coefficient = 1.0,
-     *  causalilty = CAUSAL
+    /** @name Routines to add filters
+     *
+     *  @brief Add a causal or anticausal scan to the recursive filter with given
+     *  feedback and feed forward coefficients
+     *
+     * Preconditions:
+     * - first argument must be arg of the filter
      */
     // {@
     void add_filter(
             Halide::Var x,              ///< dimension to a update
             float feedfwd,              ///< single feedforward coeff
             std::vector<float> feedback,///< n feedback coeffs, where n is filter order
-            Causality c=CAUSAL,         ///< causal or anticausal scan
-            Border b=CLAMP_TO_ZERO,     ///< value for pixels before first pixel of scan
-            Halide::Expr expr=FLOAT_ZERO ///< user defined value that does not depend upon x (if CLAMP_TO_EXPR is used)
+            bool causal                 ///< causal or anticausal filter
+            );
+
+    /** Convenience routine to add causal filter */
+    void add_causal_filter(
+            Halide::Var x,              ///< dimension to a update
+            float feedfwd,              ///< single feedforward coeff
+            std::vector<float> feedback ///< n feedback coeffs, where n is filter order
+            );
+
+    /** Convenience routine to add anticausal filter */
+    void add_anticausal_filter(
+            Halide::Var x,              ///< dimension to a update
+            float feedfwd,              ///< single feedforward coeff
+            std::vector<float> feedback ///< n feedback coeffs, where n is filter order
             );
     // @}
 
-    /** @name Image boundary conditions */
+    /** @name Image boundary conditions
+     * Clamp image border to the last pixel in all boundaries, default border is 0
+     */
     // {@
-    void set_image_border(
-            Border b,                    ///< value for pixels before first pixel of scan
-            Halide::Expr expr=FLOAT_ZERO ///< user defined const value if CLAMP_TO_EXPR is used
-            );
+    void set_clamped_image_border(void);
     // @}
 
 
@@ -233,11 +233,9 @@ public:
     // @}
 
 
-    /**@name Splitting routines
-     * @brief Split a list of dimensions into their respective tile widths specified as
-     * variable-tile width pairs. If a single tile width expression is provided, then all
-     * specified dimensions are split by the same factor. If no variables are specified,
-     * then all the dimensions are split by the same tiling factor
+    /**@name Tiling routines
+     * @brief Tile a list of dimensions into their respective tile widths specified as
+     * variable-tile width pairs.
      *
      * Preconditions:
      * - dimension with specified variable name must exist

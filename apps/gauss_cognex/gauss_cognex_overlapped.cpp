@@ -72,10 +72,10 @@ int main(int argc, char **argv) {
     RecFilter filter("Gauss");
     filter.set_args(x, y, width, height);
     filter.define(Expr(S(x, y)));
-    filter.add_filter(x, 1.0f, W1, RecFilter::CAUSAL);
-    filter.add_filter(x, 1.0f, W1, RecFilter::CAUSAL);
-    filter.add_filter(y, 1.0f, W2, RecFilter::CAUSAL);
-    filter.add_filter(y, 1.0f, W2, RecFilter::CAUSAL);
+    filter.add_causal_filter(x, 1.0f, W1);
+    filter.add_causal_filter(x, 1.0f, W1);
+    filter.add_causal_filter(y, 1.0f, W2);
+    filter.add_causal_filter(y, 1.0f, W2);
 
     filter.split(x, tile_width, y, tile_width);
 

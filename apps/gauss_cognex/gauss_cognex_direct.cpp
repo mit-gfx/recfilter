@@ -72,8 +72,8 @@ int main(int argc, char **argv) {
     RecFilter filter;
     filter.set_args(x, y, width, height);
     filter.define(Expr(S(x, y)));
-    filter.add_filter(x, 1.0f, W, RecFilter::CAUSAL);
-    filter.add_filter(y, 1.0f, W, RecFilter::CAUSAL);
+    filter.add_causal_filter(x, 1.0f, W);
+    filter.add_causal_filter(y, 1.0f, W);
 
     filter.split(x, tile_width, y, tile_width);
 

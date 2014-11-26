@@ -30,12 +30,14 @@ int main(int argc, char **argv) {
     RDom rx(0, image.width(),"rx");
 
     RecFilter filter("Test");
+
     filter.set_args(x, y, width, height);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-    filter.add_filter(x, 1.0f, Internal::vec(W(0,0), W(0,1), W(0,2)), RecFilter::CAUSAL);
-    filter.add_filter(x, 1.0f, Internal::vec(W(1,0), W(1,1), W(1,2)), RecFilter::CAUSAL);
-    filter.add_filter(x, 1.0f, Internal::vec(W(2,0), W(2,1), W(2,2)), RecFilter::CAUSAL);
-    filter.add_filter(x, 1.0f, Internal::vec(W(3,0), W(3,1), W(3,2)), RecFilter::CAUSAL);
+
+    filter.add_causal_filter(x, 1.0f, Internal::vec(W(0,0), W(0,1), W(0,2)));
+    filter.add_causal_filter(x, 1.0f, Internal::vec(W(1,0), W(1,1), W(1,2)));
+    filter.add_causal_filter(x, 1.0f, Internal::vec(W(2,0), W(2,1), W(2,2)));
+    filter.add_causal_filter(x, 1.0f, Internal::vec(W(3,0), W(3,1), W(3,2)));
 
     filter.split(x, tile);
 

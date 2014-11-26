@@ -37,10 +37,12 @@ int main(int argc, char **argv) {
     Var y("y");
 
     RecFilter filter("SAT");
+
     filter.set_args(x, y, width, height);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-    filter.add_filter(x, 1.0, Internal::vec(1.0f), RecFilter::CAUSAL);
-    filter.add_filter(y, 1.0, Internal::vec(1.0f), RecFilter::CAUSAL);
+
+    filter.add_causal_filter(x, 1.0, Internal::vec(1.0f));
+    filter.add_causal_filter(y, 1.0, Internal::vec(1.0f));
 
     filter.split(x, tile_width, y, tile_width);
 

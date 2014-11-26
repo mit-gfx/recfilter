@@ -42,16 +42,19 @@ int main(int argc, char **argv) {
     Var y("y");
 
     RecFilter filter("Gauss");
+
     filter.set_args(x, y, width, height);
+    filter.set_clamped_image_border();
     filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
-    filter.add_filter(x, B1, W1, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-    filter.add_filter(x, B1, W1, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
-    filter.add_filter(y, B1, W1, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-    filter.add_filter(y, B1, W1, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
-    filter.add_filter(x, B2, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-    filter.add_filter(x, B2, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
-    filter.add_filter(y, B2, W2, RecFilter::CAUSAL    , RecFilter::CLAMP_TO_SELF);
-    filter.add_filter(y, B2, W2, RecFilter::ANTICAUSAL, RecFilter::CLAMP_TO_SELF);
+
+    filter.add_causal_filter    (x, B1, W1);
+    filter.add_anticausal_filter(x, B1, W1);
+    filter.add_causal_filter    (y, B1, W1);
+    filter.add_anticausal_filter(y, B1, W1);
+    filter.add_causal_filter    (x, B2, W2);
+    filter.add_anticausal_filter(x, B2, W2);
+    filter.add_causal_filter    (y, B2, W2);
+    filter.add_anticausal_filter(y, B2, W2);
 
     // cascade the scans
     vector<RecFilter> cascaded_filters = filter.cascade(

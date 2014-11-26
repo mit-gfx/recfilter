@@ -663,6 +663,11 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
         // dimensions same as original filter
         rf.set_args(args, widths);
 
+        // set the image border conditions
+        if (!contents.ptr->border_expr.defined()) {
+            rf.set_clamped_image_border();
+        }
+
         // same pure def as original filter for the first
         // subsequent filters call the result of prev recfilter
         if (i == 0) {
@@ -705,28 +710,16 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
 
             Var x           = contents.ptr->filter_info[dim].var;
             RDom rx         = contents.ptr->filter_info[dim].rdom;
-            bool c          = contents.ptr->filter_info[dim].scan_causal[idx];
+            bool causal     = contents.ptr->filter_info[dim].scan_causal[idx];
             int order       = contents.ptr->filter_info[dim].filter_order;
             float feedfwd   = contents.ptr->feedfwd_coeff(scan_id);
-            Expr border_expr= contents.ptr->border_expr;
 
             vector<float> feedback;
             for (int u=0; u<order; u++) {
                 feedback.push_back(contents.ptr->feedback_coeff(scan_id,u));
             }
 
-            Causality causal = (c ? CAUSAL : ANTICAUSAL);
-
-            Border border_mode;
-            if (!border_expr.defined()) {
-                border_mode = CLAMP_TO_SELF;
-            } else if (equal(border_expr, FLOAT_ZERO)) {
-                border_mode = CLAMP_TO_ZERO;
-            } else {
-                border_mode = CLAMP_TO_EXPR;
-            }
-
-            rf.add_filter(x, feedfwd, feedback, causal, border_mode, border_expr);
+            rf.add_filter(x, feedfwd, feedback, causal);
         }
 
         recfilters.push_back(rf);
