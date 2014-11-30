@@ -41,10 +41,11 @@ class RecFilterSchedule;
 
 /** Scheduling tags for Functions */
 typedef enum {
-    INLINE  = 0x00, ///< function to be removed by inlining
-    INTER   = 0x01, ///< filter over tail elements across tiles (single 1D scan)
-    INTRA   = 0x02, ///< filter within tile (multiple scans in multiple dimensions)
-    REINDEX = 0x04, ///< function that reindexes a subset of another function to write to global mem
+    INLINE  = 0x000, ///< function to be removed by inlining
+    INTER   = 0x010, ///< filter over tail elements across tiles (single 1D scan)
+    INTRA_N = 0x020, ///< filter within tile (multiple scans in multiple dimensions)
+    INTRA_1 = 0x040, ///< filter within tile (single scan in one dimension)
+    REINDEX = 0x100, ///< function that reindexes a subset of another function to write to global mem
 } FuncTag;
 
 /** Scheduling tags for Function dimensions */
@@ -316,8 +317,10 @@ public:
     /**@name Generic handles to write schedules for internal functions */
     // {@
 
-    /** Extract a handle to schedule intra-tile functions */
-    RecFilterSchedule intra_schedule(void);
+    /** Extract a handle to schedule intra-tile functions
+     * \param id 0 for all intra tile functions, 1 for 1D intra-tile functions, otherwise nD intra-tile functions
+     */
+    RecFilterSchedule intra_schedule(int id=0);
 
     /** Extract a handle to schedule intra-tile functions */
     RecFilterSchedule inter_schedule(void);

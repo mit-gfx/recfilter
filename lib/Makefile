@@ -13,7 +13,7 @@ all: $(LIB)
 
 $(BUILD_DIR)/%.o: %.cpp $(INC)
 	@$(MKDIR) $(BUILD_DIR)
-	$(CXX) -c $< -o $@ -fPIC -fno-rtti -I$(HALIDE_DIR)/include/
+	$(CXX) -fPIC -fno-rtti -I$(HALIDE_DIR)/include/ -c $< -o $@
 
 $(LIB): $(OBJ)
 	$(CXX) -shared $(OBJ) -L$(HALIDE_DIR)/bin/ -lHalide -ldl -lz -lpthread -o $(LIB)

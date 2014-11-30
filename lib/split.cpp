@@ -549,7 +549,7 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
 
     RecFilterFunc rF_intra;
     rF_intra.func               = F_intra;
-    rF_intra.func_category      = INTRA;
+    rF_intra.func_category      = INTRA_N;
     rF_intra.pure_var_category  = pure_var_category;
     rF_intra.update_var_category= update_var_category;
 
@@ -1176,7 +1176,7 @@ static void add_prev_dimension_residual_to_tails(
             // scheduling tags: copy func type as F_intra, pure def tags from the
             // tail function or F_intra (both same) copy update tags from F_intra
             rF_tail_prev_scanned_sub.func = F_tail_prev_scanned_sub;
-            rF_tail_prev_scanned_sub.func_category = INTRA;
+            rF_tail_prev_scanned_sub.func_category = INTRA_1;
             rF_tail_prev_scanned_sub.pure_var_category = rF_tail_prev[k].pure_var_category;
 
             // pure def simply calls the completed tail
@@ -1684,12 +1684,13 @@ void RecFilter::finalize(Target target) {
         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
             RecFilterFunc rF = fit->second;
 
-            if ((rF.func_category & INTRA) && (rF.func.has_update_definition())) {
+            if (((rF.func_category==INTRA_1) || (rF.func_category==INTRA_N))
+                    && (rF.func.has_update_definition())) {
                 // get all functions that reindex the tail from intra tile computation
                 vector<string> funcs_to_merge;
                 map<string,RecFilterFunc>::iterator git;
                 for (git=contents.ptr->func.begin(); git!=contents.ptr->func.end(); git++) {
-                    if ((git->second.func_category & REINDEX) &&
+                    if ((git->second.func_category==REINDEX) &&
                             (git->second.callee_func==rF.func.name())) {
                         funcs_to_merge.push_back(git->second.func.name());
                     }
@@ -1710,7 +1711,8 @@ void RecFilter::finalize(Target target) {
             for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
                 RecFilterFunc rF = fit->second;
 
-                if ((rF.func_category & INTRA) && (rF.func.has_update_definition())) {
+                if (((rF.func_category==INTRA_1) || (rF.func_category==INTRA_N))
+                    && (rF.func.has_update_definition())) {
                     // move initialization to update def in intra tile computation stages
                     move_init_to_update_def(rF, recfilter_split_info);
 

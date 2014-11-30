@@ -49,7 +49,7 @@ RecFilter::RecFilter(vector<Var> args, vector<Expr> widths, string n) {
 
     RecFilterFunc f;
     f.func = Function(n);
-    f.func_category = INTRA;
+    f.func_category = INTRA_N;
 
     if (!contents.ptr->filter_info.empty()) {
         cerr << "Recursive filter dimensions already set" << endl;
@@ -263,14 +263,21 @@ void RecFilter::add_filter(Var x, float feedfwd, vector<float> feedback, bool ca
 
 // -----------------------------------------------------------------------------
 
-RecFilterSchedule RecFilter::intra_schedule(void) {
-    FuncTag ftag = INTRA;
+RecFilterSchedule RecFilter::intra_schedule(int id) {
     vector<string> func_list;
 
-    // all functions with tag INTRA
     map<string,RecFilterFunc>::iterator f_it = contents.ptr->func.begin();
     for (; f_it!=contents.ptr->func.end(); f_it++) {
-        if (f_it->second.func_category==ftag) {
+        bool function_condition = false;
+        FuncTag ftag = f_it->second.func_category;
+
+        switch(id) {
+            case 0: function_condition |= (ftag==INTRA_1 | ftag==INTRA_N); break;
+            case 1: function_condition |= (ftag==INTRA_1); break;
+            default:function_condition |= (ftag==INTRA_N); break;
+        }
+
+        if (function_condition) {
             string func_name = f_it->second.func.name();
 
             // all functions which are REINDEX and call/called by this function
@@ -288,7 +295,8 @@ RecFilterSchedule RecFilter::intra_schedule(void) {
     }
 
     if (func_list.empty()) {
-        cerr << "No function has the scheduling tag " << ftag << endl;
+        cerr << "No " << (id==0 ? " " : (id==1 ? "1D " : "nD "));
+        cerr << "intra tile functions to schedule" << endl;
         assert(false);
     }
     return RecFilterSchedule(*this, func_list);
@@ -307,7 +315,7 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
     }
 
     if (func_list.empty()) {
-        cerr << "No function has the scheduling tag " << ftag << endl;
+        cerr << "No inter tile functions to schedule" << endl;
         assert(false);
     }
     return RecFilterSchedule(*this, func_list);

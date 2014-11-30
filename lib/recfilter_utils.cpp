@@ -183,10 +183,11 @@ ostream &operator<<(ostream &s, const CheckResultVerbose &v) {
 }
 
 ostream &operator<<(ostream &s, const FuncTag &f) {
-    if (f ==INLINE ) { s << "INLINE" ; }
-    if (f & INTRA  ) { s << "INTRA"  ; }
-    if (f & INTER  ) { s << "INTER"  ; }
-    if (f & REINDEX) { s << "REINDEX"; }
+    if (f==INLINE ) { s << "INLINE" ; }
+    if (f==INTRA_1) { s << "INTRA_1"; }
+    if (f==INTRA_N) { s << "INTRA_N"; }
+    if (f==INTER  ) { s << "INTER"  ; }
+    if (f==REINDEX) { s << "REINDEX"; }
     return s;
 }
 
