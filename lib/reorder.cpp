@@ -658,10 +658,7 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
     vector<RecFilter> recfilters;
 
     for (int i=0; i<scans.size(); i++) {
-        RecFilter rf(func().name() + "_" + int_to_string(i));
-
-        // dimensions same as original filter
-        rf.set_args(args, widths);
+        RecFilter rf(args, widths, func().name() + "_" + int_to_string(i));
 
         // set the image border conditions
         if (!contents.ptr->border_expr.defined()) {

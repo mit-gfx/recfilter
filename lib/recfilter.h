@@ -139,11 +139,20 @@ public:
 
 public:
 
-    /** Construct an empty named recursive filter */
-    RecFilter(std::string name = "RecFilter");
+    /**@name Recursive filter specification */
+    // {@
+    /** Create a 1D recursive filter given variable and size of input/output buffer in that dimension */
+    RecFilter(Halide::Var x, Halide::Expr wx, std::string name="R");
 
-    /** Reconstruct a recursive filter from its contents */
-    RecFilter(const Halide::Internal::IntrusivePtr<RecFilterContents> &c) : contents(c) {}
+    /** Create a 2D recursive filter given variable and size of input/output buffer in that dimension */
+    RecFilter(Halide::Var x, Halide::Expr wx, Halide::Var y, Halide::Expr wy, std::string name="R");
+
+    /** Create a 3D recursive filter given variable and size of input/output buffer in that dimension */
+    RecFilter(Halide::Var x, Halide::Expr wx, Halide::Var y, Halide::Expr wy, Halide::Var z, Halide::Expr wz, std::string name="R");
+
+    /** Create a n-D recursive filter given variable and size of input/output buffer in that dimension */
+    RecFilter(std::vector<Halide::Var> args, std::vector<Halide::Expr> widths, std::string name);
+    // @}
 
     /**@name Compile and run */
     // {@
@@ -159,15 +168,6 @@ public:
     void realize(Halide::Buffer out, int iterations=1);
     // @}
 
-    /**@name Recursive filter specification
-     * @brief Set the dimensions and width of the output buffer of the recursive filter
-     */
-    // {@
-    void set_args(Halide::Var x, Halide::Expr wx);
-    void set_args(Halide::Var x, Halide::Var y, Halide::Expr wx, Halide::Expr wy);
-    void set_args(Halide::Var x, Halide::Var y, Halide::Var z, Halide::Expr wx, Halide::Expr wy, Halide::Expr wz);
-    void set_args(std::vector<Halide::Var> args, std::vector<Halide::Expr> widths);
-    // @}
 
     /** @name Recursive filter definition
      * @brief Add a pure definition to the recursive filter, can be Tuple

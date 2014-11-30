@@ -28,7 +28,16 @@ void destroy<RecFilterContents>(const RecFilterContents *f) {
 using namespace Halide;
 using namespace Halide::Internal;
 
-RecFilter::RecFilter(string n) {
+RecFilter::RecFilter(Var x, Expr wx, string n)
+    : RecFilter(vec(x), vec(wx), n) {}
+
+RecFilter::RecFilter(Var x, Expr wx, Var y, Expr wy, string n)
+    : RecFilter(vec(x,y), vec(wx,wy), n) {}
+
+RecFilter::RecFilter(Var x, Expr wx, Var y, Expr wy, Var z, Expr wz, string n)
+    : RecFilter(vec(x,y,z), vec(wx,wy,wz), n) {}
+
+RecFilter::RecFilter(vector<Var> args, vector<Expr> widths, string n) {
     contents = new RecFilterContents;
 
     contents.ptr->name = n;
@@ -41,23 +50,6 @@ RecFilter::RecFilter(string n) {
     RecFilterFunc f;
     f.func = Function(n);
     f.func_category = INTRA;
-    contents.ptr->func.insert(make_pair(f.func.name(), f));
-}
-
-void RecFilter::set_args(Var x, Expr wx) {
-    set_args(vec(x), vec(wx));
-}
-
-void RecFilter::set_args(Var x, Var y, Expr wx, Expr wy) {
-    set_args(vec(x,y), vec(wx,wy));
-}
-
-void RecFilter::set_args(Var x, Var y, Var z, Expr wx, Expr wy, Expr wz) {
-    set_args(vec(x,y,z), vec(wx,wy,wz));
-}
-
-void RecFilter::set_args(vector<Var> args, vector<Expr> widths) {
-    RecFilterFunc& f = internal_function(contents.ptr->name);
 
     if (!contents.ptr->filter_info.empty()) {
         cerr << "Recursive filter dimensions already set" << endl;
@@ -84,6 +76,8 @@ void RecFilter::set_args(vector<Var> args, vector<Expr> widths) {
         // add tag the dimension as pure
         f.pure_var_category.insert(make_pair(args[i].name(), FULL));
     }
+
+    contents.ptr->func.insert(make_pair(f.func.name(), f));
 }
 
 // -----------------------------------------------------------------------------
