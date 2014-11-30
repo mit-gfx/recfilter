@@ -109,39 +109,40 @@ public:
     int check(const VariableTag &t) const { return (as_integer() & VarTag(t).as_integer()); }
 
     int count(void) const {
-        VariableTag count = static_cast<VariableTag>(static_cast<int>(tag) & 0x0000000f);
-        int count_int;
-        switch(count) {
-            case __1: count_int = 0; break;
-            case __2: count_int = 1; break;
-            case __3: count_int = 2; break;
-            case __4: count_int = 3; break;
+        VariableTag t_count = static_cast<VariableTag>(static_cast<int>(tag) & 0x0000000f);
+        int t_int;
+        switch(t_count) {
+            case __1: t_int = 0; break;
+            case __2: t_int = 1; break;
+            case __3: t_int = 2; break;
+            case __4: t_int = 3; break;
             default: std::cerr << "VarTag does not have a count" << std::endl; assert(false);
         }
-        return count_int;
+        return t_int;
     }
     void decrement_count(void) {
-        switch (get_count()) {
-            case __2: tag = get_tag() | __1; break;
-            case __3: tag = get_tag() | __2; break;
-            case __4: tag = get_tag() | __3; break;
+        VariableTag t_tag  = static_cast<VariableTag>(as_integer() & 0xfffffff0);
+        VariableTag t_count= static_cast<VariableTag>(as_integer() & 0x0000000f);
+        switch (t_count) {
+            case __2: tag = t_tag | __1; break;
+            case __3: tag = t_tag | __2; break;
+            case __4: tag = t_tag | __3; break;
             default: std::cerr << "Cannot decrement count of VarTag" << std::endl; assert(false);
         }
     }
     void increment_count(void) {
-        switch (get_count()) {
-            case __1: tag = get_tag() | __2; break;
-            case __2: tag = get_tag() | __3; break;
-            case __3: tag = get_tag() | __4; break;
+        VariableTag t_tag  = static_cast<VariableTag>(as_integer() & 0xfffffff0);
+        VariableTag t_count= static_cast<VariableTag>(as_integer() & 0x0000000f);
+        switch (t_count) {
+            case __1: tag = t_tag | __2; break;
+            case __2: tag = t_tag | __3; break;
+            case __3: tag = t_tag | __4; break;
             default: std::cerr << "Cannot increment count of VarTag" << std::endl; assert(false);
         }
     }
 
 private:
     VariableTag tag;
-
-    VariableTag get_tag  (void) const { return static_cast<VariableTag>(static_cast<int>(tag) & 0xfffffff0); }
-    VariableTag get_count(void) const { return static_cast<VariableTag>(static_cast<int>(tag) & 0x0000000f); }
 };
 
 // ----------------------------------------------------------------------------
