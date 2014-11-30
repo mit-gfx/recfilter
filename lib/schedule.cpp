@@ -56,7 +56,7 @@ map< int,vector<VarOrRVar> > RecFilterSchedule::var_list_by_tag(RecFilterFunc f,
 
 map<int,VarOrRVar> RecFilterSchedule::var_by_tag(RecFilterFunc f, VarTag vtag) {
     // check that the VarTag has a specific count value
-    int vidx = get_count(vtag);
+    int vidx = vtag.count();
 
     map< int,vector<VarOrRVar> > var_list;
     map<string,VarTag>::iterator vit;
@@ -112,7 +112,7 @@ RecFilterSchedule& RecFilterSchedule::compute_in_shared() {
         Func            F = Func(rF.func);
 
         // ignore if this is a reindexing function
-        if (rF.func_category & REINDEX) {
+        if (rF.func_category==REINDEX) {
             continue;
         }
 
@@ -121,7 +121,7 @@ RecFilterSchedule& RecFilterSchedule::compute_in_shared() {
         Func callee_func;
         for (int i=0; i<func_list.size(); i++) {
             RecFilterFunc& rf = recfilter.internal_function(func_list[i]);
-            if ((rf.func_category & REINDEX) && rf.callee_func==F.name()) {
+            if (rf.func_category == REINDEX && rf.callee_func==F.name()) {
                 if (callee_func.defined()) {
                     cerr << F.name() << " cannot be computed in shared mem "
                         << "because it is called by multiple functions" << endl;
@@ -142,7 +142,7 @@ RecFilterSchedule& RecFilterSchedule::compute_in_shared() {
         // functions called in this function should be computed at same level
         for (int i=0; i<func_list.size(); i++) {
             RecFilterFunc& rf = recfilter.internal_function(func_list[i]);
-            if ((rf.func_category & REINDEX) && rf.caller_func==F.name()) {
+            if (rf.func_category==REINDEX && rf.caller_func==F.name()) {
                 Func(rf.func).compute_at(callee_func, Var::gpu_blocks());
                 stringstream s;
                 s << "compute_at(" << callee_func.name() << ", Var::gpu_blocks())";
@@ -159,7 +159,7 @@ RecFilterSchedule& RecFilterSchedule::compute_in_shared() {
 }
 
 RecFilterSchedule& RecFilterSchedule::parallel(VarTag vtag) {
-    if (vtag & SCAN) {
+    if (vtag.check(SCAN)) {
         cerr << "Cannot create parallel threads from scan variable" << endl;
         assert(false);
     }
@@ -191,7 +191,7 @@ RecFilterSchedule& RecFilterSchedule::parallel(VarTag vtag) {
 }
 
 RecFilterSchedule& RecFilterSchedule::parallel(VarTag vtag, int task_size) {
-    if (vtag & SCAN) {
+    if (vtag.check(SCAN)) {
         cerr << "Cannot create parallel threads from scan variable" << endl;
         assert(false);
     }
@@ -330,8 +330,16 @@ RecFilterSchedule& RecFilterSchedule::vectorize(VarTag vtag, int factor) {
     return *this;
 }
 
+RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1) {
+    return gpu_blocks(vt1, VarTag(INVALID), VarTag(INVALID));
+}
+
+RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1, VarTag vt2) {
+    return gpu_blocks(vt1, vt2, VarTag(INVALID));
+}
+
 RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1, VarTag vt2, VarTag vt3) {
-    if ((vt1 & SCAN) || (vt2 & SCAN) || (vt3 & SCAN)) {
+    if (vt1.check(SCAN) || vt2.check(SCAN) || vt3.check(SCAN)) {
         cerr << "Cannot map a scan variable to parallel GPU blocks" << endl;
         assert(false);
     }
@@ -354,7 +362,7 @@ RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1, VarTag vt2, VarTag 
                 default: break;
             }
 
-            if (!vtag) {
+            if (vtag.check(INVALID)) {
                 continue;
             }
 
@@ -391,8 +399,16 @@ RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1, VarTag vt2, VarTag 
     return *this;
 }
 
+RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1) {
+    return gpu_threads(vt1,t1,VarTag(INVALID),0,VarTag(INVALID),0);
+}
+
+RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1, VarTag vt2, int t2) {
+    return gpu_threads(vt1,t1,vt2,t2,VarTag(INVALID),0);
+}
+
 RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1, VarTag vt2, int t2, VarTag vt3, int t3) {
-    if ((vt1 & SCAN) || (vt2 & SCAN) || (vt3 & SCAN)) {
+    if (vt1.check(SCAN) || vt2.check(SCAN) || vt3.check(SCAN)) {
         cerr << "Cannot map a scan variable to parallel threads" << endl;
         assert(false);
     }
@@ -415,7 +431,7 @@ RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1, VarTag vt2
                 default:vtag = vt3; tsize = t3; break;
             }
 
-            if (!vtag || !tsize) {
+            if (vtag.check(INVALID) || !tsize) {
                 continue;
             }
 
@@ -445,10 +461,10 @@ RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1, VarTag vt2
 
                     if (def==PURE_DEF) {
                         F.split(v,v,t,tsize).reorder(t,v);
-///                        rF.pure_var_category.insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
+                        rF.pure_var_category.insert(make_pair(t.name(), vtag|SPLIT));
                     } else {
                         F.update(def).split(v,v,t,tsize).reorder(t,v);
-///                        rF.update_var_category[def].insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
+                        rF.update_var_category[def].insert(make_pair(t.name(), vtag|SPLIT));
                     }
                     rF.schedule[def].push_back(s.str());
                 }
@@ -510,10 +526,10 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(VarTag x, VarTag y, VarTag
 }
 
 RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, bool do_reorder) {
-///    if (vtag & SCHEDULE_INNER) {
-///        cerr << "Cannot split a variable which was previously split by scheduling ops" << endl;
-///        assert(false);
-///    }
+    if (vtag.check(SPLIT)) {
+        cerr << "Cannot split a variable which was created by split scheduling ops" << endl;
+        assert(false);
+    }
 
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
@@ -540,13 +556,13 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, bool do_reo
                 if (do_reorder) {
                     F.reorder(t,v);
                 }
-///                rF.pure_var_category.insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
+                rF.pure_var_category.insert(make_pair(t.name(), vtag|SPLIT));
             } else {
                 F.update(def).split(v,v,t,factor);
                 if (do_reorder) {
                     F.update(def).reorder(t,v);
                 }
-///                rF.update_var_category[def].insert(make_pair(t.name(), vtag | SCHEDULE_INNER));
+                rF.update_var_category[def].insert(make_pair(t.name(), vtag|SPLIT));
             }
             rF.schedule[def].push_back(s.str());
         }

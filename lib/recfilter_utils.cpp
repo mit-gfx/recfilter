@@ -182,28 +182,6 @@ ostream &operator<<(ostream &s, const CheckResultVerbose &v) {
     return s;
 }
 
-ostream &operator<<(ostream &s, const FuncTag &f) {
-    if (f==INLINE ) { s << "INLINE" ; }
-    if (f==INTRA_1) { s << "INTRA_1"; }
-    if (f==INTRA_N) { s << "INTRA_N"; }
-    if (f==INTER  ) { s << "INTER"  ; }
-    if (f==REINDEX) { s << "REINDEX"; }
-    return s;
-}
-
-ostream &operator<<(ostream &s, const VarTag &v) {
-    if (v & FULL ) { s << "FULL ";  }
-    if (v & INNER) { s << "INNER "; }
-    if (v & OUTER) { s << "OUTER "; }
-    if (v & SCAN ) { s << "SCAN ";  }
-    if (v & TAIL ) { s << "TAIL ";  }
-    if (v & __1)   { s << "1 ";     }
-    if (v & __2)   { s << "2 ";     }
-    if (v & __3)   { s << "3 ";     }
-    if (v & __4)   { s << "4 ";     }
-    return s;
-}
-
 ostream &operator<<(ostream &s, const Func &f) {
     s << f.function();
     return s;
@@ -354,69 +332,46 @@ ostream &operator<<(std::ostream &os, const RecFilterFunc &f) {
 
 // -----------------------------------------------------------------------------
 
-VarTag get_tag(const VarTag& v) {
-    return static_cast<VarTag>(static_cast<int>(v) & 0xfffffff0);
+VariableTag operator|(const VariableTag &a, const VariableTag &b) {
+    return static_cast<VariableTag>(static_cast<int>(a) | static_cast<int>(b));
 }
 
-VarTag get_count_from_int(int i) {
-    VarTag count;
-    switch (i) {
-        case 0: count = __1; break;
-        case 1: count = __2; break;
-        case 2: count = __3; break;
-        case 3: count = __4; break;
-        default: cerr << "Cannot convert integer to VarTag" << endl; assert(false);
-    }
-    return count;
+VariableTag operator&(const VariableTag &a, const VariableTag &b) {
+    return static_cast<VariableTag>(static_cast<int>(a) & static_cast<int>(b));
 }
 
-int get_count_as_int(const VarTag& v) {
-    VarTag count = static_cast<VarTag>(static_cast<int>(v) & 0x0000000f);
-    int count_int;
-    switch (count) {
-        case __1: count_int = 0; break;
-        case __2: count_int = 1; break;
-        case __3: count_int = 2; break;
-        case __4: count_int = 3; break;
-        default: cerr << "VarTag does not have a count" << endl; assert(false);
-    }
-    return count_int;
+VarTag operator|(const VarTag &a, const VarTag &b) { return VarTag(a.as_integer() | b.as_integer()); }
+VarTag operator&(const VarTag &a, const VarTag &b) { return VarTag(a.as_integer() & b.as_integer()); }
+
+bool operator==(const VarTag &a, const VarTag &b)      { return (a.as_integer() == b.as_integer()); }
+bool operator==(const FuncTag &a,const FuncTag &b)     { return (a.as_integer() == b.as_integer()); }
+bool operator!=(const VarTag &a, const VarTag &b)      { return !(a == b); }
+bool operator!=(const FuncTag &a,const FuncTag &b)     { return !(a == b); }
+bool operator==(const VarTag &a, const VariableTag &b) { return (a == VarTag(b));  }
+bool operator==(const FuncTag &a,const FunctionTag &b) { return (a == FuncTag(b)); }
+
+ostream &operator<<(ostream &s, const FunctionTag &f) { s << FuncTag(f); return s; }
+ostream &operator<<(ostream &s, const VariableTag &v) { s << VarTag(v);  return s; }
+
+ostream &operator<<(ostream &s, const FuncTag &f) {
+    if (f==INLINE ) { s << "INLINE" ; }
+    if (f==INTRA_1) { s << "INTRA_1"; }
+    if (f==INTRA_N) { s << "INTRA_N"; }
+    if (f==INTER  ) { s << "INTER"  ; }
+    if (f==REINDEX) { s << "REINDEX"; }
+    return s;
 }
 
-VarTag get_count(const VarTag& v) {
-    return static_cast<VarTag>(static_cast<int>(v) & 0x0000000f);
-}
-
-VarTag decrement_count(const VarTag& v) {
-    VarTag tag   = get_tag(v);
-    VarTag count = get_count(v);
-    VarTag vnew;
-    switch (count) {
-        case __2: vnew = tag | __1; break;
-        case __3: vnew = tag | __2; break;
-        case __4: vnew = tag | __3; break;
-        default: cerr << "Cannot decrement count of VarTag" << endl; assert(false);
-    }
-    return vnew;
-}
-
-VarTag increment_count(const VarTag& v) {
-    VarTag tag   = get_tag(v);
-    VarTag count = get_count(v);
-    VarTag vnew;
-    switch (count) {
-        case __1: vnew = tag | __2; break;
-        case __2: vnew = tag | __3; break;
-        case __3: vnew = tag | __4; break;
-        default: cerr << "Cannot increment count of VarTag" << endl; assert(false);
-    }
-    return vnew;
-}
-
-VarTag operator|(const VarTag& a, const VarTag& b) {
-    return static_cast<VarTag>(static_cast<unsigned int>(a) | static_cast<unsigned int>(b));
-}
-
-VarTag operator&(const VarTag& a, const VarTag& b) {
-    return static_cast<VarTag>(static_cast<unsigned int>(a) & static_cast<unsigned int>(b));
+ostream &operator<<(ostream &s, const VarTag &v) {
+    if (v.check(FULL )) { s << "FULL ";  }
+    if (v.check(INNER)) { s << "INNER "; }
+    if (v.check(OUTER)) { s << "OUTER "; }
+    if (v.check(SCAN )) { s << "SCAN ";  }
+    if (v.check(TAIL )) { s << "TAIL ";  }
+    if (v.check(__1))   { s << "1 ";     }
+    if (v.check(__2))   { s << "2 ";     }
+    if (v.check(__3))   { s << "3 ";     }
+    if (v.check(__4))   { s << "4 ";     }
+    if (v.check(SPLIT)) { s << "SPLIT ";}
+    return s;
 }

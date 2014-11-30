@@ -37,30 +37,10 @@ struct RecFilterContents;
 class RecFilterFunc;
 class RecFilterSchedule;
 
+class VarTag;
+class FuncTag;
+
 // ----------------------------------------------------------------------------
-
-/** Scheduling tags for Functions */
-typedef enum {
-    INLINE  = 0x000, ///< function to be removed by inlining
-    INTER   = 0x010, ///< filter over tail elements across tiles (single 1D scan)
-    INTRA_N = 0x020, ///< filter within tile (multiple scans in multiple dimensions)
-    INTRA_1 = 0x040, ///< filter within tile (single scan in one dimension)
-    REINDEX = 0x100, ///< function that reindexes a subset of another function to write to global mem
-} FuncTag;
-
-/** Scheduling tags for Function dimensions */
-typedef enum {
-    INVALID = 0x0000, ///< invalid var
-    FULL    = 0x0010, ///< full dimension before tiling
-    INNER   = 0x0020, ///< inner dimension after tiling
-    OUTER   = 0x0040, ///< outer dimension after tiling
-    TAIL    = 0x0080, ///< if dimension is at lower granularity (only for inner dimensions)
-    SCAN    = 0x0100, ///< if dimension is a scan
-    __1     = 0x0001, ///< first variable with one of the above tags
-    __2     = 0x0002, ///< second variable with one of the above tags
-    __3     = 0x0004, ///< third variable with one of the above tags
-    __4     = 0x0008, ///< fourth variable with one of the above tags
-} VarTag;
 
 /** Compare ref and Halide solutions and print the mean square error */
 struct CheckResult {
@@ -385,15 +365,13 @@ public:
     RecFilterSchedule& parallel(VarTag v);
     RecFilterSchedule& parallel(VarTag v, int task_size);
 
-    RecFilterSchedule& gpu_threads(
-            VarTag vt1,         int t1,
-            VarTag vt2=INVALID, int t2=0,
-            VarTag vt3=INVALID, int t3=0);
+    RecFilterSchedule& gpu_threads(VarTag vt1, int t1);
+    RecFilterSchedule& gpu_threads(VarTag vt1, int t1, VarTag vt2, int t2);
+    RecFilterSchedule& gpu_threads(VarTag vt1, int t1, VarTag vt2, int t2, VarTag vt3, int t3);
 
-    RecFilterSchedule& gpu_blocks(
-            VarTag vt1,
-            VarTag vt2=INVALID,
-            VarTag vt3=INVALID);
+    RecFilterSchedule& gpu_blocks(VarTag vt1);
+    RecFilterSchedule& gpu_blocks(VarTag vt1, VarTag vt2);
+    RecFilterSchedule& gpu_blocks(VarTag vt1, VarTag vt2, VarTag vt3);
 
     RecFilterSchedule& reorder (std::vector<VarTag> x);
     RecFilterSchedule& reorder_storage(std::vector<VarTag> x);

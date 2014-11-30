@@ -272,9 +272,9 @@ RecFilterSchedule RecFilter::intra_schedule(int id) {
         FuncTag ftag = f_it->second.func_category;
 
         switch(id) {
-            case 0: function_condition |= (ftag==INTRA_1 | ftag==INTRA_N); break;
-            case 1: function_condition |= (ftag==INTRA_1); break;
-            default:function_condition |= (ftag==INTRA_N); break;
+            case 0: function_condition |= (ftag==FuncTag(INTRA_1) | ftag==FuncTag(INTRA_N)); break;
+            case 1: function_condition |= (ftag==FuncTag(INTRA_1)); break;
+            default:function_condition |= (ftag==FuncTag(INTRA_N)); break;
         }
 
         if (function_condition) {
@@ -303,12 +303,11 @@ RecFilterSchedule RecFilter::intra_schedule(int id) {
 }
 
 RecFilterSchedule RecFilter::inter_schedule(void) {
-    FuncTag ftag = INTER;
     vector<string> func_list;
 
     map<string,RecFilterFunc>::iterator f_it = contents.ptr->func.begin();
     for (; f_it!=contents.ptr->func.end(); f_it++) {
-        if (f_it->second.func_category==ftag) {
+        if (f_it->second.func_category==INTER) {
             string func_name = f_it->second.func.name();
             func_list.push_back(func_name);
         }
@@ -321,14 +320,14 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
     return RecFilterSchedule(*this, func_list);
 }
 
-VarTag RecFilter::full_parallel (int id) { return get_count_from_int(id)|FULL     ; }
-VarTag RecFilter::full_scan     (int id) { return get_count_from_int(id)|FULL|SCAN; }
-VarTag RecFilter::inner_parallel(int id) { return get_count_from_int(id)|INNER    ; }
-VarTag RecFilter::outer_parallel(int id) { return get_count_from_int(id)|OUTER    ; }
+VarTag RecFilter::full_parallel (int id) { return VarTag(FULL, id); }
+VarTag RecFilter::full_scan     (int id) { return VarTag(FULL|SCAN, id); }
+VarTag RecFilter::inner_parallel(int id) { return VarTag(INNER, id); }
+VarTag RecFilter::outer_parallel(int id) { return VarTag(OUTER, id); }
 
-VarTag RecFilter::inner_scan(void) { return INNER|SCAN; }
-VarTag RecFilter::outer_scan(void) { return OUTER|SCAN; }
-VarTag RecFilter::inner_tail(void) { return INNER|TAIL; }
+VarTag RecFilter::inner_scan(void) { return (INNER|SCAN); }
+VarTag RecFilter::outer_scan(void) { return (OUTER|SCAN); }
+VarTag RecFilter::inner_tail(void) { return (INNER|TAIL); }
 
 // -----------------------------------------------------------------------------
 

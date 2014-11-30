@@ -466,7 +466,7 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
                 update_var_category[i].erase (rx.x.name());
                 update_var_category[i].insert(make_pair(rvar.name(),INNER|SCAN));
                 update_var_category[i].insert(make_pair(xo.name(),  OUTER|static_cast<VarTag>(outer_count)));
-                increment_count(outer_count);
+                outer_count.increment_count();
             }
             else {
                 bool found = false;
@@ -481,8 +481,8 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
                         update_var_category[i].insert(make_pair(rvar.name(),INNER|static_cast<VarTag>(inner_count)));
                         update_var_category[i].insert(make_pair(var.name(), OUTER|static_cast<VarTag>(outer_count)));
 
-                        increment_count(inner_count);
-                        increment_count(outer_count);
+                        inner_count.increment_count();
+                        outer_count.increment_count();
 
                         found = true;
                     }
@@ -648,14 +648,14 @@ static vector<RecFilterFunc> create_intra_tail_term(
 
         // extract the vartag count of xi, change xi's tag to tail and decrement the
         // count of all other INNER vars whose count is more than the count of xi
-        VarTag count_xi = get_count(rf.pure_var_category[xi.name()]);
+        int count_xi = rf.pure_var_category[xi.name()].count();
         rf.pure_var_category[xi.name()] = INNER|TAIL;
         map<string,VarTag>::iterator vit;
         for (vit=rf.pure_var_category.begin(); vit!=rf.pure_var_category.end(); vit++) {
-            if (vit->second & INNER) {
-                VarTag count = get_count(vit->second);
-                if (static_cast<VarTag>(count)>static_cast<VarTag>(count_xi)) {
-                    rf.pure_var_category[vit->first] = decrement_count(vit->second);
+            if (vit->second.check(INNER)) {
+                int count = vit->second.count();
+                if (count > count_xi) {
+                    rf.pure_var_category[vit->first].decrement_count();
                 }
             }
         }
