@@ -107,52 +107,6 @@ Arguments::Arguments(int argc, char** argv) :
 
 // -----------------------------------------------------------------------------
 
-FuncTag& operator|=(FuncTag& a, const FuncTag& b) {
-    a = static_cast<FuncTag>(static_cast<int>(a) | static_cast<int>(b));
-    return a;
-}
-
-FuncTag& operator&=(FuncTag& a, const FuncTag& b) {
-    a = static_cast<FuncTag>(static_cast<int>(a) & static_cast<int>(b));
-    return a;
-}
-
-VarTag& operator|=(VarTag& a, const VarTag& b) {
-    a = static_cast<VarTag>(static_cast<int>(a) | static_cast<int>(b));
-    return a;
-}
-
-VarTag& operator&=(VarTag& a, const VarTag& b) {
-    a = static_cast<VarTag>(static_cast<int>(a) & static_cast<int>(b));
-    return a;
-}
-
-FuncTag operator~(const FuncTag& a) {
-    return static_cast<FuncTag>(~ static_cast<int>(a));
-}
-
-FuncTag operator|(const FuncTag& a, const FuncTag& b) {
-    return static_cast<FuncTag>(static_cast<int>(a) | static_cast<int>(b));
-}
-
-FuncTag operator&(const FuncTag& a, const FuncTag& b) {
-    return static_cast<FuncTag>(static_cast<int>(a) & static_cast<int>(b));
-}
-
-VarTag operator~(const VarTag& a) {
-    return static_cast<VarTag>(~ static_cast<int>(a));
-}
-
-VarTag operator|(const VarTag& a, const VarTag& b) {
-    return static_cast<VarTag>(static_cast<int>(a) | static_cast<int>(b));
-}
-
-VarTag operator&(const VarTag& a, const VarTag& b) {
-    return static_cast<VarTag>(static_cast<int>(a) & static_cast<int>(b));
-}
-
-// -----------------------------------------------------------------------------
-
 ostream &operator<<(ostream &s, const CheckResult& v) {
     Image<float> ref = v.ref;
     Image<float> out = v.out;
@@ -229,23 +183,23 @@ ostream &operator<<(ostream &s, const CheckResultVerbose &v) {
 }
 
 ostream &operator<<(ostream &s, const FuncTag &f) {
-    if (f ==INLINE           ) { s << "INLINE "           ; }
-    if (f & FULL_RESULT      ) { s << "FULL_RESULT"       ; }
-    if (f & INTRA_TILE_SCAN  ) { s << "INTRA_TILE_SCAN "  ; }
-    if (f & INTER_TILE_SCAN  ) { s << "INTER_TILE_SCAN "  ; }
-    if (f & REINDEX_FOR_WRITE) { s << "REINDEX_FOR_WRITE "; }
-    if (f & REINDEX_FOR_READ ) { s << "REINDEX_FOR_READ " ; }
+    if (f ==INLINE ) { s << "INLINE" ; }
+    if (f & INTRA  ) { s << "INTRA"  ; }
+    if (f & INTER  ) { s << "INTER"  ; }
+    if (f & REINDEX) { s << "REINDEX"; }
     return s;
 }
 
 ostream &operator<<(ostream &s, const VarTag &v) {
-    if (v & INNER_PURE_VAR) { s << "INNER_PURE_VAR "; }
-    if (v & INNER_SCAN_VAR) { s << "INNER_SCAN_VAR "; }
-    if (v & OUTER_PURE_VAR) { s << "OUTER_PURE_VAR "; }
-    if (v & OUTER_SCAN_VAR) { s << "OUTER_SCAN_VAR "; }
-    if (v & TAIL_DIMENSION) { s << "TAIL_DIMENSION "; }
-    if (v & PURE_DIMENSION) { s << "PURE_DIMENSION "; }
-    if (v & SCAN_DIMENSION) { s << "SCAN_DIMENSION "; }
+    if (v & FULL ) { s << "FULL ";  }
+    if (v & INNER) { s << "INNER "; }
+    if (v & OUTER) { s << "OUTER "; }
+    if (v & SCAN ) { s << "SCAN ";  }
+    if (v & TAIL ) { s << "TAIL ";  }
+    if (v & __1)   { s << "1 ";     }
+    if (v & __2)   { s << "2 ";     }
+    if (v & __3)   { s << "3 ";     }
+    if (v & __4)   { s << "4 ";     }
     return s;
 }
 
@@ -367,10 +321,10 @@ ostream &operator<<(std::ostream &os, const RecFilterFunc &f) {
 
     s << "// Func " << f.func.name() << " synopsis\n";
     s << "// Function tag: " << f.func_category;
-    if (f.func_category & REINDEX_FOR_WRITE) {
+    if (!f.callee_func.empty()) {
         s << " (calls " << f.callee_func <<  ")";
     }
-    if (f.func_category & REINDEX_FOR_READ) {
+    if (!f.caller_func.empty()) {
         s << " (called by " << f.caller_func <<  ")";
     }
     s << "\n";
@@ -395,4 +349,73 @@ ostream &operator<<(std::ostream &os, const RecFilterFunc &f) {
 
     os << clean_var_names(s.str());
     return os;
+}
+
+// -----------------------------------------------------------------------------
+
+VarTag get_tag(const VarTag& v) {
+    return static_cast<VarTag>(static_cast<int>(v) & 0xfffffff0);
+}
+
+VarTag get_count_from_int(int i) {
+    VarTag count;
+    switch (i) {
+        case 0: count = __1; break;
+        case 1: count = __2; break;
+        case 2: count = __3; break;
+        case 3: count = __4; break;
+        default: cerr << "Cannot convert integer to VarTag" << endl; assert(false);
+    }
+    return count;
+}
+
+int get_count_as_int(const VarTag& v) {
+    VarTag count = static_cast<VarTag>(static_cast<int>(v) & 0x0000000f);
+    int count_int;
+    switch (count) {
+        case __1: count_int = 0; break;
+        case __2: count_int = 1; break;
+        case __3: count_int = 2; break;
+        case __4: count_int = 3; break;
+        default: cerr << "VarTag does not have a count" << endl; assert(false);
+    }
+    return count_int;
+}
+
+VarTag get_count(const VarTag& v) {
+    return static_cast<VarTag>(static_cast<int>(v) & 0x0000000f);
+}
+
+VarTag decrement_count(const VarTag& v) {
+    VarTag tag   = get_tag(v);
+    VarTag count = get_count(v);
+    VarTag vnew;
+    switch (count) {
+        case __2: vnew = tag | __1; break;
+        case __3: vnew = tag | __2; break;
+        case __4: vnew = tag | __3; break;
+        default: cerr << "Cannot decrement count of VarTag" << endl; assert(false);
+    }
+    return vnew;
+}
+
+VarTag increment_count(const VarTag& v) {
+    VarTag tag   = get_tag(v);
+    VarTag count = get_count(v);
+    VarTag vnew;
+    switch (count) {
+        case __1: vnew = tag | __2; break;
+        case __2: vnew = tag | __3; break;
+        case __3: vnew = tag | __4; break;
+        default: cerr << "Cannot increment count of VarTag" << endl; assert(false);
+    }
+    return vnew;
+}
+
+VarTag operator|(const VarTag& a, const VarTag& b) {
+    return static_cast<VarTag>(static_cast<unsigned int>(a) | static_cast<unsigned int>(b));
+}
+
+VarTag operator&(const VarTag& a, const VarTag& b) {
+    return static_cast<VarTag>(static_cast<unsigned int>(a) & static_cast<unsigned int>(b));
 }

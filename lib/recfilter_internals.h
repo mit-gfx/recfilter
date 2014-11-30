@@ -80,4 +80,25 @@ struct RecFilterContents {
     Halide::Image<float> feedback_coeff;
 };
 
+// ----------------------------------------------------------------------------
+
+/** @name Utils to print scheduling tags */
+// {@
+std::ostream &operator<<(std::ostream &s, const FuncTag &f);
+std::ostream &operator<<(std::ostream &s, const VarTag &v);
+// @}
+
+/** @name Logical operators for manipulating function and variable scheduling tags */
+// {@
+VarTag operator |      (const VarTag& a, const VarTag& b);
+VarTag operator &      (const VarTag& a, const VarTag& b);
+VarTag get_tag         (const VarTag& v);
+VarTag get_count       (const VarTag& v);
+VarTag increment_count (const VarTag& v);
+VarTag decrement_count (const VarTag& v);
+VarTag get_count_from_int(int v);
+int    get_count_as_int(const VarTag& v);
+// @}
+
+
 #endif // _RECURSIVE_FILTER_INTERNALS_H_

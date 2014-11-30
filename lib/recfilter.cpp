@@ -40,7 +40,7 @@ RecFilter::RecFilter(string n) {
 
     RecFilterFunc f;
     f.func = Function(n);
-    f.func_category = FULL_RESULT;
+    f.func_category = INTRA;
     contents.ptr->func.insert(make_pair(f.func.name(), f));
 }
 
@@ -82,7 +82,7 @@ void RecFilter::set_args(vector<Var> args, vector<Expr> widths) {
         contents.ptr->filter_info.push_back(s);
 
         // add tag the dimension as pure
-        f.pure_var_category.insert(make_pair(args[i].name(), PURE_DIMENSION));
+        f.pure_var_category.insert(make_pair(args[i].name(), FULL));
     }
 }
 
@@ -263,23 +263,36 @@ void RecFilter::add_filter(Var x, float feedfwd, vector<float> feedback, bool ca
     // change the function tag from pure to scan
     map<string, VarTag> update_var_category = rf.pure_var_category;
     update_var_category.erase(x.name());
-    update_var_category.insert(make_pair(rx.x.name(), SCAN_DIMENSION));
+    update_var_category.insert(make_pair(rx.x.name(), FULL|SCAN));
     rf.update_var_category.push_back(update_var_category);
 }
 
 // -----------------------------------------------------------------------------
 
 RecFilterSchedule RecFilter::intra_schedule(void) {
-    FuncTag ftag = INTRA_TILE_SCAN;
+    FuncTag ftag = INTRA;
     vector<string> func_list;
-    map<string,RecFilterFunc>::iterator f_it  = contents.ptr->func.begin();
-    map<string,RecFilterFunc>::iterator f_end = contents.ptr->func.end();
-    while (f_it != f_end) {
-        if (f_it->second.func_category & ftag) {
-            func_list.push_back(f_it->second.func.name());
+
+    // all functions with tag INTRA
+    map<string,RecFilterFunc>::iterator f_it = contents.ptr->func.begin();
+    for (; f_it!=contents.ptr->func.end(); f_it++) {
+        if (f_it->second.func_category==ftag) {
+            string func_name = f_it->second.func.name();
+
+            // all functions which are REINDEX and call/called by this function
+            map<string,RecFilterFunc>::iterator g_it = contents.ptr->func.begin();
+            for (; g_it!=contents.ptr->func.end(); g_it++) {
+                RecFilterFunc rf = g_it->second;
+                if (rf.func_category==REINDEX) {
+                    if (rf.callee_func==func_name || rf.caller_func==func_name) {
+                        func_list.push_back(g_it->first);
+                    }
+                }
+            }
+            func_list.push_back(func_name);
         }
-        f_it++;
     }
+
     if (func_list.empty()) {
         cerr << "No function has the scheduling tag " << ftag << endl;
         assert(false);
@@ -288,22 +301,32 @@ RecFilterSchedule RecFilter::intra_schedule(void) {
 }
 
 RecFilterSchedule RecFilter::inter_schedule(void) {
-    FuncTag ftag = INTER_TILE_SCAN;
+    FuncTag ftag = INTER;
     vector<string> func_list;
-    map<string,RecFilterFunc>::iterator f_it  = contents.ptr->func.begin();
-    map<string,RecFilterFunc>::iterator f_end = contents.ptr->func.end();
-    while (f_it != f_end) {
-        if (f_it->second.func_category & ftag) {
-            func_list.push_back(f_it->second.func.name());
+
+    map<string,RecFilterFunc>::iterator f_it = contents.ptr->func.begin();
+    for (; f_it!=contents.ptr->func.end(); f_it++) {
+        if (f_it->second.func_category==ftag) {
+            string func_name = f_it->second.func.name();
+            func_list.push_back(func_name);
         }
-        f_it++;
     }
+
     if (func_list.empty()) {
         cerr << "No function has the scheduling tag " << ftag << endl;
         assert(false);
     }
     return RecFilterSchedule(*this, func_list);
 }
+
+VarTag RecFilter::full_parallel (int id) { return get_count_from_int(id)|FULL     ; }
+VarTag RecFilter::full_scan     (int id) { return get_count_from_int(id)|FULL|SCAN; }
+VarTag RecFilter::inner_parallel(int id) { return get_count_from_int(id)|INNER    ; }
+VarTag RecFilter::outer_parallel(int id) { return get_count_from_int(id)|OUTER    ; }
+
+VarTag RecFilter::inner_scan(void) { return INNER|SCAN; }
+VarTag RecFilter::outer_scan(void) { return OUTER|SCAN; }
+VarTag RecFilter::inner_tail(void) { return INNER|TAIL; }
 
 // -----------------------------------------------------------------------------
 

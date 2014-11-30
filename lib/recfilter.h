@@ -41,24 +41,24 @@ class RecFilterSchedule;
 
 /** Scheduling tags for Functions */
 typedef enum {
-    INLINE             = 0x00, ///< function to be removed
-    FULL_RESULT        = 0x01, ///< final result
-    INTRA_TILE_SCAN    = 0x02, ///< scan within tile (multiple scans in multiple dimensions)
-    INTER_TILE_SCAN    = 0x04, ///< scan over tail elements across tiles (single 1D scan)
-    REINDEX_FOR_WRITE  = 0x08, ///< function that reindexes a subset of another function to write to global mem (to be obscured from programmer)
-    REINDEX_FOR_READ   = 0x10, ///< function that reindexes a subset of another function to write to global mem (to be obscured from programmer)
+    INLINE  = 0x00, ///< function to be removed by inlining
+    INTER   = 0x01, ///< filter over tail elements across tiles (single 1D scan)
+    INTRA   = 0x02, ///< filter within tile (multiple scans in multiple dimensions)
+    REINDEX = 0x04, ///< function that reindexes a subset of another function to write to global mem
 } FuncTag;
 
 /** Scheduling tags for Function dimensions */
 typedef enum {
-    INNER_PURE_VAR = 0x01, ///< inner pure dimension
-    INNER_SCAN_VAR = 0x02, ///< inner scan dimension
-    OUTER_PURE_VAR = 0x04, ///< outer pure dimension
-    OUTER_SCAN_VAR = 0x08, ///< outer scan dimension
-    TAIL_DIMENSION = 0x10, ///< inner dimension which only stores tails (smaller granularity)
-    PURE_DIMENSION = 0x20, ///< pure dimension which is not split
-    SCAN_DIMENSION = 0x40, ///< scan dimension which is not split
-    SCHEDULE_INNER = 0x80, ///< inner dimension created when the programmer uses the RecFilter::split()
+    INVALID = 0x0000, ///< invalid var
+    FULL    = 0x0010, ///< full dimension before tiling
+    INNER   = 0x0020, ///< inner dimension after tiling
+    OUTER   = 0x0040, ///< outer dimension after tiling
+    TAIL    = 0x0080, ///< if dimension is at lower granularity (only for inner dimensions)
+    SCAN    = 0x0100, ///< if dimension is a scan
+    __1     = 0x0001, ///< first variable with one of the above tags
+    __2     = 0x0002, ///< second variable with one of the above tags
+    __3     = 0x0004, ///< third variable with one of the above tags
+    __4     = 0x0008, ///< fourth variable with one of the above tags
 } VarTag;
 
 /** Compare ref and Halide solutions and print the mean square error */
@@ -324,6 +324,17 @@ public:
     // @}
 
 
+    /** @name Generic handles to write scheduled for dimensions of internal functions */
+    // {@
+    VarTag full_parallel (int id=0);
+    VarTag inner_parallel(int id=0);
+    VarTag outer_parallel(int id=0);
+    VarTag full_scan     (int id=0);
+    VarTag inner_scan    (void);
+    VarTag inner_tail    (void);
+    VarTag outer_scan    (void);
+    // @}
+
 protected:
     /** Allow scheduler access to internal functions; only needed to append the
      * scheduling commands to each RecFilterFunc::schedule */
@@ -339,8 +350,8 @@ private:
     RecFilter                recfilter;
     std::vector<std::string> func_list;
 
-    std::map<int,std::vector<Halide::VarOrRVar> > internal_func_vars(RecFilterFunc f, VarTag vtag);
-    std::map<int,Halide::VarOrRVar> internal_func_vars(RecFilterFunc f, VarTag vtag, uint vidx);
+    std::map<int,std::vector<Halide::VarOrRVar> > var_list_by_tag(RecFilterFunc f, VarTag vtag);
+    std::map<int,Halide::VarOrRVar> var_by_tag(RecFilterFunc f, VarTag vtag);
 
 public:
     RecFilterSchedule(RecFilter& r, std::vector<std::string> fl);
@@ -348,14 +359,15 @@ public:
     RecFilterSchedule& compute_in_global();
     RecFilterSchedule& compute_in_shared();
 
-    RecFilterSchedule& unroll(VarTag v, uint vidx=0);
-    RecFilterSchedule& unroll(VarTag v, uint factor, uint vidx=0);
+    RecFilterSchedule& unroll(VarTag v);
+    RecFilterSchedule& unroll(VarTag v, int factor);
 
-    RecFilterSchedule& vectorize(VarTag v, uint vidx=0);
-    RecFilterSchedule& vectorize(VarTag v, uint factor, uint vidx=0);
+    RecFilterSchedule& vectorize(VarTag v);
+    RecFilterSchedule& vectorize(VarTag v, int factor);
 
-    RecFilterSchedule& inner_split(VarTag v, Halide::Expr factor, uint vidx=0);
-    RecFilterSchedule& outer_split(VarTag v, Halide::Expr factor, uint vidx=0);
+    RecFilterSchedule& inner_split(VarTag v, int factor);
+    RecFilterSchedule& outer_split(VarTag v, int factor);
+    RecFilterSchedule& split   (VarTag v, int factor, bool do_reorder);
 
     RecFilterSchedule& reorder(VarTag x, VarTag y);
     RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z);
@@ -367,22 +379,23 @@ public:
     RecFilterSchedule& reorder_storage(VarTag x, VarTag y, VarTag z, VarTag w);
     RecFilterSchedule& reorder_storage(VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
 
-    RecFilterSchedule& parallel(VarTag v, uint vidx=0);
-    RecFilterSchedule& parallel(VarTag v, Halide::Expr task_size, uint vidx=0);
+    RecFilterSchedule& parallel(VarTag v);
+    RecFilterSchedule& parallel(VarTag v, int task_size);
 
-    RecFilterSchedule& gpu_threads(VarTag v, uint t1=1, uint t2=1, uint t3=1);
-    RecFilterSchedule& gpu_threads(VarTag v, std::vector<uint> task_size);
+    RecFilterSchedule& gpu_threads(
+            VarTag vt1,         int t1,
+            VarTag vt2=INVALID, int t2=0,
+            VarTag vt3=INVALID, int t3=0);
 
-    RecFilterSchedule& gpu_blocks(VarTag block_x);
+    RecFilterSchedule& gpu_blocks(
+            VarTag vt1,
+            VarTag vt2=INVALID,
+            VarTag vt3=INVALID);
 
-    RecFilterSchedule& gpu_tile(VarTag x, uint xs);
-    RecFilterSchedule& gpu_tile(VarTag x, VarTag y, uint xs, uint ys);
-    RecFilterSchedule& gpu_tile(VarTag x, VarTag y, VarTag z, uint xs, uint ys, uint zs);
-
-    RecFilterSchedule& split   (VarTag v, Halide::Expr factor, uint vidx, bool do_reorder);
     RecFilterSchedule& reorder (std::vector<VarTag> x);
-    RecFilterSchedule& gpu_tile(std::vector<std::pair<VarTag,uint> > x);
     RecFilterSchedule& reorder_storage(std::vector<VarTag> x);
+
+///    RecFilterSchedule& gpu_tile(std::vector<std::pair<VarTag,int> > x);
 };
 
 // -----------------------------------------------------------------------------
@@ -408,24 +421,6 @@ std::ostream &operator<<(std::ostream &s, const Halide::Func &f);
 std::ostream &operator<<(std::ostream &s, const Halide::Internal::Function &f);
 std::ostream &operator<<(std::ostream &s, const CheckResult &v);
 std::ostream &operator<<(std::ostream &s, const CheckResultVerbose &v);
-std::ostream &operator<<(std::ostream &s, const FuncTag &f);
-std::ostream &operator<<(std::ostream &s, const VarTag &v);
-// @}
-
-// -----------------------------------------------------------------------------
-
-/** @name Logical operators for manipulating function and variable scheduling tags */
-// {@
-FuncTag  operator ~ (const FuncTag& a);
-VarTag   operator ~ (const VarTag&  a);
-FuncTag& operator |=(FuncTag& a, const FuncTag& b);
-VarTag&  operator |=(VarTag&  a, const VarTag& b);
-FuncTag  operator | (const FuncTag& a, const FuncTag& b);
-VarTag   operator | (const VarTag&  a, const VarTag& b);
-FuncTag& operator &=(FuncTag& a, const FuncTag& b);
-VarTag&  operator &=(VarTag&  a, const VarTag& b);
-FuncTag  operator & (const FuncTag& a, const FuncTag& b);
-VarTag   operator & (const VarTag&  a, const VarTag& b);
 // @}
 
 // ----------------------------------------------------------------------------
