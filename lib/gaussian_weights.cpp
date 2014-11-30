@@ -168,7 +168,7 @@ gaussian_weights(float sigma, int order) {
         a[i] = -a[i];
     }
 
-    return std::make_pair<float, vector<float> >(b0, a);
+    return std::make_pair(b0, a);
 }
 
 Expr gaussian(Expr x, float mu, float sigma) {

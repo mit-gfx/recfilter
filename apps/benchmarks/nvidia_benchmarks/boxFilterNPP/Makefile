@@ -66,10 +66,10 @@ ifneq ($(DARWIN),)
 ifeq ($(XCODE_GE_5),1)
   GCC ?= clang
 else
-  GCC ?= g++
+  GCC ?= g++ -std=c++11
 endif
 else
-  GCC ?= g++
+  GCC ?= g++ -std=c++11
 endif
 NVCC := $(CUDA_PATH)/bin/nvcc -ccbin $(GCC)
 
