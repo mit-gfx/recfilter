@@ -332,6 +332,85 @@ ostream &operator<<(std::ostream &os, const RecFilterFunc &f) {
 
 // -----------------------------------------------------------------------------
 
+VarTag::VarTag(void) : tag(INVALID) {}
+
+VarTag::VarTag(const VarTag &t) : tag(t.tag) {}
+
+VarTag::VarTag(const VariableTag &t) : tag(t) {}
+
+VarTag::VarTag(const VarTag &t, int i) : VarTag(t.tag,i) {}
+
+VarTag::VarTag(const VariableTag &t, int i) {
+    switch(i) {
+        case 0: tag = VarTag(t | __1).tag; break;
+        case 1: tag = VarTag(t | __2).tag; break;
+        case 2: tag = VarTag(t | __3).tag; break;
+        case 3: tag = VarTag(t | __4).tag; break;
+        default: std::cerr << "Cannot convert integer to VarTag count" << std::endl; assert(false);
+    }
+}
+
+VarTag::VarTag(int i) : tag(static_cast<VariableTag>(i)) {}
+
+VarTag& VarTag::operator=(const VarTag &t) {
+    tag = t.tag;
+    return *this;
+}
+
+VarTag& VarTag::operator=(const VariableTag &t) {
+    tag = t;
+    return *this;
+}
+
+int VarTag::as_integer(void) const {
+    return static_cast<int>(tag);
+}
+
+VarTag VarTag::split_var(void) const {
+    return VarTag(tag|SPLIT);
+}
+
+int VarTag::check(const VariableTag &t) const {
+    return (as_integer() & VarTag(t).as_integer());
+}
+
+int VarTag::count(void) const {
+    VariableTag t_count = static_cast<VariableTag>(static_cast<int>(tag) & 0x0000000f);
+    int t_int;
+    switch(t_count) {
+        case __1: t_int = 0; break;
+        case __2: t_int = 1; break;
+        case __3: t_int = 2; break;
+        case __4: t_int = 3; break;
+        default: std::cerr << "VarTag does not have a count" << std::endl; assert(false);
+    }
+    return t_int;
+}
+
+void VarTag::decrement_count(void) {
+    VariableTag t_tag  = static_cast<VariableTag>(as_integer() & 0xfffffff0);
+    VariableTag t_count= static_cast<VariableTag>(as_integer() & 0x0000000f);
+    switch (t_count) {
+        case __2: tag = t_tag | __1; break;
+        case __3: tag = t_tag | __2; break;
+        case __4: tag = t_tag | __3; break;
+        default: std::cerr << "Cannot decrement count of VarTag" << std::endl; assert(false);
+    }
+}
+
+void VarTag::increment_count(void) {
+    VariableTag t_tag  = static_cast<VariableTag>(as_integer() & 0xfffffff0);
+    VariableTag t_count= static_cast<VariableTag>(as_integer() & 0x0000000f);
+    switch (t_count) {
+        case __1: tag = t_tag | __2; break;
+        case __2: tag = t_tag | __3; break;
+        case __3: tag = t_tag | __4; break;
+        default: std::cerr << "Cannot increment count of VarTag" << std::endl; assert(false);
+    }
+}
+
+// -----------------------------------------------------------------------------
+
 VariableTag operator|(const VariableTag &a, const VariableTag &b) {
     return static_cast<VariableTag>(static_cast<int>(a) | static_cast<int>(b));
 }

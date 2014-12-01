@@ -19,7 +19,7 @@ struct FilterInfo {
 
 // ----------------------------------------------------------------------------
 
-enum FunctionTag {
+enum FunctionTag : int {
     INLINE  = 0x000, ///< function to be removed by inlining
     INTER   = 0x010, ///< filter over tail elements across tiles (single 1D scan)
     INTRA_N = 0x020, ///< filter within tile (multiple scans in multiple dimensions)
@@ -27,7 +27,7 @@ enum FunctionTag {
     REINDEX = 0x100, ///< function that reindexes a subset of another function to write to global mem
 };
 
-enum VariableTag {
+enum VariableTag: int {
     INVALID = 0x0000, ///< invalid var
     FULL    = 0x0010, ///< full dimension before tiling
     INNER   = 0x0020, ///< inner dimension after tiling
@@ -79,70 +79,6 @@ public:
 
 private:
     FunctionTag tag;
-};
-
-
-/** Scheduling tags for Function dimensions */
-class VarTag {
-public:
-    VarTag(void)                 : tag(INVALID){}
-    VarTag(const VarTag      &t) : tag(t.tag) {}
-    VarTag(const VariableTag &t) : tag(t)     {}
-    VarTag(const VarTag      &t, int i) : VarTag(t.tag,i) {}
-    VarTag(const VariableTag &t, int i) {
-        switch(i) {
-            case 0: tag = VarTag(t | __1).tag; break;
-            case 1: tag = VarTag(t | __2).tag; break;
-            case 2: tag = VarTag(t | __3).tag; break;
-            case 3: tag = VarTag(t | __4).tag; break;
-            default: std::cerr << "Cannot convert integer to VarTag count" << std::endl; assert(false);
-        }
-    }
-    VarTag(int i) : tag(static_cast<VariableTag>(i)) {}
-
-    VarTag& operator=(const VarTag      &t) { tag=t.tag; return *this; }
-    VarTag& operator=(const VariableTag &t) { tag=t;     return *this; }
-
-    int as_integer  (void) const { return static_cast<int>(tag); }
-    VarTag split_var(void) const { return VarTag(tag|SPLIT);     }
-
-    int check(const VariableTag &t) const { return (as_integer() & VarTag(t).as_integer()); }
-
-    int count(void) const {
-        VariableTag t_count = static_cast<VariableTag>(static_cast<int>(tag) & 0x0000000f);
-        int t_int;
-        switch(t_count) {
-            case __1: t_int = 0; break;
-            case __2: t_int = 1; break;
-            case __3: t_int = 2; break;
-            case __4: t_int = 3; break;
-            default: std::cerr << "VarTag does not have a count" << std::endl; assert(false);
-        }
-        return t_int;
-    }
-    void decrement_count(void) {
-        VariableTag t_tag  = static_cast<VariableTag>(as_integer() & 0xfffffff0);
-        VariableTag t_count= static_cast<VariableTag>(as_integer() & 0x0000000f);
-        switch (t_count) {
-            case __2: tag = t_tag | __1; break;
-            case __3: tag = t_tag | __2; break;
-            case __4: tag = t_tag | __3; break;
-            default: std::cerr << "Cannot decrement count of VarTag" << std::endl; assert(false);
-        }
-    }
-    void increment_count(void) {
-        VariableTag t_tag  = static_cast<VariableTag>(as_integer() & 0xfffffff0);
-        VariableTag t_count= static_cast<VariableTag>(as_integer() & 0x0000000f);
-        switch (t_count) {
-            case __1: tag = t_tag | __2; break;
-            case __2: tag = t_tag | __3; break;
-            case __3: tag = t_tag | __4; break;
-            default: std::cerr << "Cannot increment count of VarTag" << std::endl; assert(false);
-        }
-    }
-
-private:
-    VariableTag tag;
 };
 
 // ----------------------------------------------------------------------------

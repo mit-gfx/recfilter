@@ -37,8 +37,11 @@ struct RecFilterContents;
 class RecFilterFunc;
 class RecFilterSchedule;
 
-class VarTag;
 class FuncTag;
+class VarTag;
+
+enum VariableTag : int;
+enum FunctionTag : int;
 
 // ----------------------------------------------------------------------------
 
@@ -381,15 +384,30 @@ public:
 
 // -----------------------------------------------------------------------------
 
-/**@name Vector creation utils */
-// {@
-template<typename T> std::vector<T> make_vec(T a)                         { return Halide::Internal::vec(a); }
-template<typename T> std::vector<T> make_vec(T a, T b)                    { return Halide::Internal::vec(a,b); }
-template<typename T> std::vector<T> make_vec(T a, T b, T c)               { return Halide::Internal::vec(a,b,c); }
-template<typename T> std::vector<T> make_vec(T a, T b, T c, T d)          { return Halide::Internal::vec(a,b,c,d); }
-template<typename T> std::vector<T> make_vec(T a, T b, T c, T d, T e)     { return Halide::Internal::vec(a,b,c,d,e); }
-template<typename T> std::vector<T> make_vec(T a, T b, T c, T d, T e, T f){ return Halide::Internal::vec(a,b,c,d,e,f); }
-// @}
+/** Scheduling tags for Function dimensions */
+class VarTag {
+public:
+    VarTag(void);
+    VarTag(const VarTag      &t);
+    VarTag(const VariableTag &t);
+    VarTag(const VarTag      &t, int i);
+    VarTag(const VariableTag &t, int i);
+    VarTag(int i);
+
+    VarTag& operator=(const VarTag      &t);
+    VarTag& operator=(const VariableTag &t);
+
+    int    as_integer(void) const;
+    VarTag split_var (void) const;
+    int    check     (const VariableTag &t) const;
+    int    count     (void) const;
+
+    void decrement_count(void);
+    void increment_count(void);
+
+private:
+    VariableTag tag;
+};
 
 // -----------------------------------------------------------------------------
 

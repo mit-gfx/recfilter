@@ -36,22 +36,22 @@ int main(int argc, char **argv) {
     Var x("x");
     Var y("y");
 
-    RecFilter filter(x, width, y, height);
+    RecFilter F(x, width, y, height);
 
-    filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
+    F.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
-    filter.add_causal_filter(x, {1.0, 1.0f});
-    filter.add_causal_filter(y, {1.0, 1.0f});
+    F.add_causal_filter(x, {1.0, 1.0f});
+    F.add_causal_filter(y, {1.0, 1.0f});
 
-    filter.split(x, tile_width, y, tile_width);
+    F.split(x, tile_width, y, tile_width);
 
-///     filter.transpose_dimensions ("SAT_Intra_Tail_y_1", "xi", "yi");
-///     filter.interleave_func("SAT_Intra_Tail_x_0", "SAT_Intra_Tail_y_1", "SAT_Intra_Tail", "xi", 1);
+///     F.transpose_dimensions ("SAT_Intra_Tail_y_1", "xi", "yi");
+///     F.interleave_func("SAT_Intra_Tail_x_0", "SAT_Intra_Tail_y_1", "SAT_Intra_Tail", "xi", 1);
 ///
-///     filter.remove_pure_def("SAT_Intra_CTail_x_0_Sub");
-///     filter.remove_pure_def("SAT_Intra_CTail_y_1_Sub");
+///     F.remove_pure_def("SAT_Intra_CTail_x_0_Sub");
+///     F.remove_pure_def("SAT_Intra_CTail_y_1_Sub");
 ///
-///     cerr << filter << endl;
+///     cerr << F << endl;
 ///
 ///    // ----------------------------------------------------------------------------------------------
 ///
@@ -64,16 +64,16 @@ int main(int argc, char **argv) {
 ///        Var rxox("rxo.x$r"), rxoy("rxo.y$r");
 ///        Var ryox("ryo.x$r"), ryoy("ryo.y$r");
 ///
-///        Func SAT             = filter.func("SAT");
-///        Func SAT_Final       = filter.func("SAT_Final");
-///        Func SAT_Intra       = filter.func("SAT_Intra");
-///        Func SAT_Tail        = filter.func("SAT_Intra_Tail");
-///        Func SAT_CTail_x     = filter.func("SAT_Intra_CTail_x_0_Sub");
-///        Func SAT_CTail_y     = filter.func("SAT_Intra_CTail_y_1_Sub");
-///        Func SAT_CTail_xy    = filter.func("SAT_Intra_CTail_x_0_y_1");
-///        Func SAT_CTail_xy_sub= filter.func("SAT_Intra_CTail_x_0_y_1_Sub");
-///        Func SAT_Deps_x      = filter.func("SAT_Intra_Deps_x_0");
-///        Func SAT_Deps_y      = filter.func("SAT_Intra_Deps_y_1");
+///        Func SAT             = F.func("SAT");
+///        Func SAT_Final       = F.func("SAT_Final");
+///        Func SAT_Intra       = F.func("SAT_Intra");
+///        Func SAT_Tail        = F.func("SAT_Intra_Tail");
+///        Func SAT_CTail_x     = F.func("SAT_Intra_CTail_x_0_Sub");
+///        Func SAT_CTail_y     = F.func("SAT_Intra_CTail_y_1_Sub");
+///        Func SAT_CTail_xy    = F.func("SAT_Intra_CTail_x_0_y_1");
+///        Func SAT_CTail_xy_sub= F.func("SAT_Intra_CTail_x_0_y_1_Sub");
+///        Func SAT_Deps_x      = F.func("SAT_Intra_Deps_x_0");
+///        Func SAT_Deps_y      = F.func("SAT_Intra_Deps_y_1");
 ///
 ///        SAT_Intra.compute_at(SAT_Tail, Var::gpu_blocks());
 ///        SAT_Intra.update(0).split(ryi,yi,t,UNROLL).reorder(t,rxi,yi,xo,yo).gpu_threads(rxi,yi).unroll(t);
@@ -129,36 +129,41 @@ int main(int argc, char **argv) {
 
     Target target = get_jit_target_from_environment();
 
-    filter.finalize(target);
-    cerr << filter << endl;
+    F.finalize(target);
+    cerr << F << endl;
 
     {
-        VarTag xi  = INNER_PURE_VAR, xit  = INNER_PURE_VAR | TAIL_DIMENSION;
-        VarTag xo  = OUTER_PURE_VAR, xot  = OUTER_PURE_VAR | TAIL_DIMENSION;
-        VarTag rxi = INNER_SCAN_VAR, rxit = INNER_SCAN_VAR | TAIL_DIMENSION;
-        VarTag rxo = OUTER_SCAN_VAR, rxot = OUTER_SCAN_VAR | TAIL_DIMENSION;
+        F.intra_schedule().compute_in_shared()
+            .reorder_storage(F.inner_tail(), F.inner_parallel(), F.outer_parallel())
+            .reorder        (F.inner_scan(), F.inner_tail(),     F.inner_parallel(), F.outer_parallel())
+            .unroll         (F.inner_scan());
 
-        filter.intra_schedule().compute_in_shared()
-            .reorder_storage(xit, xi, xo)
-            .reorder(xit, rxit, xi, rxi, xo)
-            .unroll(rxi).unroll(rxit)
-            .gpu_threads(xi, 1, 6).gpu_blocks(xo);
+        F.intra_schedule(1)
+            .gpu_threads    (F.inner_parallel(1), 1, F.inner_parallel(2), 6)
+            .unroll         (F.inner_parallel(2).split_var())
+            .gpu_blocks     (F.outer_parallel(1), F.outer_parallel(2));
 
-        filter.inter_schedule().compute_in_global()
-            .reorder_storage(xi, xit, xo)
-            .reorder(xot, xi, xo)
-            .unroll(rxo).unroll(rxot)
-            .gpu_threads(xi).gpu_blocks(xo);
+        F.intra_schedule(2)
+            .inner_split    (F.outer_parallel(1), 4)
+            .gpu_threads    (F.inner_parallel(1), 1, F.inner_parallel(2), 1, F.outer_parallel(1).split_var(), 1)
+            .gpu_blocks     (F.outer_parallel(1), F.outer_parallel(2));
+
+        F.inter_schedule().compute_in_global()
+            .reorder_storage(F.inner_parallel(), F.inner_tail(), F.outer_parallel())
+            .reorder        (F.outer_scan(),     F.inner_parallel(), F.outer_parallel())
+            .unroll         (F.outer_scan())
+            .gpu_threads    (F.inner_parallel(1), 1)
+            .gpu_blocks     (F.outer_parallel(1));
     }
 
-    cerr << filter << endl;
+    cerr << F << endl;
 
     cerr << "\nJIT compilation ... " << endl;
-    filter.compile_jit(target, "hl_stmt.html");
+    F.compile_jit(target, "hl_stmt.html");
 
     cerr << "\nRunning ... " << endl;
     Buffer out(type_of<float>(), width, height);
-    filter.realize(out, iter);
+    F.realize(out, iter);
 
     // ----------------------------------------------------------------------------------------------
 
