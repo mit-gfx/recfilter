@@ -33,10 +33,10 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Var x("x");
-    Var y("y");
+    RecFilterDim x("x", width);
+    RecFilterDim y("y", height);
 
-    RecFilter F(x, width, y, height);
+    RecFilter F(x, y);
 
     F = (image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
@@ -58,8 +58,8 @@ int main(int argc, char **argv) {
 ///    {
 ///        Var t("t");
 ///
-///        Var xi("xi"), yi("yi"), rxi("rxi"), rxf("rxf"), rxt("rxt");
-///        Var xo("xo"), yo("yo"), ryi("ryi"), ryf("ryf"), ryt("ryt");
+///        RecFilterDim x", channels)i("xi"), yi("yi"), rxi("rxi"), rxf("rxf"), rxt("rxt");
+///        RecFilterDim x", channels)o("xo"), yo("yo"), ryi("ryi"), ryf("ryf"), ryt("ryt");
 ///
 ///        Var rxox("rxo.x$r"), rxoy("rxo.y$r");
 ///        Var ryox("ryo.x$r"), ryoy("ryo.y$r");

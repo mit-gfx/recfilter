@@ -26,9 +26,9 @@ int main(int argc, char **argv) {
     W(2,0) = 0.50f; W(2,1) = 0.250f; W(2,2) = 0.0625f;
     W(3,0) = 0.25f; W(3,1) = 0.125f; W(3,2) = 0.0625f;
 
-    Var x("x"), y("y");
+    RecFilterDim x("x", width), y("y", height);
 
-    RecFilter filter(x, width, y, height);
+    RecFilter filter(x, y);
     filter = (image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
     filter.add_causal_filter(x, {1.0f, W(0,0), W(0,1), W(0,2)});

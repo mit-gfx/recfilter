@@ -30,16 +30,16 @@ using namespace Halide::Internal;
 
 RecFilter::RecFilter(void) {}
 
-RecFilter::RecFilter(Var x, Expr wx, string n)
-    : RecFilter(vec(x), vec(wx), n) {}
+RecFilter::RecFilter(RecFilterDim x, string n)
+    : RecFilter(vec(x), n) {}
 
-RecFilter::RecFilter(Var x, Expr wx, Var y, Expr wy, string n)
-    : RecFilter(vec(x,y), vec(wx,wy), n) {}
+RecFilter::RecFilter(RecFilterDim x, RecFilterDim y, string n)
+    : RecFilter(vec(x,y), n) {}
 
-RecFilter::RecFilter(Var x, Expr wx, Var y, Expr wy, Var z, Expr wz, string n)
-    : RecFilter(vec(x,y,z), vec(wx,wy,wz), n) {}
+RecFilter::RecFilter(RecFilterDim x, RecFilterDim y, RecFilterDim z, string n)
+    : RecFilter(vec(x,y,z), n) {}
 
-RecFilter::RecFilter(vector<Var> args, vector<Expr> widths, string n) {
+RecFilter::RecFilter(vector<RecFilterDim> args, string n) {
     contents = new RecFilterContents;
 
     contents.ptr->name = n;
@@ -62,11 +62,11 @@ RecFilter::RecFilter(vector<Var> args, vector<Expr> widths, string n) {
         FilterInfo s;
 
         // set the variable and filter dimension
-        s.var          = args[i];
         s.filter_dim   = i;
+        s.var          = args[i].var();
 
         // extent and domain of all scans in this dimension
-        s.image_width  = widths[i];
+        s.image_width  = args[i].extent();
         s.rdom         = RDom(0, s.image_width, unique_name("r"+s.var.name()));
 
         // default values for now
@@ -76,7 +76,8 @@ RecFilter::RecFilter(vector<Var> args, vector<Expr> widths, string n) {
         contents.ptr->filter_info.push_back(s);
 
         // add tag the dimension as pure
-        f.pure_var_category.insert(make_pair(args[i].name(), FULL));
+        f.pure_var_category.insert(make_pair(args[i].var().name(),
+                    VarTag(FULL,i)));
     }
 
     contents.ptr->func.insert(make_pair(f.func.name(), f));
@@ -125,15 +126,15 @@ void RecFilter::set_clamped_image_border(void) {
     contents.ptr->border_expr = Expr();
 }
 
-void RecFilter::add_causal_filter(Var x, vector<float> coeff) {
+void RecFilter::add_causal_filter(RecFilterDim x, vector<float> coeff) {
     add_filter(x, coeff, true);
 }
 
-void RecFilter::add_anticausal_filter(Var x, vector<float> coeff) {
+void RecFilter::add_anticausal_filter(RecFilterDim x, vector<float> coeff) {
     add_filter(x, coeff, false);
 }
 
-void RecFilter::add_filter(Var x, vector<float> coeff, bool causal) {
+void RecFilter::add_filter(RecFilterDim x, vector<float> coeff, bool causal) {
     RecFilterFunc& rf = internal_function(contents.ptr->name);
     Function        f = rf.func;
 
@@ -159,7 +160,7 @@ void RecFilter::add_filter(Var x, vector<float> coeff, bool causal) {
     // image dimension for the scan
     int dimension = -1;
     for (int i=0; dimension<0 && i<f.args().size(); i++) {
-        if (f.args()[i] == x.name()) {
+        if (f.args()[i] == x.var().name()) {
             dimension = i;
         }
     }
@@ -244,7 +245,7 @@ void RecFilter::add_filter(Var x, vector<float> coeff, bool causal) {
     // copy the dimension tags from pure def replacing x by rx
     // change the function tag from pure to scan
     map<string, VarTag> update_var_category = rf.pure_var_category;
-    update_var_category.erase(x.name());
+    update_var_category.erase(x.var().name());
     update_var_category.insert(make_pair(rx.x.name(), FULL|SCAN));
     rf.update_var_category.push_back(update_var_category);
 }

@@ -38,8 +38,8 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Var x("x");
-    Var y("y");
+    RecFilterDim x("x", width);
+    RecFilterDim y("y", height);
 
     // bounds
     Expr iw = image.width()-1;
@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
     Median(x,y) = median[median.size()-1];
 
     Median.compute_root();
-    Median.gpu_tile(x,y,WARP_SIZE,MAX_THREADS);
+    Median.gpu_tile(x.var(), y.var(), WARP_SIZE,MAX_THREADS);
 
     // ----------------------------------------------------------------------------------------------
 

@@ -26,10 +26,10 @@ int main(int argc, char **argv) {
     W(2,0) = 0.5f; W(2,1) = 0.125f; W(2,2) = 0.0625f;
     W(3,0) = 0.5f; W(3,1) = 0.125f; W(3,2) = 0.03125f;
 
-    Var x("x");
-    Var y("y");
+    RecFilterDim x("x", width);
+    RecFilterDim y("y", height);
 
-    RecFilter filter(x, width, y, height);
+    RecFilter filter(x, y);
 
     filter = (image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 

@@ -29,11 +29,11 @@ int main(int argc, char **argv) {
     W(4,0) = 0.5f; W(4,1) = 0.250f;
     W(5,0) = 0.5f; W(5,1) = 0.0625f;
 
-    Var x("x");
-    Var y("y");
-    Var z("z");
+    RecFilterDim x("x", width);
+    RecFilterDim y("y", height);
+    RecFilterDim z("z", channels);
 
-    RecFilter filter(x, width, y, height, z, channels);
+    RecFilter filter(x, y, z);
     filter = (image(
                 clamp(x,0,image.width()-1),
                 clamp(y,0,image.height()-1),

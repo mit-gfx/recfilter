@@ -36,10 +36,10 @@ int main(int argc, char **argv) {
     vector<float> W1 = gaussian_weights(sigma, 1);
     vector<float> W2 = gaussian_weights(sigma, 2);
 
-    Var x("x");
-    Var y("y");
+    RecFilterDim x("x", width);
+    RecFilterDim y("y", height);
 
-    RecFilter filter(x, width, y, height);
+    RecFilter filter(x, y);
     filter.set_clamped_image_border();
 
     filter = (image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));

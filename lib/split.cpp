@@ -1644,24 +1644,24 @@ void RecFilter::split(map<string,Expr> dim_tile) {
     contents.ptr->tiled = true;
 }
 
-void RecFilter::split(Var x, Expr tx) {
+void RecFilter::split(RecFilterDim x, Expr tx) {
     map<string,Expr> dim_tile;
-    dim_tile[x.name()] = tx;
+    dim_tile[x.var().name()] = tx;
     split(dim_tile);
 }
 
-void RecFilter::split(Var x, Expr tx, Var y, Expr ty) {
+void RecFilter::split(RecFilterDim x, Expr tx, RecFilterDim y, Expr ty) {
     map<string,Expr> dim_tile;
-    dim_tile[x.name()] = tx;
-    dim_tile[y.name()] = ty;
+    dim_tile[x.var().name()] = tx;
+    dim_tile[y.var().name()] = ty;
     split(dim_tile);
 }
 
-void RecFilter::split(Var x, Expr tx, Var y, Expr ty, Var z, Expr tz) {
+void RecFilter::split(RecFilterDim x, Expr tx, RecFilterDim y, Expr ty, RecFilterDim z, Expr tz) {
     map<string,Expr> dim_tile;
-    dim_tile[x.name()] = tx;
-    dim_tile[y.name()] = ty;
-    dim_tile[z.name()] = tz;
+    dim_tile[x.var().name()] = tx;
+    dim_tile[y.var().name()] = ty;
+    dim_tile[z.var().name()] = tz;
     split(dim_tile);
 }
 

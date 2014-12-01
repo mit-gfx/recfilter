@@ -40,8 +40,8 @@ int main(int argc, char **argv) {
     Func I("I");
     Func S("S");
 
-    Var x("x");
-    Var y("y");
+    RecFilterDim x("x", width);
+    RecFilterDim y("y", height);
 
     I(x,y) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1));
 
@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
              -3.0f * I(x+2*box,y+3*box) +
               1.0f * I(x+3*box,y+3*box)) / norm;
 
-    RecFilter filter(x, width, y, height);
+    RecFilter filter(x, y);
 
     filter = (Expr(S(x,y)));
 

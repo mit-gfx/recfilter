@@ -67,6 +67,31 @@ struct CheckResultVerbose {
 
 // ----------------------------------------------------------------------------
 
+
+/** Filter dimension with variable name and width of image in the dimension */
+class RecFilterDim {
+private:
+    Halide::Var  v;  ///< variable for the dimension
+    Halide::Expr e;  ///< size of input/output buffer in the dimension
+
+public:
+    RecFilterDim(void) {}
+    RecFilterDim(std::string var_name, Halide::Expr var_extent):
+        v(var_name), e(var_extent) {}
+
+    Halide::Var  var   (void) const { return v; }
+    Halide::Expr extent(void) const { return e; }
+
+    /** Express as Halide::Expr so that it can be used to index other Halide
+     * functions and buffers */
+    operator Halide::Expr() {
+        return Halide::Internal::Variable::make(Halide::Int(32), v.name());
+    }
+};
+
+// ----------------------------------------------------------------------------
+
+
 /** Recursive filter class */
 class RecFilter {
 private:
@@ -128,17 +153,17 @@ public:
 
     /**@name Recursive filter specification */
     // {@
-    /** Create a 1D recursive filter given variable and size of input/output buffer in that dimension */
-    RecFilter(Halide::Var x, Halide::Expr wx, std::string name="R");
+    /** Create a 1D recursive filter */
+    RecFilter(RecFilterDim x, std::string name="R");
 
-    /** Create a 2D recursive filter given variable and size of input/output buffer in that dimension */
-    RecFilter(Halide::Var x, Halide::Expr wx, Halide::Var y, Halide::Expr wy, std::string name="R");
+    /** Create a 2D recursive filter */
+    RecFilter(RecFilterDim x, RecFilterDim y, std::string name="R");
 
-    /** Create a 3D recursive filter given variable and size of input/output buffer in that dimension */
-    RecFilter(Halide::Var x, Halide::Expr wx, Halide::Var y, Halide::Expr wy, Halide::Var z, Halide::Expr wz, std::string name="R");
+    /** Create a 3D recursive filter */
+    RecFilter(RecFilterDim x, RecFilterDim y, RecFilterDim z, std::string name="R");
 
     /** Create a n-D recursive filter given variable and size of input/output buffer in that dimension */
-    RecFilter(std::vector<Halide::Var> args, std::vector<Halide::Expr> widths, std::string name);
+    RecFilter(std::vector<RecFilterDim> args, std::string name="R");
     // @}
 
     /** Standard assignment operator */
@@ -183,20 +208,20 @@ public:
      */
     // {@
     void add_filter(
-            Halide::Var x,            ///< dimension to a update
+            RecFilterDim x,            ///< dimension to a update
             std::vector<float> coeff, ///< 1 feedforward and n feedback coeffs (n = filter order)
             bool causal               ///< causal or anticausal filter
             );
 
     /** Convenience routine to add causal filter */
     void add_causal_filter(
-            Halide::Var x,            ///< dimension to a update
+            RecFilterDim x,            ///< dimension to a update
             std::vector<float> coeff  ///< 1 feedforward and n feedback coeffs (n = filter order)
             );
 
     /** Convenience routine to add anticausal filter */
     void add_anticausal_filter(
-            Halide::Var x,            ///< dimension to a update
+            RecFilterDim x,            ///< dimension to a update
             std::vector<float> coeff  ///< 1 feedforward and n feedback coeffs (n = filter order)
             );
     // @}
@@ -232,9 +257,9 @@ public:
      */
     // {@
     void split(Halide::Expr tx);
-    void split(Halide::Var x, Halide::Expr tx);
-    void split(Halide::Var x, Halide::Expr tx, Halide::Var y, Halide::Expr ty);
-    void split(Halide::Var x, Halide::Expr tx, Halide::Var y, Halide::Expr ty, Halide::Var z, Halide::Expr tz);
+    void split(RecFilterDim x, Halide::Expr tx);
+    void split(RecFilterDim x, Halide::Expr tx, RecFilterDim y, Halide::Expr ty);
+    void split(RecFilterDim x, Halide::Expr tx, RecFilterDim y, Halide::Expr ty, RecFilterDim z, Halide::Expr tz);
     void split(std::map<std::string, Halide::Expr> dims);
     // @}
 
@@ -421,6 +446,7 @@ private:
 // {@
 std::ostream &operator<<(std::ostream &s, const RecFilter &r);
 std::ostream &operator<<(std::ostream &s, const RecFilterFunc &f);
+std::ostream &operator<<(std::ostream &s, const RecFilterDim &f);
 std::ostream &operator<<(std::ostream &s, const Halide::Func &f);
 std::ostream &operator<<(std::ostream &s, const Halide::Internal::Function &f);
 std::ostream &operator<<(std::ostream &s, const CheckResult &v);

@@ -648,17 +648,17 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
     }
 
     // create the cascaded recursive filters
-    vector<Var> args;
-    vector<Expr> widths;
+    vector<RecFilterDim> args;
     for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-        args.push_back(contents.ptr->filter_info[i].var);
-        widths.push_back(contents.ptr->filter_info[i].image_width);
+        args.push_back(RecFilterDim(
+                    contents.ptr->filter_info[i].var.name(),
+                    contents.ptr->filter_info[i].image_width));
     }
 
     vector<RecFilter> recfilters;
 
     for (int i=0; i<scans.size(); i++) {
-        RecFilter rf(args, widths, func().name() + "_" + int_to_string(i));
+        RecFilter rf(args, func().name() + "_" + int_to_string(i));
 
         // set the image border conditions
         if (!contents.ptr->border_expr.defined()) {
@@ -705,8 +705,8 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
                 assert(false);
             }
 
-            Var x       = contents.ptr->filter_info[dim].var;
-            RDom rx     = contents.ptr->filter_info[dim].rdom;
+            RecFilterDim x(contents.ptr->filter_info[dim].var.name(),
+                    contents.ptr->filter_info[dim].image_width);
             bool causal = contents.ptr->filter_info[dim].scan_causal[idx];
             int order   = contents.ptr->filter_info[dim].filter_order;
 

@@ -29,10 +29,10 @@ int main(int argc, char **argv) {
     W(5,0) = 0.5f; W(5,1) = 0.0625f;
     W(6,0) = 0.5f; W(6,1) = 0.125f;
 
-    Var x("x");
-    Var y("y");
+    RecFilterDim x("x", width);
+    RecFilterDim y("y", height);
 
-    RecFilter filter(x, width, y, height);
+    RecFilter filter(x, y);
     filter = (image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
     filter.add_causal_filter    (x, {1.0f, W(0,0), W(0,1)});
     filter.add_anticausal_filter(x, {1.0f, W(1,0), W(1,1)});

@@ -35,10 +35,10 @@ int main(int argc, char **argv) {
 
     vector<float> W3 = gaussian_weights(sigma, 3);
 
-    Var x("x");
-    Var y("y");
+    RecFilterDim x("x", width);
+    RecFilterDim y("y", height);
 
-    RecFilter filter(x, width, y, height);
+    RecFilter filter(x, y);
 
     filter.set_clamped_image_border();
 

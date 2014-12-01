@@ -330,6 +330,11 @@ ostream &operator<<(std::ostream &os, const RecFilterFunc &f) {
     return os;
 }
 
+ostream &operator<<(ostream &s, const RecFilterDim &v) {
+    s << v.var();
+    return s;
+}
+
 // -----------------------------------------------------------------------------
 
 VarTag::VarTag(void) : tag(INVALID) {}
