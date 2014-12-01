@@ -36,6 +36,11 @@ struct FilterInfo;
 struct RecFilterContents;
 class RecFilterFunc;
 class RecFilterSchedule;
+class RecFilter;
+class RecFilterDim;
+class RecFilterDimAndCausality;
+class RecFilterRefVar;
+class RecFilterRefExpr;
 
 class FuncTag;
 class VarTag;
@@ -122,8 +127,8 @@ RecFilterDimAndCausality operator+(RecFilterDim x);
 RecFilterDimAndCausality operator-(RecFilterDim x);
 // @}
 
-// ----------------------------------------------------------------------------
 
+// ----------------------------------------------------------------------------
 
 /** Recursive filter class */
 class RecFilter {
@@ -182,39 +187,31 @@ public:
 public:
 
     /** Empty constructor */
-    RecFilter(void);
-
-    /**@name Recursive filter specification */
-    // {@
-    /** Create a 1D recursive filter */
-    RecFilter(RecFilterDim x, std::string name="R");
-
-    /** Create a 2D recursive filter */
-    RecFilter(RecFilterDim x, RecFilterDim y, std::string name="R");
-
-    /** Create a 3D recursive filter */
-    RecFilter(RecFilterDim x, RecFilterDim y, RecFilterDim z, std::string name="R");
-
-    /** Create a n-D recursive filter given variable and size of input/output buffer in that dimension */
-    RecFilter(std::vector<RecFilterDim> args, std::string name="R");
-    // @}
+    RecFilter(std::string name="");
 
     /** Standard assignment operator */
     RecFilter& operator=(const RecFilter &r);
 
+    /** Name of the filter */
+    std::string name(void) const;
 
-    /** @name Recursive filter definition
-     * @brief Add a pure definition to the recursive filter, can be Tuple
-     *
-     * Preconditions:
-     * - all Halide::Vars in the pure definition must be args of the filter
-     */
+    /**@name Recursive filter specification */
     // {@
-    RecFilter& operator=(Halide::Expr  pure_def);
-    RecFilter& operator=(Halide::Tuple pure_def);
-    RecFilter& operator=(std::vector<Halide::Expr> pure_def);
+    RecFilterRefVar  operator()(RecFilterDim x);
+    RecFilterRefVar  operator()(RecFilterDim x, RecFilterDim y);
+    RecFilterRefVar  operator()(RecFilterDim x, RecFilterDim y, RecFilterDim z);
+    RecFilterRefVar  operator()(std::vector<RecFilterDim> x);
+    RecFilterRefExpr operator()(Halide::Expr x);
+    RecFilterRefExpr operator()(Halide::Expr x, Halide::Expr y);
+    RecFilterRefExpr operator()(Halide::Expr x, Halide::Expr y, Halide::Expr z);
+    RecFilterRefExpr operator()(std::vector<Halide::Expr> x);
     // @}
 
+    /** Add a pure definition to the recursive filter
+     * \param pure_args list of pure args
+     * \param pure_def list of expressions to initialize the filter
+     */
+    void define(std::vector<RecFilterDim> pure_args, std::vector<Halide::Expr> pure_def);
 
     /**@name Compile and run */
     // {@
@@ -431,6 +428,55 @@ public:
     RecFilterSchedule& reorder_storage(std::vector<VarTag> x);
 
 ///    RecFilterSchedule& gpu_tile(std::vector<std::pair<VarTag,int> > x);
+};
+
+// ----------------------------------------------------------------------------
+
+class RecFilterRefVar {
+private:
+    RecFilter rf;
+    std::vector<RecFilterDim> args;
+
+public:
+    RecFilterRefVar(RecFilter r, std::vector<RecFilterDim> a);
+
+    /**  Use this as the left-hand-side of a definition */
+    void operator=(Halide::Expr pure_def);
+
+    /** Use this as the left-hand-side of a definition for a Func with multiple outputs */
+    void operator=(const Halide::Tuple &pure_def);
+
+    /**  Use this as the left-hand-side of a definition */
+    void operator=(Halide::FuncRefVar pure_def);
+
+    /**  Use this as the left-hand-side of a definition */
+    void operator=(Halide::FuncRefExpr pure_def);
+
+    /** Use this as the left-hand-side of a definition for a Func with multiple outputs */
+    void operator=(std::vector<Halide::Expr> pure_def);
+
+    /** Use this RecFilterRefVar as a call to the internal recfilter output */
+    operator Halide::Expr(void);
+
+    /** Use this RecFilterRefVar as a call to the one of the output buffers of
+     * the internal recfilter */
+    Halide::Expr operator[](int);
+};
+
+class RecFilterRefExpr {
+private:
+    RecFilter rf;
+    std::vector<Halide::Expr> args;
+
+public:
+    RecFilterRefExpr(RecFilter r, std::vector<Halide::Expr> a);
+
+    /** Use this RecFilterRefVar as a call to the internal recfilter output */
+    operator Halide::Expr(void);
+
+    /** Use this RecFilterRefVar as a call to the one of the output buffers of
+     * the internal recfilter */
+    Halide::Expr operator[](int);
 };
 
 // -----------------------------------------------------------------------------

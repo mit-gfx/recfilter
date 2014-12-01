@@ -64,9 +64,9 @@ int main(int argc, char **argv) {
              -3.0f * I(x+2*box,y+3*box) +
               1.0f * I(x+3*box,y+3*box)) / norm;
 
-    RecFilter filter(x, y);
+    RecFilter filter;
 
-    filter = (Expr(S(x,y)));
+    filter(x, y) = Expr(S(x,y));
 
     filter.add_filter(+y, {1.0f, 3.0f, -3.0f, 1.0f});
     filter.add_filter(+y, {1.0f, 3.0f, -3.0f, 1.0f});

@@ -658,17 +658,12 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
     vector<RecFilter> recfilters;
 
     for (int i=0; i<scans.size(); i++) {
-        RecFilter rf(args, func().name() + "_" + int_to_string(i));
-
-        // set the image border conditions
-        if (!contents.ptr->border_expr.defined()) {
-            rf.set_clamped_image_border();
-        }
+        RecFilter rf(func().name() + "_" + int_to_string(i));
 
         // same pure def as original filter for the first
         // subsequent filters call the result of prev recfilter
         if (i == 0) {
-            rf = func().values();
+            rf(args) = func().values();
         } else {
             vector<Expr> call_args;
             vector<Expr> pure_values;
@@ -679,8 +674,14 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
             for (int j=0; j<f_prev.outputs(); j++) {
                 pure_values.push_back(Call::make(f_prev, call_args, j));
             }
-            rf = pure_values;
+            rf(args) = pure_values;
         }
+
+        // set the image border conditions
+        if (!contents.ptr->border_expr.defined()) {
+            rf.set_clamped_image_border();
+        }
+
 
         // extract the scans from the filter and
         // add them to the new filter

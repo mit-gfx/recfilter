@@ -28,45 +28,143 @@ void destroy<RecFilterContents>(const RecFilterContents *f) {
 using namespace Halide;
 using namespace Halide::Internal;
 
-RecFilter::RecFilter(void) {}
+// -----------------------------------------------------------------------------
 
-RecFilter::RecFilter(RecFilterDim x, string n)
-    : RecFilter(vec(x), n) {}
+RecFilterRefVar::RecFilterRefVar(RecFilter r, std::vector<RecFilterDim> a) :
+    rf(r), args(a) {}
 
-RecFilter::RecFilter(RecFilterDim x, RecFilterDim y, string n)
-    : RecFilter(vec(x,y), n) {}
+RecFilterRefExpr::RecFilterRefExpr(RecFilter r, std::vector<Expr> a) :
+    rf(r), args(a) {}
 
-RecFilter::RecFilter(RecFilterDim x, RecFilterDim y, RecFilterDim z, string n)
-    : RecFilter(vec(x,y,z), n) {}
+void RecFilterRefVar::operator=(Expr pure_def) {
+    rf.define(args, vec(pure_def));
+}
 
-RecFilter::RecFilter(vector<RecFilterDim> args, string n) {
+void RecFilterRefVar::operator=(const Tuple &pure_def) {
+    rf.define(args, pure_def.as_vector());
+}
+
+void RecFilterRefVar::operator=(vector<Expr> pure_def) {
+    rf.define(args, pure_def);
+}
+
+void RecFilterRefVar::operator=(FuncRefVar pure_def) {
+    rf.define(args, vec(Expr(pure_def)));
+}
+
+void RecFilterRefVar::operator=(FuncRefExpr pure_def) {
+    rf.define(args, vec(Expr(pure_def)));
+}
+
+RecFilterRefVar ::operator Expr(void) { return this->operator[](0); }
+RecFilterRefExpr::operator Expr(void) { return this->operator[](0); }
+
+Expr RecFilterRefVar::operator[](int i) {
+    Function main_func = rf.func().function();
+    vector<Expr> expr_args;
+    for (int j=0; j<args.size(); j++) {
+        expr_args[j] = args[j];
+    }
+    if (i>=main_func.outputs()) {
+        cerr << "Could not find output buffer " << i
+             << " in recursive filter " << rf.name();
+        assert(false);
+    }
+    return Call::make(main_func, expr_args, i);
+}
+
+Expr RecFilterRefExpr::operator[](int i) {
+    Function main_func = rf.func().function();
+    vector<Expr> expr_args;
+    for (int j=0; j<args.size(); j++) {
+        expr_args[j] = args[j];
+    }
+    if (i>=main_func.outputs()) {
+        cerr << "Could not find output buffer " << i
+             << " in recursive filter " << rf.name();
+        assert(false);
+    }
+    return Call::make(main_func, expr_args, i);
+}
+
+
+// -----------------------------------------------------------------------------
+
+RecFilter::RecFilter(string name) {
     contents = new RecFilterContents;
-
-    contents.ptr->name = n;
+    if (name.empty()) {
+        contents.ptr->name = unique_name("R");
+    } else {
+        contents.ptr->name = name;
+    }
     contents.ptr->tiled          = false;
     contents.ptr->finalized      = false;
     contents.ptr->border_expr    = FLOAT_ZERO;
     contents.ptr->feedfwd_coeff  = Image<float>(0);
     contents.ptr->feedback_coeff = Image<float>(0,0);
+}
 
-    RecFilterFunc f;
-    f.func = Function(n);
-    f.func_category = INTRA_N;
+RecFilter& RecFilter::operator=(const RecFilter &f) {
+    contents = f.contents;
+    return *this;
+}
+
+string RecFilter::name(void) const {
+    return contents.ptr->name;
+}
+
+RecFilterRefVar RecFilter::operator()(RecFilterDim x) {
+    return RecFilterRefVar(*this,vec(x));
+}
+RecFilterRefVar RecFilter::operator()(RecFilterDim x, RecFilterDim y) {
+    return RecFilterRefVar(*this,vec(x,y));
+}
+RecFilterRefVar RecFilter::operator()(RecFilterDim x, RecFilterDim y, RecFilterDim z){
+    return RecFilterRefVar(*this,vec(x,y,z));
+}
+RecFilterRefVar RecFilter::operator()(vector<RecFilterDim> x) {
+    return RecFilterRefVar(*this, x);
+}
+
+RecFilterRefExpr RecFilter::operator()(Expr x) {
+    return RecFilterRefExpr(*this,vec(x));
+}
+RecFilterRefExpr RecFilter::operator()(Expr x, Expr y) {
+    return RecFilterRefExpr(*this,vec(x,y));
+}
+RecFilterRefExpr RecFilter::operator()(Expr x, Expr y, Expr z) {
+    return RecFilterRefExpr(*this,vec(x,y,z));
+}
+RecFilterRefExpr RecFilter::operator()(vector<Expr> x) {
+    return RecFilterRefExpr(*this, x);
+}
+
+void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
+    if (!contents.ptr) {
+        contents = new RecFilterContents;
+        contents.ptr->name = unique_name("R");
+    }
+
+    RecFilterFunc rf;
+    rf.func = Function(contents.ptr->name);
+    rf.func_category = INTRA_N;
 
     if (!contents.ptr->filter_info.empty()) {
         cerr << "Recursive filter dimensions already set" << endl;
         assert(false);
     }
 
-    for (int i=0; i<args.size(); i++) {
+    // add the arguments
+
+    for (int i=0; i<pure_args.size(); i++) {
         FilterInfo s;
 
         // set the variable and filter dimension
         s.filter_dim   = i;
-        s.var          = args[i].var();
+        s.var          = pure_args[i].var();
 
         // extent and domain of all scans in this dimension
-        s.image_width  = args[i].extent();
+        s.image_width  = pure_args[i].extent();
         s.rdom         = RDom(0, s.image_width, unique_name("r"+s.var.name()));
 
         // default values for now
@@ -76,30 +174,15 @@ RecFilter::RecFilter(vector<RecFilterDim> args, string n) {
         contents.ptr->filter_info.push_back(s);
 
         // add tag the dimension as pure
-        f.pure_var_category.insert(make_pair(args[i].var().name(),
+        rf.pure_var_category.insert(make_pair(pure_args[i].var().name(),
                     VarTag(FULL,i)));
     }
 
-    contents.ptr->func.insert(make_pair(f.func.name(), f));
-}
+    contents.ptr->func.insert(make_pair(rf.func.name(), rf));
 
-// -----------------------------------------------------------------------------
+    // add the right hand side definition
+    Function f = rf.func;
 
-RecFilter& RecFilter::operator=(const RecFilter &f) {
-    contents = f.contents;
-    return *this;
-}
-
-RecFilter& RecFilter::operator=(Expr pure_def) {
-    return operator=(vec(pure_def));
-}
-
-RecFilter& RecFilter::operator=(Tuple pure_def) {
-    return operator=(pure_def.as_vector());
-}
-
-RecFilter& RecFilter::operator=(vector<Expr> pure_def) {
-    Function f = internal_function(contents.ptr->name).func;
     vector<string> args;
     for (int i=0; i<contents.ptr->filter_info.size(); i++) {
         args.push_back(contents.ptr->filter_info[i].var.name());
@@ -112,7 +195,6 @@ RecFilter& RecFilter::operator=(vector<Expr> pure_def) {
         Expr extent = contents.ptr->filter_info[i].image_width;
         Func(f).bound(v, 0, extent);
     }
-    return *this;
 }
 
 // -----------------------------------------------------------------------------
@@ -120,7 +202,7 @@ RecFilter& RecFilter::operator=(vector<Expr> pure_def) {
 void RecFilter::set_clamped_image_border(void) {
     Function f = internal_function(contents.ptr->name).func;
     if (f.has_pure_definition()) {
-        cerr << "Border clamping must be set before calling RecFilter::define()" << endl;
+        cerr << "Border clamping must be set before defining the filter" << endl;
         assert(false);
     }
     contents.ptr->border_expr = Expr();

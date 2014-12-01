@@ -38,11 +38,11 @@ int main(int argc, char **argv) {
     RecFilterDim x("x", width);
     RecFilterDim y("y", height);
 
-    RecFilter filter(x, y);
+    RecFilter filter;
 
     filter.set_clamped_image_border();
 
-    filter = (image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
+    filter(x, y) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1));
 
     filter.add_filter(+x, W3);
     filter.add_filter(-x, W3);
