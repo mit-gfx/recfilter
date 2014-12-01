@@ -39,12 +39,12 @@ int main(int argc, char **argv) {
                 clamp(y,0,image.height()-1),
                 clamp(z,0,image.channels()-1)));
 
-    filter.add_causal_filter    (x, {1.0f, W(0,0), W(0,1)});
-    filter.add_anticausal_filter(x, {1.0f, W(1,0), W(1,1)});
-    filter.add_causal_filter    (y, {1.0f, W(2,0), W(2,1)});
-    filter.add_anticausal_filter(y, {1.0f, W(3,0), W(3,1)});
-    filter.add_causal_filter    (z, {1.0f, W(4,0), W(4,1)});
-    filter.add_anticausal_filter(z, {1.0f, W(5,0), W(5,1)});
+    filter.add_filter(+x, {1.0f, W(0,0), W(0,1)});
+    filter.add_filter(-x, {1.0f, W(1,0), W(1,1)});
+    filter.add_filter(+y, {1.0f, W(2,0), W(2,1)});
+    filter.add_filter(-y, {1.0f, W(3,0), W(3,1)});
+    filter.add_filter(+z, {1.0f, W(4,0), W(4,1)});
+    filter.add_filter(-z, {1.0f, W(5,0), W(5,1)});
 
     filter.split(x, tile_width, y, tile_width, z, tile_width);
 

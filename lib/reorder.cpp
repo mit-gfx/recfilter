@@ -716,7 +716,7 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
                 coeff.push_back(contents.ptr->feedback_coeff(scan_id,u));
             }
 
-            rf.add_filter(x, coeff, causal);
+            rf.add_filter((causal ? +x : -x), coeff);
         }
 
         recfilters.push_back(rf);

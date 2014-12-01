@@ -335,6 +335,11 @@ ostream &operator<<(ostream &s, const RecFilterDim &v) {
     return s;
 }
 
+// ----------------------------------------------------------------------------
+
+RecFilterDimAndCausality operator+(RecFilterDim x) { return RecFilterDimAndCausality(x,true); }
+RecFilterDimAndCausality operator-(RecFilterDim x) { return RecFilterDimAndCausality(x,false);}
+
 // -----------------------------------------------------------------------------
 
 VarTag::VarTag(void) : tag(INVALID) {}

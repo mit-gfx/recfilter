@@ -45,10 +45,10 @@ int main(int argc, char **argv) {
 
     filter = (image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
 
-    filter.add_causal_filter    (x, {b0, W2[0], W2[1]});
-    filter.add_anticausal_filter(x, {b0, W2[0], W2[1]});
-    filter.add_causal_filter    (y, {b0, W2[0], W2[1]});
-    filter.add_anticausal_filter(y, {b0, W2[0], W2[1]});
+    filter.add_filter(+x, {b0, W2[0], W2[1]});
+    filter.add_filter(-x, {b0, W2[0], W2[1]});
+    filter.add_filter(+y, {b0, W2[0], W2[1]});
+    filter.add_filter(-y, {b0, W2[0], W2[1]});
 
     filter.split(x, tile_width, y, tile_width);
 

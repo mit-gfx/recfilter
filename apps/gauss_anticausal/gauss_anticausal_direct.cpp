@@ -44,10 +44,10 @@ int main(int argc, char **argv) {
 
     filter = (image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
 
-    filter.add_causal_filter    (x, W3);
-    filter.add_anticausal_filter(x, W3);
-    filter.add_causal_filter    (y, W3);
-    filter.add_anticausal_filter(y, W3);
+    filter.add_filter(+x, W3);
+    filter.add_filter(-x, W3);
+    filter.add_filter(+y, W3);
+    filter.add_filter(-y, W3);
 
     filter.split(x, tile_width, y, tile_width);
 

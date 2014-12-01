@@ -68,10 +68,10 @@ int main(int argc, char **argv) {
 
     filter = (Expr(S(x,y)));
 
-    filter.add_causal_filter(x, {1.0f, 1.0f});
-    filter.add_causal_filter(x, {1.0f, 1.0f});
-    filter.add_causal_filter(y, {1.0f, 2.0f, -1.0f});
-    filter.add_causal_filter(y, {1.0f, 2.0f, -1.0f});
+    filter.add_filter(+x, {1.0f, 1.0f});
+    filter.add_filter(+x, {1.0f, 1.0f});
+    filter.add_filter(+y, {1.0f, 2.0f, -1.0f});
+    filter.add_filter(+y, {1.0f, 2.0f, -1.0f});
 
     filter.split(x, tile_width, y, tile_width);
 

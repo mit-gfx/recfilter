@@ -44,14 +44,14 @@ int main(int argc, char **argv) {
 
     filter = (image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
 
-    filter.add_causal_filter    (x, W1);
-    filter.add_anticausal_filter(x, W1);
-    filter.add_causal_filter    (y, W1);
-    filter.add_anticausal_filter(y, W1);
-    filter.add_causal_filter    (x, W2);
-    filter.add_anticausal_filter(x, W2);
-    filter.add_causal_filter    (y, W2);
-    filter.add_anticausal_filter(y, W2);
+    filter.add_filter(+x, W1);
+    filter.add_filter(-x, W1);
+    filter.add_filter(+y, W1);
+    filter.add_filter(-y, W1);
+    filter.add_filter(+x, W2);
+    filter.add_filter(-x, W2);
+    filter.add_filter(+y, W2);
+    filter.add_filter(-y, W2);
 
     // cascade the scans
     vector<RecFilter> cascaded_filters = filter.cascade({0,1,2,3}, {4,5,6,7});

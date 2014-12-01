@@ -126,15 +126,11 @@ void RecFilter::set_clamped_image_border(void) {
     contents.ptr->border_expr = Expr();
 }
 
-void RecFilter::add_causal_filter(RecFilterDim x, vector<float> coeff) {
-    add_filter(x, coeff, true);
+void RecFilter::add_filter(RecFilterDim x, vector<float> coeff) {
+    add_filter(RecFilterDimAndCausality(x,true), coeff);
 }
 
-void RecFilter::add_anticausal_filter(RecFilterDim x, vector<float> coeff) {
-    add_filter(x, coeff, false);
-}
-
-void RecFilter::add_filter(RecFilterDim x, vector<float> coeff, bool causal) {
+void RecFilter::add_filter(RecFilterDimAndCausality x, vector<float> coeff) {
     RecFilterFunc& rf = internal_function(contents.ptr->name);
     Function        f = rf.func;
 
@@ -149,6 +145,8 @@ void RecFilter::add_filter(RecFilterDim x, vector<float> coeff, bool causal) {
             << " without feed forward and feedback coefficients" << endl;
         assert(false);
     }
+
+    bool causal = x.causal();
 
     float feedfwd = coeff[0];
     vector<float> feedback;

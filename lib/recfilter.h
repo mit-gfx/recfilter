@@ -84,10 +84,43 @@ public:
 
     /** Express as Halide::Expr so that it can be used to index other Halide
      * functions and buffers */
-    operator Halide::Expr() {
+    operator Halide::Expr(void) {
         return Halide::Internal::Variable::make(Halide::Int(32), v.name());
     }
 };
+
+/** Filter dimension augmented with causality */
+class RecFilterDimAndCausality {
+private:
+    RecFilterDim r; ///< variable for the filter dimension
+    bool         c; ///< causality
+
+public:
+    RecFilterDimAndCausality(void) {}
+    RecFilterDimAndCausality(RecFilterDim rec_var, bool causal):
+        r(rec_var), c(causal) {}
+
+    Halide::Var  var   (void) const { return r.var();    }
+    Halide::Expr extent(void) const { return r.extent(); }
+    bool         causal(void) const { return c;          }
+
+    /** Express as Halide::Expr so that it can be used to index other Halide
+     * functions and buffers */
+    operator Halide::Expr(void) {
+        return Halide::Internal::Variable::make(Halide::Int(32), r.var().name());
+    }
+};
+
+/** Operators to indicate causal and anticausal scans in a particular filter dimension */
+// {@
+/** Operator to create causal scan indication, +x indicates causal scan where
+ * x is a RecFilterDim object */
+RecFilterDimAndCausality operator+(RecFilterDim x);
+
+/** Operator to create anticausal scan indication, -x indicates causal scan where
+ * x is a RecFilterDim object */
+RecFilterDimAndCausality operator-(RecFilterDim x);
+// @}
 
 // ----------------------------------------------------------------------------
 
@@ -203,27 +236,15 @@ public:
      *  @brief Add a causal or anticausal scan to the recursive filter with given
      *  feedback and feed forward coefficients
      *
+     * \param x filter dimension
+     * \param coeff 1 feedforward and n feedback coeffs (n = filter order)
+     *
      * Preconditions:
-     * - first argument must be an arg of the filter
+     * - first argument must of of the form +x, -x or x where x is a RecFilterDim object
      */
     // {@
-    void add_filter(
-            RecFilterDim x,            ///< dimension to a update
-            std::vector<float> coeff, ///< 1 feedforward and n feedback coeffs (n = filter order)
-            bool causal               ///< causal or anticausal filter
-            );
-
-    /** Convenience routine to add causal filter */
-    void add_causal_filter(
-            RecFilterDim x,            ///< dimension to a update
-            std::vector<float> coeff  ///< 1 feedforward and n feedback coeffs (n = filter order)
-            );
-
-    /** Convenience routine to add anticausal filter */
-    void add_anticausal_filter(
-            RecFilterDim x,            ///< dimension to a update
-            std::vector<float> coeff  ///< 1 feedforward and n feedback coeffs (n = filter order)
-            );
+    void add_filter(RecFilterDim x, std::vector<float> coeff);
+    void add_filter(RecFilterDimAndCausality x, std::vector<float> coeff);
     // @}
 
     /** @name Image boundary conditions
