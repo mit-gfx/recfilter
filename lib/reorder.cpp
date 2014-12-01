@@ -668,7 +668,7 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
         // same pure def as original filter for the first
         // subsequent filters call the result of prev recfilter
         if (i == 0) {
-            rf.define(func().values());
+            rf = func().values();
         } else {
             vector<Expr> call_args;
             vector<Expr> pure_values;
@@ -679,7 +679,7 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
             for (int j=0; j<f_prev.outputs(); j++) {
                 pure_values.push_back(Call::make(f_prev, call_args, j));
             }
-            rf.define(pure_values);
+            rf = pure_values;
         }
 
         // extract the scans from the filter and

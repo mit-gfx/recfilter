@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
 
     RecFilter filter(x, width, y, height);
 
-    filter.define(Expr(S(x,y)));
+    filter = (Expr(S(x,y)));
 
     filter.add_causal_filter(x, {1.0f, 1.0f});
     filter.add_causal_filter(x, {1.0f, 1.0f});

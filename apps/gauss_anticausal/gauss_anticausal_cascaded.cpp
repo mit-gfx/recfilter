@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
     RecFilter filter(x, width, y, height);
     filter.set_clamped_image_border();
 
-    filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
+    filter = (image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
 
     filter.add_causal_filter    (x, W1);
     filter.add_anticausal_filter(x, W1);

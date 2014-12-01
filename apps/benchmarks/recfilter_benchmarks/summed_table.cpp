@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
 
     RecFilter F(x, width, y, height);
 
-    F.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
+    F = (image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
     F.add_causal_filter(x, {1.0, 1.0f});
     F.add_causal_filter(y, {1.0, 1.0f});

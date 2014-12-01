@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
     Var z("z");
 
     RecFilter filter(x, width, y, height, z, channels);
-    filter.define(image(
+    filter = (image(
                 clamp(x,0,image.width()-1),
                 clamp(y,0,image.height()-1),
                 clamp(z,0,image.channels()-1)));

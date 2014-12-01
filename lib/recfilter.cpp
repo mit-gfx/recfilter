@@ -84,39 +84,20 @@ RecFilter::RecFilter(vector<Var> args, vector<Expr> widths, string n) {
 
 // -----------------------------------------------------------------------------
 
-void RecFilter::define(Expr pure_def) {
-    Function f = internal_function(contents.ptr->name).func;
-    vector<string> args;
-    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-        args.push_back(contents.ptr->filter_info[i].var.name());
-    }
-    f.define(args, vec(pure_def));
-
-    // bound the output buffer for each dimension
-    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-        Var  v      = contents.ptr->filter_info[i].var;
-        Expr extent = contents.ptr->filter_info[i].image_width;
-        Func(f).bound(v, 0, extent);
-    }
+RecFilter& RecFilter::operator=(const RecFilter &f) {
+    contents = f.contents;
+    return *this;
 }
 
-void RecFilter::define(Tuple pure_def) {
-    Function f = internal_function(contents.ptr->name).func;
-    vector<string> args;
-    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-        args.push_back(contents.ptr->filter_info[i].var.name());
-    }
-    f.define(args, pure_def.as_vector());
-
-    // bound the output buffer for each dimension
-    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-        Var  v      = contents.ptr->filter_info[i].var;
-        Expr extent = contents.ptr->filter_info[i].image_width;
-        Func(f).bound(v, 0, extent);
-    }
+RecFilter& RecFilter::operator=(Expr pure_def) {
+    return operator=(vec(pure_def));
 }
 
-void RecFilter::define(vector<Expr> pure_def) {
+RecFilter& RecFilter::operator=(Tuple pure_def) {
+    return operator=(pure_def.as_vector());
+}
+
+RecFilter& RecFilter::operator=(vector<Expr> pure_def) {
     Function f = internal_function(contents.ptr->name).func;
     vector<string> args;
     for (int i=0; i<contents.ptr->filter_info.size(); i++) {
@@ -130,6 +111,7 @@ void RecFilter::define(vector<Expr> pure_def) {
         Expr extent = contents.ptr->filter_info[i].image_width;
         Func(f).bound(v, 0, extent);
     }
+    return *this;
 }
 
 // -----------------------------------------------------------------------------

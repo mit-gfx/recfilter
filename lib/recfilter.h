@@ -141,6 +141,23 @@ public:
     RecFilter(std::vector<Halide::Var> args, std::vector<Halide::Expr> widths, std::string name);
     // @}
 
+    /** Standard assignment operator */
+    RecFilter& operator=(const RecFilter &r);
+
+
+    /** @name Recursive filter definition
+     * @brief Add a pure definition to the recursive filter, can be Tuple
+     *
+     * Preconditions:
+     * - all Halide::Vars in the pure definition must be args of the filter
+     */
+    // {@
+    RecFilter& operator=(Halide::Expr  pure_def);
+    RecFilter& operator=(Halide::Tuple pure_def);
+    RecFilter& operator=(std::vector<Halide::Expr> pure_def);
+    // @}
+
+
     /**@name Compile and run */
     // {@
     /** Finalize the filter; triggers automatic function transformations and cleanup */
@@ -155,18 +172,6 @@ public:
     void realize(Halide::Buffer out, int iterations=1);
     // @}
 
-
-    /** @name Recursive filter definition
-     * @brief Add a pure definition to the recursive filter, can be Tuple
-     *
-     * Preconditions:
-     * - all Halide::Vars in the pure definition must be args of the filter
-     */
-    // {@
-    void define(Halide::Expr  pure_def);
-    void define(Halide::Tuple pure_def);
-    void define(std::vector<Halide::Expr> pure_def);
-    // @}
 
     /** @name Routines to add filters
      *
