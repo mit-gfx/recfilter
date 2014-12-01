@@ -312,13 +312,13 @@ public:
 
     /** @name Generic handles to write scheduled for dimensions of internal functions */
     // {@
-    VarTag full_parallel (int id=0);
-    VarTag inner_parallel(int id=0);
-    VarTag outer_parallel(int id=0);
-    VarTag full_scan     (int id=0);
-    VarTag inner_scan    (void);
-    VarTag inner_tail    (void);
-    VarTag outer_scan    (void);
+    VarTag full      (int i=0);
+    VarTag inner     (int i=0);
+    VarTag outer     (int i=0);
+    VarTag tail      (void);
+    VarTag full_scan (int i=0);
+    VarTag inner_scan(void);
+    VarTag outer_scan(void);
     // @}
 
 protected:

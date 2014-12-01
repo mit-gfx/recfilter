@@ -326,14 +326,13 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
     return RecFilterSchedule(*this, func_list);
 }
 
-VarTag RecFilter::full_parallel (int id) { return VarTag(FULL, id); }
-VarTag RecFilter::full_scan     (int id) { return VarTag(FULL|SCAN, id); }
-VarTag RecFilter::inner_parallel(int id) { return VarTag(INNER, id); }
-VarTag RecFilter::outer_parallel(int id) { return VarTag(OUTER, id); }
-
-VarTag RecFilter::inner_scan(void) { return (INNER|SCAN); }
-VarTag RecFilter::outer_scan(void) { return (OUTER|SCAN); }
-VarTag RecFilter::inner_tail(void) { return (INNER|TAIL); }
+VarTag RecFilter::full      (int i) { return VarTag(FULL,  i);     }
+VarTag RecFilter::inner     (int i) { return VarTag(INNER, i);     }
+VarTag RecFilter::outer     (int i) { return VarTag(OUTER, i);     }
+VarTag RecFilter::tail      (void)  { return VarTag(INNER|TAIL);   }
+VarTag RecFilter::full_scan (int i) { return VarTag(FULL|SCAN, i); }
+VarTag RecFilter::inner_scan(void)  { return (INNER|SCAN);         }
+VarTag RecFilter::outer_scan(void)  { return (OUTER|SCAN);         }
 
 // -----------------------------------------------------------------------------
 
