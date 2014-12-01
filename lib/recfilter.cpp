@@ -279,8 +279,8 @@ RecFilterSchedule RecFilter::intra_schedule(int id) {
 
         switch(id) {
             case 0: function_condition |= (ftag==FuncTag(INTRA_1) | ftag==FuncTag(INTRA_N)); break;
-            case 1: function_condition |= (ftag==FuncTag(INTRA_1)); break;
-            default:function_condition |= (ftag==FuncTag(INTRA_N)); break;
+            case 1: function_condition |= (ftag==FuncTag(INTRA_N)); break;
+            default:function_condition |= (ftag==FuncTag(INTRA_1)); break;
         }
 
         if (function_condition) {

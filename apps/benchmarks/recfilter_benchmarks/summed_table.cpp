@@ -132,29 +132,27 @@ int main(int argc, char **argv) {
     F.finalize(target);
     cerr << F << endl;
 
-    {
-        F.intra_schedule().compute_in_shared()
-            .reorder_storage(F.inner_tail(), F.inner_parallel(), F.outer_parallel())
-            .reorder        (F.inner_scan(), F.inner_tail(),     F.inner_parallel(), F.outer_parallel())
-            .unroll         (F.inner_scan());
+    F.intra_schedule().compute_in_shared()
+        .reorder_storage(F.inner_tail(), F.inner_parallel(), F.outer_parallel())
+        .reorder        (F.inner_scan(), F.inner_tail(),     F.inner_parallel(), F.outer_parallel())
+        .unroll         (F.inner_scan());
 
-        F.intra_schedule(1)
-            .gpu_threads    (F.inner_parallel(1), 1, F.inner_parallel(2), 6)
-            .unroll         (F.inner_parallel(2).split_var())
-            .gpu_blocks     (F.outer_parallel(1), F.outer_parallel(2));
+    F.intra_schedule(1)
+        .gpu_threads    (F.inner_parallel(1), 1, F.inner_parallel(2), 6)
+        .unroll         (F.inner_parallel(2).split_var())
+        .gpu_blocks     (F.outer_parallel(1), F.outer_parallel(2));
 
-        F.intra_schedule(2)
-            .inner_split    (F.outer_parallel(1), 4)
-            .gpu_threads    (F.inner_parallel(1), 1, F.inner_parallel(2), 1, F.outer_parallel(1).split_var(), 1)
-            .gpu_blocks     (F.outer_parallel(1), F.outer_parallel(2));
+    F.intra_schedule(2)
+        .inner_split    (F.outer_parallel(1), 4)
+        .gpu_threads    (F.inner_parallel(1), 1, F.inner_parallel(2), 1, F.outer_parallel(1).split_var(), 1)
+        .gpu_blocks     (F.outer_parallel(1), F.outer_parallel(2));
 
-        F.inter_schedule().compute_in_global()
-            .reorder_storage(F.inner_parallel(), F.inner_tail(), F.outer_parallel())
-            .reorder        (F.outer_scan(),     F.inner_parallel(), F.outer_parallel())
-            .unroll         (F.outer_scan())
-            .gpu_threads    (F.inner_parallel(1), 1)
-            .gpu_blocks     (F.outer_parallel(1));
-    }
+    F.inter_schedule().compute_in_global()
+        .reorder_storage(F.inner_parallel(), F.inner_tail(), F.outer_parallel())
+        .reorder        (F.outer_scan(),     F.inner_parallel(), F.outer_parallel())
+        .unroll         (F.outer_scan())
+        .gpu_threads    (F.inner_parallel(1), 1)
+        .gpu_blocks     (F.outer_parallel(1));
 
     cerr << F << endl;
 

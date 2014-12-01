@@ -301,7 +301,7 @@ public:
     // {@
 
     /** Extract a handle to schedule intra-tile functions
-     * \param id 0 for all intra tile functions, 1 for 1D intra-tile functions, otherwise nD intra-tile functions
+     * \param id 0 for all intra tile functions, 1 for nD intra-tile functions, otherwise 1D intra-tile functions
      */
     RecFilterSchedule intra_schedule(int id=0);
 
