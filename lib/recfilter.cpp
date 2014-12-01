@@ -28,6 +28,8 @@ void destroy<RecFilterContents>(const RecFilterContents *f) {
 using namespace Halide;
 using namespace Halide::Internal;
 
+RecFilter::RecFilter(void) {}
+
 RecFilter::RecFilter(Var x, Expr wx, string n)
     : RecFilter(vec(x), vec(wx), n) {}
 
@@ -141,15 +143,15 @@ void RecFilter::set_clamped_image_border(void) {
     contents.ptr->border_expr = Expr();
 }
 
-void RecFilter::add_causal_filter(Var x, float feedfwd, vector<float> feedback) {
-    add_filter(x, feedfwd, feedback, true);
+void RecFilter::add_causal_filter(Var x, vector<float> coeff) {
+    add_filter(x, coeff, true);
 }
 
-void RecFilter::add_anticausal_filter(Var x, float feedfwd, vector<float> feedback) {
-    add_filter(x, feedfwd, feedback, false);
+void RecFilter::add_anticausal_filter(Var x, vector<float> coeff) {
+    add_filter(x, coeff, false);
 }
 
-void RecFilter::add_filter(Var x, float feedfwd, vector<float> feedback, bool causal) {
+void RecFilter::add_filter(Var x, vector<float> coeff, bool causal) {
     RecFilterFunc& rf = internal_function(contents.ptr->name);
     Function        f = rf.func;
 
@@ -159,11 +161,15 @@ void RecFilter::add_filter(Var x, float feedfwd, vector<float> feedback, bool ca
         assert(false);
     }
 
-    if (feedback.empty()) {
+    if (coeff.size()<2) {
         cerr << "Cannot add scan to recursive filter " << f.name()
-            << " without feedback coefficients" << endl;
+            << " without feed forward and feedback coefficients" << endl;
         assert(false);
     }
+
+    float feedfwd = coeff[0];
+    vector<float> feedback;
+    feedback.insert(feedback.begin(), coeff.begin()+1, coeff.end());
 
     // filter order and csausality
     int scan_order = feedback.size();

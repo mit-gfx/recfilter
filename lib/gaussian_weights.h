@@ -25,14 +25,12 @@ Halide::Expr gaussIntegral  (Halide::Expr x, float mu, float sigma);
 /**
  * @brief Wrapper to compute third order recursive filter weights for Gaussian blur.
  * Third order filter can be approximated by cascaded first and second order filters
+ * @param[in] order order of recursive filter for approximation
+ * @param[in] sigma sigma of Gaussian filter
  *
- * @return feedforward coeff and vector of feedback coeff
+ * @return vector with feedforward coeff as first element and rest feedback coeff
  */
-std::pair<float, std::vector<float> >
-gaussian_weights(
-        float sigma,   ///< Gaussian sigma
-        int order      ///< recursive filter order for approximating Gaussian
-        );
+std::vector<float> gaussian_weights(float sigma, int order);
 
 /**
  * @brief Compute the size of a box filter that approximates a Gaussian

@@ -33,24 +33,22 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    float b0 = 0.425294f;
-    vector<float> W2;
-    W2.push_back(0.885641f);
-    W2.push_back(-0.310935f);
+    float b0         = 0.425294f;
+    vector<float> W2 = {0.885641f, -0.310935f};
 
     Var x("x");
     Var y("y");
 
-    RecFilter filter("S");
+    RecFilter filter(x, width, y, height);
 
-    filter.set_args(x, y, width, height);
     filter.set_clamped_image_border();
+
     filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
 
-    filter.add_causal_filter    (x, b0, W2);
-    filter.add_anticausal_filter(x, b0, W2);
-    filter.add_causal_filter    (y, b0, W2);
-    filter.add_anticausal_filter(y, b0, W2);
+    filter.add_causal_filter    (x, {b0, W2[0], W2[1]});
+    filter.add_anticausal_filter(x, {b0, W2[0], W2[1]});
+    filter.add_causal_filter    (y, {b0, W2[0], W2[1]});
+    filter.add_anticausal_filter(y, {b0, W2[0], W2[1]});
 
     filter.split(x, tile_width, y, tile_width);
 

@@ -27,17 +27,14 @@ int main(int argc, char **argv) {
     W(3,0) = 0.25f; W(3,1) = 0.125f; W(3,2) = 0.0625f;
 
     Var x("x"), y("y");
-    RDom rx(0, image.width(),"rx");
 
-    RecFilter filter("Test");
-
-    filter.set_args(x, y, width, height);
+    RecFilter filter(x, width, y, height);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
-    filter.add_causal_filter(x, 1.0f, make_vec(W(0,0), W(0,1), W(0,2)));
-    filter.add_causal_filter(x, 1.0f, make_vec(W(1,0), W(1,1), W(1,2)));
-    filter.add_causal_filter(x, 1.0f, make_vec(W(2,0), W(2,1), W(2,2)));
-    filter.add_causal_filter(x, 1.0f, make_vec(W(3,0), W(3,1), W(3,2)));
+    filter.add_causal_filter(x, {1.0f, W(0,0), W(0,1), W(0,2)});
+    filter.add_causal_filter(x, {1.0f, W(1,0), W(1,1), W(1,2)});
+    filter.add_causal_filter(x, {1.0f, W(2,0), W(2,1), W(2,2)});
+    filter.add_causal_filter(x, {1.0f, W(3,0), W(3,1), W(3,2)});
 
     filter.split(x, tile);
 

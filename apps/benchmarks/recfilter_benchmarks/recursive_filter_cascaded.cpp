@@ -33,10 +33,9 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    float b0 = 0.425294f;
-    vector<float> W2;
-    W2.push_back(0.885641f);
-    W2.push_back(-0.310935f);
+    float b0         = 0.425294f;
+    vector<float> W2 = {0.885641f, -0.310935f};
+
     int filter_order = W2.size();
 
     Var x("x");
@@ -45,20 +44,19 @@ int main(int argc, char **argv) {
     RecFilter filterx;
     RecFilter filtery;
     {
-        RecFilter filter("S");
+        RecFilter filter(x, width, y, height);
 
-        filter.set_args(x, y, width, height);
         filter.set_clamped_image_border();
+
         filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
 
-        filter.add_causal_filter    (x, b0, W2);
-        filter.add_anticausal_filter(x, b0, W2);
-        filter.add_causal_filter    (y, b0, W2);
-        filter.add_anticausal_filter(y, b0, W2);
+        filter.add_causal_filter    (x, {b0, W2[0], W2[1]});
+        filter.add_anticausal_filter(x, {b0, W2[0], W2[1]});
+        filter.add_causal_filter    (y, {b0, W2[0], W2[1]});
+        filter.add_anticausal_filter(y, {b0, W2[0], W2[1]});
 
         // cascade the scans
-        vector<RecFilter> cascaded_filters = filter.cascade(
-                make_vec(0,1), make_vec(2,3));
+        vector<RecFilter> cascaded_filters = filter.cascade({0,1}, {2,3});
 
         filterx = cascaded_filters[0];
         filtery = cascaded_filters[1];

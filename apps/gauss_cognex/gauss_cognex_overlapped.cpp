@@ -37,11 +37,6 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    vector<float> W1, W2;
-    W1.push_back( 1.0f);
-    W2.push_back( 2.0f);
-    W2.push_back(-1.0f);
-
     Func I("I");
     Func S("S");
 
@@ -69,13 +64,14 @@ int main(int argc, char **argv) {
              -3.0f * I(x+2*box,y+3*box) +
               1.0f * I(x+3*box,y+3*box)) / norm;
 
-    RecFilter filter("Gauss");
-    filter.set_args(x, y, width, height);
-    filter.define(Expr(S(x, y)));
-    filter.add_causal_filter(x, 1.0f, W1);
-    filter.add_causal_filter(x, 1.0f, W1);
-    filter.add_causal_filter(y, 1.0f, W2);
-    filter.add_causal_filter(y, 1.0f, W2);
+    RecFilter filter(x, width, y, height);
+
+    filter.define(Expr(S(x,y)));
+
+    filter.add_causal_filter(x, {1.0f, 1.0f});
+    filter.add_causal_filter(x, {1.0f, 1.0f});
+    filter.add_causal_filter(y, {1.0f, 2.0f, -1.0f});
+    filter.add_causal_filter(y, {1.0f, 2.0f, -1.0f});
 
     filter.split(x, tile_width, y, tile_width);
 

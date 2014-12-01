@@ -153,22 +153,21 @@ static void weights3(const float& s, float& b0, float& a1, float& a2, float& a3)
 }
 
 
-std::pair<float, vector<float> >
-gaussian_weights(float sigma, int order) {
+vector<float> gaussian_weights(float sigma, int order) {
     float b0 = 0.0f;
-    vector<float> a(order, 0.0f);
+    vector<float> a(order+1, 0.0f);
 
     switch(order) {
-        case 1: weights1(sigma, b0, a[0]); break;
-        case 2: weights2(sigma, b0, a[0], a[1]); break;
-        default:weights3(sigma, b0, a[0], a[1], a[2]); break;
+        case 1: weights1(sigma, a[0], a[1]); break;
+        case 2: weights2(sigma, a[0], a[1], a[2]); break;
+        default:weights3(sigma, a[0], a[1], a[2], a[3]); break;
     }
 
-    for (int i=0; i<a.size(); i++) {
+    for (int i=1; i<a.size(); i++) {
         a[i] = -a[i];
     }
 
-    return std::make_pair(b0, a);
+    return a;
 }
 
 Expr gaussian(Expr x, float mu, float sigma) {

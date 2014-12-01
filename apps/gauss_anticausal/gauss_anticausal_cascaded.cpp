@@ -33,33 +33,28 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    float         B1 = gaussian_weights(sigma, 1).first;
-    float         B2 = gaussian_weights(sigma, 2).first;
-    vector<float> W1 = gaussian_weights(sigma, 1).second;
-    vector<float> W2 = gaussian_weights(sigma, 2).second;
+    vector<float> W1 = gaussian_weights(sigma, 1);
+    vector<float> W2 = gaussian_weights(sigma, 2);
 
     Var x("x");
     Var y("y");
 
-    RecFilter filter("Gauss");
-
-    filter.set_args(x, y, width, height);
+    RecFilter filter(x, width, y, height);
     filter.set_clamped_image_border();
+
     filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
 
-    filter.add_causal_filter    (x, B1, W1);
-    filter.add_anticausal_filter(x, B1, W1);
-    filter.add_causal_filter    (y, B1, W1);
-    filter.add_anticausal_filter(y, B1, W1);
-    filter.add_causal_filter    (x, B2, W2);
-    filter.add_anticausal_filter(x, B2, W2);
-    filter.add_causal_filter    (y, B2, W2);
-    filter.add_anticausal_filter(y, B2, W2);
+    filter.add_causal_filter    (x, W1);
+    filter.add_anticausal_filter(x, W1);
+    filter.add_causal_filter    (y, W1);
+    filter.add_anticausal_filter(y, W1);
+    filter.add_causal_filter    (x, W2);
+    filter.add_anticausal_filter(x, W2);
+    filter.add_causal_filter    (y, W2);
+    filter.add_anticausal_filter(y, W2);
 
     // cascade the scans
-    vector<RecFilter> cascaded_filters = filter.cascade(
-            make_vec(0,1,2,3),
-            make_vec(4,5,6,7));
+    vector<RecFilter> cascaded_filters = filter.cascade({0,1,2,3}, {4,5,6,7});
 
     RecFilter filter1 = cascaded_filters[0];
     RecFilter filter2 = cascaded_filters[1];

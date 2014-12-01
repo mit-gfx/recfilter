@@ -17,7 +17,7 @@ all: $(APPS)
 
 $(BIN_DIR)/%.app: %.cpp  $(LIBRECFILTER_LIB) $(HALIDE_LIB) $(LIBRECFILTER_INC)
 	@$(MKDIR) $(BIN_DIR)
-	$(CXX) $< -o $@ -I$(LIBRECFILTER_DIR) -I$(HALIDE_DIR)/include/ -L$(LIBRECFILTER_DIR) -L$(HALIDE_DIR)/bin/ -lz -lpthread -ldl -g -lncurses -Wall -lHalide -lRecfilter
+	$(CXX) -I$(LIBRECFILTER_DIR) -I$(HALIDE_DIR)/include/ -L$(LIBRECFILTER_DIR) -L$(HALIDE_DIR)/bin/ -lz -lpthread -ldl -g -lncurses -Wall -lHalide -lRecfilter $< -o $@
 
 $(LIBRECFILTER_LIB): $(LIBRECFILTER_INC)
 	make -C $(LIBRECFILTER_DIR)

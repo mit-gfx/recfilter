@@ -37,11 +37,6 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    vector<float> W;
-    W.push_back( 3.0f);
-    W.push_back(-3.0f);
-    W.push_back( 1.0f);
-
     Func I("I");
     Func S("S");
 
@@ -69,11 +64,12 @@ int main(int argc, char **argv) {
              -3.0f * I(x+2*box,y+3*box) +
               1.0f * I(x+3*box,y+3*box)) / norm;
 
-    RecFilter filter;
-    filter.set_args(x, y, width, height);
-    filter.define(Expr(S(x, y)));
-    filter.add_causal_filter(x, 1.0f, W);
-    filter.add_causal_filter(y, 1.0f, W);
+    RecFilter filter(x, width, y, height);
+
+    filter.define(Expr(S(x,y)));
+
+    filter.add_causal_filter(y, {1.0f, 3.0f, -3.0f, 1.0f});
+    filter.add_causal_filter(y, {1.0f, 3.0f, -3.0f, 1.0f});
 
     filter.split(x, tile_width, y, tile_width);
 

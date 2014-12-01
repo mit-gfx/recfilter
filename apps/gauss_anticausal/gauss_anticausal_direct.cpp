@@ -33,22 +33,21 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    float         B3 = gaussian_weights(sigma, 3).first;
-    vector<float> W3 = gaussian_weights(sigma, 3).second;
+    vector<float> W3 = gaussian_weights(sigma, 3);
 
     Var x("x");
     Var y("y");
 
-    RecFilter filter("Gauss");
+    RecFilter filter(x, width, y, height);
 
     filter.set_clamped_image_border();
-    filter.set_args(x, y, width, height);
+
     filter.define(image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1)));
 
-    filter.add_causal_filter    (x, B3, W3);
-    filter.add_anticausal_filter(x, B3, W3);
-    filter.add_causal_filter    (y, B3, W3);
-    filter.add_anticausal_filter(y, B3, W3);
+    filter.add_causal_filter    (x, W3);
+    filter.add_anticausal_filter(x, W3);
+    filter.add_causal_filter    (y, W3);
+    filter.add_anticausal_filter(y, W3);
 
     filter.split(x, tile_width, y, tile_width);
 

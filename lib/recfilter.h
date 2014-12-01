@@ -120,6 +120,9 @@ public:
 
 public:
 
+    /** Empty constructor */
+    RecFilter(void);
+
     /**@name Recursive filter specification */
     // {@
     /** Create a 1D recursive filter given variable and size of input/output buffer in that dimension */
@@ -168,28 +171,25 @@ public:
      *  feedback and feed forward coefficients
      *
      * Preconditions:
-     * - first argument must be arg of the filter
+     * - first argument must be an arg of the filter
      */
     // {@
     void add_filter(
-            Halide::Var x,              ///< dimension to a update
-            float feedfwd,              ///< single feedforward coeff
-            std::vector<float> feedback,///< n feedback coeffs, where n is filter order
-            bool causal                 ///< causal or anticausal filter
+            Halide::Var x,            ///< dimension to a update
+            std::vector<float> coeff, ///< 1 feedforward and n feedback coeffs (n = filter order)
+            bool causal               ///< causal or anticausal filter
             );
 
     /** Convenience routine to add causal filter */
     void add_causal_filter(
-            Halide::Var x,              ///< dimension to a update
-            float feedfwd,              ///< single feedforward coeff
-            std::vector<float> feedback ///< n feedback coeffs, where n is filter order
+            Halide::Var x,            ///< dimension to a update
+            std::vector<float> coeff  ///< 1 feedforward and n feedback coeffs (n = filter order)
             );
 
     /** Convenience routine to add anticausal filter */
     void add_anticausal_filter(
-            Halide::Var x,              ///< dimension to a update
-            float feedfwd,              ///< single feedforward coeff
-            std::vector<float> feedback ///< n feedback coeffs, where n is filter order
+            Halide::Var x,            ///< dimension to a update
+            std::vector<float> coeff  ///< 1 feedforward and n feedback coeffs (n = filter order)
             );
     // @}
 

@@ -652,7 +652,7 @@ static vector<RecFilterFunc> create_intra_tail_term(
         rf.pure_var_category[xi.name()] = INNER|TAIL;
         map<string,VarTag>::iterator vit;
         for (vit=rf.pure_var_category.begin(); vit!=rf.pure_var_category.end(); vit++) {
-            if (vit->second.check(INNER)) {
+            if (vit->first!=xi.name() && vit->second.check(INNER)) {
                 int count = vit->second.count();
                 if (count > count_xi) {
                     rf.pure_var_category[vit->first].decrement_count();

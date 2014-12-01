@@ -705,18 +705,18 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
                 assert(false);
             }
 
-            Var x           = contents.ptr->filter_info[dim].var;
-            RDom rx         = contents.ptr->filter_info[dim].rdom;
-            bool causal     = contents.ptr->filter_info[dim].scan_causal[idx];
-            int order       = contents.ptr->filter_info[dim].filter_order;
-            float feedfwd   = contents.ptr->feedfwd_coeff(scan_id);
+            Var x       = contents.ptr->filter_info[dim].var;
+            RDom rx     = contents.ptr->filter_info[dim].rdom;
+            bool causal = contents.ptr->filter_info[dim].scan_causal[idx];
+            int order   = contents.ptr->filter_info[dim].filter_order;
 
-            vector<float> feedback;
+            vector<float> coeff;
+            coeff.push_back(contents.ptr->feedfwd_coeff(scan_id));
             for (int u=0; u<order; u++) {
-                feedback.push_back(contents.ptr->feedback_coeff(scan_id,u));
+                coeff.push_back(contents.ptr->feedback_coeff(scan_id,u));
             }
 
-            rf.add_filter(x, feedfwd, feedback, causal);
+            rf.add_filter(x, coeff, causal);
         }
 
         recfilters.push_back(rf);

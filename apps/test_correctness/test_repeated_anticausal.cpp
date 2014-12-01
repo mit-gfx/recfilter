@@ -28,15 +28,13 @@ int main(int argc, char **argv) {
 
     Var x("x"), y("y");
 
-    RecFilter filter("S");
-
-    filter.set_args(x, y, width, height);
+    RecFilter filter(x, width, y, height);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
 
-    filter.add_anticausal_filter(x, 1.0f, make_vec(W(0,0), W(0,1)));
-    filter.add_anticausal_filter(x, 1.0f, make_vec(W(1,0), W(1,1)));
-    filter.add_anticausal_filter(x, 1.0f, make_vec(W(2,0), W(2,1)));
-    filter.add_anticausal_filter(x, 1.0f, make_vec(W(3,0), W(3,1)));
+    filter.add_anticausal_filter(x, {1.0f, W(0,0), W(0,1)});
+    filter.add_anticausal_filter(x, {1.0f, W(1,0), W(1,1)});
+    filter.add_anticausal_filter(x, {1.0f, W(2,0), W(2,1)});
+    filter.add_anticausal_filter(x, {1.0f, W(3,0), W(3,1)});
 
     filter.split(x, tile);
 

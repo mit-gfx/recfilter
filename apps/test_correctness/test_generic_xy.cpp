@@ -32,19 +32,15 @@ int main(int argc, char **argv) {
     Var x("x");
     Var y("y");
 
-    RDom rx(0, image.width(), "rx");
-    RDom ry(0, image.height(),"ry");
-
-    RecFilter filter("S");
-    filter.set_args(x, y, width, height);
+    RecFilter filter(x, width, y, height);
     filter.define(image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1)));
-    filter.add_causal_filter    (x, 1.0f, make_vec(W(0,0), W(0,1)));
-    filter.add_anticausal_filter(x, 1.0f, make_vec(W(1,0), W(1,1)));
-    filter.add_causal_filter    (x, 1.0f, make_vec(W(2,0), W(2,1)));
-    filter.add_anticausal_filter(x, 1.0f, make_vec(W(3,0), W(3,1)));
-    filter.add_causal_filter    (y, 1.0f, make_vec(W(4,0), W(4,1)));
-    filter.add_anticausal_filter(y, 1.0f, make_vec(W(5,0), W(5,1)));
-    filter.add_anticausal_filter(y, 1.0f, make_vec(W(6,0), W(6,1)));
+    filter.add_causal_filter    (x, {1.0f, W(0,0), W(0,1)});
+    filter.add_anticausal_filter(x, {1.0f, W(1,0), W(1,1)});
+    filter.add_causal_filter    (x, {1.0f, W(2,0), W(2,1)});
+    filter.add_anticausal_filter(x, {1.0f, W(3,0), W(3,1)});
+    filter.add_causal_filter    (y, {1.0f, W(4,0), W(4,1)});
+    filter.add_anticausal_filter(y, {1.0f, W(5,0), W(5,1)});
+    filter.add_anticausal_filter(y, {1.0f, W(6,0), W(6,1)});
 
     filter.split(x, tile, y, tile);
 

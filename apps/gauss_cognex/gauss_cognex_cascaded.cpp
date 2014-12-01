@@ -36,10 +36,6 @@ int main(int argc, char **argv) {
     float norm  = std::pow(box, 3*2);            // normalizing factor
 
     // ----------------------------------------------------------------------------------------------
-    vector<float> W1, W2;
-    W1.push_back( 1.0f);
-    W2.push_back( 2.0f);
-    W2.push_back(-1.0f);
 
     Func I("I");
     Func S("S");
@@ -68,20 +64,20 @@ int main(int argc, char **argv) {
              -3.0f * I(x+2*box,y+3*box) +
               1.0f * I(x+3*box,y+3*box)) / norm;
 
-    RecFilter filter;
-    filter.set_args(x, y, width, height);
-    filter.define(Expr(S(x, y)));
-    filter.add_causal_filter(x, 1.0f, W1);
-    filter.add_causal_filter(x, 1.0f, W1);
-    filter.add_causal_filter(y, 1.0f, W2);
-    filter.add_causal_filter(y, 1.0f, W2);
+    RecFilter filter(x, width, y, height);
+
+    filter.define(Expr(S(x,y)));
+
+    filter.add_causal_filter(x, {1.0f, 1.0f});
+    filter.add_causal_filter(x, {1.0f, 1.0f});
+    filter.add_causal_filter(y, {1.0f, 2.0f, -1.0f});
+    filter.add_causal_filter(y, {1.0f, 2.0f, -1.0f});
 
     // cascade the scans
-    vector<RecFilter> cascaded_filters = filter.cascade(
-            make_vec(0,1),
-            make_vec(2,3));
+    vector<RecFilter> cascaded_filters = filter.cascade({0,1}, {2,3});
     RecFilter filter1 = cascaded_filters[0];
     RecFilter filter2 = cascaded_filters[1];
+
     filter1.split(x, tile_width);
     filter2.split(y, tile_width);
 
