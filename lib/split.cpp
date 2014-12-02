@@ -1164,23 +1164,21 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
 
             for (int i=first_scan; i<=last_scan; i++) {
                 map<string, VarTag> uvar_category = rF_intra.update_var_category[i];
-                vector<Expr> args;
-                vector<Expr> values;
-                for (int u=0; u<F_intra.updates()[i].args.size(); u++) {
-                    Expr a = F_intra.updates()[i].args[u];
-                    for (int v=0; v<ryi.dimensions(); v++) {
-                        a = substitute(ryi[v].name(), ryt[v], a);
-                        uvar_category.erase(ryi[v].name());
+                vector<Expr> args = F_intra.updates()[i].args;
+                vector<Expr> values = F_intra.updates()[i].values;
+                for (int v=0; v<ryi.dimensions(); v++) {
+                    for (int u=0; u<args.size(); u++) {
+                        args[u] = substitute(ryi[v].name(), ryt[v], args[u]);
                     }
-                    args.push_back(a);
+                    VarTag vc = uvar_category[ryi[v].name()];
+                    uvar_category.erase(ryi[v].name());
+                    uvar_category.insert(make_pair(ryt[v].name(), vc));
                 }
-                for (int u=0; u<F_intra.updates()[i].values.size(); u++) {
-                    Expr val = F_intra.updates()[i].values[u];
-                    val = substitute_func_call(F_intra.name(), F_tail_prev_scanned_sub, val);
-                    for (int v=0; v<ryi.dimensions(); v++) {
-                        val = substitute(ryi[v].name(), ryt[v], val);
+                for (int v=0; v<ryi.dimensions(); v++) {
+                    for (int u=0; u<values.size(); u++) {
+                        values[u] = substitute_func_call(F_intra.name(), F_tail_prev_scanned_sub, values[u]);
+                        values[u] = substitute(ryi[v].name(), ryt[v], values[u]);
                     }
-                    values.push_back(val);
                 }
                 F_tail_prev_scanned_sub.define_update(args, values);
 
