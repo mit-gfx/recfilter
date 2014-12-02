@@ -397,28 +397,6 @@ int VarTag::count(void) const {
     return t_int;
 }
 
-void VarTag::decrement_count(void) {
-    VariableTag t_tag  = static_cast<VariableTag>(as_integer() & 0xfffffff0);
-    VariableTag t_count= static_cast<VariableTag>(as_integer() & 0x0000000f);
-    switch (t_count) {
-        case __2: tag = t_tag | __1; break;
-        case __3: tag = t_tag | __2; break;
-        case __4: tag = t_tag | __3; break;
-        default: std::cerr << "Cannot decrement count of VarTag" << std::endl; assert(false);
-    }
-}
-
-void VarTag::increment_count(void) {
-    VariableTag t_tag  = static_cast<VariableTag>(as_integer() & 0xfffffff0);
-    VariableTag t_count= static_cast<VariableTag>(as_integer() & 0x0000000f);
-    switch (t_count) {
-        case __1: tag = t_tag | __2; break;
-        case __2: tag = t_tag | __3; break;
-        case __3: tag = t_tag | __4; break;
-        default: std::cerr << "Cannot increment count of VarTag" << std::endl; assert(false);
-    }
-}
-
 // -----------------------------------------------------------------------------
 
 VariableTag operator|(const VariableTag &a, const VariableTag &b) {

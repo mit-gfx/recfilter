@@ -499,9 +499,6 @@ public:
     int    check     (const VariableTag &t) const;
     int    count     (void) const;
 
-    void decrement_count(void);
-    void increment_count(void);
-
 private:
     VariableTag tag;
 };
