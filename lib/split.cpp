@@ -273,7 +273,7 @@ static void extract_tails_from_each_scan(RecFilterFunc rF_intra, vector<SplitInf
                     }
                 }
                 VarTag vc = update_var_category[scan_id][rxi[k].name()];
-                var_cat.insert(make_pair(rxt[k].name(), vc|TAIL));
+                var_cat.insert(make_pair(rxt[k].name(), TAIL));
                 var_cat.erase(rxi[k].name());
             }
 
@@ -382,7 +382,7 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
     // manipulate the pure def
     vector<string> pure_args   = F.args();
     vector<Expr>   pure_values = F.values();
-    for (int i=0; i<split_info.size(); i++) {
+    for (int i=0, o_cnt=0, i_cnt=0; i<split_info.size(); i++) {
         Var x            = split_info[i].var;
         Var xi           = split_info[i].inner_var;
         Var xo           = split_info[i].outer_var;
@@ -394,15 +394,13 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
 
         // replace x by xi in LHS pure args
         // replace x by tile*xo+xi in RHS values
-
-        for (int j=0, count=1; j<pure_args.size(); j++) {
+        for (int j=0; j<pure_args.size(); j++) {
             if (pure_args[j] == x.name()) {
                 pure_args[j] = xi.name();
                 pure_args.insert(pure_args.begin()+j+1, xo.name());
                 pure_var_category.erase (x.name());
-                pure_var_category.insert(make_pair(xi.name(), INNER|static_cast<VarTag>(count)));
-                pure_var_category.insert(make_pair(xo.name(), OUTER|static_cast<VarTag>(count)));
-                count++;
+                pure_var_category.insert(make_pair(xi.name(), VarTag(INNER,i_cnt++)));
+                pure_var_category.insert(make_pair(xo.name(), VarTag(OUTER,o_cnt++)));
             }
         }
         for (int j=0; j<pure_values.size(); j++) {
@@ -446,8 +444,9 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
             feedback[j] = s.feedback_coeff(i,j);
         }
 
-        VarTag outer_count = __1;
-        VarTag inner_count = __1;
+        // number of inner and outer vars in the update def
+        int i_cnt = 0;
+        int o_cnt = 0;
 
         // update args: replace rx by the RVar of this dimension in rxi and xo
         // replace all other pure args with their respective RVar in rxi
@@ -465,8 +464,7 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
                 args.push_back(xo);
                 update_var_category[i].erase (rx.x.name());
                 update_var_category[i].insert(make_pair(rvar.name(),INNER|SCAN));
-                update_var_category[i].insert(make_pair(xo.name(),  OUTER|static_cast<VarTag>(outer_count)));
-                outer_count.increment_count();
+                update_var_category[i].insert(make_pair(xo.name(),  VarTag(OUTER,o_cnt++)));
             }
             else {
                 bool found = false;
@@ -478,11 +476,8 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
                         args.push_back(var);
 
                         update_var_category[i].erase(a);
-                        update_var_category[i].insert(make_pair(rvar.name(),INNER|static_cast<VarTag>(inner_count)));
-                        update_var_category[i].insert(make_pair(var.name(), OUTER|static_cast<VarTag>(outer_count)));
-
-                        inner_count.increment_count();
-                        outer_count.increment_count();
+                        update_var_category[i].insert(make_pair(rvar.name(),VarTag(INNER,i_cnt++)));
+                        update_var_category[i].insert(make_pair(var.name(), VarTag(OUTER,o_cnt++)));
 
                         found = true;
                     }
@@ -649,7 +644,7 @@ static vector<RecFilterFunc> create_intra_tail_term(
         // extract the vartag count of xi, change xi's tag to tail and decrement the
         // count of all other INNER vars whose count is more than the count of xi
         int count_xi = rf.pure_var_category[xi.name()].count();
-        rf.pure_var_category[xi.name()] = INNER|TAIL;
+        rf.pure_var_category[xi.name()] = TAIL;
         map<string,VarTag>::iterator vit;
         for (vit=rf.pure_var_category.begin(); vit!=rf.pure_var_category.end(); vit++) {
             if (vit->first!=xi.name() && vit->second.check(INNER)) {
@@ -660,7 +655,7 @@ static vector<RecFilterFunc> create_intra_tail_term(
             }
         }
 
-        rf.pure_var_category[xi.name()] = INNER|TAIL;
+        rf.pure_var_category[xi.name()] = TAIL;
 
         // add the generated recfilter function to the global list
         recfilter_func_list.insert(make_pair(rf.func.name(), rf));
@@ -1668,6 +1663,9 @@ void RecFilter::split(RecFilterDim x, Expr tx, RecFilterDim y, Expr ty, RecFilte
 // -----------------------------------------------------------------------------
 
 void RecFilter::finalize(Target target) {
+
+    cerr << print_synopsis() << endl;
+
     if (contents.ptr->tiled) {
 
         // inline all functions not required any more
