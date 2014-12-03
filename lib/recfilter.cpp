@@ -486,40 +486,42 @@ string RecFilter::print_schedule(void) const {
     stringstream s;
     map<string,RecFilterFunc>::iterator f;
 
+    s << "// Function schedules \n\n";
+
     for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
         map<int,vector<string> >::iterator sit;
 
-        bool has_schedule = false;
-        for (sit=f->second.schedule.begin(); sit!=f->second.schedule.end(); sit++) {
-            int def = sit->first;
-            vector<string> str = sit->second;
-            if (!str.empty()) {
-                has_schedule = true;
-                s << f->second.func.name();
-                // first print any compute at rules
-                if (def<0) {
-                    bool compute_def_found = false;
-                    for (int i=0; !compute_def_found && i<str.size(); i++) {
-                        if (str[i].find("compute_root")!= string::npos ||
-                            str[i].find("compute_at")  != string::npos) {
-                            s << "." << str[i];
-                            str.erase(str.begin()+i);
-                            compute_def_found = true;
-                        }
-                    }
-                } else {
-                    s << ".update(" << def << ")";
+        // dump the pure def schedule
+        if (!f->second.pure_schedule.empty()) {
+            vector<string> str = f->second.pure_schedule;
+            s << f->second.func.name();
+            // first print any compute at rules
+            bool compute_def_found = false;
+            for (int i=0; !compute_def_found && i<str.size(); i++) {
+                if (str[i].find("compute_root")!= string::npos ||
+                        str[i].find("compute_at")  != string::npos) {
+                    s << "." << str[i];
+                    str.erase(str.begin()+i);
+                    compute_def_found = true;
                 }
             }
-
-            // print rest of schedule
             for (int i=0; i<str.size(); i++) {
                 s << "\n    ." << str[i];
             }
             s << ";\n";
         }
-        if (has_schedule) {
-            s << "\n";
+
+        // dump the update def schedules
+        for (sit=f->second.update_schedule.begin(); sit!=f->second.update_schedule.end(); sit++) {
+            int def = sit->first;
+            vector<string> str = sit->second;
+            if (!str.empty()) {
+                s << f->second.func.name() << ".update(" << def << ")";
+            }
+            for (int i=0; i<str.size(); i++) {
+                s << "\n    ." << str[i];
+            }
+            s << ";\n";
         }
     }
     s << "\n";

@@ -14,6 +14,7 @@ using std::map;
 using std::set;
 using std::pair;
 using std::make_pair;
+using std::stringstream;
 
 // -----------------------------------------------------------------------------
 
@@ -1645,6 +1646,27 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         rF.func_category = REINDEX;
         rF.callee_func = F_final.name();
         rF.update_var_category.clear();
+
+        // split the tiled vars of the final term
+        for (int i=0; i<recfilter_split_info.size(); i++) {
+            Var var         = recfilter_split_info[i].var;
+            Var inner_var   = recfilter_split_info[i].inner_var;
+            Var outer_var   = recfilter_split_info[i].outer_var;
+            Expr tile_width = recfilter_split_info[i].tile_width;
+
+            Func(F).split(var, outer_var, inner_var, tile_width);
+
+            stringstream s;
+            s << "split(Var(\"" << var.name() << "\"), Var(\""
+              << outer_var.name() << "\"), Var(\"" << inner_var.name() << "\"), "
+              << tile_width << ")";
+
+            rF.pure_var_category.erase(var.name());
+            rF.pure_var_category.insert(make_pair(inner_var.name(), VarTag(INNER,i)));
+            rF.pure_var_category.insert(make_pair(outer_var.name(), VarTag(OUTER,i)));
+            rF.pure_schedule.push_back(s.str());
+        }
+
         recfilter_func_list.insert(make_pair(rF.func.name(), rF));
     }
 
@@ -1739,8 +1761,9 @@ void RecFilter::finalize(Target target) {
         }
         else {
             for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-                RecFilterFunc rF = fit->second;
+                RecFilterFunc& rF = fit->second;
                 Func(rF.func).compute_root();
+                rF.pure_schedule.push_back("compute_root()");
             }
         }
     }

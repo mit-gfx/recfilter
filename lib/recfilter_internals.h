@@ -106,9 +106,11 @@ public:
      * has the REINDEX_FOR_WRITE tag set */
     std::string callee_func;
 
-    /** Function schedule as valid Halide code; first element is pure
-     * def schedule, subsequent entries are update def schedule */
-    std::map<int, std::vector<std::string> >  schedule;
+    /** Schedule for pure def of the function as valid Halide code */
+    std::vector<std::string> pure_schedule;
+
+    /** Schedule for update defs of the function as valid Halide code */
+    std::map<int, std::vector<std::string> > update_schedule;
 };
 
 // ----------------------------------------------------------------------------

@@ -99,7 +99,7 @@ RecFilterSchedule& RecFilterSchedule::compute_in_global() {
             move_pure_def_to_update(F.function());
         }
 
-        rF.schedule[PURE_DEF].push_back("compute_root()");
+        rF.pure_schedule.push_back("compute_root()");
     }
     return *this;
 }
@@ -127,7 +127,7 @@ RecFilterSchedule& RecFilterSchedule::compute_in_shared() {
                 }
                 callee_func = Func(rf.func);
                 callee_func.compute_root();
-                rf.schedule[PURE_DEF].push_back("compute_root()");
+                rf.pure_schedule.push_back("compute_root()");
             }
         }
 
@@ -144,14 +144,14 @@ RecFilterSchedule& RecFilterSchedule::compute_in_shared() {
                 Func(rf.func).compute_at(callee_func, Var::gpu_blocks());
                 stringstream s;
                 s << "compute_at(" << callee_func.name() << ", Var::gpu_blocks())";
-                rf.schedule[PURE_DEF].push_back(s.str());
+                rf.pure_schedule.push_back(s.str());
             }
         }
 
         F.compute_at(callee_func, Var::gpu_blocks());
         stringstream s;
         s << "compute_at(" << callee_func.name() << ", Var::gpu_blocks())";
-        rF.schedule[PURE_DEF].push_back(s.str());
+        rF.pure_schedule.push_back(s.str());
     }
     return *this;
 }
@@ -176,12 +176,12 @@ RecFilterSchedule& RecFilterSchedule::parallel(VarTag vtag) {
                 F.parallel(v);
                 stringstream s;
                 s << "parallel(Var(\"" << v.name() << "\"))";
-                rF.schedule[PURE_DEF].push_back(s.str());
+                rF.pure_schedule.push_back(s.str());
             } else {
                 F.update(def).parallel(v);
                 stringstream s;
                 s << "parallel(Var(\"" << v.name() << "\"))";
-                rF.schedule[def].push_back(s.str());
+                rF.update_schedule[def].push_back(s.str());
             }
         }
     }
@@ -208,12 +208,12 @@ RecFilterSchedule& RecFilterSchedule::parallel(VarTag vtag, int task_size) {
                 F.parallel(v, task_size);
                 stringstream s;
                 s << "parallel(Var(\"" << v.name() << "\")," << task_size << ")";
-                rF.schedule[def].push_back(s.str());
+                rF.pure_schedule.push_back(s.str());
             } else {
                 F.update(def).parallel(v, task_size);
                 stringstream s;
                 s << "parallel(Var(\"" << v.name() << "\")," << task_size << ")";
-                rF.schedule[def].push_back(s.str());
+                rF.update_schedule[def].push_back(s.str());
             }
         }
     }
@@ -236,12 +236,12 @@ RecFilterSchedule& RecFilterSchedule::unroll(VarTag vtag) {
                 F.unroll(v);
                 stringstream s;
                 s << "unroll(Var(\"" << v.name() << "\"))";
-                rF.schedule[def].push_back(s.str());
+                rF.pure_schedule.push_back(s.str());
             } else {
                 F.update(def).unroll(v);
                 stringstream s;
                 s << "unroll(Var(\"" << v.name() << "\"))";
-                rF.schedule[def].push_back(s.str());
+                rF.update_schedule[def].push_back(s.str());
             }
             }
         }
@@ -265,12 +265,12 @@ RecFilterSchedule& RecFilterSchedule::unroll(VarTag vtag, int factor) {
                     F.unroll(v, factor);
                     stringstream s;
                     s << "unroll(Var(\"" << v.name() << "\")," << factor << ")";
-                    rF.schedule[def].push_back(s.str());
+                    rF.pure_schedule.push_back(s.str());
                 } else {
                     F.update(def).unroll(v, factor);
                     stringstream s;
                     s << "unroll(Var(\"" << v.name() << "\")," << factor << ")";
-                    rF.schedule[def].push_back(s.str());
+                    rF.update_schedule[def].push_back(s.str());
                 }
             }
         }
@@ -293,12 +293,12 @@ RecFilterSchedule& RecFilterSchedule::vectorize(VarTag vtag) {
                 F.vectorize(v);
                 stringstream s;
                 s << "vectorize(Var(\"" << v.name() << "\"))";
-                rF.schedule[def].push_back(s.str());
+                rF.pure_schedule.push_back(s.str());
             } else {
                 F.update(def).vectorize(v);
                 stringstream s;
                 s << "vectorize(Var(\"" << v.name() << "\"))";
-                rF.schedule[def].push_back(s.str());
+                rF.update_schedule[def].push_back(s.str());
             }
         }
     }
@@ -320,12 +320,12 @@ RecFilterSchedule& RecFilterSchedule::vectorize(VarTag vtag, int factor) {
                 F.vectorize(v, factor);
                 stringstream s;
                 s << "vectorize(Var(\"" << v.name() << "\")," << factor << ")";
-                rF.schedule[def].push_back(s.str());
+                rF.pure_schedule.push_back(s.str());
             } else {
                 F.update(def).vectorize(v, factor);
                 stringstream s;
                 s << "vectorize(Var(\"" << v.name() << "\")," << factor << ")";
-                rF.schedule[def].push_back(s.str());
+                rF.update_schedule[def].push_back(s.str());
             }
         }
     }
@@ -395,11 +395,11 @@ RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1, VarTag vt2, VarTag 
                 s << "rename(Var(\""   << v.name() << "\"), Var(\"" << GPU_BLOCK[block_id_x].name() << "\"))";
                 if (def==PURE_DEF) {
                     F.parallel(v).rename(v, GPU_BLOCK[block_id_x]);
+                    rF.pure_schedule.push_back(s.str());
                 } else {
                     F.update(def).parallel(v).rename(v, GPU_BLOCK[block_id_x]);
+                    rF.update_schedule[def].push_back(s.str());
                 }
-
-                rF.schedule[def].push_back(s.str());
             }
         }
     }
@@ -479,11 +479,11 @@ RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1, VarTag vt2
                 s << "rename(Var(\""   << v.name() << "\"), Var(\"" << GPU_THREAD[thread_id_x].name() << "\"))";
                 if (def==PURE_DEF) {
                     F.parallel(v).rename(v, GPU_THREAD[thread_id_x]);
+                    rF.pure_schedule.push_back(s.str());
                 } else {
                     F.update(def).parallel(v).rename(v, GPU_THREAD[thread_id_x]);
+                    rF.update_schedule[def].push_back(s.str());
                 }
-
-                rF.schedule[def].push_back(s.str());
             }
         }
     }
@@ -562,14 +562,15 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, bool do_reo
                     F.reorder(t,v);
                 }
                 rF.pure_var_category.insert(make_pair(t.name(), vtag|SPLIT));
+                rF.pure_schedule.push_back(s.str());
             } else {
                 F.update(def).split(v,v,t,factor);
                 if (do_reorder) {
                     F.update(def).reorder(t,v);
                 }
                 rF.update_var_category[def].insert(make_pair(t.name(), vtag|SPLIT));
+                rF.update_schedule[def].push_back(s.str());
             }
-            rF.schedule[def].push_back(s.str());
         }
     }
     return *this;
@@ -609,10 +610,11 @@ RecFilterSchedule& RecFilterSchedule::reorder(vector<VarTag> vtag) {
 
                 if (def==PURE_DEF) {
                     F.reorder(var_list); break;
+                    rF.pure_schedule.push_back(s.str());
                 } else {
                     F.update(def).reorder(var_list); break;
+                    rF.update_schedule[def].push_back(s.str());
                 }
-                rF.schedule[def].push_back(s.str());
             }
         }
     }
@@ -671,7 +673,7 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
                                 var_list[4].var); break;
                 default:cerr << "Too many variables in reorder_storage()" << endl; assert(false); break;
             }
-            rF.schedule[PURE_DEF].push_back(s.str());
+            rF.pure_schedule.push_back(s.str());
         }
     }
     return *this;
@@ -750,6 +752,7 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
 ///                                         var_list[2].second); break;
 ///                         default:cerr << "Too many variables in gpu_tile()" << endl; assert(false); break;
 ///                     }
+///                     rF.pure_schedule.push_back(s.str());
 ///                 } else {
 ///                     switch (var_list.size()) {
 ///                         case 1: F.update(def).gpu_tile(var_list[0].first,
@@ -766,8 +769,8 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
 ///                                         var_list[2].second); break;
 ///                         default:cerr << "Too many variables in gpu_tile()" << endl; assert(false); break;
 ///                     }
+///                     rF.update_schedule[def].push_back(s.str());
 ///                 }
-///                 rF.schedule[def].push_back(s.str());
 ///             }
 ///         }
 ///     }
