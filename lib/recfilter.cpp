@@ -490,23 +490,35 @@ string RecFilter::print_schedule(void) const {
     stringstream s;
     map<string,RecFilterFunc>::iterator f;
     for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
-        map<int,vector<string> >::iterator sit = f->second.schedule.begin();
-        map<int,vector<string> >::iterator se  = f->second.schedule.end();
-        while (sit!=se) {
+        map<int,vector<string> >::iterator sit;
+        for (sit=f->second.schedule.begin(); sit!=f->second.schedule.end(); sit++) {
             int def = sit->first;
             vector<string> str = sit->second;
             if (!str.empty()) {
                 s << f->second.func.name();
-                if (def>=0) {
+                // first print any compute at rules
+                if (def<0) {
+                    bool compute_def_found = false;
+                    for (int i=0; !compute_def_found && i<str.size(); i++) {
+                        if (str[i].find("compute_root")!= string::npos ||
+                            str[i].find("compute_at")  != string::npos) {
+                            s << "." << str[i];
+                            str.erase(str.begin()+i);
+                            compute_def_found = true;
+                        }
+                    }
+                } else {
                     s << ".update(" << def << ")";
                 }
             }
+
+            // print rest of schedule
             for (int i=0; i<str.size(); i++) {
-                s << "." << str[i];
+                s << "\n    ." << str[i];
             }
             s << ";\n";
-            sit++;
         }
+        s << "\n";
     }
     s << "\n";
     return s.str();

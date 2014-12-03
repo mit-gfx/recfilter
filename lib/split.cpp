@@ -919,7 +919,8 @@ static vector<RecFilterFunc> create_tail_residual_term(
 static vector<RecFilterFunc> create_final_residual_term(
         vector<RecFilterFunc> rF_ctail,
         SplitInfo split_info,
-        string func_name)
+        string func_name,
+        string final_result_func)
 {
     int order      = split_info.filter_order;
     Var  xi        = split_info.inner_var;
@@ -958,7 +959,7 @@ static vector<RecFilterFunc> create_final_residual_term(
         rf.func = function;
         rf.func_category = REINDEX;
         rf.pure_var_category = rF_ctail[j].pure_var_category;
-        rf.caller_func = ""; // this needs to be set - actually done in split_scans()
+        rf.caller_func = final_result_func;
 
         // add the genertaed recfilter function to the global list
         recfilter_func_list.insert(make_pair(rf.func.name(), rf));
@@ -1382,7 +1383,7 @@ static void add_all_residuals_to_final_result(
 
 static vector< vector<RecFilterFunc> > split_scans(
         RecFilterFunc F_intra,
-        string final_result_func_name,
+        string final_result_func,
         vector<SplitInfo> &split_info)
 {
     vector< vector<RecFilterFunc> > F_ctail_list;
@@ -1402,12 +1403,7 @@ static vector< vector<RecFilterFunc> > split_scans(
         vector<RecFilterFunc> F_ctail  = create_complete_tail_term (F_tail,   split_info[i], s1);
         vector<RecFilterFunc> F_ctailw = wrap_complete_tail_term   (F_ctail,  split_info[i], s1);
         vector<RecFilterFunc> F_tdeps  = create_tail_residual_term (F_ctail,  split_info[i], s2);
-        vector<RecFilterFunc> F_deps   = create_final_residual_term(F_ctailw, split_info[i], s3);
-
-        // final residual terms are all called by the final result function
-        for (int j=0; j<F_deps.size(); j++) {
-            F_deps[j].caller_func = final_result_func_name;
-        }
+        vector<RecFilterFunc> F_deps   = create_final_residual_term(F_ctailw, split_info[i], s3, final_result_func);
 
         // add the dependency from each scan to the tail of the next scan
         // this ensures that the tail of each scan includes the complete
@@ -1685,9 +1681,6 @@ void RecFilter::split(RecFilterDim x, Expr tx, RecFilterDim y, Expr ty, RecFilte
 // -----------------------------------------------------------------------------
 
 void RecFilter::finalize(Target target) {
-
-    cerr << print_synopsis() << endl;
-
     if (contents.ptr->tiled) {
 
         // inline all functions not required any more

@@ -55,34 +55,32 @@ map< int,vector<VarOrRVar> > RecFilterSchedule::var_list_by_tag(RecFilterFunc f,
 }
 
 map<int,VarOrRVar> RecFilterSchedule::var_by_tag(RecFilterFunc f, VarTag vtag) {
-    // check that the VarTag has a specific count value
-    int vidx = vtag.count();
-
-    map< int,vector<VarOrRVar> > var_list;
+    map<int,VarOrRVar> var_list;
     map<string,VarTag>::iterator vit;
     for (vit = f.pure_var_category.begin(); vit!=f.pure_var_category.end(); vit++) {
         if (vit->second == vtag) {
-            var_list[PURE_DEF].push_back(Var(vit->first));
+            if (var_list.find(PURE_DEF)==var_list.end()) {
+                var_list.insert(make_pair(PURE_DEF, Var(vit->first)));
+            } else {
+                cerr << "Found multiple vars with the scheduling tag " << vtag << endl;
+                assert(false);
+            }
         }
     }
     for (int i=0; i<f.update_var_category.size(); i++) {
         for (vit=f.update_var_category[i].begin(); vit!=f.update_var_category[i].end(); vit++) {
             if (vit->second == vtag) {
-                var_list[i].push_back(Var(vit->first));
+                if (var_list.find(i)==var_list.end()) {
+                    var_list.insert(make_pair(i, Var(vit->first)));
+                } else {
+                    cerr << "Found multiple vars with the scheduling tag " << vtag << endl;
+                    assert(false);
+                }
             }
         }
     }
 
-    map<int,VarOrRVar> vlist;
-    map<int,vector<VarOrRVar> >::iterator var_list_it;
-    for (var_list_it=var_list.begin(); var_list_it!=var_list.end(); var_list_it++) {
-        int def             = var_list_it->first;
-        vector<VarOrRVar> v = var_list_it->second;
-        if (v.size()>vidx) {
-            vlist.insert(make_pair(def,v[vidx]));
-        }
-    }
-    return vlist;
+    return var_list;
 }
 
 // -----------------------------------------------------------------------------
@@ -227,12 +225,13 @@ RecFilterSchedule& RecFilterSchedule::unroll(VarTag vtag) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map<int,VarOrRVar> vars = var_by_tag(rF, vtag);
-        map<int,VarOrRVar>::iterator vit;
+        map<int, vector<VarOrRVar> > vars = var_list_by_tag(rF, vtag);
+        map<int, vector<VarOrRVar> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            VarOrRVar v = vit->second;
+            for (int i=0; i<vit->second.size(); i++) {
+            VarOrRVar v = vit->second[i];
             if (def==PURE_DEF) {
                 F.unroll(v);
                 stringstream s;
@@ -244,6 +243,7 @@ RecFilterSchedule& RecFilterSchedule::unroll(VarTag vtag) {
                 s << "unroll(Var(\"" << v.name() << "\"))";
                 rF.schedule[def].push_back(s.str());
             }
+            }
         }
     }
     return *this;
@@ -254,22 +254,24 @@ RecFilterSchedule& RecFilterSchedule::unroll(VarTag vtag, int factor) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map<int,VarOrRVar> vars = var_by_tag(rF, vtag);
-        map<int,VarOrRVar>::iterator vit;
+        map<int, vector<VarOrRVar> > vars = var_list_by_tag(rF, vtag);
+        map<int, vector<VarOrRVar> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            VarOrRVar v = vit->second;
-            if (def==PURE_DEF) {
-                F.unroll(v, factor);
-                stringstream s;
-                s << "unroll(Var(\"" << v.name() << "\")," << factor << ")";
-                rF.schedule[def].push_back(s.str());
-            } else {
-                F.update(def).unroll(v, factor);
-                stringstream s;
-                s << "unroll(Var(\"" << v.name() << "\")," << factor << ")";
-                rF.schedule[def].push_back(s.str());
+            for (int i=0; i<vit->second.size(); i++) {
+                VarOrRVar v = vit->second[i];
+                if (def==PURE_DEF) {
+                    F.unroll(v, factor);
+                    stringstream s;
+                    s << "unroll(Var(\"" << v.name() << "\")," << factor << ")";
+                    rF.schedule[def].push_back(s.str());
+                } else {
+                    F.update(def).unroll(v, factor);
+                    stringstream s;
+                    s << "unroll(Var(\"" << v.name() << "\")," << factor << ")";
+                    rF.schedule[def].push_back(s.str());
+                }
             }
         }
     }
@@ -348,6 +350,11 @@ RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1, VarTag vt2, VarTag 
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
+        // no need to set gpu_blocks if the function is not compute root
+        if (!rF.func.schedule().compute_level().is_root()) {
+            continue;
+        }
+
         map<int,VarOrRVar>::iterator vit;
         map<int,vector<VarOrRVar> > parallel_vars;
         map<int,int> next_gpu_block;
@@ -362,7 +369,7 @@ RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1, VarTag vt2, VarTag 
                 default: break;
             }
 
-            if (vtag.check(INVALID)) {
+            if (vtag == INVALID) {
                 continue;
             }
 
@@ -431,7 +438,7 @@ RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1, VarTag vt2
                 default:vtag = vt3; tsize = t3; break;
             }
 
-            if (vtag.check(INVALID) || !tsize) {
+            if (vtag==INVALID || !tsize) {
                 continue;
             }
 
@@ -457,7 +464,7 @@ RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1, VarTag vt2
                     Var t(v.name()+".1");
 
                     s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name() << "\"), Var(\"" << t.name() << "\"), " << tsize << ").";
-                    s << "reorder(Var(\""  << t.name() << "\"), Var(\"" << v.name() << "\"))";
+                    s << "reorder(Var(\""  << t.name() << "\"), Var(\"" << v.name() << "\")).";
 
                     if (def==PURE_DEF) {
                         F.split(v,v,t,tsize).reorder(t,v);
@@ -466,10 +473,8 @@ RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1, VarTag vt2
                         F.update(def).split(v,v,t,tsize).reorder(t,v);
                         rF.update_var_category[def].insert(make_pair(t.name(), vtag|SPLIT));
                     }
-                    rF.schedule[def].push_back(s.str());
                 }
 
-                s << std::flush;
                 s << "parallel(Var(\"" << v.name() << "\")).";
                 s << "rename(Var(\""   << v.name() << "\"), Var(\"" << GPU_THREAD[thread_id_x].name() << "\"))";
                 if (def==PURE_DEF) {

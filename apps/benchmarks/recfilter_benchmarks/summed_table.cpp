@@ -130,7 +130,6 @@ int main(int argc, char **argv) {
     Target target = get_jit_target_from_environment();
 
     F.finalize(target);
-    cerr << F << endl;
 
     F.intra_schedule().compute_in_shared()
         .reorder_storage(F.tail(),       F.inner(), F.outer())
@@ -138,21 +137,21 @@ int main(int argc, char **argv) {
         .unroll         (F.inner_scan());
 
     F.intra_schedule(1)
-        .gpu_threads    (F.inner(1), 1, F.inner(2), 6)
-        .unroll         (F.inner(2).split_var())
-        .gpu_blocks     (F.outer(1), F.outer(2));
+        .gpu_threads    (F.inner(0), 1, F.inner(1), 6)
+        .unroll         (F.inner(1).split_var())
+        .gpu_blocks     (F.outer(0), F.outer(2));
 
     F.intra_schedule(2)
-        .inner_split    (F.outer(1), 4)
-        .gpu_threads    (F.inner(1), 1, F.inner(2), 1, F.outer(1).split_var(), 1)
-        .gpu_blocks     (F.outer(1), F.outer(2));
+        .inner_split    (F.outer(0), 4)
+        .gpu_threads    (F.inner(0), 1, F.inner(1), 1, F.outer(0).split_var(), 1)
+        .gpu_blocks     (F.outer(0), F.outer(1));
 
     F.inter_schedule().compute_in_global()
         .reorder_storage(F.inner(),      F.tail(),  F.outer())
         .reorder        (F.outer_scan(), F.inner(), F.outer())
         .unroll         (F.outer_scan())
-        .gpu_threads    (F.inner(1), 1)
-        .gpu_blocks     (F.outer(1));
+        .gpu_threads    (F.inner(0), 1)
+        .gpu_blocks     (F.outer(0));
 
     cerr << F << endl;
 

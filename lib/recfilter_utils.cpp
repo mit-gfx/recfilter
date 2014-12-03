@@ -351,12 +351,14 @@ VarTag::VarTag(const VariableTag &t) : tag(t) {}
 VarTag::VarTag(const VarTag &t, int i) : VarTag(t.tag,i) {}
 
 VarTag::VarTag(const VariableTag &t, int i) {
-    switch(i) {
-        case 0: tag = VarTag(t | __1).tag; break;
-        case 1: tag = VarTag(t | __2).tag; break;
-        case 2: tag = VarTag(t | __3).tag; break;
-        case 3: tag = VarTag(t | __4).tag; break;
-        default: std::cerr << "Cannot convert integer to VarTag count" << std::endl; assert(false);
+   if      (i<0)  { tag = t; }
+   else if (i==0) { tag = VarTag(t | __1).tag; }
+   else if (i==1) { tag = VarTag(t | __2).tag; }
+   else if (i==2) { tag = VarTag(t | __3).tag; }
+   else if (i==3) { tag = VarTag(t | __4).tag; }
+   else {
+       std::cerr << "Cannot convert integer to VarTag count" << std::endl;
+       assert(false);
     }
 }
 

@@ -360,11 +360,11 @@ public:
 
     /** @name Generic handles to write scheduled for dimensions of internal functions */
     // {@
-    VarTag full      (int i=0);
-    VarTag inner     (int i=0);
-    VarTag outer     (int i=0);
+    VarTag full      (int i=-1);
+    VarTag inner     (int i=-1);
+    VarTag outer     (int i=-1);
     VarTag tail      (void);
-    VarTag full_scan (int i=0);
+    VarTag full_scan (int i=-1);
     VarTag inner_scan(void);
     VarTag outer_scan(void);
     // @}
