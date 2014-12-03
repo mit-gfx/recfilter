@@ -127,10 +127,6 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Target target = get_jit_target_from_environment();
-
-    F.finalize(target);
-
     F.intra_schedule().compute_in_shared()
         .reorder_storage(F.tail(),       F.inner(), F.outer())
         .reorder        (F.inner_scan(), F.tail(),  F.inner(), F.outer())
@@ -156,7 +152,7 @@ int main(int argc, char **argv) {
     cerr << F << endl;
 
     cerr << "\nJIT compilation ... " << endl;
-    F.compile_jit(target, "hl_stmt.html");
+    F.compile_jit("hl_stmt.html");
 
     cerr << "\nRunning ... " << endl;
     Buffer out(type_of<float>(), width, height);

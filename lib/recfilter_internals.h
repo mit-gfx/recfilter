@@ -121,9 +121,6 @@ struct RecFilterContents {
     /** Flag to indicate if the filter has been tiled  */
     bool tiled;
 
-    /** Flag to indicate if the filter has been finalized, which performs platform specific optimizations */
-    bool finalized;
-
     /** Name of recursive filter as well as function that contains the
      * definition of the filter  */
     std::string name;
@@ -142,6 +139,9 @@ struct RecFilterContents {
 
     /** Feedback coeffs (num_scans x max_order) order j-th coeff of i-th scan is (i+1,j) */
     Halide::Image<float> feedback_coeff;
+
+    /** Compilation and execution target */
+    Halide::Target target;
 };
 
 #endif // _RECURSIVE_FILTER_INTERNALS_H_

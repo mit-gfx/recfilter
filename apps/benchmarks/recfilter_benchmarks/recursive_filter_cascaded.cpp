@@ -135,8 +135,6 @@ int main(int argc, char **argv) {
 
             P.bound(xo, 0, width/tile_width).bound(yo, 0, height/tile_width).bound(xi, 0, tile_width).bound(yi, 0, tile_width+2*filter_order);
 
-
-            Target target = get_jit_target_from_environment();
             for (int i=0; i<iter; i++) {
                 P.realize(tile_width, width/tile_width, tile_width+2*filter_order, height/tile_width);
             }
@@ -226,10 +224,8 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Target target = get_jit_target_from_environment();
-
     cerr << "\nJIT compilation ... " << endl;
-    filtery.compile_jit(target, "stmt.html");
+    filtery.compile_jit("stmt.html");
 
     cerr << "\nRunning ... " << endl;
     Buffer out(type_of<float>(), width, height);

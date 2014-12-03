@@ -90,8 +90,6 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Target target = get_jit_target_from_environment();
-
     cerr << "\nJIT compilation ... " << endl;
     filter.func().compile_jit();
 

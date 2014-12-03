@@ -1655,6 +1655,9 @@ void RecFilter::split(map<string,Expr> dim_tile) {
     recfilter_split_info.clear();
 
     contents.ptr->tiled = true;
+
+    // perform generic and target dependent optimizations
+    finalize(contents.ptr->target);
 }
 
 void RecFilter::split(RecFilterDim x, Expr tx) {
@@ -1741,6 +1744,4 @@ void RecFilter::finalize(Target target) {
             }
         }
     }
-
-    contents.ptr->finalized = true;
 }

@@ -98,10 +98,14 @@ RecFilter::RecFilter(string name) {
         contents.ptr->name = name;
     }
     contents.ptr->tiled          = false;
-    contents.ptr->finalized      = false;
     contents.ptr->border_expr    = FLOAT_ZERO;
     contents.ptr->feedfwd_coeff  = Image<float>(0);
     contents.ptr->feedback_coeff = Image<float>(0,0);
+
+    contents.ptr->target = get_jit_target_from_environment();
+    if (contents.ptr->target.to_string().empty()) {
+        cerr << "Warning: HL_JIT_TARGET not set, using default" << endl;
+    }
 }
 
 RecFilter& RecFilter::operator=(const RecFilter &f) {
@@ -438,23 +442,15 @@ RecFilterFunc& RecFilter::internal_function(string func_name) {
 
 // -----------------------------------------------------------------------------
 
-void RecFilter::compile_jit(Target target, string filename) {
-    if (!contents.ptr->finalized) {
-        finalize(target);
-    }
-
+void RecFilter::compile_jit(string filename) {
     Func F(internal_function(contents.ptr->name).func);
     if (!filename.empty()) {
-        F.compile_to_lowered_stmt(filename, HTML, target);
+        F.compile_to_lowered_stmt(filename, HTML, contents.ptr->target);
     }
-    F.compile_jit(target);
+    F.compile_jit(contents.ptr->target);
 }
 
 void RecFilter::realize(Buffer out, int iterations) {
-    if (!contents.ptr->finalized) {
-        finalize(get_jit_target_from_environment());
-    }
-
     Func F(internal_function(contents.ptr->name).func);
 
     // upload all buffers to device
@@ -489,12 +485,16 @@ string RecFilter::print_synopsis(void) const {
 string RecFilter::print_schedule(void) const {
     stringstream s;
     map<string,RecFilterFunc>::iterator f;
+
     for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
         map<int,vector<string> >::iterator sit;
+
+        bool has_schedule = false;
         for (sit=f->second.schedule.begin(); sit!=f->second.schedule.end(); sit++) {
             int def = sit->first;
             vector<string> str = sit->second;
             if (!str.empty()) {
+                has_schedule = true;
                 s << f->second.func.name();
                 // first print any compute at rules
                 if (def<0) {
@@ -518,7 +518,9 @@ string RecFilter::print_schedule(void) const {
             }
             s << ";\n";
         }
-        s << "\n";
+        if (has_schedule) {
+            s << "\n";
+        }
     }
     s << "\n";
     return s.str();

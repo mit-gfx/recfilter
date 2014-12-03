@@ -159,6 +159,9 @@ private:
      * */
     void inline_func(std::string func_name);
 
+    /** Finalize the filter; triggers automatic function transformations and cleanup */
+    void finalize(Halide::Target target);
+
 public:
     /**
      * Merge multiple functions into a single function with mutiple outputs
@@ -215,12 +218,9 @@ public:
 
     /**@name Compile and run */
     // {@
-    /** Finalize the filter; triggers automatic function transformations and cleanup */
-    void finalize(Halide::Target target);
-
     /** Trigger JIT compilation for specified hardware-platform target; dumps the generated
      * codegen in human readable HTML format if filename is specified */
-    void compile_jit(Halide::Target target, std::string filename="");
+    void compile_jit(std::string filename="");
 
     /** Compute the filter for a given output buffer for specified number of iterations
      * for timing purposes; last iteration copies the result to host */
