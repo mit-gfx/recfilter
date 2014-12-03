@@ -155,7 +155,7 @@ static vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> 
 
 // -----------------------------------------------------------------------------
 
-static void move_init_to_update_def(RecFilterFunc rF, vector<SplitInfo> split_info) {
+static void move_init_to_update_def(RecFilterFunc& rF, vector<SplitInfo> split_info) {
     Function F = rF.func;
 
     vector<string> pure_args = F.args();
@@ -166,25 +166,9 @@ static void move_init_to_update_def(RecFilterFunc rF, vector<SplitInfo> split_in
     map<string,VarTag> update_var_category = rF.pure_var_category;
 
     // leave the pure def undefined
-    {
-        for (int i=0; i<split_info.size(); i++) {
-            Var x  = split_info[i].var;
-            Var xi = split_info[i].inner_var;
-            Var xo = split_info[i].outer_var;
-
-            // replace x by xi in LHS pure args
-            // replace x by tile*xo+xi in RHS values
-            for (int j=0; j<pure_args.size(); j++) {
-                if (pure_args[j] == x.name()) {
-                    pure_args[j] = xi.name();
-                    pure_args.insert(pure_args.begin()+j+1, xo.name());
-                }
-            }
-        }
-        vector<Expr> undef_values(F.outputs(), FLOAT_UNDEF);
-        F.clear_all_definitions();
-        F.define(pure_args, undef_values);
-    }
+    vector<Expr> undef_values(F.outputs(), FLOAT_UNDEF);
+    F.clear_all_definitions();
+    F.define(pure_args, undef_values);
 
     // initialize the buffer in the first update def
     // replace the scheduling tags of xi by rxi
@@ -194,19 +178,17 @@ static void move_init_to_update_def(RecFilterFunc rF, vector<SplitInfo> split_in
             args.push_back(Var(pure_args[j]));
         }
         for (int i=0; i<split_info.size(); i++) {
-            Var  x    = split_info[i].var;
             Var  xo   = split_info[i].outer_var;
             Var  xi   = split_info[i].inner_var;
             RVar rxi  = split_info[i].inner_rdom[ split_info[i].filter_dim ];
-            Expr tile = split_info[i].tile_width;
             for (int j=0; j<args.size(); j++) {
                 args[j] = substitute(xi.name(), rxi, args[j]);
-                update_var_category.insert(make_pair(rxi.name(), update_var_category[xi.name()]));
-                update_var_category.erase(xi.name());
             }
             for (int j=0; j<values.size(); j++) {
                 values[j] = substitute(xi.name(), rxi, values[j]);
             }
+            update_var_category.insert(make_pair(rxi.name(), update_var_category[xi.name()]));
+            update_var_category.erase(xi.name());
         }
         F.define_update(args, values);
     }
@@ -307,26 +289,12 @@ static void extract_tails_from_each_scan(RecFilterFunc& rF_intra, vector<SplitIn
 // -----------------------------------------------------------------------------
 
 static void add_padding_to_avoid_bank_conflicts(RecFilterFunc rF, vector<SplitInfo> split_info, bool flag) {
-    Function F = rF.func;
-
-    // find all the dimensions containing a scan
-    set<int> update_dimensions;
-    for (int i=0; i<F.updates().size(); i++) {
-        UpdateDefinition u = F.updates()[i];
-        ReductionDomain r = u.domain;
-        for (int j=0; j<u.args.size(); j++) {
-            for (int k=0; k<r.domain().size(); k++) {
-                if (expr_depends_on_var(u.args[j], r.domain()[k].var)) {
-                    update_dimensions.insert(j);
-                }
-            }
-        }
-    }
-
     // bank conflicts expected if there are scans in multiple dimensions
-    if (update_dimensions.size()<=1) {
+    if (split_info.size()<=1) {
         return;
     }
+
+    Function F = rF.func;
 
     // map inner var of first dimension to tile width +
     // map inner vars of all other dimensions to 0
@@ -1673,13 +1641,13 @@ void RecFilter::split(map<string,Expr> dim_tile) {
     // add all the generated RecFilterFuncs
     contents.ptr->func.insert(recfilter_func_list.begin(), recfilter_func_list.end());
 
-    recfilter_func_list.clear();
-    recfilter_split_info.clear();
-
     contents.ptr->tiled = true;
 
     // perform generic and target dependent optimizations
     finalize(contents.ptr->target);
+
+    recfilter_func_list.clear();
+    recfilter_split_info.clear();
 }
 
 void RecFilter::split(RecFilterDim x, Expr tx) {
@@ -1747,16 +1715,19 @@ void RecFilter::finalize(Target target) {
         // platform specific optimization
         if (target.has_gpu_feature()) {
             for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-                RecFilterFunc rF = fit->second;
+                RecFilterFunc& rF = fit->second;
 
-                if (((rF.func_category==INTRA_1) || (rF.func_category==INTRA_N))
-                    && (rF.func.has_update_definition())) {
-                    // move initialization to update def in intra tile computation stages
+                // move initialization to update def in intra tile computation stages
+                // add padding to intra tile terms to avoid bank conflicts
+
+                if (rF.func_category==INTRA_1 && rF.func.has_update_definition()) {
                     move_init_to_update_def(rF, recfilter_split_info);
-
-                    // add padding to intra tile terms to avoid bank conflicts
+                }
+                if (rF.func_category==INTRA_N && rF.func.has_update_definition()) {
+                    move_init_to_update_def(rF, recfilter_split_info);
                     add_padding_to_avoid_bank_conflicts(rF, recfilter_split_info, true);
                 }
+
             }
         }
         else {

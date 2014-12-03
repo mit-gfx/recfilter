@@ -133,9 +133,9 @@ int main(int argc, char **argv) {
         .unroll         (F.inner_scan());
 
     F.intra_schedule(1)
-        .gpu_threads    (F.inner(0), 1, F.inner(1), 6)
+        .gpu_threads    (F.inner(0), 1, F.inner(1), 8)
         .unroll         (F.inner(1).split_var())
-        .gpu_blocks     (F.outer(0), F.outer(2));
+        .gpu_blocks     (F.outer(0), F.outer(1));
 
     F.intra_schedule(2)
         .inner_split    (F.outer(0), 4)

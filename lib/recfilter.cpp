@@ -523,6 +523,7 @@ string RecFilter::print_schedule(void) const {
             }
             s << ";\n";
         }
+        s << "\n";
     }
     s << "\n";
     return s.str();
