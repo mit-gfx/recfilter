@@ -396,10 +396,10 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
 VarTag RecFilter::full      (int i) { return VarTag(FULL,  i);     }
 VarTag RecFilter::inner     (int i) { return VarTag(INNER, i);     }
 VarTag RecFilter::outer     (int i) { return VarTag(OUTER, i);     }
-VarTag RecFilter::tail      (void)  { return VarTag(INNER|TAIL);   }
+VarTag RecFilter::tail      (void)  { return VarTag(TAIL);         }
 VarTag RecFilter::full_scan (int i) { return VarTag(FULL|SCAN, i); }
-VarTag RecFilter::inner_scan(void)  { return (INNER|SCAN);         }
-VarTag RecFilter::outer_scan(void)  { return (OUTER|SCAN);         }
+VarTag RecFilter::inner_scan(void)  { return VarTag(INNER|SCAN);   }
+VarTag RecFilter::outer_scan(void)  { return VarTag(OUTER|SCAN);   }
 
 // -----------------------------------------------------------------------------
 

@@ -40,13 +40,13 @@ map< int,vector<VarOrRVar> > RecFilterSchedule::var_list_by_tag(RecFilterFunc f,
     map< int,vector<VarOrRVar> > var_list;
     map<string,VarTag>::iterator vit;
     for (vit = f.pure_var_category.begin(); vit!=f.pure_var_category.end(); vit++) {
-        if (vit->second == vtag) {
+        if (vit->second.check(vtag)) {
             var_list[PURE_DEF].push_back(Var(vit->first));
         }
     }
     for (int i=0; i<f.update_var_category.size(); i++) {
         for (vit=f.update_var_category[i].begin(); vit!=f.update_var_category[i].end(); vit++) {
-            if (vit->second == vtag) {
+            if (vit->second.check(vtag)) {
                 var_list[i].push_back(Var(vit->first));
             }
         }
@@ -231,18 +231,18 @@ RecFilterSchedule& RecFilterSchedule::unroll(VarTag vtag) {
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
             for (int i=0; i<vit->second.size(); i++) {
-            VarOrRVar v = vit->second[i];
-            if (def==PURE_DEF) {
-                F.unroll(v);
-                stringstream s;
-                s << "unroll(Var(\"" << v.name() << "\"))";
-                rF.pure_schedule.push_back(s.str());
-            } else {
-                F.update(def).unroll(v);
-                stringstream s;
-                s << "unroll(Var(\"" << v.name() << "\"))";
-                rF.update_schedule[def].push_back(s.str());
-            }
+                VarOrRVar v = vit->second[i];
+                if (def==PURE_DEF) {
+                    F.unroll(v);
+                    stringstream s;
+                    s << "unroll(Var(\"" << v.name() << "\"))";
+                    rF.pure_schedule.push_back(s.str());
+                } else {
+                    F.update(def).unroll(v);
+                    stringstream s;
+                    s << "unroll(Var(\"" << v.name() << "\"))";
+                    rF.update_schedule[def].push_back(s.str());
+                }
             }
         }
     }
@@ -598,7 +598,7 @@ RecFilterSchedule& RecFilterSchedule::reorder(vector<VarTag> vtag) {
             vector<VarOrRVar> var_list = vit->second;
             stringstream s;
 
-            if (var_list.size() > 2) {                 // at least 2 to reorder
+            if (var_list.size()>1) {                 // at least 2 to reorder
                 s << "reorder(Internal::vec(";
                 for (int i=0; i<var_list.size(); i++) {
                     if (i>0) {
@@ -627,34 +627,35 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
         Func            F = Func(rF.func);
 
         // no need to reorder storage if the function is not compute
-        if (!rF.func.schedule().compute_level().is_root()) {
+        // don't reorder storage of final result
+        if (!rF.func.schedule().compute_level().is_root() ||
+            rF.func.name()==recfilter.func().name()) {
             continue;
         }
 
-        map< int,vector<VarOrRVar> > vars;
+        vector<VarOrRVar> var_list;
         map< int,vector<VarOrRVar> >::iterator vit;
 
         for (int i=0; i<vtag.size(); i++) {
             map< int,vector<VarOrRVar> > vars_x = var_list_by_tag(rF, vtag[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
-                for (int k=0; k<vit->second.size(); k++) {
-                    vars[vit->first].push_back(vit->second[k]);
+                if (vit->first == PURE_DEF) {
+                    var_list.insert(var_list.end(), vit->second.begin(), vit->second.end());
                 }
             }
         }
 
-        vector<VarOrRVar> var_list = vars[PURE_DEF];
         stringstream s;
 
-        if (var_list.size() > 2) {                 // at least 2 to reorder
-            s << "reorder_storage(Internal::vec(";
+        if (var_list.size()>1) {                 // at least 2 to reorder
+            s << "reorder_storage(";
             for (int i=0; i<var_list.size(); i++) {
                 if (i>0) {
                     s << ",";
                 }
                 s << "Var(\"" << var_list[i].name() << "\")";
             }
-            s << "))";
+            s << ")";
 
             switch (var_list.size()) {
                 case 2: F.reorder_storage(var_list[0].var,

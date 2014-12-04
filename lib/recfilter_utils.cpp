@@ -382,8 +382,12 @@ VarTag VarTag::split_var(void) const {
     return VarTag(tag|SPLIT);
 }
 
+int VarTag::check(const VarTag &t) const {
+    return (VarTag(as_integer() & t.as_integer())==t);
+}
+
 int VarTag::check(const VariableTag &t) const {
-    return (as_integer() & VarTag(t).as_integer());
+    return check(VarTag(t));
 }
 
 int VarTag::count(void) const {

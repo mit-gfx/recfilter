@@ -496,6 +496,7 @@ public:
 
     int    as_integer(void) const;
     VarTag split_var (void) const;
+    int    check     (const VarTag &t)      const;
     int    check     (const VariableTag &t) const;
     int    count     (void) const;
 

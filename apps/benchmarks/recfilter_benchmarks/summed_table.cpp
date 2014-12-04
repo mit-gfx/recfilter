@@ -130,7 +130,8 @@ int main(int argc, char **argv) {
     F.intra_schedule().compute_in_shared()
         .reorder_storage(F.tail(),       F.inner(), F.outer())
         .reorder        (F.inner_scan(), F.tail(),  F.inner(), F.outer())
-        .unroll         (F.inner_scan());
+        .unroll         (F.inner_scan())
+        ;
 
     F.intra_schedule(1)
         .gpu_threads    (F.inner(0), 1, F.inner(1), 8)
