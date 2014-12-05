@@ -3,10 +3,6 @@
 
 #include "recfilter.h"
 
-#define MAX_THREADS    192
-#define UNROLL         8
-#define TILES_PER_WARP 4
-
 using namespace Halide;
 
 using std::map;
@@ -127,27 +123,32 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
+    // innermost: unrolled dimensions, then gpu_thread dimensions, then gpu_block dimensions
+
     F.intra_schedule().compute_in_shared()
-        .reorder_storage(F.tail(),       F.inner(), F.outer())
-        .reorder        (F.inner_scan(), F.tail(),  F.inner(), F.outer())
-        .unroll         (F.inner_scan())
-        ;
+        .reorder_storage(F.tail(), F.inner(), F.outer())
+        .unroll         (F.tail())
+        .unroll         (F.inner_scan());
 
     F.intra_schedule(1)
-        .gpu_threads    (F.inner(0), 1, F.inner(1), 8)
+        .split          (F.inner(1), 8)
         .unroll         (F.inner(1).split_var())
+        .reorder        (F.inner_scan(), F.inner(1).split_var(), F.tail(), F.inner(), F.outer())
+        .gpu_threads    (F.inner(0), F.inner(1))
         .gpu_blocks     (F.outer(0), F.outer(1));
 
     F.intra_schedule(2)
-        .inner_split    (F.outer(0), 4)
-        .gpu_threads    (F.inner(0), 1, F.inner(1), 1, F.outer(0).split_var(), 1)
+        .split          (F.outer(0), 4)
+        .reorder        (F.inner_scan(), F.tail(), F.inner(), F.outer(0).split_var(), F.outer())
+        .gpu_threads    (F.inner(0), F.inner(1), F.outer(0).split_var())
         .gpu_blocks     (F.outer(0), F.outer(1));
 
     F.inter_schedule().compute_in_global()
-        .reorder_storage(F.inner(),      F.tail(),  F.outer())
-        .reorder        (F.outer_scan(), F.inner(), F.outer())
+        .reorder_storage(F.inner(), F.tail(), F.outer())
         .unroll         (F.outer_scan())
-        .gpu_threads    (F.inner(0), 1)
+        .split          (F.outer(0), 8)
+        .reorder        (F.outer_scan(), F.tail(), F.inner(), F.outer(0).split_var(), F.outer())
+        .gpu_threads    (F.inner(0), F.outer(0).split_var())
         .gpu_blocks     (F.outer(0));
 
     cerr << F << endl;

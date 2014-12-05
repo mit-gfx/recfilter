@@ -364,7 +364,7 @@ public:
     VarTag inner     (int i=-1);
     VarTag outer     (int i=-1);
     VarTag tail      (void);
-    VarTag full_scan (int i=-1);
+    VarTag full_scan (void);
     VarTag inner_scan(void);
     VarTag outer_scan(void);
     // @}
@@ -393,41 +393,33 @@ public:
     RecFilterSchedule& compute_in_global();
     RecFilterSchedule& compute_in_shared();
 
-    RecFilterSchedule& unroll(VarTag v);
-    RecFilterSchedule& unroll(VarTag v, int factor);
-
-    RecFilterSchedule& vectorize(VarTag v);
-    RecFilterSchedule& vectorize(VarTag v, int factor);
-
-    RecFilterSchedule& inner_split(VarTag v, int factor);
-    RecFilterSchedule& outer_split(VarTag v, int factor);
-    RecFilterSchedule& split   (VarTag v, int factor, bool do_reorder);
+    RecFilterSchedule& split(VarTag v, int factor);
 
     RecFilterSchedule& reorder(VarTag x, VarTag y);
     RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z);
     RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z, VarTag w);
-    RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
+    RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s);
+    RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s, VarTag t);
+    RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s, VarTag t, VarTag u);
 
     RecFilterSchedule& reorder_storage(VarTag x, VarTag y);
     RecFilterSchedule& reorder_storage(VarTag x, VarTag y, VarTag z);
     RecFilterSchedule& reorder_storage(VarTag x, VarTag y, VarTag z, VarTag w);
     RecFilterSchedule& reorder_storage(VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
 
-    RecFilterSchedule& parallel(VarTag v);
-    RecFilterSchedule& parallel(VarTag v, int task_size);
+    RecFilterSchedule& unroll     (VarTag v);
+    RecFilterSchedule& parallel   (VarTag v);
+    RecFilterSchedule& vectorize  (VarTag v);
+    RecFilterSchedule& gpu_threads(VarTag v1);
+    RecFilterSchedule& gpu_threads(VarTag v1, VarTag v2);
+    RecFilterSchedule& gpu_threads(VarTag v1, VarTag v2, VarTag v3);
 
-    RecFilterSchedule& gpu_threads(VarTag vt1, int t1);
-    RecFilterSchedule& gpu_threads(VarTag vt1, int t1, VarTag vt2, int t2);
-    RecFilterSchedule& gpu_threads(VarTag vt1, int t1, VarTag vt2, int t2, VarTag vt3, int t3);
-
-    RecFilterSchedule& gpu_blocks(VarTag vt1);
-    RecFilterSchedule& gpu_blocks(VarTag vt1, VarTag vt2);
-    RecFilterSchedule& gpu_blocks(VarTag vt1, VarTag vt2, VarTag vt3);
+    RecFilterSchedule& gpu_blocks(VarTag v1);
+    RecFilterSchedule& gpu_blocks(VarTag v1, VarTag v2);
+    RecFilterSchedule& gpu_blocks(VarTag v1, VarTag v2, VarTag v3);
 
     RecFilterSchedule& reorder (std::vector<VarTag> x);
     RecFilterSchedule& reorder_storage(std::vector<VarTag> x);
-
-///    RecFilterSchedule& gpu_tile(std::vector<std::pair<VarTag,int> > x);
 };
 
 // ----------------------------------------------------------------------------

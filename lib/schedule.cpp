@@ -90,7 +90,7 @@ RecFilterSchedule& RecFilterSchedule::compute_in_global() {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        F.compute_root();
+        cerr << "CR " << F.name() << " " << rF.func.schedule().compute_level().is_root() << endl;
 
         // remove the initializations of all scans which are scheduled as
         // compute_root to avoid extra kernel execution for initializing
@@ -99,6 +99,7 @@ RecFilterSchedule& RecFilterSchedule::compute_in_global() {
             move_pure_def_to_update(F.function());
         }
 
+        F.compute_root();
         rF.pure_schedule.push_back("compute_root()");
     }
     return *this;
@@ -172,48 +173,18 @@ RecFilterSchedule& RecFilterSchedule::parallel(VarTag vtag) {
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
             VarOrRVar v = vit->second;
+
+            // no need to add scheduling to pure def if the function has update defs
+            // pure def is left undefined by construction
             if (def==PURE_DEF) {
-                F.parallel(v);
-                stringstream s;
-                s << "parallel(Var(\"" << v.name() << "\"))";
-                rF.pure_schedule.push_back(s.str());
+                if (!F.has_update_definition()) {
+                    F.parallel(v);
+                    rF.pure_schedule.push_back("parallel(Var(\"" + v.name() + "\"))");
+                }
             } else {
                 F.update(def).parallel(v);
                 stringstream s;
-                s << "parallel(Var(\"" << v.name() << "\"))";
-                rF.update_schedule[def].push_back(s.str());
-            }
-        }
-    }
-    return *this;
-}
-
-RecFilterSchedule& RecFilterSchedule::parallel(VarTag vtag, int task_size) {
-    if (vtag.check(SCAN)) {
-        cerr << "Cannot create parallel threads from scan variable" << endl;
-        assert(false);
-    }
-
-    for (int j=0; j<func_list.size(); j++) {
-        RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
-        Func            F = Func(rF.func);
-
-        map<int,VarOrRVar> vars = var_by_tag(rF, vtag);
-        map<int,VarOrRVar>::iterator vit;
-
-        for (vit=vars.begin(); vit!=vars.end(); vit++) {
-            int def = vit->first;
-            VarOrRVar v = vit->second;
-            if (def==PURE_DEF) {
-                F.parallel(v, task_size);
-                stringstream s;
-                s << "parallel(Var(\"" << v.name() << "\")," << task_size << ")";
-                rF.pure_schedule.push_back(s.str());
-            } else {
-                F.update(def).parallel(v, task_size);
-                stringstream s;
-                s << "parallel(Var(\"" << v.name() << "\")," << task_size << ")";
-                rF.update_schedule[def].push_back(s.str());
+                rF.update_schedule[def].push_back("parallel(Var(\"" + v.name() + "\"))");
             }
         }
     }
@@ -232,45 +203,17 @@ RecFilterSchedule& RecFilterSchedule::unroll(VarTag vtag) {
             int def = vit->first;
             for (int i=0; i<vit->second.size(); i++) {
                 VarOrRVar v = vit->second[i];
+
+                // no need to add scheduling to pure def if the function has update defs
+                // pure def is left undefined by construction
                 if (def==PURE_DEF) {
-                    F.unroll(v);
-                    stringstream s;
-                    s << "unroll(Var(\"" << v.name() << "\"))";
-                    rF.pure_schedule.push_back(s.str());
+                    if (!F.has_update_definition()) {
+                        F.unroll(v);
+                        rF.pure_schedule.push_back("unroll(Var(\"" + v.name() + "\"))");
+                    }
                 } else {
                     F.update(def).unroll(v);
-                    stringstream s;
-                    s << "unroll(Var(\"" << v.name() << "\"))";
-                    rF.update_schedule[def].push_back(s.str());
-                }
-            }
-        }
-    }
-    return *this;
-}
-
-RecFilterSchedule& RecFilterSchedule::unroll(VarTag vtag, int factor) {
-    for (int j=0; j<func_list.size(); j++) {
-        RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
-        Func            F = Func(rF.func);
-
-        map<int, vector<VarOrRVar> > vars = var_list_by_tag(rF, vtag);
-        map<int, vector<VarOrRVar> >::iterator vit;
-
-        for (vit=vars.begin(); vit!=vars.end(); vit++) {
-            int def = vit->first;
-            for (int i=0; i<vit->second.size(); i++) {
-                VarOrRVar v = vit->second[i];
-                if (def==PURE_DEF) {
-                    F.unroll(v, factor);
-                    stringstream s;
-                    s << "unroll(Var(\"" << v.name() << "\")," << factor << ")";
-                    rF.pure_schedule.push_back(s.str());
-                } else {
-                    F.update(def).unroll(v, factor);
-                    stringstream s;
-                    s << "unroll(Var(\"" << v.name() << "\")," << factor << ")";
-                    rF.update_schedule[def].push_back(s.str());
+                    rF.update_schedule[def].push_back("unroll(Var(\"" + v.name() + "\"))");
                 }
             }
         }
@@ -289,59 +232,35 @@ RecFilterSchedule& RecFilterSchedule::vectorize(VarTag vtag) {
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
             VarOrRVar v = vit->second;
+
+            // no need to add scheduling to pure def if the function has update defs
+            // pure def is left undefined by construction
             if (def==PURE_DEF) {
-                F.vectorize(v);
-                stringstream s;
-                s << "vectorize(Var(\"" << v.name() << "\"))";
-                rF.pure_schedule.push_back(s.str());
+                if (!F.has_update_definition()) {
+                    F.vectorize(v);
+                    rF.pure_schedule.push_back("vectorize(Var(\"" + v.name() + "\"))");
+                }
             } else {
                 F.update(def).vectorize(v);
                 stringstream s;
                 s << "vectorize(Var(\"" << v.name() << "\"))";
-                rF.update_schedule[def].push_back(s.str());
+                rF.update_schedule[def].push_back("vectorize(Var(\"" + v.name() + "\"))");
             }
         }
     }
     return *this;
 }
 
-RecFilterSchedule& RecFilterSchedule::vectorize(VarTag vtag, int factor) {
-    for (int j=0; j<func_list.size(); j++) {
-        RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
-        Func            F = Func(rF.func);
-
-        map<int,VarOrRVar> vars = var_by_tag(rF, vtag);
-        map<int,VarOrRVar>::iterator vit;
-
-        for (vit=vars.begin(); vit!=vars.end(); vit++) {
-            int def = vit->first;
-            VarOrRVar v = vit->second;
-            if (def==PURE_DEF) {
-                F.vectorize(v, factor);
-                stringstream s;
-                s << "vectorize(Var(\"" << v.name() << "\")," << factor << ")";
-                rF.pure_schedule.push_back(s.str());
-            } else {
-                F.update(def).vectorize(v, factor);
-                stringstream s;
-                s << "vectorize(Var(\"" << v.name() << "\")," << factor << ")";
-                rF.update_schedule[def].push_back(s.str());
-            }
-        }
-    }
-    return *this;
+RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag v1) {
+    return gpu_blocks(v1, VarTag(INVALID), VarTag(INVALID));
 }
 
-RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1) {
-    return gpu_blocks(vt1, VarTag(INVALID), VarTag(INVALID));
+RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag v1, VarTag v2) {
+    return gpu_blocks(v1, v2, VarTag(INVALID));
 }
 
-RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1, VarTag vt2) {
-    return gpu_blocks(vt1, vt2, VarTag(INVALID));
-}
-
-RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1, VarTag vt2, VarTag vt3) {
-    if (vt1.check(SCAN) || vt2.check(SCAN) || vt3.check(SCAN)) {
+RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag v1, VarTag v2, VarTag v3) {
+    if (v1.check(SCAN) || v2.check(SCAN) || v3.check(SCAN)) {
         cerr << "Cannot map a scan variable to parallel GPU blocks" << endl;
         assert(false);
     }
@@ -363,9 +282,9 @@ RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1, VarTag vt2, VarTag 
             VarTag vtag;
 
             switch (i) {
-                case 0: vtag = vt1; break;
-                case 1: vtag = vt2; break;
-                case 2: vtag = vt3; break;
+                case 0: vtag = v1; break;
+                case 1: vtag = v2; break;
+                case 2: vtag = v3; break;
                 default: break;
             }
 
@@ -393,9 +312,14 @@ RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1, VarTag vt2, VarTag 
 
                 s << "parallel(Var(\"" << v.name() << "\")).";
                 s << "rename(Var(\""   << v.name() << "\"), Var(\"" << GPU_BLOCK[block_id_x].name() << "\"))";
+
+                // no need to add scheduling to pure def if the function has update defs
+                // pure def is left undefined by construction
                 if (def==PURE_DEF) {
-                    F.parallel(v).rename(v, GPU_BLOCK[block_id_x]);
-                    rF.pure_schedule.push_back(s.str());
+                    if (!F.has_update_definition()) {
+                        F.parallel(v).rename(v, GPU_BLOCK[block_id_x]);
+                        rF.pure_schedule.push_back(s.str());
+                    }
                 } else {
                     F.update(def).parallel(v).rename(v, GPU_BLOCK[block_id_x]);
                     rF.update_schedule[def].push_back(s.str());
@@ -406,16 +330,16 @@ RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag vt1, VarTag vt2, VarTag 
     return *this;
 }
 
-RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1) {
-    return gpu_threads(vt1,t1,VarTag(INVALID),0,VarTag(INVALID),0);
+RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag v1) {
+    return gpu_threads(v1,VarTag(INVALID),VarTag(INVALID));
 }
 
-RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1, VarTag vt2, int t2) {
-    return gpu_threads(vt1,t1,vt2,t2,VarTag(INVALID),0);
+RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag v1, VarTag v2) {
+    return gpu_threads(v1,v2,VarTag(INVALID));
 }
 
-RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1, VarTag vt2, int t2, VarTag vt3, int t3) {
-    if (vt1.check(SCAN) || vt2.check(SCAN) || vt3.check(SCAN)) {
+RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag v1, VarTag v2, VarTag v3) {
+    if (v1.check(SCAN) || v2.check(SCAN) || v3.check(SCAN)) {
         cerr << "Cannot map a scan variable to parallel threads" << endl;
         assert(false);
     }
@@ -430,15 +354,14 @@ RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1, VarTag vt2
 
         for (int i=0; i<3; i++) {
             VarTag vtag;
-            int tsize;
 
             switch (i) {
-                case 0: vtag = vt1; tsize = t1; break;
-                case 1: vtag = vt2; tsize = t2; break;
-                default:vtag = vt3; tsize = t3; break;
+                case 0: vtag = v1; break;
+                case 1: vtag = v2; break;
+                default:vtag = v3; break;
             }
 
-            if (vtag==INVALID || !tsize) {
+            if (vtag == INVALID) {
                 continue;
             }
 
@@ -460,26 +383,16 @@ RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1, VarTag vt2
                     assert(false);
                 }
 
-                if (tsize > 1) {
-                    Var t(v.name()+".1");
-
-                    s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name() << "\"), Var(\"" << t.name() << "\"), " << tsize << ").";
-                    s << "reorder(Var(\""  << t.name() << "\"), Var(\"" << v.name() << "\")).";
-
-                    if (def==PURE_DEF) {
-                        F.split(v,v,t,tsize).reorder(t,v);
-                        rF.pure_var_category.insert(make_pair(t.name(), vtag|SPLIT));
-                    } else {
-                        F.update(def).split(v,v,t,tsize).reorder(t,v);
-                        rF.update_var_category[def].insert(make_pair(t.name(), vtag|SPLIT));
-                    }
-                }
-
                 s << "parallel(Var(\"" << v.name() << "\")).";
                 s << "rename(Var(\""   << v.name() << "\"), Var(\"" << GPU_THREAD[thread_id_x].name() << "\"))";
+
+                // no need to add scheduling to pure def if the function has update defs
+                // pure def is left undefined by construction
                 if (def==PURE_DEF) {
-                    F.parallel(v).rename(v, GPU_THREAD[thread_id_x]);
-                    rF.pure_schedule.push_back(s.str());
+                    if (!F.has_update_definition()) {
+                        F.parallel(v).rename(v, GPU_THREAD[thread_id_x]);
+                        rF.pure_schedule.push_back(s.str());
+                    }
                 } else {
                     F.update(def).parallel(v).rename(v, GPU_THREAD[thread_id_x]);
                     rF.update_schedule[def].push_back(s.str());
@@ -490,47 +403,47 @@ RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag vt1, int t1, VarTag vt2
     return *this;
 }
 
-RecFilterSchedule& RecFilterSchedule::inner_split(VarTag vtag, int factor) {
-    return split(vtag, factor, true);
-}
-
-RecFilterSchedule& RecFilterSchedule::outer_split(VarTag vtag, int factor) {
-    return split(vtag, factor, false);
-}
-
 RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y) {
-    return reorder(Internal::vec(x,y));
+    return reorder({x,y});
 }
 
 RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y, VarTag z) {
-    return reorder(Internal::vec(x,y,z));
+    return reorder({x,y,z});
 }
 
 RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y, VarTag z, VarTag w) {
-    return reorder(Internal::vec(x,y,z,w));
+    return reorder({x,y,z,w});
 }
 
 RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag t) {
-    return reorder(Internal::vec(x,y,z,w,t));
+    return reorder({x,y,z,w,t});
+}
+
+RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s, VarTag t) {
+    return reorder({x,y,z,s,t});
+}
+
+RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s, VarTag t, VarTag u) {
+    return reorder({x,y,z,s,t,u});
 }
 
 RecFilterSchedule& RecFilterSchedule::reorder_storage(VarTag x, VarTag y) {
-    return reorder_storage(Internal::vec(x,y));
+    return reorder_storage({x,y});
 }
 
 RecFilterSchedule& RecFilterSchedule::reorder_storage(VarTag x, VarTag y, VarTag z) {
-    return reorder_storage(Internal::vec(x,y,z));
+    return reorder_storage({x,y,z});
 }
 
 RecFilterSchedule& RecFilterSchedule::reorder_storage(VarTag x, VarTag y, VarTag z, VarTag w) {
-    return reorder(Internal::vec(x,y,z,w));
+    return reorder({x,y,z,w});
 }
 
 RecFilterSchedule& RecFilterSchedule::reorder_storage(VarTag x, VarTag y, VarTag z, VarTag w, VarTag t) {
-    return reorder_storage(Internal::vec(x,y,z,w,t));
+    return reorder_storage({x,y,z,w,t});
 }
 
-RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, bool do_reorder) {
+RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor) {
     if (vtag.check(SPLIT)) {
         cerr << "Cannot split a variable which was created by split scheduling ops" << endl;
         assert(false);
@@ -552,22 +465,17 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, bool do_reo
 
             s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name()
                 << "\"), Var(\"" << t.name() << "\"), " << factor << ")";
-            if (do_reorder) {
-                s << ".reorder(Var(\"" << t.name() << "\"), Var(\"" << v.name() << "\"))";
-            }
 
+            // no need to add scheduling to pure def if the function has update defs
+            // pure def is left undefined by construction
             if (def==PURE_DEF) {
-                F.split(v,v,t,factor);
-                if (do_reorder) {
-                    F.reorder(t,v);
+                if (!F.has_update_definition()) {
+                    F.split(v,v,t,factor);
+                    rF.pure_var_category.insert(make_pair(t.name(), vtag|SPLIT));
+                    rF.pure_schedule.push_back(s.str());
                 }
-                rF.pure_var_category.insert(make_pair(t.name(), vtag|SPLIT));
-                rF.pure_schedule.push_back(s.str());
             } else {
                 F.update(def).split(v,v,t,factor);
-                if (do_reorder) {
-                    F.update(def).reorder(t,v);
-                }
                 rF.update_var_category[def].insert(make_pair(t.name(), vtag|SPLIT));
                 rF.update_schedule[def].push_back(s.str());
             }
@@ -588,7 +496,16 @@ RecFilterSchedule& RecFilterSchedule::reorder(vector<VarTag> vtag) {
             map< int,vector<VarOrRVar> > vars_x = var_list_by_tag(rF, vtag[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
                 for (int k=0; k<vit->second.size(); k++) {
-                    vars[vit->first].push_back(vit->second[k]);
+                    // check if this var is already in the list
+                    bool already_added = false;
+                    for (int u=0; !already_added && u<vars[vit->first].size(); u++) {
+                        if (vars[vit->first][u].name() == vit->second[k].name()) {
+                            already_added = true;
+                        }
+                    }
+                    if (!already_added) {
+                        vars[vit->first].push_back(vit->second[k]);
+                    }
                 }
             }
         }
@@ -608,13 +525,20 @@ RecFilterSchedule& RecFilterSchedule::reorder(vector<VarTag> vtag) {
                 }
                 s << "))";
 
+                // no need to add scheduling to pure def if the function has update defs
+                // pure def is left undefined by construction
                 if (def==PURE_DEF) {
-                    F.reorder(var_list); break;
-                    rF.pure_schedule.push_back(s.str());
+                    if (!F.has_update_definition()) {
+                        F.reorder(var_list);
+                        rF.pure_schedule.push_back(s.str());
+                    }
                 } else {
-                    F.update(def).reorder(var_list); break;
+                    F.update(def).reorder(var_list);
                     rF.update_schedule[def].push_back(s.str());
                 }
+            } else {
+                cerr << "VarTags provided to reorder() resulted in less than 2 variables" << endl;
+                assert(false);
             }
         }
     }
@@ -626,10 +550,12 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
+        cerr << F.name() << " " << rF.func.schedule().compute_level().is_root() << endl;
+
         // no need to reorder storage if the function is not compute
         // don't reorder storage of final result
         if (!rF.func.schedule().compute_level().is_root() ||
-            rF.func.name()==recfilter.func().name()) {
+                rF.func.name()==recfilter.func().name()) {
             continue;
         }
 
@@ -640,7 +566,18 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
             map< int,vector<VarOrRVar> > vars_x = var_list_by_tag(rF, vtag[i]);
             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
                 if (vit->first == PURE_DEF) {
-                    var_list.insert(var_list.end(), vit->second.begin(), vit->second.end());
+                    for (int k=0; k<vit->second.size(); k++) {
+                        // check if this var is already in the list
+                        bool already_added = false;
+                        for (int u=0; !already_added && u<var_list.size(); u++) {
+                            if (var_list[u].name() == vit->second[k].name()) {
+                                already_added = true;
+                            }
+                        }
+                        if (!already_added) {
+                            var_list.push_back(vit->second[k]);
+                        }
+                    }
                 }
             }
         }
@@ -651,7 +588,7 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
             s << "reorder_storage(";
             for (int i=0; i<var_list.size(); i++) {
                 if (i>0) {
-                    s << ",";
+                    s  << ",";
                 }
                 s << "Var(\"" << var_list[i].name() << "\")";
             }
@@ -675,6 +612,9 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
                 default:cerr << "Too many variables in reorder_storage()" << endl; assert(false); break;
             }
             rF.pure_schedule.push_back(s.str());
+        } else {
+            cerr << "VarTags provided to reorder_storage() resulted in less than 2 variables" << endl;
+            assert(false);
         }
     }
     return *this;

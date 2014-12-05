@@ -609,8 +609,6 @@ static vector<RecFilterFunc> create_intra_tail_term(
             }
         }
 
-        rf.pure_var_category[xi.name()] = TAIL;
-
         tail_functions_list.push_back(rf);
     }
 
@@ -728,15 +726,29 @@ static vector<RecFilterFunc> create_complete_tail_term(
 
         // create the function scheduling tags
         // pure var tags are same as incomplete tail function tags
-        // update var tags are same as pure var tags expect for outer scan var xo
+        // update var tags are same as pure var tags expect for xi and xo
         RecFilterFunc rf;
         rf.func = function;
         rf.func_category = INTER;
         rf.pure_var_category = rF_tail[k].pure_var_category;
         rf.update_var_category.push_back(rF_tail[k].pure_var_category);
-        rf.update_var_category[0].erase(xo.name());
         rf.update_var_category[0].insert(make_pair(rxo.x.name(), OUTER|SCAN));
         rf.update_var_category[0].insert(make_pair(rxo.y.name(), OUTER|SCAN));
+
+        // extract the vartag count of xo, decrement the count of all other
+        // OUTER vars whose count is more than the count of xo
+        int count_xo = rf.update_var_category[0][xo.name()].count();
+        rf.update_var_category[0].erase(xo.name());
+        rf.update_var_category[0].erase(xi.name());
+        map<string,VarTag>::iterator vit;
+        for (vit=rf.update_var_category[0].begin(); vit!=rf.update_var_category[0].end(); vit++) {
+            if (vit->second.check(OUTER) && !vit->second.check(SCAN)) {
+                int count = vit->second.count();
+                if (count>count_xo) {
+                    rf.update_var_category[0][vit->first] = VarTag(OUTER,count-1);
+                }
+            }
+        }
 
         rF_ctail.push_back(rf);
     }
