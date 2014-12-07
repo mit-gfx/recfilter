@@ -316,7 +316,7 @@ public:
     // @}
 
 
-    /**@name Merging and interleaving routines
+    /**@name Interleaving routines
      *
      * @brief Interleave two functions into a single function with output that contains
      * the buffers of both the input functions.  The functions to be interleaved are
