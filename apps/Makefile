@@ -2,7 +2,7 @@ MKDIR=mkdir -p
 BIN_DIR=bin/
 
 all: scripts
-	make -C ../lib
+	make -C ../lib -j8
 	make -C test_correctness -j8
 	make -C boxcar
 	make -C gauss_anticausal -j8

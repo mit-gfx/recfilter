@@ -3,7 +3,7 @@ MKDIR=mkdir -p
 RM=rm -rf
 
 BUILD_DIR=_build
-LIB=libRecfilter.so
+LIB=libRecFilter.a
 
 SRC := $(wildcard *.cpp)
 OBJ := $(addprefix $(BUILD_DIR)/,$(notdir $(SRC:.cpp=.o)))
@@ -16,7 +16,9 @@ $(BUILD_DIR)/%.o: %.cpp $(INC)
 	$(CXX) -fPIC -fno-rtti -I$(HALIDE_DIR)/include/ -c $< -o $@
 
 $(LIB): $(OBJ)
-	$(CXX) -shared $(OBJ) -L$(HALIDE_DIR)/bin/ -lHalide -ldl -lz -lpthread -o $(LIB)
+	$(RM) $(LIB)
+	ar q $(LIB) $(OBJ)
+	ranlib $(LIB)
 
 clean:
 	$(RM) $(BUILD_DIR)

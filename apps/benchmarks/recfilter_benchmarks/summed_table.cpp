@@ -97,7 +97,6 @@ int main(int argc, char **argv) {
 ///        SAT_CTail_xy.compute_root().reorder_storage(yi,xi,yo,xo);
 ///        SAT_CTail_xy.split(xo,xo,x,TILES_PER_WARP).reorder(yi,xi,x,xo,yo).gpu_threads(x,yi).gpu_blocks(xo,yo);
 ///
-///        //
 ///
 ///        SAT_CTail_y.compute_root().reorder_storage(xi,yi,xo,yo);
 ///        SAT_CTail_y.update().reorder(ryox,ryoy,xi,xo).fuse(xi,xo,x).gpu_tile(x,MAX_THREADS);
@@ -140,14 +139,14 @@ int main(int argc, char **argv) {
     F.intra_schedule(2)
         .split          (F.outer(0), 4)
         .reorder        (F.inner_scan(), F.tail(), F.inner(), F.outer(0).split_var(), F.outer())
-        .gpu_threads    (F.inner(0), F.inner(1), F.outer(0).split_var())
+        .gpu_threads    (F.outer(0).split_var(), F.inner(0))
         .gpu_blocks     (F.outer(0), F.outer(1));
 
     F.inter_schedule().compute_in_global()
         .reorder_storage(F.inner(), F.tail(), F.outer())
         .unroll         (F.outer_scan())
-        .split          (F.outer(0), 8)
-        .reorder        (F.outer_scan(), F.tail(), F.inner(), F.outer(0).split_var(), F.outer())
+        .split          (F.outer(0), 2)
+        .reorder        (F.outer_scan(), F.inner(), F.tail(), F.outer(0).split_var(), F.outer())
         .gpu_threads    (F.inner(0), F.outer(0).split_var())
         .gpu_blocks     (F.outer(0));
 

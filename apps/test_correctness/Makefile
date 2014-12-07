@@ -6,21 +6,21 @@ BIN_DIR=../bin/test_correctness/
 
 LIBRECFILTER_DIR=../../lib/
 LIBRECFILTER_INC=$(LIBRECFILTER_DIR)/recfilter.h
-LIBRECFILTER_LIB=$(LIBRECFILTER_DIR)/libRecfilter.so
+LIBRECFILTER_LIB=$(LIBRECFILTER_DIR)/libRecFilter.a
 
-HALIDE_LIB=$(HALIDE_DIR)/bin/libHalide.so
+HALIDE_LIB=$(HALIDE_DIR)/bin/libHalide.a
 
 SRC  := $(wildcard *.cpp)
 APPS := $(addprefix $(BIN_DIR)/,$(notdir $(SRC:.cpp=.app)))
 
 all: $(APPS)
 
-$(BIN_DIR)/%.app: %.cpp  $(LIBRECFILTER_LIB) $(HALIDE_LIB) $(LIBRECFILTER_INC)
+$(BIN_DIR)/%.app: %.cpp $(LIBRECFILTER_LIB) $(HALIDE_LIB) $(LIBRECFILTER_INC)
 	@$(MKDIR) $(BIN_DIR)
-	$(CXX) -I$(LIBRECFILTER_DIR) -I$(HALIDE_DIR)/include/ -L$(LIBRECFILTER_DIR) -L$(HALIDE_DIR)/bin/ -lz -lpthread -ldl -g -lncurses -Wall -lHalide -lRecfilter $< -o $@
+	$(CXX) -I$(LIBRECFILTER_DIR) -I$(HALIDE_DIR)/include/ -lz -lpthread -ldl -lncurses -g -Wall $< $(HALIDE_LIB) $(LIBRECFILTER_LIB) -o $@
 
 $(LIBRECFILTER_LIB): $(LIBRECFILTER_INC)
-	make -C $(LIBRECFILTER_DIR)
+	make -C $(LIBRECFILTER_DIR) -j8
 
 clean:
 	$(RM) $(APPS)
