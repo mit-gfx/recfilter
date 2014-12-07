@@ -10,21 +10,6 @@
 
 #include <Halide.h>
 
-/** Symbolic integer zero  */
-#define INT_ZERO Halide::Internal::make_zero(Halide::type_of<int>())
-
-/** Symbolic floating point zero  */
-#define FLOAT_ZERO Halide::Internal::make_zero(Halide::type_of<float>())
-
-/** Symbolic integer one */
-#define INT_ONE  Halide::Internal::make_one(Halide::type_of<int>())
-
-/** Symbolic floating point one */
-#define FLOAT_ONE  Halide::Internal::make_one(Halide::type_of<float>())
-
-/** Symbolic undefined integer point constant */
-#define INT_UNDEF Halide::undef<int>()
-
 /** Symbolic undefined floating point constant */
 #define FLOAT_UNDEF Halide::undef<float>()
 
@@ -47,28 +32,6 @@ class VarTag;
 
 enum VariableTag : int;
 enum FunctionTag : int;
-
-// ----------------------------------------------------------------------------
-
-/** Compare ref and Halide solutions and print the mean square error */
-struct CheckResult {
-    Halide::Image<float> ref;   ///< reference solution
-    Halide::Image<float> out;   ///< Halide solution
-    CheckResult(
-            Halide::Image<float> r,
-            Halide::Image<float> o) :
-        ref(r), out(o) {}
-};
-
-/** Compare ref and Halide solutions and print the verbose difference */
-struct CheckResultVerbose {
-    Halide::Image<float> ref;   ///< reference solution
-    Halide::Image<float> out;   ///< Halide solution
-    CheckResultVerbose(
-            Halide::Image<float> r,
-            Halide::Image<float> o) :
-        ref(r), out(o) {}
-};
 
 // ----------------------------------------------------------------------------
 
@@ -240,8 +203,8 @@ public:
      * - first argument must of of the form +x, -x or x where x is a RecFilterDim object
      */
     // {@
-    void add_filter(RecFilterDim x, std::vector<float> coeff);
-    void add_filter(RecFilterDimAndCausality x, std::vector<float> coeff);
+    void add_filter(RecFilterDim x, std::vector<double> coeff);
+    void add_filter(RecFilterDimAndCausality x, std::vector<double> coeff);
     // @}
 
     /** @name Image boundary conditions
@@ -506,8 +469,6 @@ std::ostream &operator<<(std::ostream &s, const RecFilterFunc &f);
 std::ostream &operator<<(std::ostream &s, const RecFilterDim &f);
 std::ostream &operator<<(std::ostream &s, const Halide::Func &f);
 std::ostream &operator<<(std::ostream &s, const Halide::Internal::Function &f);
-std::ostream &operator<<(std::ostream &s, const CheckResult &v);
-std::ostream &operator<<(std::ostream &s, const CheckResultVerbose &v);
 // @}
 
 // ----------------------------------------------------------------------------
@@ -597,5 +558,104 @@ std::ostream &operator<<(std::ostream &s, Halide::Image<T> image) {
     }
     return s;
 }
+
+// ----------------------------------------------------------------------------
+
+/** Compare ref and Halide solutions and print the mean square error */
+template <typename T>
+struct CheckResult {
+    Halide::Image<T> ref;   ///< reference solution
+    Halide::Image<T> out;   ///< Halide solution
+    CheckResult(
+            Halide::Image<T> r,
+            Halide::Image<T> o) :
+        ref(r), out(o) {}
+};
+
+/** Compare ref and Halide solutions and print the verbose difference */
+template <typename T>
+struct CheckResultVerbose {
+    Halide::Image<T> ref;   ///< reference solution
+    Halide::Image<T> out;   ///< Halide solution
+    CheckResultVerbose(
+            Halide::Image<T> r,
+            Halide::Image<T> o) :
+        ref(r), out(o) {}
+};
+
+
+/** Print the synopsis of checking error */
+template<typename T>
+std::ostream &operator<<(std::ostream &s, const CheckResult<T> &v) {
+    assert(v.ref.width()   == v.out.width());
+    assert(v.ref.height()  == v.out.height());
+    assert(v.ref.channels()== v.out.channels());
+
+    int width = v.ref.width();
+    int height = v.ref.height();
+    int channels = v.ref.channels();
+
+    Halide::Image<double> diff(width, height, channels);
+
+    double re      = 0.0;
+    double max_re  = 0.0;
+    double mean_re = 0.0;
+
+    for (int z=0; z<channels; z++) {
+        for (int y=0; y<height; y++) {
+            for (int x=0; x<width; x++) {
+                diff(x,y,z) = v.ref(x,y,z) - v.out(x,y,z);
+                re       = std::abs(diff(x,y,z)) / v.ref(x,y,z);
+                mean_re += re;
+                max_re   = std::max(re, max_re);
+            }
+        }
+    }
+    mean_re /= double(width*height*channels);
+
+    s << "Max  relative error = " << 100.0*max_re << " % \n";
+    s << "Mean relative error = " << 100.0*mean_re << " % \n\n";
+
+    return s;
+}
+
+/** Print the result and synopsis of checking error */
+template<typename T>
+std::ostream &operator<<(std::ostream &s, const CheckResultVerbose<T> &v) {
+    assert(v.ref.width()   == v.out.width());
+    assert(v.ref.height()  == v.out.height());
+    assert(v.ref.channels()== v.out.channels());
+
+    int width = v.ref.width();
+    int height = v.ref.height();
+    int channels = v.ref.channels();
+
+    Halide::Image<double> diff(width, height, channels);
+
+    double re      = 0.0;
+    double max_re  = 0.0;
+    double mean_re = 0.0;
+
+    for (int z=0; z<channels; z++) {
+        for (int y=0; y<height; y++) {
+            for (int x=0; x<width; x++) {
+                diff(x,y,z) = (v.ref(x,y,z) - v.out(x,y,z));
+                re       = std::abs(diff(x,y,z)) / v.ref(x,y,z);
+                mean_re += re;
+                max_re   = std::max(re, max_re);
+            }
+        }
+    }
+    mean_re /= double(width*height*channels);
+
+    s << "Reference" << "\n" << v.ref << "\n";
+    s << "Halide output" << "\n" << v.out << "\n";
+    s << "Difference " << "\n" << diff << "\n";
+    s << "Max  relative error = " << 100.0*max_re << " % \n";
+    s << "Mean relative error = " << 100.0*mean_re << " % \n\n";
+
+    return s;
+}
+
 
 #endif // _RECURSIVE_FILTER_H_

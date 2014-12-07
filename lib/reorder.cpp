@@ -678,7 +678,7 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
         }
 
         // set the image border conditions
-        if (!contents.ptr->border_expr.defined()) {
+        if (!contents.ptr->clamped_border) {
             rf.set_clamped_image_border();
         }
 
@@ -711,7 +711,7 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
             bool causal = contents.ptr->filter_info[dim].scan_causal[idx];
             int order   = contents.ptr->filter_info[dim].filter_order;
 
-            vector<float> coeff;
+            vector<double> coeff;
             coeff.push_back(contents.ptr->feedfwd_coeff(scan_id));
             for (int u=0; u<order; u++) {
                 coeff.push_back(contents.ptr->feedback_coeff(scan_id,u));

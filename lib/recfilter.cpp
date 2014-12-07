@@ -98,9 +98,9 @@ RecFilter::RecFilter(string name) {
         contents.ptr->name = name;
     }
     contents.ptr->tiled          = false;
-    contents.ptr->border_expr    = FLOAT_ZERO;
-    contents.ptr->feedfwd_coeff  = Image<float>(0);
-    contents.ptr->feedback_coeff = Image<float>(0,0);
+    contents.ptr->clamped_border = false;
+    contents.ptr->feedfwd_coeff  = Image<double>(0);
+    contents.ptr->feedback_coeff = Image<double>(0,0);
 
     contents.ptr->target = get_jit_target_from_environment();
     if (contents.ptr->target.to_string().empty()) {
@@ -209,14 +209,14 @@ void RecFilter::set_clamped_image_border(void) {
         cerr << "Border clamping must be set before defining the filter" << endl;
         assert(false);
     }
-    contents.ptr->border_expr = Expr();
+    contents.ptr->clamped_border = true;
 }
 
-void RecFilter::add_filter(RecFilterDim x, vector<float> coeff) {
+void RecFilter::add_filter(RecFilterDim x, vector<double> coeff) {
     add_filter(RecFilterDimAndCausality(x,true), coeff);
 }
 
-void RecFilter::add_filter(RecFilterDimAndCausality x, vector<float> coeff) {
+void RecFilter::add_filter(RecFilterDimAndCausality x, vector<double> coeff) {
     RecFilterFunc& rf = internal_function(contents.ptr->name);
     Function        f = rf.func;
 
@@ -234,8 +234,8 @@ void RecFilter::add_filter(RecFilterDimAndCausality x, vector<float> coeff) {
 
     bool causal = x.causal();
 
-    float feedfwd = coeff[0];
-    vector<float> feedback;
+    double feedfwd = coeff[0];
+    vector<double> feedback;
     feedback.insert(feedback.begin(), coeff.begin()+1, coeff.end());
 
     // filter order and csausality
@@ -286,10 +286,10 @@ void RecFilter::add_filter(RecFilterDimAndCausality x, vector<float> coeff) {
                 } else {
                     call_args[dimension] = min(call_args[dimension]+(j+1),width-1);
                 }
-                if (contents.ptr->border_expr.defined()) {
-                    values[i] += feedback[j] * select(rx>j, Call::make(f,call_args,i), contents.ptr->border_expr);
-                } else {
+                if (contents.ptr->clamped_border) {
                     values[i] += feedback[j] * Call::make(f,call_args,i);
+                } else {
+                    values[i] += feedback[j] * select(rx>j, Call::make(f,call_args,i), 0);
                 }
             }
         }
@@ -309,8 +309,8 @@ void RecFilter::add_filter(RecFilterDimAndCausality x, vector<float> coeff) {
     // add the coeff of the newly added scan as the last row of coeff
     int num_scans = f.updates().size();
     int max_order = contents.ptr->feedback_coeff.height();
-    Image<float> feedfwd_coeff(num_scans);
-    Image<float> feedback_coeff(num_scans, std::max(max_order,scan_order));
+    Image<double> feedfwd_coeff(num_scans);
+    Image<double> feedback_coeff(num_scans, std::max(max_order,scan_order));
     for (int j=0; j<num_scans-1; j++) {
         feedfwd_coeff(j) = contents.ptr->feedfwd_coeff(j);
         for (int i=0; i<contents.ptr->feedback_coeff.height(); i++) {

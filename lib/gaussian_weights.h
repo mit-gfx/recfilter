@@ -7,18 +7,18 @@
 #include <Halide.h>
 
 /**@name Compute the Gaussian, derivative of Gaussian and integral of Gaussian
- * @param[in] x input (float or Halide::Expr)
+ * @param[in] x input (double or Halide::Expr)
  * @param[in] mu mean of the Gaussian function
  * @param[in] sigma sigma support of the true Gaussian filter
  */
 // @ {
-float gaussian       (float x, float mu, float sigma);
-float gaussDerivative(float x, float mu, float sigma);
-float gaussIntegral  (float x, float mu, float sigma);
+double gaussian       (double x, double mu, double sigma);
+double gaussDerivative(double x, double mu, double sigma);
+double gaussIntegral  (double x, double mu, double sigma);
 
-Halide::Expr gaussian       (Halide::Expr x, float mu, float sigma);
-Halide::Expr gaussDerivative(Halide::Expr x, float mu, float sigma);
-Halide::Expr gaussIntegral  (Halide::Expr x, float mu, float sigma);
+Halide::Expr gaussian       (Halide::Expr x, double mu, double sigma);
+Halide::Expr gaussDerivative(Halide::Expr x, double mu, double sigma);
+Halide::Expr gaussIntegral  (Halide::Expr x, double mu, double sigma);
 // @}
 
 
@@ -30,7 +30,7 @@ Halide::Expr gaussIntegral  (Halide::Expr x, float mu, float sigma);
  *
  * @return vector with feedforward coeff as first element and rest feedback coeff
  */
-std::vector<float> gaussian_weights(float sigma, int order);
+std::vector<double> gaussian_weights(double sigma, int order);
 
 /**
  * @brief Compute the size of a box filter that approximates a Gaussian
@@ -43,7 +43,7 @@ std::vector<float> gaussian_weights(float sigma, int order);
  * @param[in] sigma sigma support of the true Gaussian filter
  * @return box filter width
  */
-int gaussian_box_filter(int k, float sigma);
+int gaussian_box_filter(int k, double sigma);
 
 
 /** @brief Apply Gaussian filter on an input image
@@ -52,7 +52,7 @@ int gaussian_box_filter(int k, float sigma);
  * @param[in] sigma sigma support of the true Gaussian filter
  * @return filtered image
  */
-Halide::Image<float> reference_gaussian(Halide::Image<float> in, float sigma);
+Halide::Image<double> reference_gaussian(Halide::Image<double> in, double sigma);
 
 
 #endif // _GAUSSIAN_WEIGHTS_H_

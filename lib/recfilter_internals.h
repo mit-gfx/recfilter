@@ -123,6 +123,9 @@ struct RecFilterContents {
     /** Flag to indicate if the filter has been tiled  */
     bool tiled;
 
+    /** Image border expression */
+    bool clamped_border;
+
     /** Name of recursive filter as well as function that contains the
      * definition of the filter  */
     std::string name;
@@ -133,14 +136,11 @@ struct RecFilterContents {
     /** List of functions along with their names and their schedules */
     std::map<std::string, RecFilterFunc> func;
 
-    /** Image border expression */
-    Halide::Expr border_expr;
-
     /** Feed forward coeffs, only one for each scan */
-    Halide::Image<float> feedfwd_coeff;
+    Halide::Image<double> feedfwd_coeff;
 
     /** Feedback coeffs (num_scans x max_order) order j-th coeff of i-th scan is (i+1,j) */
-    Halide::Image<float> feedback_coeff;
+    Halide::Image<double> feedback_coeff;
 
     /** Compilation and execution target */
     Halide::Target target;
