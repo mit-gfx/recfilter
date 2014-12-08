@@ -36,8 +36,8 @@ int main(int argc, char **argv) {
 
     F(x, y) = image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1));
 
-    F.add_filter(+x, {1.0, 1.0f});
-    F.add_filter(+y, {1.0, 1.0f});
+    F.add_filter(+x, {1.0, 1.0});
+    F.add_filter(+y, {1.0, 1.0});
 
     F.split(x, tile_width, y, tile_width);
 
@@ -182,7 +182,7 @@ int main(int argc, char **argv) {
             }
         }
 
-        cout << CheckResult(ref,hl_out) << endl;
+        cout << CheckResult<float>(ref,hl_out) << endl;
     }
 
     return 0;

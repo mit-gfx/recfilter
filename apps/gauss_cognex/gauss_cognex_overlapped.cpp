@@ -31,9 +31,9 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    float sigma = 16.0f;
-    int   box   = gaussian_box_filter(3, sigma); // approx Gaussian with 3 box filters
-    float norm  = std::pow(box, 3*2);            // normalizing factor
+    double sigma = 16.0;
+    int    box   = gaussian_box_filter(3, sigma); // approx Gaussian with 3 box filters
+    double norm  = std::pow(box, 3*2);            // normalizing factor
 
     // ----------------------------------------------------------------------------------------------
 
@@ -47,31 +47,31 @@ int main(int argc, char **argv) {
 
     // convolve image with third derivative of three box filters
     S(x,y) =
-            ( 1.0f * I(x+0*box,y+0*box) +
-             -3.0f * I(x+1*box,y+0*box) +
-              3.0f * I(x+2*box,y+0*box) +
-             -1.0f * I(x+3*box,y+0*box) +
-             -3.0f * I(x+0*box,y+1*box) +
-              9.0f * I(x+1*box,y+1*box) +
-             -9.0f * I(x+2*box,y+1*box) +
-              3.0f * I(x+3*box,y+1*box) +
-              3.0f * I(x+0*box,y+2*box) +
-             -9.0f * I(x+1*box,y+2*box) +
-              9.0f * I(x+2*box,y+2*box) +
-             -3.0f * I(x+3*box,y+2*box) +
-             -1.0f * I(x+0*box,y+3*box) +
-              3.0f * I(x+1*box,y+3*box) +
-             -3.0f * I(x+2*box,y+3*box) +
-              1.0f * I(x+3*box,y+3*box)) / norm;
+            ( 1.0 * I(x+0*box,y+0*box) +
+             -3.0 * I(x+1*box,y+0*box) +
+              3.0 * I(x+2*box,y+0*box) +
+             -1.0 * I(x+3*box,y+0*box) +
+             -3.0 * I(x+0*box,y+1*box) +
+              9.0 * I(x+1*box,y+1*box) +
+             -9.0 * I(x+2*box,y+1*box) +
+              3.0 * I(x+3*box,y+1*box) +
+              3.0 * I(x+0*box,y+2*box) +
+             -9.0 * I(x+1*box,y+2*box) +
+              9.0 * I(x+2*box,y+2*box) +
+             -3.0 * I(x+3*box,y+2*box) +
+             -1.0 * I(x+0*box,y+3*box) +
+              3.0 * I(x+1*box,y+3*box) +
+             -3.0 * I(x+2*box,y+3*box) +
+              1.0 * I(x+3*box,y+3*box)) / norm;
 
     RecFilter filter;
 
     filter(x,y) = S(x,y);
 
-    filter.add_filter(+x, {1.0f, 1.0f});
-    filter.add_filter(+x, {1.0f, 1.0f});
-    filter.add_filter(+y, {1.0f, 2.0f, -1.0f});
-    filter.add_filter(+y, {1.0f, 2.0f, -1.0f});
+    filter.add_filter(+x, {1.0, 1.0});
+    filter.add_filter(+x, {1.0, 1.0});
+    filter.add_filter(+y, {1.0, 2.0, -1.0});
+    filter.add_filter(+y, {1.0, 2.0, -1.0});
 
     filter.split(x, tile_width, y, tile_width);
 
@@ -99,8 +99,8 @@ int main(int argc, char **argv) {
     if (!nocheck) {
         cerr << "\nChecking difference ...\n" << endl;
         Image<float> hl_out(hl_out_buff);
-        Image<float> ref = reference_gaussian(random_image, sigma);
-        cerr << "Difference with true Gaussian \n" << CheckResultVerbose(ref,hl_out) << endl;
+        Image<float> ref = reference_gaussian<float>(random_image, sigma);
+        cerr << "Difference with true Gaussian \n" << CheckResultVerbose<float>(ref,hl_out) << endl;
     }
 
     return 0;

@@ -130,6 +130,9 @@ struct RecFilterContents {
      * definition of the filter  */
     std::string name;
 
+    /** Filter output type */
+    Halide::Type type;
+
     /** Info about all the scans in the recursive filter */
     std::vector<FilterInfo> filter_info;
 

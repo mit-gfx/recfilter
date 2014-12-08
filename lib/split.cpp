@@ -37,9 +37,9 @@ struct SplitInfo {
     int filter_order;                   ///< order of recursive filter in a given dimension
     int filter_dim;                     ///< dimension id
     int num_scans;                      ///< number of scans in the dimension that must be tiled
-
     bool clamped_border;                ///< Image border expression (from RecFilterContents)
 
+    Halide::Type type;                  ///< filter output type
     Halide::Expr tile_width;            ///< tile width for splitting
     Halide::Expr image_width;           ///< image width in this dimension
     Halide::Expr num_tiles;             ///< number of tile in this dimension
@@ -157,6 +157,8 @@ static vector<SplitInfo> group_scans_by_dimension(Function F, vector<SplitInfo> 
 // -----------------------------------------------------------------------------
 
 static void move_init_to_update_def(RecFilterFunc& rF, vector<SplitInfo> split_info) {
+    assert(!split_info.empty());
+
     Function F = rF.func;
 
     vector<string> pure_args = F.args();
@@ -167,7 +169,7 @@ static void move_init_to_update_def(RecFilterFunc& rF, vector<SplitInfo> split_i
     map<string,VarTag> update_var_category = rF.pure_var_category;
 
     // leave the pure def undefined
-    vector<Expr> undef_values(F.outputs(), FLOAT_UNDEF);
+    vector<Expr> undef_values(F.outputs(), undef(split_info[0].type));
     F.clear_all_definitions();
     F.define(pure_args, undef_values);
 
@@ -324,8 +326,8 @@ static void add_padding_to_avoid_bank_conflicts(RecFilterFunc rF, vector<SplitIn
         }
     }
 
-    vector<Expr> values(F.outputs(), FLOAT_UNDEF);
-    F.define_update(args, values);
+    vector<Expr> undef_values(F.outputs(), undef(split_info[0].type));
+    F.define_update(args, undef_values);
 
     // no need for scheduling tags for the last update def
 }
@@ -333,8 +335,14 @@ static void add_padding_to_avoid_bank_conflicts(RecFilterFunc rF, vector<SplitIn
 // -----------------------------------------------------------------------------
 
 static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> split_info) {
+
+    assert(!split_info.empty());
+
     Function F = rF.func;
     Function F_intra(F.name() + DASH + INTRA_TILE_RESULT);
+
+    // filter type
+    Type type = split_info[0].type;
 
     // scheduling tags for function dimensions
     map<string,VarTag>          pure_var_category   = rF.pure_var_category;
@@ -455,7 +463,7 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
         // border for all internal tiles is zero
         vector<Expr> values(F_intra.outputs());
         for (int j=0; j<values.size(); j++) {
-            values[j] = feedfwd * Call::make(F_intra, args, j);
+            values[j] = Cast::make(type,feedfwd) * Call::make(F_intra, args, j);
 
             for (int k=0; k<feedback.size(); k++) {
                 vector<Expr> call_args = args;
@@ -470,16 +478,15 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
                 // tiles on the image border unless clamping is specified in
                 // which case only inner tiles are clamped to zero beyond
                 if (clamped_border) {
-                    values[j] += feedback[k] *
-                        select(rxi[filter_dim]>k || first_tile ,
-                                Call::make(F_intra,call_args,j), 0);
+                    values[j] += Cast::make(type,feedback[k]) *
+                        select(rxi[filter_dim]>k || first_tile,
+                                Call::make(F_intra,call_args,j), make_zero(type));
                 } else {
-                    values[j] += feedback[k] *
+                    values[j] += Cast::make(type,feedback[k]) *
                         select(rxi[filter_dim]>k,
-                            Call::make(F_intra,call_args,j), 0);
+                            Call::make(F_intra,call_args,j), make_zero(type));
                 }
             }
-            values[j] = simplify(values[j]);
         }
         F_intra.define_update(args, values);
     }
@@ -692,14 +699,14 @@ static vector<RecFilterFunc> create_complete_tail_term(
 
             // multiply each tail element with its weight before adding
             for (int i=0; i<F_tail[k].outputs(); i++) {
-                Expr prev_tile_expr = 0;
+                Expr prev_tile_expr = make_zero(split_info.type);
                 for (int j=0; j<order; j++) {
-                    prev_tile_expr += weight(tile-rxo.x-1, j) *
+                    prev_tile_expr += Cast::make(split_info.type, weight(tile-rxo.x-1, j)) *
                         Call::make(function, call_args_prev_tile[j], i);
                 }
 
                 Expr val = Call::make(function, call_args_curr_tile, i) +
-                    select(rxo.y>0, prev_tile_expr, 0);
+                    select(rxo.y>0, prev_tile_expr, make_zero(split_info.type));
                 values.push_back(simplify(val));
             }
 
@@ -811,7 +818,7 @@ static vector<RecFilterFunc> create_tail_residual_term(
 
         // args are same as completed tail terms
         vector<string> args = F_ctail[0].args();
-        vector<Expr> values(num_outputs, 0);
+        vector<Expr> values(num_outputs, make_zero(split_info.type));
 
         // accumulate the completed tails of all the preceedings scans
         // the list F_ctail is in reverse order just as split_info struct
@@ -848,8 +855,8 @@ static vector<RecFilterFunc> create_tail_residual_term(
 
                 for (int i=0; i<num_outputs; i++) {
                     Expr val = Call::make(F_ctail[j], call_args, i);
-                    Expr wt  = (split_info.scan_causal[j] ? weight(xi,k) : weight(tile-1-xi,k));
-                    Expr cwt = (split_info.scan_causal[j] ? c_weight(xi,k): c_weight(tile-1-xi,k));
+                    Expr wt  = Cast::make(split_info.type, (split_info.scan_causal[j] ? weight(xi,k) : weight(tile-1-xi,k)));
+                    Expr cwt = Cast::make(split_info.type, (split_info.scan_causal[j] ? c_weight(xi,k): c_weight(tile-1-xi,k)));
 
                     // change the weight for the first tile only, only this tile is
                     // affected by clamping the image at all borders
@@ -858,7 +865,7 @@ static vector<RecFilterFunc> create_tail_residual_term(
                         wt = select(first_tile_u, cwt, wt);
                     }
 
-                    values[i] += simplify(select(first_tile, 0, wt*val));
+                    values[i] += simplify(select(first_tile, make_zero(split_info.type), wt*val));
                 }
             }
         }
@@ -943,7 +950,7 @@ static vector<RecFilterFunc> create_final_residual_term(
 
         // args are same as completed tail terms
         vector<string> args = F_deps[j].args();
-        vector<Expr> values(num_outputs, 0);
+        vector<Expr> values(num_outputs, make_zero(split_info.type));
 
         // weight matrix for accumulating completed tail elements
         // of scan after applying only current scan
@@ -978,10 +985,12 @@ static vector<RecFilterFunc> create_final_residual_term(
                 Expr val;
                 if (split_info.scan_causal[j]) {
                     val = select(xo>0,
-                            weight(xi,k) * Call::make(F_deps[j], call_args, i), 0);
+                            Cast::make(split_info.type, weight(xi,k)) *
+                            Call::make(F_deps[j], call_args, i), make_zero(split_info.type));
                 } else {
                     val = select(xo<num_tiles-1,
-                            weight(simplify(tile-1-xi),k) * Call::make(F_deps[j], call_args, i), 0);
+                            Cast::make(split_info.type, weight(simplify(tile-1-xi),k)) *
+                            Call::make(F_deps[j], call_args, i),  make_zero(split_info.type));
                 }
                 values[i] = simplify(values[i] + val);
             }
@@ -1218,14 +1227,14 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
                     Expr first_tile = (split_info_prev.scan_causal[k] ? (yo==0) : (yo==num_tiles-1));
                     Expr last_tile  = (split_info_prev.scan_causal[k] ? (yo==num_tiles-1) : (yo==0));
                     Expr val = Call::make(F_tail_prev_scanned, call_args, i);
-                    Expr wt  = (split_info_prev.scan_causal[k] ? weight(yi,o)  : weight(tile-1-yi,o));
-                    Expr cwt = (split_info_prev.scan_causal[k] ? c_weight(yi,o): c_weight(tile-1-yi,o));
+                    Expr wt  = Cast::make(split_info.type, (split_info_prev.scan_causal[k] ? weight(yi,o)  : weight(tile-1-yi,o)));
+                    Expr cwt = Cast::make(split_info.type, (split_info_prev.scan_causal[k] ? c_weight(yi,o): c_weight(tile-1-yi,o)));
 
                     // change the weight for the first tile only, only this tile is affected
                     // by clamping the image at all borders
                     wt = select(last_tile, cwt, wt);
 
-                    pure_values[i] += simplify(select(first_tile, 0, wt*val));
+                    pure_values[i] += simplify(select(first_tile, make_zero(split_info.type), wt*val));
                 }
             }
 
@@ -1433,6 +1442,7 @@ void RecFilter::split(map<string,Expr> dim_tile) {
         recfilter_split_info[i].feedfwd_coeff   = contents.ptr->feedfwd_coeff;
         recfilter_split_info[i].feedback_coeff  = contents.ptr->feedback_coeff;
         recfilter_split_info[i].clamped_border  = contents.ptr->clamped_border;
+        recfilter_split_info[i].type            = contents.ptr->type;
         recfilter_split_info[i].tile_width      = Expr();
         recfilter_split_info[i].num_tiles       = Expr();
         recfilter_split_info[i].inner_var       = Var();

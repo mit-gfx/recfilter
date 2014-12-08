@@ -52,7 +52,27 @@ int gaussian_box_filter(int k, double sigma);
  * @param[in] sigma sigma support of the true Gaussian filter
  * @return filtered image
  */
-Halide::Image<double> reference_gaussian(Halide::Image<double> in, double sigma);
-
+template <typename T>
+Halide::Image<T> reference_gaussian(Halide::Image<T> in, T sigma) {
+    int width = in.width();
+    int height= in.height();
+    Halide::Image<T> ref(width,height);
+    for (int y=0; y<height; y++) {
+        for (int x=0; x<width; x++) {
+            double a = 0.0;
+            double w = 0.0;
+            for (int j=0; j<height; j++) {
+                for (int i=0; i<width; i++) {
+                    double d = (x-i)*(x-i) + (y-j)*(y-j);
+                    double g = gaussian(std::sqrt(d), 0.0, sigma);
+                    a += g * in(i,j);
+                    w += g;
+                }
+            }
+            ref(x,y) = a/w;
+        }
+    }
+    return ref;
+}
 
 #endif // _GAUSSIAN_WEIGHTS_H_

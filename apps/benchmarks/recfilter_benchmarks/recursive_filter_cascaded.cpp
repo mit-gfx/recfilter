@@ -33,8 +33,8 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    float b0         = 0.425294f;
-    vector<float> W2 = {0.885641f, -0.310935f};
+    double b0         = 0.425294;
+    vector<double> W2 = {0.885641, -0.310935};
 
     int filter_order = W2.size();
 
@@ -273,7 +273,7 @@ int main(int argc, char **argv) {
             }
         }
 
-        cout << CheckResult(ref,hl_out) << endl;
+        cout << CheckResult<float>(ref,hl_out) << endl;
     }
 
     return 0;

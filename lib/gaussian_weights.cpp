@@ -212,25 +212,3 @@ int gaussian_box_filter(int k, double sigma) {
     sum = std::sqrt(2.0*M_PI) * (sum+alpha) * sigma;
     return int(std::ceil(sum));
 }
-
-Image<double> reference_gaussian(Image<double> in, double sigma) {
-    int width = in.width();
-    int height= in.height();
-    Image<double> ref(width,height);
-    for (int y=0; y<height; y++) {
-        for (int x=0; x<width; x++) {
-            double a = 0.0;
-            double w = 0.0;
-            for (int j=0; j<height; j++) {
-                for (int i=0; i<width; i++) {
-                    double d = (x-i)*(x-i) + (y-j)*(y-j);
-                    double g = gaussian(std::sqrt(d), 0.0, sigma);
-                    a += g * in(i,j);
-                    w += g;
-                }
-            }
-            ref(x,y) = a/w;
-        }
-    }
-    return ref;
-}

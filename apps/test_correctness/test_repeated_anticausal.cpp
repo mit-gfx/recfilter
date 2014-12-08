@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    cerr << CheckResultVerbose(ref, hl_out) << endl;
+    cerr << CheckResultVerbose<float>(ref, hl_out) << endl;
 
     return 0;
 }

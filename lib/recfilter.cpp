@@ -149,6 +149,17 @@ void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
         contents.ptr->name = unique_name("R");
     }
 
+    assert(!pure_args.empty());
+    assert(!pure_def.empty());
+
+    contents.ptr->type = pure_def[0].type();
+    for (int i=1; i<pure_def.size(); i++) {
+        if (contents.ptr->type != pure_def[i].type()) {
+            cerr << "Type of all Tuple elements in filter definition must be same" << endl;
+            assert(false);
+        }
+    }
+
     RecFilterFunc rf;
     rf.func = Function(contents.ptr->name);
     rf.func_category = INTRA_N;
@@ -276,24 +287,24 @@ void RecFilter::add_filter(RecFilterDimAndCausality x, vector<double> coeff) {
     // RHS scan definition
     vector<Expr> values(f.values().size());
     for (int i=0; i<values.size(); i++) {
-        values[i] = feedfwd * Call::make(f, args, i);
+        values[i] = Cast::make(contents.ptr->type,feedfwd) *
+            Call::make(f, args, i);
 
         for (int j=0; j<feedback.size(); j++) {
-            if (feedback[j] != 0.0f) {
-                vector<Expr> call_args = args;
-                if (causal) {
-                    call_args[dimension] = max(call_args[dimension]-(j+1),0);
-                } else {
-                    call_args[dimension] = min(call_args[dimension]+(j+1),width-1);
-                }
-                if (contents.ptr->clamped_border) {
-                    values[i] += feedback[j] * Call::make(f,call_args,i);
-                } else {
-                    values[i] += feedback[j] * select(rx>j, Call::make(f,call_args,i), 0);
-                }
+            vector<Expr> call_args = args;
+            if (causal) {
+                call_args[dimension] = max(call_args[dimension]-(j+1),0);
+            } else {
+                call_args[dimension] = min(call_args[dimension]+(j+1),width-1);
+            }
+            if (contents.ptr->clamped_border) {
+                values[i] += Cast::make(contents.ptr->type,feedback[j]) *
+                    Call::make(f,call_args,i);
+            } else {
+                values[i] += Cast::make(contents.ptr->type,feedback[j]) *
+                    select(rx>j, Call::make(f,call_args,i), make_zero(contents.ptr->type));
             }
         }
-        values[i] = simplify(values[i]);
     }
     f.define_update(args, values);
 

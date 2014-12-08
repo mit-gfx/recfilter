@@ -24,8 +24,6 @@ int main(int argc, char **argv) {
     int  height  = args.width;
     int  tile_width = args.block;
 
-    float sigma = 16.0f;
-
     Image<float> random_image = generate_random_image<float>(width,height);
 
     ImageParam image(type_of<float>(), 2);
@@ -33,8 +31,9 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    vector<float> W1 = gaussian_weights(sigma, 1);
-    vector<float> W2 = gaussian_weights(sigma, 2);
+    double sigma = 16.0;
+    vector<double> W1 = gaussian_weights(sigma, 1);
+    vector<double> W2 = gaussian_weights(sigma, 2);
 
     RecFilterDim x("x", width);
     RecFilterDim y("y", height);
@@ -86,8 +85,8 @@ int main(int argc, char **argv) {
     if (!nocheck) {
         cerr << "\nChecking difference ...\n" << endl;
         Image<float> hl_out(hl_out_buff);
-        Image<float> ref = reference_gaussian(random_image, sigma);
-        cerr << "Difference with true Gaussian \n" << CheckResult(ref,hl_out) << endl;
+        Image<float> ref = reference_gaussian<float>(random_image, sigma);
+        cerr << "Difference with true Gaussian \n" << CheckResult<float>(ref,hl_out) << endl;
     }
 
     return 0;

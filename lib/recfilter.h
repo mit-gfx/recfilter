@@ -490,19 +490,52 @@ class Arguments {
 
 // Random image generation and printing utils
 
-#define MIN_ELEMENT 1
-#define MAX_ELEMENT 1
-#define PRINT_WIDTH 3
-
 /** Generate an image of a given size with random entries */
 template<typename T>
 Halide::Image<T> generate_random_image(size_t w, size_t h=1, size_t c=1, size_t d=1) {
-    Halide::Image<T> image(w,h,c,d);
-    for (size_t t=0; t<d; t++) {
+    Halide::Image<T> image;
+
+    int MIN_ELEMENT = 1;
+    int MAX_ELEMENT = 1;
+
+    if (h<=1 && c<=1 && d<=1) {
+        image = Halide::Image<T>(w);
+    } else if (c<=1 && d<=1) {
+        image = Halide::Image<T>(w,h);
+    } else if (d<=1) {
+        image = Halide::Image<T>(w,h,c);
+    } else {
+        image = Halide::Image<T>(w,h,c,d);
+    }
+
+    if (image.dimensions() == 1) {
+        for (size_t x=0; x<w; x++) {
+            image(x) = T(MIN_ELEMENT + (rand() % MAX_ELEMENT));
+        }
+    }
+    else if (image.dimensions() == 2) {
+        for (size_t y=0; y<h; y++) {
+            for (size_t x=0; x<w; x++) {
+                image(x,y) = T(MIN_ELEMENT + (rand() % MAX_ELEMENT));
+            }
+        }
+    }
+    else if (image.dimensions() == 3) {
         for (size_t z=0; z<c; z++) {
             for (size_t y=0; y<h; y++) {
                 for (size_t x=0; x<w; x++) {
-                    image(x,y,z,t) = T(MIN_ELEMENT + (rand() % MAX_ELEMENT));
+                    image(x,y,z) = T(MIN_ELEMENT + (rand() % MAX_ELEMENT));
+                }
+            }
+        }
+    }
+    else if (image.dimensions() == 4) {
+        for (size_t t=0; t<d; t++) {
+            for (size_t z=0; z<c; z++) {
+                for (size_t y=0; y<h; y++) {
+                    for (size_t x=0; x<w; x++) {
+                        image(x,y,z,t) = T(MIN_ELEMENT + (rand() % MAX_ELEMENT));
+                    }
                 }
             }
         }
@@ -514,40 +547,38 @@ Halide::Image<T> generate_random_image(size_t w, size_t h=1, size_t c=1, size_t 
 /** Print an image */
 template<typename T>
 std::ostream &operator<<(std::ostream &s, Halide::Image<T> image) {
+    int precision = 4;
     if (image.dimensions() == 1) {
         for (size_t x=image.min(0); x<image.min(0)+image.extent(0); x++) {
-            s << std::setw(PRINT_WIDTH) << image(x) << " ";
+            s << std::setw(precision) << image(x) << " ";
         }
         s << "\n";
     }
-
-    if (image.dimensions() == 2) {
+    else if (image.dimensions() == 2) {
         for (size_t y=image.min(1); y<image.min(1)+image.extent(1); y++) {
             for (size_t x=image.min(0); x<image.min(0)+image.extent(0); x++) {
-                s << std::setw(PRINT_WIDTH) << image(x,y) << " ";
+                s << std::setw(precision) << double(image(x,y)) << " ";
             }
             s << "\n";
         }
     }
-
-    if (image.dimensions() == 3) {
+    else if (image.dimensions() == 3) {
         for (size_t z=image.min(2); z<image.min(2)+image.extent(2); z++) {
             for (size_t y=image.min(1); y<image.min(1)+image.extent(1); y++) {
                 for (size_t x=image.min(0); x<image.min(0)+image.extent(0); x++) {
-                    s << std::setw(PRINT_WIDTH) << image(x,y,z) << " ";
+                    s << std::setw(precision) << double(image(x,y,z)) << " ";
                 }
                 s << "\n";
             }
             s << "--\n";
         }
     }
-
-    if (image.dimensions() == 4) {
+    else if (image.dimensions() == 4) {
         for (size_t w=image.min(3); w<image.min(3)+image.extent(3); w++) {
             for (size_t z=image.min(2); z<image.min(2)+image.extent(2); z++) {
                 for (size_t y=image.min(1); y<image.min(1)+image.extent(1); y++) {
                     for (size_t x=image.min(0); x<image.min(0)+image.extent(0); x++) {
-                        s << std::setw(PRINT_WIDTH) << image(x,y,z,w) << " ";
+                        s << std::setw(precision) << double(image(x,y,z,w)) << " ";
                     }
                     s << "\n";
                 }
