@@ -186,8 +186,9 @@ public:
     void compile_jit(std::string filename="");
 
     /** Compute the filter for a given output buffer for specified number of iterations
-     * for timing purposes; last iteration copies the result to host */
-    void realize(Halide::Buffer out, int iterations=1);
+     * for timing purposes; last iteration copies the result to host, returns
+     * computation time in milliseconds */
+    double realize(Halide::Buffer out, int iterations=1);
     // @}
 
 

@@ -1,6 +1,7 @@
 #include "recfilter.h"
 #include "recfilter_internals.h"
 #include "modifiers.h"
+#include "timer.h"
 
 using std::string;
 using std::cerr;
@@ -144,11 +145,7 @@ RecFilterRefExpr RecFilter::operator()(vector<Expr> x) {
 }
 
 void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
-    if (!contents.ptr) {
-        contents = new RecFilterContents;
-        contents.ptr->name = unique_name("R");
-    }
-
+    assert(contents.ptr);
     assert(!pure_args.empty());
     assert(!pure_def.empty());
 
@@ -160,16 +157,16 @@ void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
         }
     }
 
+    if (!contents.ptr->filter_info.empty()) {
+        cerr << "Recursive filter already defined" << endl;
+        assert(false);
+    }
+
     RecFilterFunc rf;
     rf.func = Function(contents.ptr->name);
     rf.func_category = INTRA_N;
 
-    if (!contents.ptr->filter_info.empty()) {
-        cerr << "Recursive filter dimensions already set" << endl;
-        assert(false);
-    }
-
-    // add the arguments
+   // add the arguments
 
     for (int i=0; i<pure_args.size(); i++) {
         FilterInfo s;
@@ -215,9 +212,8 @@ void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
 // -----------------------------------------------------------------------------
 
 void RecFilter::set_clamped_image_border(void) {
-    Function f = internal_function(contents.ptr->name).func;
-    if (f.has_pure_definition()) {
-        cerr << "Border clamping must be set before defining the filter" << endl;
+    if (!contents.ptr->filter_info.empty()) {
+        cerr << "Recursive filter already defined" << endl;
         assert(false);
     }
     contents.ptr->clamped_border = true;
@@ -461,7 +457,9 @@ void RecFilter::compile_jit(string filename) {
     F.compile_jit(contents.ptr->target);
 }
 
-void RecFilter::realize(Buffer out, int iterations) {
+double RecFilter::realize(Buffer out, int iterations) {
+    unsigned long time_start = millisecond_timer();
+
     Func F(internal_function(contents.ptr->name).func);
 
     // upload all buffers to device
@@ -479,6 +477,9 @@ void RecFilter::realize(Buffer out, int iterations) {
     F.realize(out);
     out.copy_to_host();
     out.free_dev_buffer();
+
+    unsigned long time_end = millisecond_timer();
+    return double(time_end-time_start);
 }
 
 // -----------------------------------------------------------------------------
