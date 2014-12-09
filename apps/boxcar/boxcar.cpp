@@ -1,7 +1,7 @@
 #include <iostream>
 #include <Halide.h>
 
-#include "../../lib/recfilter.h"
+#include "recfilter.h"
 
 #define MAX_THREAD        192
 #define BOX_FILTER_FACTOR 16

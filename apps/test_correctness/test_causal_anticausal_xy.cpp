@@ -1,7 +1,7 @@
 #include <iostream>
 #include <Halide.h>
 
-#include "../../lib/recfilter.h"
+#include "recfilter.h"
 
 using namespace Halide;
 

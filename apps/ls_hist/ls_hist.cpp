@@ -1,9 +1,9 @@
 #include <iostream>
 #include <Halide.h>
 
-#include "../../lib/recfilter.h"
+#include "recfilter.h"
 
-#include "../../lib/gaussian_weights.h"
+#include "gaussian_weights.h"
 
 #define WARP_SIZE   32
 #define MAX_THREADS 192
