@@ -91,7 +91,7 @@ IMDIFF_OBJECTS=$(IMDIFF_SOURCES:.c=.o)
 .PHONY: all clean rebuild srcdoc dist dist-zip dist-xz
 
 MKDIR=mkdir -p
-BIN_DIR=../../bin/cpu
+BIN_DIR=../../../bin/cpu
 
 # all: gaussian_bench gaussian_demo imdiff
 all: $(BIN_DIR)/gaussian_box_cpu.app $(BIN_DIR)/gaussian_vyv_cpu.app

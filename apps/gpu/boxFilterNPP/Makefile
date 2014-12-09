@@ -66,10 +66,10 @@ ifneq ($(DARWIN),)
 ifeq ($(XCODE_GE_5),1)
   GCC ?= clang
 else
-  GCC ?= g++ -std=c++11
+  GCC ?= g++
 endif
 else
-  GCC ?= g++ -std=c++11
+  GCC ?= g++
 endif
 NVCC := $(CUDA_PATH)/bin/nvcc -ccbin $(GCC)
 
@@ -146,14 +146,14 @@ LIBRARIES += -L../common/FreeImage/lib/$(OSLOWER) -L../common/FreeImage/lib/$(OS
 
 MKDIR=mkdir -p
 RM=rm -rf
-BIN_DIR=../../../bin/benchmarks/
-APP=$(BIN_DIR)/nv_boxfilter.app
+BIN_DIR=../../../bin/gpu/
+APP=$(BIN_DIR)/nv_box_filter.app
 
 all: $(APP)
 
 $(APP): boxFilterNPP.cpp
 	$(MKDIR) $(BIN_DIR)
-	$(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(ALL_LDFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $(APP) boxFilterNPP.cpp
+	$(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(ALL_LDFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) $< -o $@
 
 clean:
 	$(RM) $(APP)

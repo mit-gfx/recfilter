@@ -2,7 +2,7 @@ CXX=g++ -std=c++11
 MKDIR=mkdir -p
 RM=rm -rf
 
-BIN_DIR=../bin/boxcar/
+BIN_DIR=../../bin/boxcar/
 
 LIBRECFILTER_DIR=../../lib/
 LIBRECFILTER_INC=$(LIBRECFILTER_DIR)/recfilter.h
