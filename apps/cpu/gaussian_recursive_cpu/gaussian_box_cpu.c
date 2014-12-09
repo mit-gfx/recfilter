@@ -54,6 +54,8 @@ int main(int argc, char **argv)
     num *output = NULL;
     int success = 0;
 
+    long N;
+
     param.bench_type = (const char *)"speed2D";
     param.N = 100;
     param.n0 = (param.N + 1) / 2;
@@ -63,7 +65,7 @@ int main(int argc, char **argv)
     param.K = 3;
     param.tol = 1e-2;
 
-    if (argc < 2)
+    if (argc == 2)
     {
         param.num_runs = (long)atof(argv[1]);
         if (param.num_runs <= 0)
@@ -74,11 +76,9 @@ int main(int argc, char **argv)
     }
     else
     {
-        fprintf(stderr, "Usage: gaussian_box_cpu [number of benchmarking runs]");
+        fprintf(stderr, "Usage: gaussian_box_cpu [number of benchmarking runs]\n");
         goto fail;
     }
-
-    long N;
 
     fprintf(stderr, "\nwidth\ttime (ms)\truns\n");
     for (N = 64; N <= 8192; N += 64)

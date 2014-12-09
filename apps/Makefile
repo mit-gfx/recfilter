@@ -9,6 +9,7 @@ all: scripts
 	make -C gauss_cognex -j8
 	make -C benchmarks -j8
 	make -C ls_hist
+	make -C cpu
 
 clean:
 	make -C ../lib clean
@@ -18,6 +19,7 @@ clean:
 	make -C gauss_cognex clean
 	make -C test_correctness clean
 	make -C benchmarks clean
+	make -C cpu clean
 	rm -f $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh
 
 scripts: $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh

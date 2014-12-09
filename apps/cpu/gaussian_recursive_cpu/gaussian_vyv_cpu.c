@@ -65,7 +65,7 @@ int main(int argc, char **argv)
     param.K = 3;
     param.tol = 1e-2;
 
-    if (argc < 2)
+    if (argc == 2)
     {
         param.num_runs = (long)atof(argv[1]);
         if (param.num_runs <= 0)
@@ -76,7 +76,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        fprintf(stderr, "Usage: gaussian_vyv_cpu [number of benchmarking runs]");
+        fprintf(stderr, "Usage: gaussian_vyv_cpu [number of benchmarking runs]\n");
         goto fail;
     }
 

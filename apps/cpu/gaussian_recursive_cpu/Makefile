@@ -22,7 +22,7 @@ LDLIBTIFF=-ltiff
 SHELL=/bin/sh
 CFLAGS=-O3 -ansi -pedantic -Wall -Wextra $(NUM)
 LDFLAGS=$(OPENMP)
-LDLIBS=-lm $(LDFFTW3) $(LDLIBJPEG) $(LDLIBPNG) $(LDLIBTIFF)
+LDLIBS=-lm $(LDFFTW3) $(LDLIBJPEG) $(LDLIBPNG) $(LDLIBTIFF) -lgomp
 
 GAUSSIAN_BOX_BENCH_SOURCES=gaussian_box_cpu.c strategy_gaussian_conv.c \
 gaussian_conv_fir.c gaussian_conv_dct.c gaussian_conv_am.c \
@@ -81,7 +81,7 @@ ifneq ($(LDLIBTIFF),)
 	CTIFF=-DUSE_LIBTIFF
 endif
 
-ALLCFLAGS=$(CFLAGS) $(CJPEG) $(CPNG) $(CTIFF)
+ALLCFLAGS=$(CFLAGS) $(CJPEG) $(CPNG) $(CTIFF) -fopenmp
 GAUSSIAN_BOX_BENCH_OBJECTS=$(GAUSSIAN_BOX_BENCH_SOURCES:.c=.o)
 GAUSSIAN_VYV_BENCH_OBJECTS=$(GAUSSIAN_VYV_BENCH_SOURCES:.c=.o)
 GAUSSIAN_BENCH_OBJECTS=$(GAUSSIAN_BENCH_SOURCES:.c=.o)
@@ -98,7 +98,7 @@ all: $(BIN_DIR)/gaussian_box_cpu.app $(BIN_DIR)/gaussian_vyv_cpu.app
 
 $(BIN_DIR)/gaussian_box_cpu.app: $(GAUSSIAN_BOX_BENCH_OBJECTS)
 	$(MKDIR) $(BIN_DIR)
-	$(CC) $(LDFLAGS) -o $@ $(GAUSSIAN_BOX_BENCH_OBJECTS) $(LDLIBS) $(LDFLAGS)
+	$(CC) $(LDFLAGS) -o $@ $(GAUSSIAN_BOX_BENCH_OBJECTS) $(LDLIBS)
 
 $(BIN_DIR)/gaussian_vyv_cpu.app: $(GAUSSIAN_VYV_BENCH_OBJECTS)
 	$(MKDIR) $(BIN_DIR)

@@ -231,6 +231,7 @@ static void gconv_box_execute_2D(gconv *g)
     const num *src_y = g->src;
 
     /* Filter each column of the channel. */
+#pragma omp parallel for
     for (y = 0; y < height; ++y)
     {
         box_gaussian_conv(dest_y, g->buffer, src_y,
@@ -240,6 +241,7 @@ static void gconv_box_execute_2D(gconv *g)
     }
 
     /* Filter each row of the channel. */
+#pragma omp parallel for
     for (x = 0; x < width; ++x)
         box_gaussian_conv(g->dest + x, g->buffer, g->dest + x,
                 height, width, g->sigma, g->K);
@@ -413,6 +415,7 @@ static void gconv_vyv_execute_2D(gconv *g)
     const num *src_y = g->src;
 
     /* Filter each row of the channel. */
+#pragma omp parallel for
     for (y = 0; y < height; ++y)
     {
         vyv_gaussian_conv(*((vyv_coeffs *)g->coeffs), dest_y, src_y, width, 1);
@@ -421,6 +424,7 @@ static void gconv_vyv_execute_2D(gconv *g)
     }
 
     /* Filter each column of the channel. */
+#pragma omp parallel for
     for (x = 0; x < width; ++x)
         vyv_gaussian_conv(*((vyv_coeffs *)g->coeffs), g->dest + x, g->dest + x, height, width);
 }
