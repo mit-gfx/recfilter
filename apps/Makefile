@@ -10,6 +10,7 @@ all: scripts
 	make -C benchmarks -j8
 	make -C ls_hist
 	make -C cpu
+	make -C gpu
 
 clean:
 	make -C ../lib clean
@@ -20,6 +21,7 @@ clean:
 	make -C test_correctness clean
 	make -C benchmarks clean
 	make -C cpu clean
+	make -C gpu clean
 	rm -f $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh
 
 scripts: $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh

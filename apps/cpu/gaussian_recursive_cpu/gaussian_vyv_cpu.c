@@ -29,6 +29,7 @@ int speed_test_2D(program_params p, num *output, num *input)
     gconv *g = NULL;
     unsigned long time_start, time_stop;
     long run;
+    double time;
 
     if (!(g = gconv_plan(output, input, p.N, 1,
         p.algo, p.sigma, p.K, p.tol)))
@@ -40,8 +41,9 @@ int speed_test_2D(program_params p, num *output, num *input)
         gconv_execute_2D(g);
 
     time_stop = millisecond_timer();
-    fprintf(stderr, "%ld\t%e\t%ld\n",
-        p.N, ((double)(time_stop - time_start)), p.num_runs);
+
+    time = ((double)(time_stop-time_start))/ ((double)(p.num_runs));
+    fprintf(stderr, "%ld\t%f\n", p.N, time);
     gconv_free(g);
     return 1;
 }
@@ -80,7 +82,7 @@ int main(int argc, char **argv)
         goto fail;
     }
 
-    fprintf(stderr, "\nwidth\ttime (ms)\truns\n");
+    fprintf(stderr, "\nwidth\ttime (ms)\n");
     for (N = 64; N <= 8192; N += 64)
     {
         param.N = N;

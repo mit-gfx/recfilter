@@ -153,22 +153,19 @@ int main(int argc, char** argv)
       return -1;
   }
 
-  std::cerr << "width\ttime (ms)\tnum_runs" << std::endl;
+  std::cerr << "width\ttime (ms)" << std::endl;
 
   for (int width=64; width<=8192; width+=64)
   {
     size_t m = width;
     size_t n = width;
 
-    // 2d array stored in row-major order [(0,0), (0,1), (0,2) ... ]
-    thrust::device_vector<float> in_data(m * n, 1.0f);
-
     unsigned long time_start = millisecond_timer();
 
     for (int j=0; j<num_runs; j++)
     {
       // 2d array stored in row-major order [(0,0), (0,1), (0,2) ... ]
-      thrust::device_vector<float> data = in_data;
+      thrust::device_vector<float> data(m * n, 1.0f);
 
       //std::cout << "[step 0] initial array" << std::endl;
       //print(m, n, data);
@@ -190,15 +187,12 @@ int main(int argc, char** argv)
       transpose(n, m, temp, data);
       //print(m, n, data);
     }
-    thrust::host_vector<float> h_data = in_data;
 
     unsigned long time_end = millisecond_timer();
 
-    double time_elapsed = double(time_end-time_start);
+    double time = double(time_end-time_start)/double(num_runs);
 
-    std::cerr << width << "\t"
-        << std::scientific << std::setw(8) << time_elapsed << "\t"
-        << std::fixed << num_runs << std::endl;
+    std::cerr << width << "\t" << time << std::endl;
   }
   return 0;
 }
