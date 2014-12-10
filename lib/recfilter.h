@@ -321,6 +321,8 @@ public:
     RecFilterSchedule inter_schedule(void);
     // @}
 
+    /** Get the compilation target, inferred from HL_JIT_TARGET */
+    Halide::Target target(void);
 
     /** @name Generic handles to write scheduled for dimensions of internal functions */
     // {@

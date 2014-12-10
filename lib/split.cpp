@@ -408,14 +408,19 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
         int  dimension   = -1;
 
         double feedfwd = s.feedfwd_coeff(i);
+cerr << "2" << endl;
         vector<double> feedback(filter_order,0.0);
+cerr << "2" << endl;
         for (int j=0; j<s.feedback_coeff.height(); j++) {
+cerr << "21" << endl;
             feedback[j] = s.feedback_coeff(i,j);
+cerr << "22" << endl;
         }
 
         // number of inner and outer vars in the update def
         int i_cnt = 0;
         int o_cnt = 0;
+cerr << "2" << endl;
 
         // update args: replace rx by the RVar of this dimension in rxi and xo
         // replace all other pure args with their respective RVar in rxi
@@ -457,6 +462,7 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
             }
         }
         assert(dimension >= 0);
+cerr << "2" << endl;
 
         // update values: create the intra tile scans with special
         // borders for all tile on image boundary is clamped_border as specified
@@ -489,6 +495,7 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
             }
         }
         F_intra.define_update(args, values);
+cerr << "2" << endl;
     }
 
     RecFilterFunc rF_intra;
@@ -1476,6 +1483,13 @@ void RecFilter::split(map<string,Expr> dim_tile) {
                 recfilter_split_info[j].inner_var = Var(name + "i");
                 recfilter_split_info[j].outer_var = Var(name + "o");
 
+                // check that there are scans in this dimension
+                if (recfilter_split_info[j].scan_id.empty() ||
+                    recfilter_split_info[j].scan_causal.empty())
+                {
+                    cerr << "No scans to tile in dimension " << x << endl;
+                    assert(false);
+                }
                 found = true;
             }
         }
@@ -1733,6 +1747,14 @@ void RecFilter::finalize(Target target) {
             }
         }
         else {
+            // inline all reindexing functions
+            for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+                if (fit->second.func_category == REINDEX) {
+                    inline_func(fit->second.func.name());
+                    fit = contents.ptr->func.begin();            // list changed, start all over again
+                }
+            }
+            // make all other functions as compute root
             for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
                 RecFilterFunc& rF = fit->second;
                 Func(rF.func).compute_root();

@@ -336,7 +336,19 @@ void RecFilter::add_filter(RecFilterDimAndCausality x, vector<double> coeff) {
     // copy the dimension tags from pure def replacing x by rx
     // change the function tag from pure to scan
     map<string, VarTag> update_var_category = rf.pure_var_category;
+
+    // decrement the full count of all vars whose count was more than count of x
+    int count_x = update_var_category[x.var().name()].count();
     update_var_category.erase(x.var().name());
+    map<string,VarTag>::iterator vit;
+    for (vit=update_var_category.begin(); vit!=update_var_category.end(); vit++) {
+        if (vit->second.check(FULL) && !vit->second.check(SCAN)) {
+            int count = vit->second.count();
+            if (count > count_x) {
+                update_var_category[vit->first] = VarTag(FULL,count-1);
+            }
+        }
+    }
     update_var_category.insert(make_pair(rx.x.name(), FULL|SCAN));
     rf.update_var_category.push_back(update_var_category);
 }
@@ -375,9 +387,8 @@ RecFilterSchedule RecFilter::intra_schedule(int id) {
     }
 
     if (func_list.empty()) {
-        cerr << "No " << (id==0 ? " " : (id==1 ? "1D " : "nD "));
+        cerr << "Warning: No " << (id==0 ? " " : (id==1 ? "1D " : "nD "));
         cerr << "intra tile functions to schedule" << endl;
-        assert(false);
     }
     return RecFilterSchedule(*this, func_list);
 }
@@ -394,8 +405,7 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
     }
 
     if (func_list.empty()) {
-        cerr << "No inter tile functions to schedule" << endl;
-        assert(false);
+        cerr << "Warning: No inter tile functions to schedule" << endl;
     }
     return RecFilterSchedule(*this, func_list);
 }
@@ -479,7 +489,11 @@ double RecFilter::realize(Buffer out, int iterations) {
     out.free_dev_buffer();
 
     unsigned long time_end = millisecond_timer();
-    return double(time_end-time_start);
+    return double(time_end-time_start)/double(iterations);
+}
+
+Target RecFilter::target(void) {
+    return contents.ptr->target;
 }
 
 // -----------------------------------------------------------------------------
