@@ -90,8 +90,6 @@ RecFilterSchedule& RecFilterSchedule::compute_in_global() {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        cerr << "CR " << F.name() << " " << rF.func.schedule().compute_level().is_root() << endl;
-
         // remove the initializations of all scans which are scheduled as
         // compute_root to avoid extra kernel execution for initializing
         // the output buffer
@@ -549,8 +547,6 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
-
-        cerr << F.name() << " " << rF.func.schedule().compute_level().is_root() << endl;
 
         // no need to reorder storage if the function is not compute
         // don't reorder storage of final result

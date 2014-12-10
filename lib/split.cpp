@@ -408,19 +408,14 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
         int  dimension   = -1;
 
         double feedfwd = s.feedfwd_coeff(i);
-cerr << "2" << endl;
         vector<double> feedback(filter_order,0.0);
-cerr << "2" << endl;
         for (int j=0; j<s.feedback_coeff.height(); j++) {
-cerr << "21" << endl;
             feedback[j] = s.feedback_coeff(i,j);
-cerr << "22" << endl;
         }
 
         // number of inner and outer vars in the update def
         int i_cnt = 0;
         int o_cnt = 0;
-cerr << "2" << endl;
 
         // update args: replace rx by the RVar of this dimension in rxi and xo
         // replace all other pure args with their respective RVar in rxi
@@ -462,7 +457,6 @@ cerr << "2" << endl;
             }
         }
         assert(dimension >= 0);
-cerr << "2" << endl;
 
         // update values: create the intra tile scans with special
         // borders for all tile on image boundary is clamped_border as specified
@@ -495,7 +489,6 @@ cerr << "2" << endl;
             }
         }
         F_intra.define_update(args, values);
-cerr << "2" << endl;
     }
 
     RecFilterFunc rF_intra;

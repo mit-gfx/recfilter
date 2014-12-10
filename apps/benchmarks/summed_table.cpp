@@ -157,7 +157,8 @@ int main(int argc, char **argv) {
 
     cerr << "\nRunning ... " << endl;
     Buffer out(type_of<float>(), width, height);
-    F.realize(out, iter);
+    float time = F.realize(out, iter);
+    cerr << width << "\t" << time << endl;
 
     // ----------------------------------------------------------------------------------------------
 
