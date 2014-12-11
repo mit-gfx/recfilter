@@ -8,9 +8,9 @@
  * is strictly prohibited.
  *
  */
- 
+
 // *********************************************************************
-// Generic Utilities for NVIDIA GPU Computing SDK 
+// Generic Utilities for NVIDIA GPU Computing SDK
 // *********************************************************************
 
 // includes
@@ -27,35 +27,35 @@
 
 using namespace std;
 
-// size of PGM file header 
+// size of PGM file header
 const unsigned int PGMHeaderSize = 0x40;
 #define MIN_EPSILON_ERROR 1e-3f
 
 // Deallocate memory allocated within shrUtils
 // *********************************************************************
-void shrFree(void* ptr) 
+void shrFree(void* ptr)
 {
   if( NULL != ptr) free( ptr);
 }
 
-// Helper function to init data arrays 
+// Helper function to init data arrays
 // *********************************************************************
 void shrFillArray(float* pfData, int iSize)
 {
-    int i; 
+    int i;
     const float fScale = 1.0f / (float)RAND_MAX;
-    for (i = 0; i < iSize; ++i) 
+    for (i = 0; i < iSize; ++i)
     {
         pfData[i] = fScale * rand();
     }
 }
 
-// Helper function to print data arrays 
+// Helper function to print data arrays
 // *********************************************************************
 void shrPrintArray(float* pfData, int iSize)
 {
     int i;
-    for (i = 0; i < iSize; ++i) 
+    for (i = 0; i < iSize; ++i)
     {
         shrLog("%d: %.3f\n", i, pfData[i]);
     }
@@ -73,26 +73,26 @@ double shrDeltaT(int iCounterID = 0)
         // Variables that need to retain state between calls
         static LARGE_INTEGER liOldCount[3] = { {0, 0}, {0, 0}, {0, 0} };
 
-        // locals for new count, new freq and new time delta 
+        // locals for new count, new freq and new time delta
 	    LARGE_INTEGER liNewCount, liFreq;
 	    if (QueryPerformanceFrequency(&liFreq))
 	    {
 		    // Get new counter reading
 		    QueryPerformanceCounter(&liNewCount);
 
-		    if (iCounterID >= 0 && iCounterID <= 2) 
+		    if (iCounterID >= 0 && iCounterID <= 2)
 		    {
-			    // Calculate time difference for timer 0.  (zero when called the first time) 
+			    // Calculate time difference for timer 0.  (zero when called the first time)
 			    DeltaT = liOldCount[iCounterID].LowPart ? (((double)liNewCount.QuadPart - (double)liOldCount[iCounterID].QuadPart) / (double)liFreq.QuadPart) : 0.0;
 			    // Reset old count to new
 			    liOldCount[iCounterID] = liNewCount;
 			}
-			else 
+			else
 			{
 		        // Requested counter ID out of range
 		        DeltaT = -9999.0;
 			}
-			
+
 		    // Returns time difference in seconds sunce the last call
 		    return DeltaT;
 	    }
@@ -108,15 +108,15 @@ double shrDeltaT(int iCounterID = 0)
         // Get new counter reading
         gettimeofday(&_NewTime, NULL);
 
-		if (iCounterID >= 0 && iCounterID <= 2) 
+		if (iCounterID >= 0 && iCounterID <= 2)
 		{
-		    // Calculate time difference for timer (iCounterID).  (zero when called the first time) 
+		    // Calculate time difference for timer (iCounterID).  (zero when called the first time)
 		    DeltaT =  ((double)_NewTime.tv_sec + 1.0e-6 * (double)_NewTime.tv_usec) - ((double)_OldTime[iCounterID].tv_sec + 1.0e-6 * (double)_OldTime[iCounterID].tv_usec);
 		    // Reset old timer (iCounterID) to new timer
 		    _OldTime[iCounterID].tv_sec  = _NewTime.tv_sec;
 		    _OldTime[iCounterID].tv_usec = _NewTime.tv_usec;
 		}
-		else 
+		else
 		{
 	        // Requested counterID is out of rangewith respect to available counters
 	        DeltaT = -9999.0;
@@ -131,16 +131,16 @@ double shrDeltaT(int iCounterID = 0)
 
         _NewTime  = clock();
 
-		if (iCounterID >= 0 && iCounterID <= 2) 
+		if (iCounterID >= 0 && iCounterID <= 2)
 		{
-		    // Calculate time difference for timer (iCounterID).  (zero when called the first time) 
+		    // Calculate time difference for timer (iCounterID).  (zero when called the first time)
 		    DeltaT = double(_NewTime-_OldTime[iCounterID])/CLOCKS_PER_SEC;
 
 		    // Reset old time (iCounterID) to the new one
 		    _OldTime[iCounterID].tv_sec  = _NewTime.tv_sec;
 		    _OldTime[iCounterID].tv_usec = _NewTime.tv_usec;
 		}
-		else 
+		else
 		{
 	        // Requested counter ID out of range
 	        DeltaT = -9999.0;
@@ -149,7 +149,7 @@ double shrDeltaT(int iCounterID = 0)
         #else
         printf("shrDeltaT returning early\n");
 	#endif
-} 
+}
 
 // Optional LogFileName Override function
 // *********************************************************************
@@ -183,24 +183,24 @@ static int shrLogV(int iLogMode, int iErrNum, const char* cFormatString, va_list
         // if the default filename has not been overriden, set to default
         if (cLogFilePathAndName == NULL)
         {
-            shrSetLogFileName(DEFAULTLOGFILE); 
+            shrSetLogFileName(DEFAULTLOGFILE);
         }
 
         #ifdef _WIN32   // Windows version
             // set the file mode
             if (iLogMode & APPENDMODE)  // append to prexisting file contents
             {
-                sprintf_s (cFileMode, 3, "a+");  
+                sprintf_s (cFileMode, 3, "a+");
             }
             else                        // replace prexisting file contents
             {
-                sprintf_s (cFileMode, 3, "w"); 
+                sprintf_s (cFileMode, 3, "w");
             }
 
             // open the individual sample log file in the requested mode
             errno_t err = fopen_s(&pFileStream0, cLogFilePathAndName, cFileMode);
-            
-            // if error on attempt to open, be sure the file is null or close it, then return negative error code            
+
+            // if error on attempt to open, be sure the file is null or close it, then return negative error code
             if (err != 0)
             {
                 if (pFileStream0)
@@ -213,11 +213,11 @@ static int shrLogV(int iLogMode, int iErrNum, const char* cFormatString, va_list
             // set the file mode
             if (iLogMode & APPENDMODE)  // append to prexisting file contents
             {
-                sprintf (cFileMode, "a+");  
+                sprintf (cFileMode, "a+");
             }
             else                        // replace prexisting file contents
             {
-                sprintf (cFileMode, "w"); 
+                sprintf (cFileMode, "w");
             }
 
             // open the file in the requested mode
@@ -232,7 +232,7 @@ static int shrLogV(int iLogMode, int iErrNum, const char* cFormatString, va_list
             }
         #endif
     }
-    
+
     // if the master log file is closed and the call incudes a "write-to-file" and MASTER, open master logfile file for writing
     if ((pFileStream1 == NULL) && (iLogMode & LOGFILE) && (iLogMode & MASTER))
     {
@@ -266,11 +266,11 @@ static int shrLogV(int iLogMode, int iErrNum, const char* cFormatString, va_list
 //              return -1;
             }
         #endif
-        
+
         // If master log file length has become excessive, empty/reopen
 		if (iLogMode != LOGCONSOLE)
 		{
-			fseek(pFileStream1, 0L, SEEK_END);            
+			fseek(pFileStream1, 0L, SEEK_END);
 			if (ftell(pFileStream1) > 50000L)
 			{
 				fclose (pFileStream1);
@@ -284,22 +284,22 @@ static int shrLogV(int iLogMode, int iErrNum, const char* cFormatString, va_list
     }
 
     // Handle special Error Message code
-    if (iLogMode & ERRORMSG)  
-    {   
+    if (iLogMode & ERRORMSG)
+    {
         // print string to console if flagged
-        if (iLogMode & LOGCONSOLE) 
+        if (iLogMode & LOGCONSOLE)
         {
-            szNumWritten = printf ("\n !!! Error # %i at ", iErrNum);                           // console 
+            szNumWritten = printf ("\n !!! Error # %i at ", iErrNum);                           // console
         }
         // print string to file if flagged
-        if (iLogMode & LOGFILE) 
+        if (iLogMode & LOGFILE)
         {
             szNumWritten = fprintf (pFileStream0, "\n !!! Error # %i at ", iErrNum);            // sample log file
         }
     }
 
     // Vars used for variable argument processing
-    const char*     pStr; 
+    const char*     pStr;
     const char*     cArg;
     int             iArg;
     double          dArg;
@@ -312,24 +312,24 @@ static int shrLogV(int iLogMode, int iErrNum, const char* cFormatString, va_list
     // Start at the head of the string and scan to the null at the end
     for (pStr = cFormatString; *pStr; ++pStr)
     {
-        // Check if the current character is not a formatting specifier ('%') 
+        // Check if the current character is not a formatting specifier ('%')
         if (*pStr != '%')
         {
             // character is not '%', so print it verbatim to console and/or files as flagged
-            if (iLogMode & LOGCONSOLE) 
+            if (iLogMode & LOGCONSOLE)
             {
-                szNumWritten = putc(*pStr, stdout);                                             // console 
+                szNumWritten = putc(*pStr, stdout);                                             // console
             }
-            if (iLogMode & LOGFILE)    
+            if (iLogMode & LOGFILE)
             {
                 szNumWritten  = putc(*pStr, pFileStream0);                                      // sample log file
-                if (iLogMode & MASTER)                          
+                if (iLogMode & MASTER)
                 {
                     szNumWritten = putc(*pStr, pFileStream1);                                   // master log file
                 }
             }
-        } 
-        else 
+        }
+        else
         {
             // character is '%', so skip over it and read the full format specifier for the argument
             ++pStr;
@@ -343,16 +343,16 @@ static int shrLogV(int iLogMode, int iErrNum, const char* cFormatString, va_list
             }
 
             // chars after the '%' are part of format if on list of constants... scan until that isn't true or NULL is found
-            while (pStr && ((sFormatChars.find(*pStr) != string::npos) || bRepeater))    
+            while (pStr && ((sFormatChars.find(*pStr) != string::npos) || bRepeater))
             {
                 sFormatSpec += *pStr;
 
                 // If the char is a type specifier, trap it and stop scanning
                 // (a type specifier char is always the last in the format except for string of %%%)
-                if (sTypeChars.find(*pStr) != string::npos)    
+                if (sTypeChars.find(*pStr) != string::npos)
                 {
                     cType = *pStr;
-                    break;                                      
+                    break;
                 }
 
                 // Special handling for string of %%%
@@ -365,19 +365,19 @@ static int shrLogV(int iLogMode, int iErrNum, const char* cFormatString, va_list
                 pStr++;
             }
 
-            // Now handle the arg according to type 
+            // Now handle the arg according to type
             switch (cType)
             {
                 case '%':   // special handling for string of %%%%
                 {
-                    if (iLogMode & LOGCONSOLE) 
+                    if (iLogMode & LOGCONSOLE)
                     {
-                        szNumWritten = printf(sFormatSpec.c_str());                             // console 
+                        szNumWritten = printf(sFormatSpec.c_str());                             // console
                     }
                     if (iLogMode & LOGFILE)
                     {
                         szNumWritten = fprintf (pFileStream0, sFormatSpec.c_str());             // sample log file
-                        if (iLogMode & MASTER)                          
+                        if (iLogMode & MASTER)
                         {
                             szNumWritten  = fprintf(pFileStream1, sFormatSpec.c_str());         // master log file
                         }
@@ -389,54 +389,54 @@ static int shrLogV(int iLogMode, int iErrNum, const char* cFormatString, va_list
                 {
                     // Set cArg as the next value in list and print to console and/or files if flagged
                     cArg = va_arg(vaArgList, char*);
-                    if (iLogMode & LOGCONSOLE) 
+                    if (iLogMode & LOGCONSOLE)
                     {
-                        szNumWritten = printf(sFormatSpec.c_str(), cArg);                       // console 
+                        szNumWritten = printf(sFormatSpec.c_str(), cArg);                       // console
                     }
                     if (iLogMode & LOGFILE)
                     {
                         szNumWritten = fprintf (pFileStream0, sFormatSpec.c_str(), cArg);       // sample log file
-                        if (iLogMode & MASTER)                          
+                        if (iLogMode & MASTER)
                         {
                             szNumWritten  = fprintf(pFileStream1, sFormatSpec.c_str(), cArg);   // master log file
                         }
                     }
                     continue;
                 }
-                case 'd':   // signed decimal integer 
-                case 'i':   // signed decimal integer 
+                case 'd':   // signed decimal integer
+                case 'i':   // signed decimal integer
                 {
                     // set iArg as the next value in list and print to console and/or files if flagged
                     iArg = va_arg(vaArgList, int);
-                    if (iLogMode & LOGCONSOLE) 
+                    if (iLogMode & LOGCONSOLE)
                     {
-                        szNumWritten = printf(sFormatSpec.c_str(), iArg);                       // console 
+                        szNumWritten = printf(sFormatSpec.c_str(), iArg);                       // console
                     }
                     if (iLogMode & LOGFILE)
                     {
-                        szNumWritten = fprintf (pFileStream0, sFormatSpec.c_str(), iArg);       // sample log file  
-                        if (iLogMode & MASTER)                          
+                        szNumWritten = fprintf (pFileStream0, sFormatSpec.c_str(), iArg);       // sample log file
+                        if (iLogMode & MASTER)
                         {
                             szNumWritten  = fprintf(pFileStream1, sFormatSpec.c_str(), iArg);   // master log file
                         }
                     }
                     continue;
                 }
-                case 'u':   // unsigned decimal integer 
-                case 'o':   // unsigned octal integer 
+                case 'u':   // unsigned decimal integer
+                case 'o':   // unsigned octal integer
                 case 'x':   // unsigned hexadecimal integer using "abcdef"
                 case 'X':   // unsigned hexadecimal integer using "ABCDEF"
                 {
                     // set uiArg as the next value in list and print to console and/or files if flagged
                     uiArg = va_arg(vaArgList, unsigned int);
-                    if (iLogMode & LOGCONSOLE)                                                  
+                    if (iLogMode & LOGCONSOLE)
                     {
-                        szNumWritten = printf(sFormatSpec.c_str(), uiArg);                      // console 
+                        szNumWritten = printf(sFormatSpec.c_str(), uiArg);                      // console
                     }
                     if (iLogMode & LOGFILE)
                     {
                         szNumWritten = fprintf (pFileStream0, sFormatSpec.c_str(), uiArg);      // sample log file
-                        if (iLogMode & MASTER)                          
+                        if (iLogMode & MASTER)
                         {
                             szNumWritten  = fprintf(pFileStream1, sFormatSpec.c_str(), uiArg);  // master log file
                         }
@@ -453,31 +453,31 @@ static int shrLogV(int iLogMode, int iErrNum, const char* cFormatString, va_list
                 {
                     // set dArg as the next value in list and print to console and/or files if flagged
                     dArg = va_arg(vaArgList, double);
-                    if (iLogMode & LOGCONSOLE) 
+                    if (iLogMode & LOGCONSOLE)
                     {
-                        szNumWritten = printf(sFormatSpec.c_str(), dArg);                       // console 
+                        szNumWritten = printf(sFormatSpec.c_str(), dArg);                       // console
                     }
                     if (iLogMode & LOGFILE)
                     {
                         szNumWritten = fprintf (pFileStream0, sFormatSpec.c_str(), dArg);       // sample log file
-                        if (iLogMode & MASTER)                          
+                        if (iLogMode & MASTER)
                         {
                             szNumWritten  = fprintf(pFileStream1, sFormatSpec.c_str(), dArg);   // master log file
                         }
                     }
                     continue;
                 }
-                default: 
+                default:
                 {
                     // print arg of unknown/unsupported type to console and/or file if flagged
-                    if (iLogMode & LOGCONSOLE)                          // console 
+                    if (iLogMode & LOGCONSOLE)                          // console
                     {
                         szNumWritten = putc(*pStr, stdout);
                     }
-                    if (iLogMode & LOGFILE)    
+                    if (iLogMode & LOGFILE)
                     {
                         szNumWritten  = putc(*pStr, pFileStream0);      // sample log file
-                        if (iLogMode & MASTER)                          
+                        if (iLogMode & MASTER)
                         {
                             szNumWritten  = putc(*pStr, pFileStream1);  // master log file
                         }
@@ -488,9 +488,9 @@ static int shrLogV(int iLogMode, int iErrNum, const char* cFormatString, va_list
     }
 
     // end the sample log with a horizontal line if closing
-    if (iLogMode & CLOSELOG) 
+    if (iLogMode & CLOSELOG)
     {
-        if (iLogMode & LOGCONSOLE) 
+        if (iLogMode & LOGCONSOLE)
         {
             printf(HDASHLINE);
         }
@@ -501,7 +501,7 @@ static int shrLogV(int iLogMode, int iErrNum, const char* cFormatString, va_list
     }
 
     // flush console and/or file buffers if updated
-    if (iLogMode & LOGCONSOLE) 
+    if (iLogMode & LOGCONSOLE)
     {
         fflush(stdout);
     }
@@ -528,12 +528,12 @@ static int shrLogV(int iLogMode, int iErrNum, const char* cFormatString, va_list
         pFileStream1 = NULL;
     }
 
-    // return error code or OK 
+    // return error code or OK
     if (iLogMode & ERRORMSG)
     {
         return iErrNum;
     }
-    else 
+    else
     {
         return 0;
     }
@@ -545,7 +545,7 @@ int shrLogEx(int iLogMode = LOGCONSOLE, int iErrNum = 0, const char* cFormatStri
 {
     va_list vaArgList;
 
-    // Prepare variable agument list 
+    // Prepare variable agument list
     va_start(vaArgList, cFormatString);
     int ret = shrLogV(iLogMode, iErrNum, cFormatString, vaArgList);
 
@@ -561,7 +561,7 @@ int shrLog(const char* cFormatString = "", ...)
 {
     va_list vaArgList;
 
-    // Prepare variable agument list 
+    // Prepare variable agument list
     va_start(vaArgList, cFormatString);
     int ret = shrLogV(LOGBOTH, 0, cFormatString, vaArgList);
 
@@ -579,96 +579,67 @@ int shrLog(const char* cFormatString = "", ...)
 //! @param filename         name of the file
 //! @param executable_path  optional absolute path of the executable
 //////////////////////////////////////////////////////////////////////////////
-char* shrFindFilePath(const char* filename, const char* executable_path) 
+char* shrFindFilePath(const char* filename, const char* executable_path)
 {
     // <executable_name> defines a variable that is replaced with the name of the executable
 
     // Typical relative search paths to locate needed companion files (e.g. sample input data, or JIT source files)
     // The origin for the relative search may be the .exe file, a .bat file launching an .exe, a browser .exe launching the .exe or .bat, etc
-    const char* searchPath[] = 
+    const char* searchPath[] =
     {
-        "./",                                       // same dir 
-        "./data/",                                  // "/data/" subdir 
-        "./src/",                                   // "/src/" subdir
-        "./src/<executable_name>/data/",            // "/src/<executable_name>/data/" subdir 
-        "./inc/",                                   // "/inc/" subdir
-        "../",                                      // up 1 in tree 
-        "../data/",                                 // up 1 in tree, "/data/" subdir 
-        "../src/",                                  // up 1 in tree, "/src/" subdir 
-        "../inc/",                                  // up 1 in tree, "/inc/" subdir 
-        "../OpenCL/src/<executable_name>/",         // up 1 in tree, "/OpenCL/src/<executable_name>/" subdir 
-        "../OpenCL/src/<executable_name>/data/",    // up 1 in tree, "/OpenCL/src/<executable_name>/data/" subdir 
-        "../OpenCL/src/<executable_name>/src/",     // up 1 in tree, "/OpenCL/src/<executable_name>/src/" subdir 
-        "../OpenCL/src/<executable_name>/inc/",     // up 1 in tree, "/OpenCL/src/<executable_name>/inc/" subdir 
-        "../C/src/<executable_name>/",              // up 1 in tree, "/C/src/<executable_name>/" subdir 
-        "../C/src/<executable_name>/data/",         // up 1 in tree, "/C/src/<executable_name>/data/" subdir 
-        "../C/src/<executable_name>/src/",          // up 1 in tree, "/C/src/<executable_name>/src/" subdir 
-        "../C/src/<executable_name>/inc/",          // up 1 in tree, "/C/src/<executable_name>/inc/" subdir 
-        "../DirectCompute/src/<executable_name>/",      // up 1 in tree, "/DirectCompute/src/<executable_name>/" subdir 
-        "../DirectCompute/src/<executable_name>/data/", // up 1 in tree, "/DirectCompute/src/<executable_name>/data/" subdir 
-        "../DirectCompute/src/<executable_name>/src/",  // up 1 in tree, "/DirectCompute/src/<executable_name>/src/" subdir 
-        "../DirectCompute/src/<executable_name>/inc/",  // up 1 in tree, "/DirectCompute/src/<executable_name>/inc/" subdir 
-        "../../",                                   // up 2 in tree 
-        "../../data/",                              // up 2 in tree, "/data/" subdir 
-        "../../src/",                               // up 2 in tree, "/src/" subdir 
-        "../../inc/",                               // up 2 in tree, "/inc/" subdir 
-        "../../../",                                // up 3 in tree 
-        "../../../src/<executable_name>/",          // up 3 in tree, "/src/<executable_name>/" subdir 
-        "../../../src/<executable_name>/data/",     // up 3 in tree, "/src/<executable_name>/data/" subdir 
-        "../../../src/<executable_name>/src/",      // up 3 in tree, "/src/<executable_name>/src/" subdir 
-        "../../../src/<executable_name>/inc/",      // up 3 in tree, "/src/<executable_name>/inc/" subdir 
-        "../../../sandbox/<executable_name>/",      // up 3 in tree, "/sandbox/<executable_name>/" subdir
-        "../../../sandbox/<executable_name>/data/", // up 3 in tree, "/sandbox/<executable_name>/data/" subdir
-        "../../../sandbox/<executable_name>/src/",  // up 3 in tree, "/sandbox/<executable_name>/src/" subdir
-        "../../../sandbox/<executable_name>/inc/"   // up 3 in tree, "/sandbox/<executable_name>/inc/" subdir
+        "./",                                      // same dir
+        "<executable_dir>",                        // directory containing the executable
     };
-    
+
     // Extract the executable name
+    std::string executable_dir;
     std::string executable_name;
-    if (executable_path != 0) 
+    if (executable_path != 0)
     {
         executable_name = std::string(executable_path);
+        executable_dir  = std::string(executable_path);
 
-    #ifdef _WIN32        
+    #ifdef _WIN32
         // Windows path delimiter
-        size_t delimiter_pos = executable_name.find_last_of('\\');        
+        size_t delimiter_pos = executable_name.find_last_of('\\');
         executable_name.erase(0, delimiter_pos + 1);
 
 		if (executable_name.rfind(".exe") != string::npos)
         {
 			// we strip .exe, only if the .exe is found
-			executable_name.resize(executable_name.size() - 4);        
+			executable_name.resize(executable_name.size() - 4);
 		}
     #else
         // Linux & OSX path delimiter
-        size_t delimiter_pos = executable_name.find_last_of('/');        
+        size_t delimiter_pos = executable_name.find_last_of('/');
         executable_name.erase(0,delimiter_pos+1);
+        executable_dir .erase(delimiter_pos+1,executable_dir.length());
     #endif
-        
+
     }
-    
+
     // Loop over all search paths and return the first hit
     for( unsigned int i = 0; i < sizeof(searchPath)/sizeof(char*); ++i )
     {
-        std::string path(searchPath[i]);        
-        size_t executable_name_pos = path.find("<executable_name>");
+        std::string path(searchPath[i]);
+        size_t executable_dir_pos = path.find("<executable_dir>");
 
-        // If there is executable_name variable in the searchPath 
+        // If there is executable_name variable in the searchPath
         // replace it with the value
-        if(executable_name_pos != std::string::npos)
+        if(executable_dir_pos != std::string::npos)
         {
-            if(executable_path != 0) 
+            if(executable_path != 0)
             {
-                path.replace(executable_name_pos, strlen("<executable_name>"), executable_name);
+                path.replace(executable_dir_pos, strlen("<executable_dir>"), executable_dir);
 
-            } 
-            else 
+            }
+            else
             {
                 // Skip this path entry if no executable argument is given
                 continue;
             }
         }
-        
+
         // Test if the file exists
         path.append(filename);
         std::fstream fh(path.c_str(), std::fstream::in);
@@ -677,14 +648,14 @@ char* shrFindFilePath(const char* filename, const char* executable_path)
             // File found
             // returning an allocated array here for backwards compatibility reasons
             char* file_path = (char*) malloc(path.length() + 1);
-        #ifdef _WIN32  
+        #ifdef _WIN32
             strcpy_s(file_path, path.length() + 1, path.c_str());
         #else
             strcpy(file_path, path.c_str());
-        #endif                
+        #endif
             return file_path;
         }
-    }    
+    }
 
     // File not found
     return 0;
@@ -700,7 +671,7 @@ char* shrFindFilePath(const char* filename, const char* executable_path)
 //////////////////////////////////////////////////////////////////////////////
 template<class T>
 shrBOOL
-shrReadFile( const char* filename, T** data, unsigned int* len, bool verbose) 
+shrReadFile( const char* filename, T** data, unsigned int* len, bool verbose)
 {
     // check input arguments
     ARGCHECK(NULL != filename);
@@ -712,18 +683,18 @@ shrReadFile( const char* filename, T** data, unsigned int* len, bool verbose)
     // open file for reading
     std::fstream fh( filename, std::fstream::in);
     // check if filestream is valid
-    if(!fh.good()) 
+    if(!fh.good())
     {
         if (verbose)
             std::cerr << "shrReadFile() : Opening file failed." << std::endl;
         return shrFALSE;
     }
 
-    // read all data elements 
+    // read all data elements
     T token;
-    while( fh.good()) 
+    while( fh.good())
     {
-        fh >> token;   
+        fh >> token;
         data_read.push_back( token);
     }
 
@@ -731,19 +702,19 @@ shrReadFile( const char* filename, T** data, unsigned int* len, bool verbose)
     data_read.pop_back();
 
     // check if reading result is consistent
-    if( ! fh.eof()) 
+    if( ! fh.eof())
     {
         if (verbose)
-            std::cerr << "WARNING : readData() : reading file might have failed." 
+            std::cerr << "WARNING : readData() : reading file might have failed."
             << std::endl;
     }
 
     fh.close();
 
     // check if the given handle is already initialized
-    if( NULL != *data) 
+    if( NULL != *data)
     {
-        if( *len != data_read.size()) 
+        if( *len != data_read.size())
         {
             std::cerr << "shrReadFile() : Initialized memory given but "
                       << "size  mismatch with signal read "
@@ -753,7 +724,7 @@ shrReadFile( const char* filename, T** data, unsigned int* len, bool verbose)
             return shrFALSE;
         }
     }
-    else 
+    else
     {
         // allocate storage for the data read
 		*data = (T*) malloc( sizeof(T) * data_read.size());
@@ -768,7 +739,7 @@ shrReadFile( const char* filename, T** data, unsigned int* len, bool verbose)
 }
 
 //////////////////////////////////////////////////////////////////////////////
-//! Write a data file \filename 
+//! Write a data file \filename
 //! @return shrTRUE if writing the file succeeded, otherwise shrFALSE
 //! @param filename name of the source file
 //! @param data  data to write
@@ -778,7 +749,7 @@ shrReadFile( const char* filename, T** data, unsigned int* len, bool verbose)
 template<class T>
 shrBOOL
 shrWriteFile( const char* filename, const T* data, unsigned int len,
-              const T epsilon, bool verbose) 
+              const T epsilon, bool verbose)
 {
     ARGCHECK(NULL != filename);
     ARGCHECK(NULL != data);
@@ -786,7 +757,7 @@ shrWriteFile( const char* filename, const T* data, unsigned int len,
     // open file for writing
     std::fstream fh( filename, std::fstream::out);
     // check if filestream is valid
-    if(!fh.good()) 
+    if(!fh.good())
     {
         if (verbose)
             std::cerr << "shrWriteFile() : Opening file failed." << std::endl;
@@ -797,13 +768,13 @@ shrWriteFile( const char* filename, const T* data, unsigned int len,
     fh << "# " << epsilon << "\n";
 
     // write data
-    for( unsigned int i = 0; (i < len) && (fh.good()); ++i) 
+    for( unsigned int i = 0; (i < len) && (fh.good()); ++i)
     {
         fh << data[i] << ' ';
     }
 
     // Check if writing succeeded
-    if( ! fh.good()) 
+    if( ! fh.good())
     {
         if (verbose)
             std::cerr << "shrWriteFile() : Writing file failed." << std::endl;
@@ -817,79 +788,79 @@ shrWriteFile( const char* filename, const T* data, unsigned int len,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//! Read file \filename containg single precision floating point data 
+//! Read file \filename containg single precision floating point data
 //! @return shrTRUEif reading the file succeeded, otherwise shrFALSE
 //! @param filename name of the source file
 //! @param data  uninitialized pointer, returned initialized and pointing to
 //!        the data read
 //! @param len  number of data elements in data, -1 on error
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrReadFilef( const char* filename, float** data, unsigned int* len, bool verbose) 
+shrBOOL shrReadFilef( const char* filename, float** data, unsigned int* len, bool verbose)
 {
     return shrReadFile( filename, data, len, verbose);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//! Read file \filename containg double precision floating point data 
+//! Read file \filename containg double precision floating point data
 //! @return shrTRUEif reading the file succeeded, otherwise shrFALSE
 //! @param filename name of the source file
 //! @param data  uninitialized pointer, returned initialized and pointing to
 //!        the data read
 //! @param len  number of data elements in data, -1 on error
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrReadFiled( const char* filename, double** data, unsigned int* len, bool verbose) 
+shrBOOL shrReadFiled( const char* filename, double** data, unsigned int* len, bool verbose)
 {
     return shrReadFile( filename, data, len, verbose);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//! Read file \filename containg integer data 
+//! Read file \filename containg integer data
 //! @return shrTRUEif reading the file succeeded, otherwise shrFALSE
 //! @param filename name of the source file
 //! @param data  uninitialized pointer, returned initialized and pointing to
 //!        the data read
 //! @param len  number of data elements in data, -1 on error
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrReadFilei( const char* filename, int** data, unsigned int* len, bool verbose) 
+shrBOOL shrReadFilei( const char* filename, int** data, unsigned int* len, bool verbose)
 {
     return shrReadFile( filename, data, len, verbose);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//! Read file \filename containg unsigned integer data 
+//! Read file \filename containg unsigned integer data
 //! @return shrTRUEif reading the file succeeded, otherwise shrFALSE
 //! @param filename name of the source file
 //! @param data  uninitialized pointer, returned initialized and pointing to
 //!        the data read
 //! @param len  number of data elements in data, -1 on error
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrReadFileui( const char* filename, unsigned int** data, unsigned int* len, bool verbose) 
+shrBOOL shrReadFileui( const char* filename, unsigned int** data, unsigned int* len, bool verbose)
 {
     return shrReadFile( filename, data, len, verbose);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//! Read file \filename containg char / byte data 
+//! Read file \filename containg char / byte data
 //! @return shrTRUEif reading the file succeeded, otherwise shrFALSE
 //! @param filename name of the source file
 //! @param data  uninitialized pointer, returned initialized and pointing to
 //!        the data read
 //! @param len  number of data elements in data, -1 on error
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrReadFileb( const char* filename, char** data, unsigned int* len, bool verbose) 
+shrBOOL shrReadFileb( const char* filename, char** data, unsigned int* len, bool verbose)
 {
     return shrReadFile( filename, data, len, verbose);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//! Read file \filename containg unsigned char / byte data 
+//! Read file \filename containg unsigned char / byte data
 //! @return shrTRUEif reading the file succeeded, otherwise shrFALSE
 //! @param filename name of the source file
 //! @param data  uninitialized pointer, returned initialized and pointing to
 //!        the data read
 //! @param len  number of data elements in data, -1 on error
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrReadFileub( const char* filename, unsigned char** data, unsigned int* len, bool verbose) 
+shrBOOL shrReadFileub( const char* filename, unsigned char** data, unsigned int* len, bool verbose)
 {
     return shrReadFile( filename, data, len, verbose);
 }
@@ -903,7 +874,7 @@ shrBOOL shrReadFileub( const char* filename, unsigned char** data, unsigned int*
 //! @param epsilon  epsilon for comparison
 ////////////////////////////////////////////////////////////////////////////////
 shrBOOL shrWriteFilef( const char* filename, const float* data, unsigned int len,
-               const float epsilon, bool verbose) 
+               const float epsilon, bool verbose)
 {
     return shrWriteFile( filename, data, len, epsilon, verbose);
 }
@@ -917,7 +888,7 @@ shrBOOL shrWriteFilef( const char* filename, const float* data, unsigned int len
 //! @param epsilon  epsilon for comparison
 ////////////////////////////////////////////////////////////////////////////////
 shrBOOL shrWriteFiled( const char* filename, const double* data, unsigned int len,
-               const double epsilon, bool verbose) 
+               const double epsilon, bool verbose)
 {
     return shrWriteFile( filename, data, len, epsilon, verbose);
 }
@@ -930,7 +901,7 @@ shrBOOL shrWriteFiled( const char* filename, const double* data, unsigned int le
 //! @param len  number of data elements in data, -1 on error
 //! @param epsilon  epsilon for comparison
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrWriteFilei( const char* filename, const int* data, unsigned int len, bool verbose) 
+shrBOOL shrWriteFilei( const char* filename, const int* data, unsigned int len, bool verbose)
 {
     return shrWriteFile( filename, data, len, 0, verbose);
 }
@@ -956,8 +927,8 @@ shrBOOL shrWriteFileui( const char* filename,const unsigned int* data,unsigned i
 //! @param len  number of data elements in data, -1 on error
 //! @param epsilon  epsilon for comparison
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrWriteFileb( const char* filename, const char* data, unsigned int len, bool verbose) 
-{  
+shrBOOL shrWriteFileb( const char* filename, const char* data, unsigned int len, bool verbose)
+{
     return shrWriteFile( filename, data, len, static_cast<char>(0), verbose);
 }
 
@@ -969,9 +940,9 @@ shrBOOL shrWriteFileb( const char* filename, const char* data, unsigned int len,
 //! @param len  number of data elements in data, -1 on error
 //! @param epsilon  epsilon for comparison
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrWriteFileub( const char* filename, const unsigned char* data, 
-                unsigned int len, bool verbose) 
-{  
+shrBOOL shrWriteFileub( const char* filename, const unsigned char* data,
+                unsigned int len, bool verbose)
+{
     return shrWriteFile( filename, data, len, static_cast<unsigned char>(0), verbose);
 }
 
@@ -990,7 +961,7 @@ shrBOOL shrWriteFileb( const char* filename,const unsigned char* data,unsigned i
 
 //////////////////////////////////////////////////////////////////////////////
 //! Load PGM or PPM file
-//! @note if data == NULL then the necessary memory is allocated in the 
+//! @note if data == NULL then the necessary memory is allocated in the
 //!       function and w and h are initialized to the size of the image
 //! @return shrTRUE if the file loading succeeded, otherwise shrFALSE
 //! @param file        name of the file to load
@@ -999,8 +970,8 @@ shrBOOL shrWriteFileb( const char* filename,const unsigned char* data,unsigned i
 //! @param h        height of the image
 //! @param channels number of channels in image
 //////////////////////////////////////////////////////////////////////////////
-shrBOOL loadPPM(const char* file, unsigned char** data, 
-            unsigned int *w, unsigned int *h, unsigned int *channels) 
+shrBOOL loadPPM(const char* file, unsigned char** data,
+            unsigned int *w, unsigned int *h, unsigned int *channels)
 {
     FILE* fp = 0;
 
@@ -1055,7 +1026,7 @@ shrBOOL loadPPM(const char* file, unsigned char** data,
     unsigned int height = 0;
     unsigned int maxval = 0;
     unsigned int i = 0;
-    while(i < 3) 
+    while(i < 3)
     {
         if ((fgets(header, PGMHeaderSize, fp) == NULL) && ferror(fp))
         {
@@ -1069,28 +1040,28 @@ shrBOOL loadPPM(const char* file, unsigned char** data,
         if(header[0] == '#') continue;
 
         #ifdef _WIN32
-            if(i == 0) 
+            if(i == 0)
             {
                 i += sscanf_s(header, "%u %u %u", &width, &height, &maxval);
             }
-            else if (i == 1) 
+            else if (i == 1)
             {
                 i += sscanf_s(header, "%u %u", &height, &maxval);
             }
-            else if (i == 2) 
+            else if (i == 2)
             {
                 i += sscanf_s(header, "%u", &maxval);
             }
         #else
-            if(i == 0) 
+            if(i == 0)
             {
                 i += sscanf(header, "%u %u %u", &width, &height, &maxval);
             }
-            else if (i == 1) 
+            else if (i == 1)
             {
                 i += sscanf(header, "%u %u", &height, &maxval);
             }
-            else if (i == 2) 
+            else if (i == 2)
             {
                 i += sscanf(header, "%u", &maxval);
             }
@@ -1098,16 +1069,16 @@ shrBOOL loadPPM(const char* file, unsigned char** data,
     }
 
     // check if given handle for the data is initialized
-    if(NULL != *data) 
+    if(NULL != *data)
     {
-        if (*w != width || *h != height) 
+        if (*w != width || *h != height)
         {
             fclose(fp);
             std::cerr << "loadPPM() : Invalid image dimensions." << std::endl;
             return shrFALSE;
         }
-    } 
-    else 
+    }
+    else
     {
         *data = (unsigned char*)malloc( sizeof(unsigned char) * width * height * *channels);
         *w = width;
@@ -1133,16 +1104,16 @@ shrBOOL loadPPM(const char* file, unsigned char** data,
 //! @param data  handle to the data read
 //! @param w     width of the image
 //! @param h     height of the image
-//////////////////////////////////////////////////////////////////////////////  
-shrBOOL savePPM( const char* file, unsigned char *data, 
-             unsigned int w, unsigned int h, unsigned int channels) 
+//////////////////////////////////////////////////////////////////////////////
+shrBOOL savePPM( const char* file, unsigned char *data,
+             unsigned int w, unsigned int h, unsigned int channels)
 {
     ARGCHECK(NULL != data);
     ARGCHECK(w > 0);
     ARGCHECK(h > 0);
 
     std::fstream fh( file, std::fstream::out | std::fstream::binary );
-    if( fh.bad()) 
+    if( fh.bad())
     {
         std::cerr << "savePPM() : Opening file failed." << std::endl;
         return shrFALSE;
@@ -1162,17 +1133,17 @@ shrBOOL savePPM( const char* file, unsigned char *data,
 
     fh << w << "\n" << h << "\n" << 0xff << std::endl;
 
-    for( unsigned int i = 0; (i < (w*h*channels)) && fh.good(); ++i) 
+    for( unsigned int i = 0; (i < (w*h*channels)) && fh.good(); ++i)
     {
         fh << data[i];
     }
     fh.flush();
 
-    if( fh.bad()) 
+    if( fh.bad())
     {
         std::cerr << "savePPM() : Writing data failed." << std::endl;
         return shrFALSE;
-    } 
+    }
     fh.close();
 
     return shrTRUE;
@@ -1186,7 +1157,7 @@ shrBOOL savePPM( const char* file, unsigned char *data,
 //! @param w     width of the image
 //! @param h     height of the image
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrLoadPPM4ub( const char* file, unsigned char** OutData, 
+shrBOOL shrLoadPPM4ub( const char* file, unsigned char** OutData,
                 unsigned int *w, unsigned int *h)
 {
     // Load file data into a temporary buffer with automatic allocation
@@ -1194,10 +1165,10 @@ shrBOOL shrLoadPPM4ub( const char* file, unsigned char** OutData,
     unsigned int channels;
     shrBOOL bLoadOK = loadPPM(file, &cLocalData, w, h, &channels);   // this allocates cLocalData, which must be freed later
 
-    // If the data loaded OK from file to temporary buffer, then go ahead with padding and transfer 
+    // If the data loaded OK from file to temporary buffer, then go ahead with padding and transfer
     if (shrTRUE == bLoadOK)
     {
-        // if the receiving buffer is null, allocate it... caller must free this 
+        // if the receiving buffer is null, allocate it... caller must free this
         int size = *w * *h;
         if (*OutData == NULL)
         {
@@ -1209,7 +1180,7 @@ shrBOOL shrLoadPPM4ub( const char* file, unsigned char** OutData,
         unsigned char* cOutPtr = *OutData;
 
         // transfer data, padding 4th element
-        for(int i=0; i<size; i++) 
+        for(int i=0; i<size; i++)
         {
             *cOutPtr++ = *cTemp++;
             *cOutPtr++ = *cTemp++;
@@ -1237,8 +1208,8 @@ shrBOOL shrLoadPPM4ub( const char* file, unsigned char** OutData,
 //! @param w     width of the image
 //! @param h     height of the image
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrSavePPM4ub( const char* file, unsigned char *data, 
-               unsigned int w, unsigned int h) 
+shrBOOL shrSavePPM4ub( const char* file, unsigned char *data,
+               unsigned int w, unsigned int h)
 {
     // strip 4th component
     int size = w * h;
@@ -1250,7 +1221,7 @@ shrBOOL shrSavePPM4ub( const char* file, unsigned char *data,
         *ptr++ = *data++;
         data++;
     }
-    
+
     shrBOOL succ = savePPM(file, ndata, w, h, 3);
     free(ndata);
     return succ;
@@ -1263,8 +1234,8 @@ shrBOOL shrSavePPM4ub( const char* file, unsigned char *data,
 //! @param w     width of the image
 //! @param h     height of the image
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrSavePGMub( const char* file, unsigned char *data, 
-              unsigned int w, unsigned int h) 
+shrBOOL shrSavePGMub( const char* file, unsigned char *data,
+              unsigned int w, unsigned int h)
 {
     return savePPM( file, data, w, h, 1);
 }
@@ -1277,7 +1248,7 @@ shrBOOL shrSavePGMub( const char* file, unsigned char *data,
 //! @param w     width of the image
 //! @param h     height of the image
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrLoadPGMub( const char* file, unsigned char** data, 
+shrBOOL shrLoadPGMub( const char* file, unsigned char** data,
               unsigned int *w,unsigned int *h)
 {
     unsigned int channels;
@@ -1291,25 +1262,25 @@ shrBOOL shrLoadPGMub( const char* file, unsigned char** data,
 //! @param argv  argv as passed to main()
 //! @param flag_name  name of command line flag
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrCheckCmdLineFlag( const int argc, const char** argv, const char* flag_name) 
+shrBOOL shrCheckCmdLineFlag( const int argc, const char** argv, const char* flag_name)
 {
     shrBOOL ret_val = shrFALSE;
 
-    try 
+    try
     {
-        // initalize 
+        // initalize
         CmdArgReader::init( argc, argv);
 
         // check if the command line argument exists
-        if( CmdArgReader::existArg( flag_name)) 
+        if( CmdArgReader::existArg( flag_name))
         {
             ret_val = shrTRUE;
         }
     }
-    catch( const std::exception& /*ex*/) 
-    {    
+    catch( const std::exception& /*ex*/)
+    {
         std::cerr << "Error when parsing command line argument string." << std::endl;
-    } 
+    }
 
     return ret_val;
 }
@@ -1323,33 +1294,33 @@ shrBOOL shrCheckCmdLineFlag( const int argc, const char** argv, const char* flag
 //! @param arg_name  name of the command line argument
 //! @param val  value of the command line argument
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrGetCmdLineArgumenti( const int argc, const char** argv, 
-                        const char* arg_name, int* val) 
+shrBOOL shrGetCmdLineArgumenti( const int argc, const char** argv,
+                        const char* arg_name, int* val)
 {
     shrBOOL ret_val = shrFALSE;
 
-    try 
+    try
     {
         // initialize
         CmdArgReader::init( argc, argv);
 
         // access argument
         const int* v = CmdArgReader::getArg<int>( arg_name);
-        if( NULL != v) 
+        if( NULL != v)
         {
             // assign value
             *val = *v;
             ret_val = shrTRUE;
-        }		
+        }
 		else {
 			// fail safe
 			val = NULL;
 		}
     }
-    catch( const std::exception& /*ex*/) 
-    {    
+    catch( const std::exception& /*ex*/)
+    {
         std::cerr << "Error when parsing command line argument string." << std::endl;
-    } 
+    }
 
     return ret_val;
 }
@@ -1363,33 +1334,33 @@ shrBOOL shrGetCmdLineArgumenti( const int argc, const char** argv,
 //! @param arg_name  name of the command line argument
 //! @param val  value of the command line argument
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrGetCmdLineArgumentu( const int argc, const char** argv, 
-                        const char* arg_name, unsigned int* val) 
+shrBOOL shrGetCmdLineArgumentu( const int argc, const char** argv,
+                        const char* arg_name, unsigned int* val)
 {
     shrBOOL ret_val = shrFALSE;
 
-    try 
+    try
     {
         // initialize
         CmdArgReader::init( argc, argv);
 
         // access argument
         const int* v = CmdArgReader::getArg<int>( arg_name);
-        if( NULL != v) 
+        if( NULL != v)
         {
             // assign value
             *val = *v;
             ret_val = shrTRUE;
-        }		
+        }
 		else {
 			// fail safe
 			val = NULL;
 		}
     }
-    catch( const std::exception& /*ex*/) 
-    {    
+    catch( const std::exception& /*ex*/)
+    {
         std::cerr << "Error when parsing command line argument string." << std::endl;
-    } 
+    }
 
     return ret_val;
 }
@@ -1403,19 +1374,19 @@ shrBOOL shrGetCmdLineArgumentu( const int argc, const char** argv,
 //! @param arg_name  name of the command line argument
 //! @param val  value of the command line argument
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrGetCmdLineArgumentf( const int argc, const char** argv, 
-                       const char* arg_name, float* val) 
+shrBOOL shrGetCmdLineArgumentf( const int argc, const char** argv,
+                       const char* arg_name, float* val)
 {
     shrBOOL ret_val = shrFALSE;
 
-    try 
+    try
     {
         // initialize
         CmdArgReader::init( argc, argv);
 
         // access argument
         const float* v = CmdArgReader::getArg<float>( arg_name);
-        if( NULL != v) 
+        if( NULL != v)
         {
             // assign value
             *val = *v;
@@ -1426,10 +1397,10 @@ shrBOOL shrGetCmdLineArgumentf( const int argc, const char** argv,
 			val = NULL;
 		}
     }
-    catch( const std::exception& /*ex*/) 
-    {    
+    catch( const std::exception& /*ex*/)
+    {
         std::cerr << "Error when parsing command line argument string." << std::endl;
-    } 
+    }
 
     return ret_val;
 }
@@ -1443,19 +1414,19 @@ shrBOOL shrGetCmdLineArgumentf( const int argc, const char** argv,
 //! @param arg_name  name of the command line argument
 //! @param val  value of the command line argument
 ////////////////////////////////////////////////////////////////////////////////
-shrBOOL shrGetCmdLineArgumentstr( const int argc, const char** argv, 
-                         const char* arg_name, char** val) 
+shrBOOL shrGetCmdLineArgumentstr( const int argc, const char** argv,
+                         const char* arg_name, char** val)
 {
     shrBOOL ret_val = shrFALSE;
 
-    try 
+    try
     {
         // initialize
         CmdArgReader::init( argc, argv);
 
         // access argument
         const std::string* v = CmdArgReader::getArg<std::string>( arg_name);
-        if( NULL != v) 
+        if( NULL != v)
         {
 
             // allocate memory for the string
@@ -1468,24 +1439,24 @@ shrBOOL shrGetCmdLineArgumentstr( const int argc, const char** argv,
                 strcpy(*val, v->c_str());
             #endif
             ret_val = shrTRUE;
-        }		
+        }
 		else {
 			// fail safe
 			*val = NULL;
 		}
     }
-    catch( const std::exception& /*ex*/) 
-    {    
-        std::cerr << "Error when parsing command line argument string."<< 
+    catch( const std::exception& /*ex*/)
+    {
+        std::cerr << "Error when parsing command line argument string."<<
         std::endl;
-    } 
+    }
 
     return ret_val;
 
 }
 
-////////////////////////////////////////////////////////////////////////////// 
-//! Compare two arrays of arbitrary type       
+//////////////////////////////////////////////////////////////////////////////
+//! Compare two arrays of arbitrary type
 //! @return shrTRUE if \a reference and \a data are identical, otherwise shrFALSE
 //! @param reference  handle to the reference data / gold image
 //! @param data       handle to the computed data
@@ -1493,9 +1464,9 @@ shrBOOL shrGetCmdLineArgumentstr( const int argc, const char** argv,
 //! @param epsilon    epsilon to use for the comparison
 //////////////////////////////////////////////////////////////////////////////
 template<class T, class S>
-shrBOOL  
-compareData( const T* reference, const T* data, const unsigned int len, 
-             const S epsilon, const float threshold) 
+shrBOOL
+compareData( const T* reference, const T* data, const unsigned int len,
+             const S epsilon, const float threshold)
 {
     ARGCHECK( epsilon >= 0);
 
@@ -1511,11 +1482,11 @@ compareData( const T* reference, const T* data, const unsigned int len,
         error_count += !comp;
 
 #ifdef _DEBUG
-        if( ! comp) 
+        if( ! comp)
         {
-            std::cerr << "ERROR, i = " << i << ",\t " 
+            std::cerr << "ERROR, i = " << i << ",\t "
                 << reference[i] << " / "
-                << data[i] 
+                << data[i]
                 << " (reference / data)\n";
         }
 #endif
@@ -1528,8 +1499,8 @@ compareData( const T* reference, const T* data, const unsigned int len,
     }
 }
 
-////////////////////////////////////////////////////////////////////////////// 
-//! Compare two arrays of arbitrary type       
+//////////////////////////////////////////////////////////////////////////////
+//! Compare two arrays of arbitrary type
 //! @return shrTRUE if \a reference and \a data are identical, otherwise shrFALSE
 //! @param reference  handle to the reference data / gold image
 //! @param data       handle to the computed data
@@ -1537,9 +1508,9 @@ compareData( const T* reference, const T* data, const unsigned int len,
 //! @param epsilon    epsilon to use for the comparison
 //////////////////////////////////////////////////////////////////////////////
 template<class T, class S>
-shrBOOL  
-compareDataAsFloat( const T* reference, const T* data, const unsigned int len, 
-                    const S epsilon) 
+shrBOOL
+compareDataAsFloat( const T* reference, const T* data, const unsigned int len,
+                    const S epsilon)
 {
     ARGCHECK(epsilon >= 0);
 
@@ -1553,7 +1524,7 @@ compareDataAsFloat( const T* reference, const T* data, const unsigned int len,
         bool comp = (diff < max_error);
         result &= comp;
 
-        if( ! comp) 
+        if( ! comp)
         {
             error_count++;
 #ifdef _DEBUG
@@ -1569,8 +1540,8 @@ compareDataAsFloat( const T* reference, const T* data, const unsigned int len,
     return (error_count == 0) ? shrTRUE : shrFALSE;
 }
 
-////////////////////////////////////////////////////////////////////////////// 
-//! Compare two arrays of arbitrary type       
+//////////////////////////////////////////////////////////////////////////////
+//! Compare two arrays of arbitrary type
 //! @return shrTRUE if \a reference and \a data are identical, otherwise shrFALSE
 //! @param reference  handle to the reference data / gold image
 //! @param data       handle to the computed data
@@ -1579,9 +1550,9 @@ compareDataAsFloat( const T* reference, const T* data, const unsigned int len,
 //! @param epsilon    threshold % of (# of bytes) for pass/fail
 //////////////////////////////////////////////////////////////////////////////
 template<class T, class S>
-shrBOOL  
-compareDataAsFloatThreshold( const T* reference, const T* data, const unsigned int len, 
-                    const S epsilon, const float threshold) 
+shrBOOL
+compareDataAsFloatThreshold( const T* reference, const T* data, const unsigned int len,
+                    const S epsilon, const float threshold)
 {
     ARGCHECK(epsilon >= 0);
 
@@ -1595,7 +1566,7 @@ compareDataAsFloatThreshold( const T* reference, const T* data, const unsigned i
         bool comp = (diff < max_error);
         result &= comp;
 
-        if( ! comp) 
+        if( ! comp)
         {
             error_count++;
 #ifdef _DEBUG
@@ -1629,7 +1600,7 @@ compareDataAsFloatThreshold( const T* reference, const T* data, const unsigned i
 //! @param len        number of elements in reference and data
 ////////////////////////////////////////////////////////////////////////////////
 shrBOOL shrComparef( const float* reference, const float* data,
-            const unsigned int len ) 
+            const unsigned int len )
 {
     const float epsilon = 0.0;
     return compareData( reference, data, len, epsilon, 0.0f );
@@ -1643,7 +1614,7 @@ shrBOOL shrComparef( const float* reference, const float* data,
 //! @param len        number of elements in reference and data
 ////////////////////////////////////////////////////////////////////////////////
 shrBOOL shrComparei( const int* reference, const int* data,
-            const unsigned int len ) 
+            const unsigned int len )
 {
     const int epsilon = 0;
     return compareData( reference, data, len, epsilon, 0.0f);
@@ -1670,7 +1641,7 @@ shrBOOL shrCompareuit( const unsigned int* reference, const unsigned int* data,
 //! @param len        number of elements in reference and data
 ////////////////////////////////////////////////////////////////////////////////
 shrBOOL shrCompareub( const unsigned char* reference, const unsigned char* data,
-             const unsigned int len ) 
+             const unsigned int len )
 {
     const int epsilon = 0;
     return compareData( reference, data, len, epsilon, 0.0f);
@@ -1684,21 +1655,21 @@ shrBOOL shrCompareub( const unsigned char* reference, const unsigned char* data,
 //! @param len        number of elements in reference and data
 ////////////////////////////////////////////////////////////////////////////////
 shrBOOL shrCompareubt( const unsigned char* reference, const unsigned char* data,
-             const unsigned int len, const float epsilon, const float threshold ) 
+             const unsigned int len, const float epsilon, const float threshold )
 {
     return compareDataAsFloatThreshold( reference, data, len, epsilon, threshold );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Compare two integer arrays
-//! @return  shrTRUE if \a reference and \a data are identical, 
+//! @return  shrTRUE if \a reference and \a data are identical,
 //!          otherwise shrFALSE
 //! @param reference  handle to the reference data / gold image
 //! @param data       handle to the computed data
 //! @param len        number of elements in reference and data
 ////////////////////////////////////////////////////////////////////////////////
 shrBOOL shrCompareube( const unsigned char* reference, const unsigned char* data,
-             const unsigned int len, const float epsilon ) 
+             const unsigned int len, const float epsilon )
 {
     return compareDataAsFloat( reference, data, len, epsilon );
 }
@@ -1712,13 +1683,13 @@ shrBOOL shrCompareube( const unsigned char* reference, const unsigned char* data
 //! @param epsilon    epsilon to use for the comparison
 ////////////////////////////////////////////////////////////////////////////////
 shrBOOL shrComparefe( const float* reference, const float* data,
-             const unsigned int len, const float epsilon ) 
+             const unsigned int len, const float epsilon )
 {
     return compareData( reference, data, len, epsilon, 0.0f);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//! Compare two float arrays with an epsilon tolerance for equality and a 
+//! Compare two float arrays with an epsilon tolerance for equality and a
 //!     threshold for # pixel errors
 //! @return  shrTRUE if \a reference and \a data are identical, otherwise shrFALSE
 //! @param reference  handle to the reference data / gold image
@@ -1727,7 +1698,7 @@ shrBOOL shrComparefe( const float* reference, const float* data,
 //! @param epsilon    epsilon to use for the comparison
 ////////////////////////////////////////////////////////////////////////////////
 shrBOOL shrComparefet( const float* reference, const float* data,
-             const unsigned int len, const float epsilon, const float threshold ) 
+             const unsigned int len, const float epsilon, const float threshold )
 {
     return compareDataAsFloatThreshold( reference, data, len, epsilon, threshold );
 }
@@ -1741,7 +1712,7 @@ shrBOOL shrComparefet( const float* reference, const float* data,
 //! @param epsilon    epsilon to use for the comparison
 ////////////////////////////////////////////////////////////////////////////////
 shrBOOL shrCompareL2fe( const float* reference, const float* data,
-                const unsigned int len, const float epsilon ) 
+                const unsigned int len, const float epsilon )
 {
     ARGCHECK(epsilon >= 0);
 
@@ -1766,9 +1737,9 @@ shrBOOL shrCompareL2fe( const float* reference, const float* data,
     error = normError / normRef;
     bool result = error < epsilon;
 #ifdef _DEBUG
-    if( ! result) 
+    if( ! result)
     {
-        std::cerr << "ERROR, l2-norm error " 
+        std::cerr << "ERROR, l2-norm error "
             << error << " is greater than epsilon " << epsilon << "\n";
     }
 #endif
@@ -1801,14 +1772,14 @@ shrBOOL shrComparePPM( const char *src_file, const char *ref_file, const float e
     shrLog("\n> shrComparePPM:\n    (a)rendered:  <%s>\n    (b)reference: <%s>\n", src_file, ref_file);
 
     // Load the ref image file
-	if (shrLoadPPM4ub(ref_file, &ref_data, &ref_width, &ref_height) != shrTRUE) 
+	if (shrLoadPPM4ub(ref_file, &ref_data, &ref_width, &ref_height) != shrTRUE)
 	{
 		shrLog("\n    Unable to load ref image file: %s\n    Aborting comparison !!!\n\n", ref_file);
 		return shrFALSE;
 	}
 
     // Load the sample image file
-	if (shrLoadPPM4ub(src_file, &src_data, &src_width, &src_height) != shrTRUE) 
+	if (shrLoadPPM4ub(src_file, &src_data, &src_width, &src_height) != shrTRUE)
 	{
 		shrLog("\n    Unable to load src image file: %s\n    Aborting comparison !!!\n\n", src_file);
 		return shrFALSE;
@@ -1817,18 +1788,18 @@ shrBOOL shrComparePPM( const char *src_file, const char *ref_file, const float e
     // check to see if image dimensions match
 	if(src_height != ref_height || src_width != ref_width)
 	{
-		shrLog("\n    Source and ref size mismatch (%u x %u) vs (%u x %u)\n    Aborting Comparison !!!\n\n ", 
+		shrLog("\n    Source and ref size mismatch (%u x %u) vs (%u x %u)\n    Aborting Comparison !!!\n\n ",
 		    src_width, src_height, ref_width, ref_height);
 		return shrFALSE;
 	}
 
     // compare the images
-	if (shrCompareubt(ref_data, src_data, src_width*src_height*4, epsilon, threshold ) == shrFALSE) 
+	if (shrCompareubt(ref_data, src_data, src_width*src_height*4, epsilon, threshold ) == shrFALSE)
 	{
 		error_count=1;
 	}
 
-    shrLog("    Images %s\n\n", (error_count == 0) ? "Match" : "Don't Match !!!"); 
+    shrLog("    Images %s\n\n", (error_count == 0) ? "Match" : "Don't Match !!!");
 	return (error_count == 0) ? shrTRUE : shrFALSE;  // returns true if all pixels pass
 }
 
@@ -1856,14 +1827,14 @@ shrBOOL shrComparePGM( const char *src_file, const char *ref_file, const float e
     shrLog("\n> shrComparePGM:\n    (a)rendered:  <%s>\n    (b)reference: <%s>\n", src_file, ref_file);
 
     // Load the ref image file
-	if (shrLoadPPM4ub(ref_file, &ref_data, &ref_width, &ref_height) != shrTRUE) 
+	if (shrLoadPPM4ub(ref_file, &ref_data, &ref_width, &ref_height) != shrTRUE)
 	{
 		shrLog("\n    Unable to load ref image file: %s\n    Aborting comparison !!!\n\n", ref_file);
 		return shrFALSE;
 	}
 
     // Load the sample image file
-	if (shrLoadPPM4ub(src_file, &src_data, &src_width, &src_height) != shrTRUE) 
+	if (shrLoadPPM4ub(src_file, &src_data, &src_width, &src_height) != shrTRUE)
 	{
 		shrLog("\n    Unable to load src image file: %s\n    Aborting comparison !!!\n\n", src_file);
 		return shrFALSE;
@@ -1872,18 +1843,18 @@ shrBOOL shrComparePGM( const char *src_file, const char *ref_file, const float e
     // check to see if image dimensions match
 	if(src_height != ref_height || src_width != ref_width)
 	{
-		shrLog("\n    Source and ref size mismatch (%u x %u) vs (%u x %u)\n    Aborting Comparison !!!\n\n ", 
+		shrLog("\n    Source and ref size mismatch (%u x %u) vs (%u x %u)\n    Aborting Comparison !!!\n\n ",
 		    src_width, src_height, ref_width, ref_height);
 		return shrFALSE;
 	}
 
     // compare the images
-	if (shrCompareubt(ref_data, src_data, src_width*src_height*4, epsilon, threshold ) == shrFALSE) 
+	if (shrCompareubt(ref_data, src_data, src_width*src_height*4, epsilon, threshold ) == shrFALSE)
 	{
 		error_count=1;
 	}
 
-    shrLog("    Images %s\n\n", (error_count == 0) ? "Match" : "Don't Match !!!"); 
+    shrLog("    Images %s\n\n", (error_count == 0) ? "Match" : "Don't Match !!!");
 	return (error_count == 0) ? shrTRUE : shrFALSE;  // returns true if all pixels pass
 }
 
@@ -1895,7 +1866,7 @@ unsigned char* shrLoadRawFile(const char* filename, size_t size)
         errno_t err;
         if ((err = fopen_s(&fp, filename, "rb")) != 0)
     #else
-        if ((fp = fopen(filename, "rb")) == NULL) 
+        if ((fp = fopen(filename, "rb")) == NULL)
     #endif
         {
             shrLog(" Error opening file '%s' !!!\n", filename);
@@ -1912,13 +1883,13 @@ unsigned char* shrLoadRawFile(const char* filename, size_t size)
 }
 
 // Round Up Division function
-size_t shrRoundUp(int group_size, int global_size) 
+size_t shrRoundUp(int group_size, int global_size)
 {
     int r = global_size % group_size;
-    if(r == 0) 
+    if(r == 0)
     {
         return global_size;
-    } else 
+    } else
     {
         return global_size + group_size - r;
     }
