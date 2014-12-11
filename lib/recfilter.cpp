@@ -99,6 +99,8 @@ RecFilter::RecFilter(string name) {
         contents.ptr->name = name;
     }
     contents.ptr->tiled          = false;
+    contents.ptr->finalized      = false;
+    contents.ptr->compiled       = false;
     contents.ptr->clamped_border = false;
     contents.ptr->feedfwd_coeff  = Image<double>(0);
     contents.ptr->feedback_coeff = Image<double>(0,0);
@@ -460,15 +462,23 @@ RecFilterFunc& RecFilter::internal_function(string func_name) {
 // -----------------------------------------------------------------------------
 
 void RecFilter::compile_jit(string filename) {
+    if (!contents.ptr->finalized) {
+        finalize(contents.ptr->target);
+    }
+
     Func F(internal_function(contents.ptr->name).func);
     if (!filename.empty()) {
         F.compile_to_lowered_stmt(filename, HTML, contents.ptr->target);
     }
     F.compile_jit(contents.ptr->target);
+
+    contents.ptr->compiled = true;
 }
 
 double RecFilter::realize(Buffer out, int iterations) {
-    unsigned long time_start = millisecond_timer();
+    if (!contents.ptr->compiled) {
+        compile_jit();
+    }
 
     Func F(internal_function(contents.ptr->name).func);
 
@@ -477,6 +487,17 @@ double RecFilter::realize(Buffer out, int iterations) {
     for (map<string,Buffer>::iterator b=buff.begin(); b!=buff.end(); b++) {
         b->second.copy_to_dev();
     }
+
+    // run once to warmup the driver if profiling with multiple runs
+    if (iterations>1) {
+        F.realize(out);
+    }
+
+    unsigned long time_start;
+    unsigned long time_end;
+
+    // start timer
+    time_start = millisecond_timer();
 
     // profiling realizations without copying result back to host
     for (int i=0; i<iterations-1; i++) {
@@ -488,7 +509,8 @@ double RecFilter::realize(Buffer out, int iterations) {
     out.copy_to_host();
     out.free_dev_buffer();
 
-    unsigned long time_end = millisecond_timer();
+    time_end = millisecond_timer();
+
     return double(time_end-time_start)/double(iterations);
 }
 

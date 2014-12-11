@@ -123,6 +123,12 @@ struct RecFilterContents {
     /** Flag to indicate if the filter has been tiled  */
     bool tiled;
 
+    /** Flag to indicate if the filter has been JIT compiled, required before execution */
+    bool compiled;
+
+    /** Flag to indicate if the filter has been finalized, required before compilation */
+    bool finalized;
+
     /** Image border expression */
     bool clamped_border;
 

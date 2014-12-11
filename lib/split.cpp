@@ -1425,6 +1425,8 @@ void RecFilter::split(map<string,Expr> dim_tile) {
 
     // flush away tiling info from global variables
     // TODO: remove the global vars and make them objects of the RecFilter class in some way
+    contents.ptr->finalized = false;
+    contents.ptr->compiled  = false;
     recfilter_split_info.clear();
     recfilter_func_list.clear();
 
@@ -1683,10 +1685,10 @@ void RecFilter::split(RecFilterDim x, Expr tx, RecFilterDim y, Expr ty, RecFilte
 // -----------------------------------------------------------------------------
 
 void RecFilter::finalize(Target target) {
-    if (contents.ptr->tiled) {
+    map<string,RecFilterFunc>::iterator fit;
 
+    if (contents.ptr->tiled) {
         // inline all functions not required any more
-        map<string,RecFilterFunc>::iterator fit;
         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
             if (fit->second.func_category == INLINE) {
                 inline_func(fit->second.func.name());
@@ -1739,20 +1741,24 @@ void RecFilter::finalize(Target target) {
 
             }
         }
-        else {
-            // inline all reindexing functions
-            for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-                if (fit->second.func_category == REINDEX) {
-                    inline_func(fit->second.func.name());
-                    fit = contents.ptr->func.begin();            // list changed, start all over again
-                }
-            }
-            // make all other functions as compute root
-            for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-                RecFilterFunc& rF = fit->second;
-                Func(rF.func).compute_root();
-                rF.pure_schedule.push_back("compute_root()");
+    }
+
+    // CPU optimizations to be performed with out without tiling
+    if (!target.has_gpu_feature()) {
+        // inline all reindexing functions
+        for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+            if (fit->second.func_category == REINDEX) {
+                inline_func(fit->second.func.name());
+                fit = contents.ptr->func.begin();            // list changed, start all over again
             }
         }
+        // make all other functions as compute root
+        for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+            RecFilterFunc& rF = fit->second;
+            Func(rF.func).compute_root();
+            rF.pure_schedule.push_back("compute_root()");
+        }
     }
+
+    contents.ptr->finalized = true;
 }
