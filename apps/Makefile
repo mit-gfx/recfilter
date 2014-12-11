@@ -9,6 +9,7 @@ all: scripts
 	make -C gaussian_vyv -j8
 	make -C benchmarks -j8
 	make -C ls_hist
+	make -C audio_filter
 	make -C cpu
 	make -C gpu
 
@@ -20,6 +21,7 @@ clean:
 	make -C gaussian_vyv clean
 	make -C test_correctness clean
 	make -C benchmarks clean
+	make -C audio_filter clean
 	make -C cpu clean
 	make -C gpu clean
 	rm -f $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh
