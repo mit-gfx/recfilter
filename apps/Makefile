@@ -1,5 +1,5 @@
 MKDIR=mkdir -p
-BIN_DIR=bin/
+BIN_DIR=../bin/
 
 all: scripts
 	make -C ../lib -j8
