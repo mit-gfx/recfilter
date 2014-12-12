@@ -160,7 +160,7 @@ void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
     }
 
     if (!contents.ptr->filter_info.empty()) {
-        cerr << "Recursive filter already defined" << endl;
+        cerr << "Recursive filter " << contents.ptr->name << " already defined" << endl;
         assert(false);
     }
 
@@ -215,7 +215,7 @@ void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
 
 void RecFilter::set_clamped_image_border(void) {
     if (!contents.ptr->filter_info.empty()) {
-        cerr << "Recursive filter already defined" << endl;
+        cerr << "Recursive filter " << contents.ptr->name << " already defined" << endl;
         assert(false);
     }
     contents.ptr->clamped_border = true;
@@ -482,33 +482,31 @@ double RecFilter::realize(Buffer out, int iterations) {
 
     Func F(internal_function(contents.ptr->name).func);
 
-    // upload all buffers to device
-    map<string,Buffer> buff = extract_buffer_calls(F);
-    for (map<string,Buffer>::iterator b=buff.begin(); b!=buff.end(); b++) {
-        b->second.copy_to_dev();
+    // upload all buffers to device if computed on GPU
+    if (contents.ptr->target.has_gpu_feature()) {
+        map<string,Buffer> buff = extract_buffer_calls(F);
+        for (map<string,Buffer>::iterator b=buff.begin(); b!=buff.end(); b++) {
+            b->second.copy_to_dev();
+        }
     }
+
+    unsigned long time_start = 0;
+    unsigned long time_end   = 0;
 
     // run once to warmup the driver if profiling with multiple runs
     if (iterations>1) {
         F.realize(out);
     }
 
-    unsigned long time_start;
-    unsigned long time_end;
-
-    // start timer
     time_start = millisecond_timer();
-
-    // profiling realizations without copying result back to host
-    for (int i=0; i<iterations-1; i++) {
+    for (int i=0; i<iterations; i++) {
         F.realize(out);
     }
-
-    // last realization copies result back to host
-    F.realize(out);
-    out.copy_to_host();
-    out.free_dev_buffer();
-
+    // copy result to CPU if computed on GPU
+    if (contents.ptr->target.has_gpu_feature()) {
+        out.copy_to_host();
+        out.free_dev_buffer();
+    }
     time_end = millisecond_timer();
 
     return double(time_end-time_start)/double(iterations);

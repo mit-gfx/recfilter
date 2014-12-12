@@ -1754,9 +1754,8 @@ void RecFilter::finalize(Target target) {
         }
         // make all other functions as compute root
         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-            RecFilterFunc& rF = fit->second;
-            Func(rF.func).compute_root();
-            rF.pure_schedule.push_back("compute_root()");
+            Func(fit->second.func).compute_root();
+            fit->second.pure_schedule.push_back("compute_root()");
         }
     }
 
