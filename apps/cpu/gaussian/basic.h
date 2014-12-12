@@ -71,7 +71,7 @@
     typedef __int8 int8_t;
     typedef __int16 int16_t;
     typedef __int32 int32_t;
-    
+
 #else
 
     /* UNIX system: Use stdint to define uint8_t, etc. */
@@ -168,7 +168,7 @@
  * obtain timing at high resolution, platform-specific functions are needed:
  *
  *    - On Windows systems, the GetSystemTime function is used.
- *    - On POSIX systems, the gettimeofday function is used.
+ *    - On Mac and POSIX systems, the gettimeofday function is used.
  *
  * Otherwise as a fallback, time.h time is used, and in this case
  * millisecond_timer() has only second accuracy.  Preprocessor symbols are
@@ -176,6 +176,6 @@
  * defines millisecond_timer() accordingly.  A particular implementation can
  * be forced by defining USE_GETSYSTEMTIME, USE_GETTIMEOFDAY, or USE_TIME.
  */
-unsigned long millisecond_timer();
+unsigned long millisecond_timer(void);
 
 #endif /* _BASIC_H_ */
