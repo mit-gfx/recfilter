@@ -20,9 +20,9 @@ LDFFTW3=-lfftw3 -lfftw3f
 
 # Make settings
 SHELL=/bin/sh
-CFLAGS=-O3 -ansi -pedantic -Wall -Wextra $(NUM)
-LDFLAGS=$(OPENMP)
-LDLIBS=-lm $(LDFFTW3) $(LDLIBJPEG) $(LDLIBPNG) $(LDLIBTIFF) -lgomp
+CFLAGS=-O3 -ansi -pedantic -Wall -Wextra -fopenmp  $(NUM)
+LDFLAGS=-lgomp
+LDLIBS=-lm $(LDFFTW3) $(LDLIBJPEG) $(LDLIBPNG) $(LDLIBTIFF)
 
 GAUSSIAN_BOX_BENCH_SOURCES=gaussian_box_cpu.c strategy_gaussian_conv.c \
 gaussian_conv_fir.c gaussian_conv_dct.c gaussian_conv_am.c \
@@ -81,7 +81,7 @@ ifneq ($(LDLIBTIFF),)
 	CTIFF=-DUSE_LIBTIFF
 endif
 
-ALLCFLAGS=$(CFLAGS) $(CJPEG) $(CPNG) $(CTIFF) -fopenmp
+ALLCFLAGS=$(CFLAGS) $(CJPEG) $(CPNG) $(CTIFF)
 GAUSSIAN_BOX_BENCH_OBJECTS=$(GAUSSIAN_BOX_BENCH_SOURCES:.c=.o)
 GAUSSIAN_VYV_BENCH_OBJECTS=$(GAUSSIAN_VYV_BENCH_SOURCES:.c=.o)
 GAUSSIAN_BENCH_OBJECTS=$(GAUSSIAN_BENCH_SOURCES:.c=.o)
@@ -92,6 +92,13 @@ IMDIFF_OBJECTS=$(IMDIFF_SOURCES:.c=.o)
 
 MKDIR=mkdir -p
 BIN_DIR=../../../bin/cpu
+
+UNAME := $(shell uname)
+ifeq ($(UNAME), Darwin)
+	CC := gcc-4.9
+else
+	CC := gcc
+endif
 
 # all: gaussian_bench gaussian_demo imdiff
 all: $(BIN_DIR)/gaussian_box_cpu.app $(BIN_DIR)/gaussian_vyv_cpu.app
