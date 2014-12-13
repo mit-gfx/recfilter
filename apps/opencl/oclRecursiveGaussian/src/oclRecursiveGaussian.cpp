@@ -63,7 +63,6 @@ cl_command_queue cqCommandQueue;    // OpenCL command que
 cl_device_id* cdDevices = NULL;     // device list
 cl_uint uiNumDevsUsed = 1;          // Number of devices used in this sample
 cl_program cpProgram=0;             // OpenCL program
-cl_kernel ckSimpleRecursiveRGBA=0;  // OpenCL Kernel for simple recursion
 cl_kernel ckRecursiveGaussianRGBA=0;// OpenCL Kernel for gaussian recursion
 cl_kernel ckTranspose;              // OpenCL for transpose
 cl_mem cmDevBufIn=0;                // OpenCL device memory input buffer object
@@ -213,8 +212,6 @@ int main(int argc, char** argv)
         }
 
         // Create kernels
-        ckSimpleRecursiveRGBA = clCreateKernel(cpProgram, "SimpleRecursiveRGBA", &ciErrNum);
-        oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
         ckRecursiveGaussianRGBA = clCreateKernel(cpProgram, "RecursiveGaussianRGBA", &ciErrNum);
         oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
         ckTranspose = clCreateKernel(cpProgram, "Transpose", &ciErrNum);
@@ -274,12 +271,6 @@ void TestNoGL(int iCycles)
 void GPUGaussianSetCommonArgs(GaussParms* pGP)
 {
     // common Gaussian args
-#if USE_SIMPLE_FILTER
-    // Set the Common Argument values for the simple Gaussian kernel
-    ciErrNum |= clSetKernelArg(ckSimpleRecursiveRGBA, 4, sizeof(float), (void*)&pGP->ema);
-    oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
-
-#else
     // Set the Common Argument values for the Gaussian kernel
     ciErrNum |= clSetKernelArg(ckRecursiveGaussianRGBA, 4, sizeof(float), (void*)&pGP->a0);
     ciErrNum |= clSetKernelArg(ckRecursiveGaussianRGBA, 5, sizeof(float), (void*)&pGP->a1);
@@ -290,8 +281,6 @@ void GPUGaussianSetCommonArgs(GaussParms* pGP)
     ciErrNum |= clSetKernelArg(ckRecursiveGaussianRGBA, 10, sizeof(float), (void*)&pGP->coefp);
     ciErrNum |= clSetKernelArg(ckRecursiveGaussianRGBA, 11, sizeof(float), (void*)&pGP->coefn);
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
-
-#endif
 
     // Set common transpose Argument values
     ciErrNum |= clSetKernelArg(ckTranspose, 4, sizeof(unsigned int) * iTransposeBlockDim * (iTransposeBlockDim + 1), NULL );
@@ -315,18 +304,7 @@ double GPUGaussianFilterRGBA(GaussParms* pGP)
 
     // Set Gaussian global work dimensions, then set variable args and process in 1st dimension
     szGaussGlobalWork = shrRoundUp((int)szGaussLocalWork, uiImageWidth);
-#if USE_SIMPLE_FILTER
-    // Set simple Gaussian kernel variable arg values
-    ciErrNum = clSetKernelArg(ckSimpleRecursiveRGBA, 0, sizeof(cl_mem), (void*)&cmDevBufIn);
-    ciErrNum |= clSetKernelArg(ckSimpleRecursiveRGBA, 1, sizeof(cl_mem), (void*)&cmDevBufTemp);
-    ciErrNum |= clSetKernelArg(ckSimpleRecursiveRGBA, 2, sizeof(unsigned int), (void*)&uiImageWidth);
-    ciErrNum |= clSetKernelArg(ckSimpleRecursiveRGBA, 3, sizeof(unsigned int), (void*)&uiImageHeight);
-    oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
 
-    // Launch simple Gaussian kernel on the data in one dimension
-    ciErrNum = clEnqueueNDRangeKernel(cqCommandQueue, ckSimpleRecursiveRGBA, 1, NULL, &szGaussGlobalWork, &szGaussLocalWork, 0, NULL, NULL);
-    oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
-#else
     // Set full Gaussian kernel variable arg values
     ciErrNum = clSetKernelArg(ckRecursiveGaussianRGBA, 0, sizeof(cl_mem), (void*)&cmDevBufIn);
     ciErrNum |= clSetKernelArg(ckRecursiveGaussianRGBA, 1, sizeof(cl_mem), (void*)&cmDevBufTemp);
@@ -337,7 +315,6 @@ double GPUGaussianFilterRGBA(GaussParms* pGP)
     // Launch full Gaussian kernel on the data in one dimension
     ciErrNum = clEnqueueNDRangeKernel(cqCommandQueue, ckRecursiveGaussianRGBA, 1, NULL, &szGaussGlobalWork, &szGaussLocalWork, 0, NULL, NULL);
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
-#endif
 
     // Set transpose global work dimensions and variable args
     szTransposeGlobalWork[0] = shrRoundUp((int)szTransposeLocalWork[0], uiImageWidth);
@@ -355,18 +332,7 @@ double GPUGaussianFilterRGBA(GaussParms* pGP)
     // Reset Gaussian global work dimensions and variable args, then process in 2nd dimension
     // note width and height parameters flipped due to transpose
     szGaussGlobalWork = shrRoundUp((int)szGaussLocalWork, uiImageHeight);
-#if USE_SIMPLE_FILTER
-    // set simple Gaussian kernel arg values
-    ciErrNum = clSetKernelArg(ckSimpleRecursiveRGBA, 0, sizeof(cl_mem), (void*)&cmDevBufOut);
-    ciErrNum |= clSetKernelArg(ckSimpleRecursiveRGBA, 1, sizeof(cl_mem), (void*)&cmDevBufTemp);
-    ciErrNum |= clSetKernelArg(ckSimpleRecursiveRGBA, 2, sizeof(unsigned int), (void*)&uiImageHeight);
-    ciErrNum |= clSetKernelArg(ckSimpleRecursiveRGBA, 3, sizeof(unsigned int), (void*)&uiImageWidth);
-    oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
 
-    // Launch simple Gaussian kernel on the data in the other dimension
-    ciErrNum = clEnqueueNDRangeKernel(cqCommandQueue, ckSimpleRecursiveRGBA, 1, NULL, &szGaussGlobalWork, &szGaussLocalWork, 0, NULL, NULL);
-    oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
-#else
     // Set full Gaussian kernel arg values
     ciErrNum = clSetKernelArg(ckRecursiveGaussianRGBA, 0, sizeof(cl_mem), (void*)&cmDevBufOut);
     ciErrNum |= clSetKernelArg(ckRecursiveGaussianRGBA, 1, sizeof(cl_mem), (void*)&cmDevBufTemp);
@@ -377,7 +343,6 @@ double GPUGaussianFilterRGBA(GaussParms* pGP)
     // Launch full Gaussian kernel on the data in the other dimension
     ciErrNum = clEnqueueNDRangeKernel(cqCommandQueue, ckRecursiveGaussianRGBA, 1, NULL, &szGaussGlobalWork, &szGaussLocalWork, 0, NULL, NULL);
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
-#endif
 
     // Reset transpose global work dimensions and variable args
     // note width and height parameters flipped due to 1st transpose
@@ -421,7 +386,6 @@ void Cleanup()
     if(cmDevBufOut)   { clReleaseMemObject(cmDevBufOut);   cmDevBufOut=0;    }
     if(cPathAndName)  { free(cPathAndName);                cPathAndName=0;   }
     if(ckTranspose)   { clReleaseKernel(ckTranspose);      ckTranspose=0;    }
-    if(ckSimpleRecursiveRGBA)  { clReleaseKernel(ckSimpleRecursiveRGBA);   ckSimpleRecursiveRGBA=0;  }
     if(ckRecursiveGaussianRGBA){ clReleaseKernel(ckRecursiveGaussianRGBA); ckRecursiveGaussianRGBA=0;}
 }
 void Exit(int iExitCode)

@@ -9,7 +9,7 @@
  *
  */
 
-// Inline device function to convert 32-bit unsigned integer to floating point rgba color 
+// Inline device function to convert 32-bit unsigned integer to floating point rgba color
 //*****************************************************************
 float4 rgbaUintToFloat4(const unsigned int uiPackedRGBA)
 {
@@ -35,8 +35,8 @@ unsigned int rgbaFloat4ToUint(const float4 rgba)
 
 // Transpose kernel (see transpose SDK sample for details)
 //*****************************************************************
-__kernel void Transpose(__global const unsigned int* uiDataIn, __global unsigned int* uiDataOut, 
-                        int iWidth, int iHeight, 
+__kernel void Transpose(__global const unsigned int* uiDataIn, __global unsigned int* uiDataOut,
+                        int iWidth, int iHeight,
                         __local unsigned int* uiLocalBuff)
 {
     // read the matrix tile into LMEM
@@ -60,72 +60,22 @@ __kernel void Transpose(__global const unsigned int* uiDataIn, __global unsigned
     }
 }
 
-// 	simple 1st order recursive filter kernel 
+// Recursive Gaussian filter
 //*****************************************************************
-//    - processes one image column per thread
-//      parameters:	
+//  parameters:
 //      uiDataIn - pointer to input data (RGBA image packed into 32-bit integers)
-//      uiDataOut - pointer to output data 
-//      iWidth  - image width
-//      iHeight  - image height
-//      a  - blur parameter
-//*****************************************************************
-__kernel void SimpleRecursiveRGBA(__global const unsigned int* uiDataIn, __global unsigned int* uiDataOut, 
-                                  int iWidth, int iHeight, float a)
-{
-    // compute X pixel location and check in-bounds
-    unsigned int X = mul24(get_group_id(0), get_local_size(0)) + get_local_id(0);
-	if (X >= iWidth) return;
-    
-    // advance global pointers to correct column for this work item and x position
-    uiDataIn += X;    
-    uiDataOut += X;
-
-    // start forward filter pass
-    float4 yp = rgbaUintToFloat4(*uiDataIn);  // previous output
-    for (int Y = 0; Y < iHeight; Y++) 
-    {
-        float4 xc = rgbaUintToFloat4(*uiDataIn);
-        float4 yc = xc + (yp - xc) * (float4)a;   
-		*uiDataOut = rgbaFloat4ToUint(yc);
-        yp = yc;
-        uiDataIn += iWidth;     // move to next row
-        uiDataOut += iWidth;    // move to next row
-    }
-
-    // reset global pointers to point to last element in column for this work item and x position
-    uiDataIn -= iWidth;
-    uiDataOut -= iWidth;
-
-    // start reverse filter pass: ensures response is symmetrical
-    yp = rgbaUintToFloat4(*uiDataIn);
-    for (int Y = iHeight - 1; Y > -1; Y--) 
-    {
-        float4 xc = rgbaUintToFloat4(*uiDataIn);
-        float4 yc = xc + (yp - xc) * (float4)a;
-		*uiDataOut = rgbaFloat4ToUint((rgbaUintToFloat4(*uiDataOut) + yc) * 0.5f);
-        yp = yc;
-        uiDataIn -= iWidth;   // move to previous row
-        uiDataOut -= iWidth;  // move to previous row
-    }
-}
-
-// Recursive Gaussian filter 
-//*****************************************************************
-//  parameters:	
-//      uiDataIn - pointer to input data (RGBA image packed into 32-bit integers)
-//      uiDataOut - pointer to output data 
+//      uiDataOut - pointer to output data
 //      iWidth  - image width
 //      iHeight  - image height
 //      a0-a3, b1, b2, coefp, coefn - filter parameters
 //
 //      If used, CLAMP_TO_EDGE is passed in via OpenCL clBuildProgram call options string at app runtime
 //*****************************************************************
-__kernel void RecursiveGaussianRGBA(__global const unsigned int* uiDataIn, __global unsigned int* uiDataOut, 
-                                    int iWidth, int iHeight, 
-                                    float a0, float a1, 
-                                    float a2, float a3, 
-                                    float b1, float b2, 
+__kernel void RecursiveGaussianRGBA(__global const unsigned int* uiDataIn, __global unsigned int* uiDataOut,
+                                    int iWidth, int iHeight,
+                                    float a0, float a1,
+                                    float a2, float a3,
+                                    float b1, float b2,
                                     float coefp, float coefn)
 {
     // compute X pixel location and check in-bounds
@@ -133,7 +83,7 @@ __kernel void RecursiveGaussianRGBA(__global const unsigned int* uiDataIn, __glo
 	if (X >= iWidth) return;
 
     // advance global pointers to correct column for this work item and x position
-    uiDataIn += X;    
+    uiDataIn += X;
     uiDataOut += X;
 
     // start forward filter pass
@@ -142,19 +92,19 @@ __kernel void RecursiveGaussianRGBA(__global const unsigned int* uiDataIn, __glo
     float4 yb = (float4)0.0f;  // previous output by 2
 
 #ifdef CLAMP_TO_EDGE
-    xp = rgbaUintToFloat4(*uiDataIn); 
-    yb = xp * (float4)coefp; 
+    xp = rgbaUintToFloat4(*uiDataIn);
+    yb = xp * (float4)coefp;
     yp = yb;
 #endif
 
-    for (int Y = 0; Y < iHeight; Y++) 
+    for (int Y = 0; Y < iHeight; Y++)
     {
         float4 xc = rgbaUintToFloat4(*uiDataIn);
         float4 yc = (xc * a0) + (xp * a1) - (yp * b1) - (yb * b2);
 		*uiDataOut = rgbaFloat4ToUint(yc);
-        xp = xc; 
-        yb = yp; 
-        yp = yc; 
+        xp = xc;
+        yb = yp;
+        yp = yc;
         uiDataIn += iWidth;     // move to next row
         uiDataOut += iWidth;    // move to next row
     }
@@ -171,18 +121,18 @@ __kernel void RecursiveGaussianRGBA(__global const unsigned int* uiDataIn, __glo
 
 #ifdef CLAMP_TO_EDGE
     xn = rgbaUintToFloat4(*uiDataIn);
-    xa = xn; 
-    yn = xn * (float4)coefn; 
+    xa = xn;
+    yn = xn * (float4)coefn;
     ya = yn;
 #endif
 
-    for (int Y = iHeight - 1; Y > -1; Y--) 
+    for (int Y = iHeight - 1; Y > -1; Y--)
     {
         float4 xc = rgbaUintToFloat4(*uiDataIn);
         float4 yc = (xn * a2) + (xa * a3) - (yn * b1) - (ya * b2);
-        xa = xn; 
-        xn = xc; 
-        ya = yn; 
+        xa = xn;
+        xn = xc;
+        ya = yn;
         yn = yc;
 		*uiDataOut = rgbaFloat4ToUint(rgbaUintToFloat4(*uiDataOut) + yc);
         uiDataIn -= iWidth;   // move to previous row
