@@ -44,3 +44,5 @@ all:
 
 clean:
 	$(MAKE) -C common clean
+	$(MAKE) -C oclRecursiveGaussian clean
+	$(MAKE) -C oclBoxFilter clean

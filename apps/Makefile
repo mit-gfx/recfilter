@@ -12,6 +12,7 @@ all: scripts
 	make -C audio_filter
 	make -C cpu
 	make -C gpu
+	make -C opencl
 
 clean:
 	make -C ../lib clean
@@ -24,6 +25,7 @@ clean:
 	make -C audio_filter clean
 	make -C cpu clean
 	make -C gpu clean
+	make -C opencl clean
 	rm -f $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh
 
 scripts: $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh

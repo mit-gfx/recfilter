@@ -10,11 +10,6 @@
 
 #include <Halide.h>
 
-/** Symbolic undefined floating point constant */
-#define FLOAT_UNDEF Halide::undef<float>()
-
-// -----------------------------------------------------------------------------
-
 // Forward declarations of internal structures
 
 struct FilterInfo;
@@ -335,6 +330,21 @@ public:
     VarTag outer_scan(void);
     // @}
 
+    /**
+     * Millisecond-precision timer function
+     * \return Clock value in milliseconds
+     *
+     * This routine implements a timer with millisecond precision.  In order to
+     * obtain timing at high resolution, platform-specific functions are needed:
+     *
+     *    - On Windows systems, the GetSystemTime function is used.
+     *    - On Mac and POSIX systems, the gettimeofday function is used.
+     *
+     * Preprocessor symbols are checked in attempt to detect whether the platform
+     * is POSIX or Windows or Mac and defines millisecond_timer() accordingly.
+     */
+    unsigned long millisecond_timer(void);
+
 protected:
     /** Allow scheduler access to internal functions; only needed to append the
      * scheduling commands to each RecFilterFunc::schedule */
@@ -387,6 +397,7 @@ public:
     RecFilterSchedule& reorder (std::vector<VarTag> x);
     RecFilterSchedule& reorder_storage(std::vector<VarTag> x);
 };
+
 
 // ----------------------------------------------------------------------------
 
