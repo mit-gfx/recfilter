@@ -7,8 +7,6 @@
 #include "gaussian_weights.h"
 #include "recfilter.h"
 
-#define MAX_THREAD 192
-
 using namespace Halide;
 
 using std::vector;
@@ -16,22 +14,24 @@ using std::string;
 using std::cerr;
 using std::endl;
 
+#define VECTORIZE_WIDTH 8
+
 int main(int argc, char **argv) {
     Arguments args(argc, argv);
 
-    bool nocheck = args.nocheck;
-    int  width  = args.width;
-    int  height = args.width;
-    int  tile_width   = args.block;
+    bool nocheck    = true; //args.nocheck;
+    int  width      = args.width;
+    int  height     = args.width;
+    int  tile_width = args.block;
+    int  iterations = args.iterations;
 
-    Image<float> random_image = generate_random_image<float>(width,height);
-
-    ImageParam image(type_of<float>(), 2);
-    image.set(random_image);
+    Image<float> image = generate_random_image<float>(width,height);
+    Buffer out(type_of<float>(), width, height);
 
     // ----------------------------------------------------------------------------------------------
 
-    double sigma = 4.0;
+    double time  = 0.0;
+    double sigma = 5.0;
     int    box   = gaussian_box_filter(3, sigma); // approx Gaussian with 3 box filters
     double norm  = std::pow(box, 3*2);            // normalizing factor
 
@@ -64,40 +64,63 @@ int main(int argc, char **argv) {
              -3.0 * I(x+2*box,y+3*box) +
               1.0 * I(x+3*box,y+3*box)) / norm;
 
-    RecFilter filter;
+    // ----------------------------------------------------------------------------------------------
 
-    filter(x, y) = Expr(S(x,y));
+    // non-tiled version of the same filter
+    RecFilter F_non_tiled;
+    F_non_tiled(x, y) = S(x,y);
+    F_non_tiled.add_filter(+x, {1.0, 3.0, -3.0, 1.0});
+    F_non_tiled.add_filter(+y, {1.0, 3.0, -3.0, 1.0});
 
-    filter.add_filter(+y, {1.0, 3.0, -3.0, 1.0});
-    filter.add_filter(+y, {1.0, 3.0, -3.0, 1.0});
-
-    filter.split(x, tile_width, y, tile_width);
-
-    cerr << filter << endl;
+    // tiled version of the same filter
+    RecFilter F_tiled(F_non_tiled);
+    F_tiled(x, y) = S(x,y);
+    F_tiled.add_filter(+x, {1.0, 3.0, -3.0, 1.0});
+    F_tiled.add_filter(+y, {1.0, 3.0, -3.0, 1.0});
+    F_tiled.split(x, tile_width, y, tile_width);
 
     // ----------------------------------------------------------------------------------------------
 
+    if (F_tiled.target().has_gpu_feature() ||
+        F_non_tiled.target().has_gpu_feature())
     {
+    } else {
+        Var xi;
+
+        S.compute_root()
+            .split(x.var(), x.var(), xi,VECTORIZE_WIDTH)
+            .vectorize(xi).parallel(x.var()).parallel(y.var());
+
+        F_non_tiled.intra_schedule().compute_in_global()
+            .reorder(F_non_tiled.inner_scan(), F_non_tiled.full())
+            .split(F_non_tiled.full(0), VECTORIZE_WIDTH)
+            .vectorize(F_non_tiled.full(0).split_var())
+            .parallel(F_non_tiled.full(0));
+
+//        F_tiled.intra_schedule().compute_in_global()
+//            .reorder  (F_tiled.inner_scan(), F_tiled.full())
+//            .split    (F_tiled.full(0), VECTORIZE_WIDTH)
+//            .vectorize(F_tiled.full(0).split_var())
+//            .parallel (F_tiled.full(0));
+//
+//        F_tiled.inter_schedule().compute_in_global()
+//            .reorder  (F_tiled.outer_scan(), F_tiled.full())
+//            .split    (F_tiled.full(0), VECTORIZE_WIDTH)
+//            .vectorize(F_tiled.full(0).split_var())
+//            .parallel (F_tiled.full(0));
+//
+//        time = F_tiled.realize(out, iterations);
+        time = F_non_tiled.realize(out, iterations);
+        cerr << "non_tiled_direct\t" << width << "\t" << time << endl;
+        cerr << "tiled_direct\t" << width << "\t" << time << endl;
     }
-
-    // ----------------------------------------------------------------------------------------------
-
-    cerr << "\nJIT compilation ... " << endl;
-    filter.func().compile_jit();
-
-    Buffer hl_out_buff(type_of<float>(), width,height);
-    {
-        filter.func().realize(hl_out_buff);
-    }
-    hl_out_buff.copy_to_host();
-    hl_out_buff.free_dev_buffer();
 
     // ----------------------------------------------------------------------------------------------
 
     if (!nocheck) {
         cerr << "\nChecking difference ...\n" << endl;
-        Image<float> hl_out(hl_out_buff);
-        Image<float> ref = reference_gaussian<float>(random_image, sigma);
+        Image<float> hl_out(out);
+        Image<float> ref = reference_gaussian<float>(image, sigma);
         cerr << "Difference with true Gaussian \n" << CheckResultVerbose<float>(ref,hl_out) << endl;
     }
 

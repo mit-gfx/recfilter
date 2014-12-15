@@ -14,10 +14,11 @@ using std::string;
 using std::cerr;
 using std::endl;
 
+#define VECTORIZE_WIDTH 8
+
 int main(int argc, char **argv) {
     Arguments args(argc, argv);
 
-    bool nocheck = true; //args.nocheck;
     int  width   = args.width;
     int  height  = args.width;
     int  tile_width = args.block;
@@ -44,41 +45,50 @@ int main(int argc, char **argv) {
     F.add_filter(+y, W3);
     F.add_filter(-y, W3);
 
-    vector<RecFilter> cascaded_filters = F.cascade({2,3}, {0,1});
+    vector<RecFilter> cascaded_filters = F.cascade({0,1}, {2,3});
 
-    cascaded_filters[0].split(y, tile_width);
-    cascaded_filters[1].split(x, tile_width);
+#define SPLIT 1
+#if SPLIT
+    cascaded_filters[0].split(x, tile_width);
+    cascaded_filters[1].split(y, tile_width);
+#endif
 
     // ----------------------------------------------------------------------------------------------
 
-    F.intra_schedule().compute_in_global().parallel(F.full(0));
+    F.intra_schedule().compute_in_global()
+        .split    (F.full(0), VECTORIZE_WIDTH)
+        .vectorize(F.full(0).split_var())
+        .parallel (F.full(0));
 
     for (int i=0; i<cascaded_filters.size(); i++) {
         RecFilter f = cascaded_filters[i];
         if (f.target().has_gpu_feature()) {
         } else {
 
-            //f.intra_schedule().compute_in_global()
-                //.split    (f.full(0), 4)
-                //.vectorize(f.full(0).split_var())
-                //.parallel (f.full(0))
-                //;
-
+#if SPLIT
             f.intra_schedule().compute_in_global()
                 .reorder_storage(f.full(), f.inner(), f.outer())
                 .reorder  (f.inner_scan(), f.full(), f.outer())
-                .split    (f.full(0), 8)
+                .split    (f.full(0), VECTORIZE_WIDTH)
                 .vectorize(f.full(0).split_var())
                 .parallel (f.full(0))
-                .parallel (f.outer(0));
+                .parallel (f.outer(0))
+                ;
 
             f.inter_schedule().compute_in_global()
                 .reorder_storage(f.full(), f.tail(), f.outer())
-                .reorder (f.outer_scan(), f.tail(), f.full())
-                .vectorize(f.tail())
-                .split    (f.full(0), 8)
+                .reorder  (f.outer_scan(), f.tail(), f.full())
+                .split    (f.full(0), VECTORIZE_WIDTH)
                 .vectorize(f.full(0).split_var())
-                .parallel (f.full(0));
+                .parallel (f.full(0))
+                ;
+#else
+            f.intra_schedule().compute_in_global()
+                .split    (f.full(0), VECTORIZE_WIDTH)
+                .vectorize(f.full(0).split_var())
+                .parallel (f.full(0))
+                ;
+#endif
         }
 
         cerr << f << endl;
@@ -86,27 +96,20 @@ int main(int argc, char **argv) {
 
 
     // ----------------------------------------------------------------------------------------------
-
-    cerr << "width\ttime (ms)" << endl;
+    double time = 0.0;
 
     RecFilter f = cascaded_filters[cascaded_filters.size()-1];
 
-    f.compile_jit("hl_stmt.html");
-
     Buffer out(type_of<float>(), width, height);
-    double time = f.realize(out, iterations);
-    cerr << width << "\t" << time << endl;
+
+    f.compile_jit("tiled.html");
+    F.compile_jit("nontiled.html");
+
     time = F.realize(out, iterations);
-    cerr << width << "\t" << time << endl;
+    cerr << "non_tiled_direct\t" << width << "\t" << time << endl;
 
-    // ----------------------------------------------------------------------------------------------
-
-    if (!nocheck) {
-        cerr << "\nChecking difference ...\n" << endl;
-        Image<float> hl_out(out);
-        Image<float> ref = reference_gaussian<float>(image, sigma);
-        cerr << "Difference with true Gaussian \n" << CheckResult<float>(ref,hl_out) << endl;
-    }
+    time = f.realize(out, iterations);
+    cerr << "tiled_xy_cascaded\t" << width << "\t" << time << endl;
 
     return 0;
 }
