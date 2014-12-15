@@ -94,10 +94,17 @@ void (*pCleanup)(int) = &Exit;
 //*****************************************************************************
 int main(int argc, char** argv)
 {
-    if (argc == 2) {
+    cl_uint uiNumDevices = 0;           // Number of devices available
+    cl_uint uiTargetDevice = 0;	        // Default Device to compute on
+    cl_uint uiNumComputeUnits;          // Number of compute units (SM's on NV GPU)
+
+    if (argc >= 2) {
         iCycles = atoi(argv[1]);
+        if (argc == 3) {
+            uiTargetDevice = atoi(argv[2]);
+        }
     } else {
-        printf("Usage: oclRecursiveGaussian [number of runs]");
+        printf("Usage: oclBoxFilter [number of runs] [OpenCL device]");
         exit(EXIT_FAILURE);
     }
 
@@ -106,9 +113,6 @@ int main(int argc, char** argv)
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
 
     //Get all the devices
-    cl_uint uiNumDevices = 0;           // Number of devices available
-    cl_uint uiTargetDevice = 0;	        // Default Device to compute on
-    cl_uint uiNumComputeUnits;          // Number of compute units (SM's on NV GPU)
     ciErrNum = clGetDeviceIDs(cpPlatform, CL_DEVICE_TYPE_GPU, 0, NULL, &uiNumDevices);
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
     cdDevices = (cl_device_id *)malloc(uiNumDevices * sizeof(cl_device_id) );
@@ -116,13 +120,14 @@ int main(int argc, char** argv)
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
 
     // Set target device and Query number of compute units on uiTargetDevice
-    printf("  # of Devices Available = %u\n", uiNumDevices);
-    uiTargetDevice = CLAMP(uiTargetDevice, 0, (uiNumDevices - 1));
-    printf("  Using Device %u: ", uiTargetDevice);
-    oclPrintDevName(LOGBOTH, cdDevices[uiTargetDevice]);
-    ciErrNum = clGetDeviceInfo(cdDevices[uiTargetDevice], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(uiNumComputeUnits), &uiNumComputeUnits, NULL);
-    oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
-    printf("\n  # of Compute Units = %u\n\n", uiNumComputeUnits);
+    printf("Devices Available = %u\n", uiNumDevices);
+    for (int i=0; i<uiNumDevices; i++) {
+        ciErrNum = clGetDeviceInfo(cdDevices[i], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(uiNumComputeUnits), &uiNumComputeUnits, NULL);
+        printf("Device %u: # of Compute Units = %u ", i, uiNumComputeUnits);
+        oclPrintDevName(LOGBOTH, cdDevices[i]);
+        oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+    }
+    printf("Using Device %u: ", uiTargetDevice);
 
     //Create the context
     cxGPUContext = clCreateContext(0, uiNumDevsUsed, &cdDevices[uiTargetDevice], NULL, NULL, &ciErrNum);
