@@ -10,7 +10,8 @@ struct FilterInfo {
     int                  filter_order;  ///< order of recursive filter in a given dimension
     int                  filter_dim;    ///< dimension id
     int                  num_scans;     ///< number of scans in the dimension that must be tiled
-    Halide::Expr         image_width;   ///< image width in this dimension
+    int                  image_width;   ///< image width in this dimension
+    int                  tile_width;    ///< tile width in this dimension
     Halide::Var          var;           ///< variable that represents this dimension
     Halide::RDom         rdom;          ///< RDom update domain of each scan
     std::vector<bool>    scan_causal;   ///< causal or anticausal flag for each scan

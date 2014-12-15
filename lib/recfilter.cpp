@@ -167,7 +167,7 @@ void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
     rf.func = Function(contents.ptr->name);
     rf.func_category = INTRA_N;
 
-   // add the arguments
+    // add the arguments
 
     for (int i=0; i<pure_args.size(); i++) {
         FilterInfo s;
@@ -177,8 +177,9 @@ void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
         s.var          = pure_args[i].var();
 
         // extent and domain of all scans in this dimension
-        s.image_width  = pure_args[i].extent();
-        s.rdom         = RDom(0, s.image_width, unique_name("r"+s.var.name()));
+        s.image_width = pure_args[i].extent();
+        s.tile_width  = s.image_width;
+        s.rdom        = RDom(0, s.image_width, unique_name("r"+s.var.name()));
 
         // default values for now
         s.num_scans      = 0;
@@ -187,8 +188,7 @@ void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
         contents.ptr->filter_info.push_back(s);
 
         // add tag the dimension as pure
-        rf.pure_var_category.insert(make_pair(pure_args[i].var().name(),
-                    VarTag(FULL,i)));
+        rf.pure_var_category.insert(make_pair(pure_args[i].var().name(), VarTag(FULL,i)));
     }
 
     contents.ptr->func.insert(make_pair(rf.func.name(), rf));
@@ -462,7 +462,7 @@ RecFilterFunc& RecFilter::internal_function(string func_name) {
 
 void RecFilter::compile_jit(string filename) {
     if (!contents.ptr->finalized) {
-        finalize(contents.ptr->target);
+        finalize();
     }
 
     Func F(internal_function(contents.ptr->name).func);
@@ -474,39 +474,64 @@ void RecFilter::compile_jit(string filename) {
     contents.ptr->compiled = true;
 }
 
-double RecFilter::realize(Buffer out, int iterations) {
+double RecFilter::realize(Buffer& out, int iterations) {
     if (!contents.ptr->compiled) {
         compile_jit();
     }
 
     Func F(internal_function(contents.ptr->name).func);
 
-    // upload all buffers to device if computed on GPU
-    if (contents.ptr->target.has_gpu_feature()) {
-        map<string,Buffer> buff = extract_buffer_calls(F);
-        for (map<string,Buffer>::iterator b=buff.begin(); b!=buff.end(); b++) {
-            b->second.copy_to_dev();
+    // allocate the buffer
+    vector<int> sizes;
+    vector<int> original_sizes;
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        assert(i==contents.ptr->filter_info[i].filter_dim);
+        Var x = contents.ptr->filter_info[i].var;
+        int w = contents.ptr->filter_info[i].image_width;
+        int t = contents.ptr->filter_info[i].tile_width;
+        if (t!=w) {
+            sizes.push_back(t);
+            sizes.push_back(w/t);
+        } else {
+            sizes.push_back(w);
         }
+        original_sizes.push_back(w);
     }
 
-    unsigned long time_start = 0;
-    unsigned long time_end   = 0;
+    Buffer hl_out(contents.ptr->type, sizes);
+    out = Buffer(contents.ptr->type, original_sizes);
+
+    // // upload all buffers to device if computed on GPU
+    // if (contents.ptr->target.has_gpu_feature()) {
+    //     map<string,Buffer> buff = extract_buffer_calls(F);
+    //     for (map<string,Buffer>::iterator b=buff.begin(); b!=buff.end(); b++) {
+    //         b->second.copy_to_dev();
+    //     }
+    // }
 
     // run once to warmup the driver if profiling with multiple runs
     if (iterations>1) {
-        F.realize(out);
+        F.realize(hl_out);
     }
 
-    time_start = millisecond_timer();
+    unsigned long time_start = millisecond_timer();
     for (int i=0; i<iterations; i++) {
-        F.realize(out);
+        F.realize(hl_out);
     }
+    unsigned long time_end = millisecond_timer();
+
     // copy result to CPU if computed on GPU
     if (contents.ptr->target.has_gpu_feature()) {
         out.copy_to_host();
         out.free_dev_buffer();
     }
-    time_end = millisecond_timer();
+
+    // // copy results to a non tiled image buffer
+    // if (contents.ptr->tiled) {
+    //     void *  host_ptr();
+    // } else {
+    //     out = hl_out;
+    // }
 
     return double(time_end-time_start)/double(iterations);
 }

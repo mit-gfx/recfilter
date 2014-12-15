@@ -34,16 +34,16 @@ enum FunctionTag : int;
 /** Filter dimension with variable name and width of image in the dimension */
 class RecFilterDim {
 private:
-    Halide::Var  v;  ///< variable for the dimension
-    Halide::Expr e;  ///< size of input/output buffer in the dimension
+    Halide::Var v;  ///< variable for the dimension
+    int         e;  ///< size of input/output buffer in the dimension
 
 public:
     RecFilterDim(void) {}
-    RecFilterDim(std::string var_name, Halide::Expr var_extent):
+    RecFilterDim(std::string var_name, int var_extent):
         v(var_name), e(var_extent) {}
 
     Halide::Var  var   (void) const { return v; }
-    Halide::Expr extent(void) const { return e; }
+    int          extent(void) const { return e; }
 
     /** Express as Halide::Expr so that it can be used to index other Halide
      * functions and buffers */
@@ -64,7 +64,7 @@ public:
         r(rec_var), c(causal) {}
 
     Halide::Var  var   (void) const { return r.var();    }
-    Halide::Expr extent(void) const { return r.extent(); }
+    int          extent(void) const { return r.extent(); }
     bool         causal(void) const { return c;          }
 
     /** Express as Halide::Expr so that it can be used to index other Halide
@@ -118,7 +118,7 @@ private:
     void inline_func(std::string func_name);
 
     /** Finalize the filter; triggers automatic function transformations and cleanup */
-    void finalize(Halide::Target target);
+    void finalize(void);
 
 public:
     /**
@@ -180,10 +180,12 @@ public:
      * codegen in human readable HTML format if filename is specified */
     void compile_jit(std::string filename="");
 
-    /** Compute the filter for a given output buffer for specified number of iterations
-     * for timing purposes; last iteration copies the result to host, returns
-     * computation time in milliseconds */
-    double realize(Halide::Buffer out, int iterations=1);
+    /** Compute the filter
+     * \param out output buffer that holds the result, allocated automatically
+     * \param iterations number of profiling iterations
+     * \returns computation time in milliseconds (not including device-host transfers)
+     */
+    double realize(Halide::Buffer& out, int iterations=1);
     // @}
 
 
@@ -233,11 +235,11 @@ public:
      * - tile width must be a multiple of image width for each dimension
      */
     // {@
-    void split(Halide::Expr tx);
-    void split(RecFilterDim x, Halide::Expr tx);
-    void split(RecFilterDim x, Halide::Expr tx, RecFilterDim y, Halide::Expr ty);
-    void split(RecFilterDim x, Halide::Expr tx, RecFilterDim y, Halide::Expr ty, RecFilterDim z, Halide::Expr tz);
-    void split(std::map<std::string, Halide::Expr> dims);
+    void split(int tx);
+    void split(RecFilterDim x, int tx);
+    void split(RecFilterDim x, int tx, RecFilterDim y, int ty);
+    void split(RecFilterDim x, int tx, RecFilterDim y, int ty, RecFilterDim z, int tz);
+    void split(std::map<std::string, int> dims);
     // @}
 
 
