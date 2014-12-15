@@ -321,9 +321,6 @@ public:
     /** Get the compilation target, inferred from HL_JIT_TARGET */
     Halide::Target target(void);
 
-    /** Set the target to debug mode to disable all code optimizations */
-    void set_debug_target(void);
-
     /** @name Generic handles to write scheduled for dimensions of internal functions */
     // {@
     VarTag full      (int i=-1);

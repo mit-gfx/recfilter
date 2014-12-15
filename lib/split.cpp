@@ -1673,8 +1673,6 @@ void RecFilter::split(RecFilterDim x, int tx, RecFilterDim y, int ty, RecFilterD
 // -----------------------------------------------------------------------------
 
 void RecFilter::finalize(void) {
-    contents.ptr->finalized = true;
-
     map<string,RecFilterFunc>::iterator fit;
 
     if (contents.ptr->tiled) {
@@ -1713,12 +1711,6 @@ void RecFilter::finalize(void) {
             }
         }
 
-        // no more optimizations if debug mode
-        if (contents.ptr->target.has_feature(Target::Debug)) {
-            cerr << "debug mode" << endl;
-            return;
-        }
-
         // GPU optimization
         if (contents.ptr->target.has_gpu_feature()) {
             for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
@@ -1745,6 +1737,12 @@ void RecFilter::finalize(void) {
                     fit = contents.ptr->func.begin();            // list changed, start all over again
                 }
             }
+
+            for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+                Func(fit->second.func).compute_root();
+                fit->second.pure_schedule.push_back("compute_root()");
+            }
         }
     }
+    contents.ptr->finalized = true;
 }

@@ -474,26 +474,9 @@ void RecFilter::compile_jit(string filename) {
     contents.ptr->compiled = true;
 }
 
-void RecFilter::set_debug_target(void) {
-    contents.ptr->target.set_feature(Target::Debug);
-}
-
 double RecFilter::realize(Buffer out, int iterations) {
     if (!contents.ptr->compiled) {
         compile_jit();
-    }
-
-    // check if schedules for all functions is are scheduled inline,
-    // if so, then this is a result of no schedule being specified
-    // use compute_root as default in this case
-    bool all_inline = true;
-    vector<Func> all_funcs = funcs();
-    for (int i=0; all_inline && i<all_funcs.size(); i++) {
-        all_inline &= all_funcs[i].function().schedule().compute_level().is_inline();
-    }
-    for (int i=0; all_inline && i<all_funcs.size(); i++) {
-        cerr << "Warning: setting " << all_funcs[i].name() << " to compute root" << endl;
-        all_funcs[i].compute_root();
     }
 
     Func F(internal_function(contents.ptr->name).func);

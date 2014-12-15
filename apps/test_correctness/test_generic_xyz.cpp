@@ -34,7 +34,6 @@ int main(int argc, char **argv) {
     RecFilterDim z("z", channels);
 
     RecFilter filter;
-    filter.set_debug_target();
     filter(x, y, z) = image(
                 clamp(x,0,image.width()-1),
                 clamp(y,0,image.height()-1),
