@@ -474,32 +474,24 @@ void RecFilter::compile_jit(string filename) {
     contents.ptr->compiled = true;
 }
 
-double RecFilter::realize(Buffer& out, int iterations) {
+double RecFilter::realize(Buffer out, int iterations) {
     if (!contents.ptr->compiled) {
         compile_jit();
     }
 
-    Func F(internal_function(contents.ptr->name).func);
-
-    // allocate the buffer
-    vector<int> sizes;
-    vector<int> original_sizes;
-    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-        assert(i==contents.ptr->filter_info[i].filter_dim);
-        Var x = contents.ptr->filter_info[i].var;
-        int w = contents.ptr->filter_info[i].image_width;
-        int t = contents.ptr->filter_info[i].tile_width;
-        if (t!=w) {
-            sizes.push_back(t);
-            sizes.push_back(w/t);
-        } else {
-            sizes.push_back(w);
-        }
-        original_sizes.push_back(w);
+    // check if schedules for all functions is are scheduled inline,
+    // if so, then this is a result of no schedule being specified
+    // use compute_root as default in this case
+    bool all_inline = true;
+    vector<Func> all_funcs = funcs();
+    for (int i=0; all_inline && i<all_funcs.size(); i++) {
+        all_inline &= all_funcs[i].function().schedule().compute_level().is_inline();
+    }
+    for (int i=0; all_inline && i<all_funcs.size(); i++) {
+        all_funcs[i].compute_root();
     }
 
-    Buffer hl_out(contents.ptr->type, sizes);
-    out = Buffer(contents.ptr->type, original_sizes);
+    Func F(internal_function(contents.ptr->name).func);
 
     // // upload all buffers to device if computed on GPU
     // if (contents.ptr->target.has_gpu_feature()) {
@@ -511,12 +503,12 @@ double RecFilter::realize(Buffer& out, int iterations) {
 
     // run once to warmup the driver if profiling with multiple runs
     if (iterations>1) {
-        F.realize(hl_out);
+        F.realize(out);
     }
 
     unsigned long time_start = millisecond_timer();
     for (int i=0; i<iterations; i++) {
-        F.realize(hl_out);
+        F.realize(out);
     }
     unsigned long time_end = millisecond_timer();
 
@@ -525,13 +517,6 @@ double RecFilter::realize(Buffer& out, int iterations) {
         out.copy_to_host();
         out.free_dev_buffer();
     }
-
-    // // copy results to a non tiled image buffer
-    // if (contents.ptr->tiled) {
-    //     void *  host_ptr();
-    // } else {
-    //     out = hl_out;
-    // }
 
     return double(time_end-time_start)/double(iterations);
 }

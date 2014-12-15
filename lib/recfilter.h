@@ -181,11 +181,11 @@ public:
     void compile_jit(std::string filename="");
 
     /** Compute the filter
-     * \param out output buffer that holds the result, allocated automatically
+     * \param out output buffer that holds the result, should be allocated by caller
      * \param iterations number of profiling iterations
      * \returns computation time in milliseconds (not including device-host transfers)
      */
-    double realize(Halide::Buffer& out, int iterations=1);
+    double realize(Halide::Buffer out, int iterations=1);
     // @}
 
 

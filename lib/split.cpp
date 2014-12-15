@@ -1556,17 +1556,55 @@ void RecFilter::split(map<string,int> dim_tile) {
     }
 
     // change the original function to index into the final term
-    // for GPU codegen
-    if (contents.ptr->target.has_gpu_feature()) {
+    // if (contents.ptr->target.has_gpu_feature()) {
+    //     Function F_final = rF_final.func;
+    //     vector<string> args = F_final.args();
+    //     vector<Expr> values;
+    //     vector<Expr> call_args;
+    //     for (int i=0; i<args.size(); i++) {
+    //         call_args.push_back(Var(args[i]));
+    //     }
+    //     for (int i=0; i<F_final.outputs(); i++) {
+    //         values.push_back(Call::make(F_final, call_args, i));
+    //     }
+    //     F.clear_all_definitions();
+    //     F.define(args, values);
+
+    //     // remove the scheduling tags of the update defs
+    //     rF.func_category = REINDEX;
+    //     rF.callee_func = F_final.name();
+    //     rF.update_var_category.clear();
+    // } else {
+    //     rF = create_copy(rF_final, contents.ptr->name);
+    //     recfilter_func_list.erase(rF_final.func.name());
+    // }
+    // recfilter_func_list.insert(make_pair(rF.func.name(), rF));
+
+    // change the original function to index into the final term
+    {
         Function F_final = rF_final.func;
-        vector<string> args = F_final.args();
+        vector<string> args = F.args();
         vector<Expr> values;
         vector<Expr> call_args;
-        for (int i=0; i<args.size(); i++) {
-            call_args.push_back(Var(args[i]));
+        for (int i=0; i<F_final.args().size(); i++) {
+            string arg = F_final.args()[i];
+            call_args.push_back(Var(arg));
+
+            for (int j=0; j<recfilter_split_info.size(); j++) {
+                Var var        = recfilter_split_info[j].var;
+                Var inner_var  = recfilter_split_info[j].inner_var;
+                Var outer_var  = recfilter_split_info[j].outer_var;
+                int tile_width = recfilter_split_info[j].tile_width;
+                if (arg == inner_var.name()) {
+                    call_args[i] = substitute(arg, var%tile_width, call_args[i]);
+                } else if (arg == outer_var.name()) {
+                    call_args[i] = substitute(arg, var/tile_width, call_args[i]);
+                }
+            }
         }
-        for (int i=0; i<F_final.outputs(); i++) {
-            values.push_back(Call::make(F_final, call_args, i));
+        for (int i=0; i<F.outputs(); i++) {
+            Expr val = Call::make(F_final, call_args, i);
+            values.push_back(val);
         }
         F.clear_all_definitions();
         F.define(args, values);
@@ -1575,67 +1613,29 @@ void RecFilter::split(map<string,int> dim_tile) {
         rF.func_category = REINDEX;
         rF.callee_func = F_final.name();
         rF.update_var_category.clear();
-    } else {
-        rF = create_copy(rF_final, contents.ptr->name);
-        recfilter_func_list.erase(rF_final.func.name());
-    }
-    recfilter_func_list.insert(make_pair(rF.func.name(), rF));
 
-//    {
-//        Function F_final = rF_final.func;
-//        vector<string> args = F.args();
-//        vector<Expr> values;
-//        vector<Expr> call_args;
-//        for (int i=0; i<F_final.args().size(); i++) {
-//            string arg = F_final.args()[i];
-//            call_args.push_back(Var(arg));
-//
-//            for (int j=0; j<recfilter_split_info.size(); j++) {
-//                Var var        = recfilter_split_info[j].var;
-//                Var inner_var  = recfilter_split_info[j].inner_var;
-//                Var outer_var  = recfilter_split_info[j].outer_var;
-//                int tile_width = recfilter_split_info[j].tile_width;
-//                if (arg == inner_var.name()) {
-//                    call_args[i] = substitute(arg, var%tile_width, call_args[i]);
-//                } else if (arg == outer_var.name()) {
-//                    call_args[i] = substitute(arg, var/tile_width, call_args[i]);
-//                }
-//            }
-//        }
-//        for (int i=0; i<F.outputs(); i++) {
-//            Expr val = Call::make(F_final, call_args, i);
-//            values.push_back(val);
-//        }
-//        F.clear_all_definitions();
-//        F.define(args, values);
-//
-//        // remove the scheduling tags of the update defs
-//        rF.func_category = REINDEX;
-//        rF.callee_func = F_final.name();
-//        rF.update_var_category.clear();
-//
-//        // split the tiled vars of the final term
-//        for (int i=0; i<recfilter_split_info.size(); i++) {
-//            Var var        = recfilter_split_info[i].var;
-//            Var inner_var  = recfilter_split_info[i].inner_var;
-//            Var outer_var  = recfilter_split_info[i].outer_var;
-//            int tile_width = recfilter_split_info[i].tile_width;
-//
-//            Func(F).split(var, outer_var, inner_var, tile_width);
-//
-//            stringstream s;
-//            s << "split(Var(\"" << var.name() << "\"), Var(\""
-//                << outer_var.name() << "\"), Var(\"" << inner_var.name() << "\"), "
-//                << tile_width << ")";
-//
-//            rF.pure_var_category.erase(var.name());
-//            rF.pure_var_category.insert(make_pair(inner_var.name(), VarTag(INNER,i)));
-//            rF.pure_var_category.insert(make_pair(outer_var.name(), VarTag(OUTER,i)));
-//            rF.pure_schedule.push_back(s.str());
-//        }
-//
-//        recfilter_func_list.insert(make_pair(rF.func.name(), rF));
-//    }
+        // split the tiled vars of the final term
+        for (int i=0; i<recfilter_split_info.size(); i++) {
+            Var var        = recfilter_split_info[i].var;
+            Var inner_var  = recfilter_split_info[i].inner_var;
+            Var outer_var  = recfilter_split_info[i].outer_var;
+            int tile_width = recfilter_split_info[i].tile_width;
+
+            Func(F).split(var, outer_var, inner_var, tile_width);
+
+            stringstream s;
+            s << "split(Var(\"" << var.name() << "\"), Var(\""
+                << outer_var.name() << "\"), Var(\"" << inner_var.name() << "\"), "
+                << tile_width << ")";
+
+            rF.pure_var_category.erase(var.name());
+            rF.pure_var_category.insert(make_pair(inner_var.name(), VarTag(INNER,i)));
+            rF.pure_var_category.insert(make_pair(outer_var.name(), VarTag(OUTER,i)));
+            rF.pure_schedule.push_back(s.str());
+        }
+
+        recfilter_func_list.insert(make_pair(rF.func.name(), rF));
+    }
 
     // add all the generated RecFilterFuncs
     contents.ptr->func.insert(recfilter_func_list.begin(), recfilter_func_list.end());
@@ -1739,11 +1739,6 @@ void RecFilter::finalize(void) {
                 inline_func(fit->second.func.name());
                 fit = contents.ptr->func.begin();            // list changed, start all over again
             }
-        }
-        // make all other functions as compute root
-        for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-            Func(fit->second.func).compute_root();
-            fit->second.pure_schedule.push_back("compute_root()");
         }
     }
 
