@@ -117,10 +117,7 @@ int main(int argc, char** argv)
 
     // Set target device and Query number of compute units on uiTargetDevice
     printf("  # of Devices Available = %u\n", uiNumDevices);
-    if(shrGetCmdLineArgumentu(argc, (const char**)argv, "device", &uiTargetDevice)== shrTRUE)
-    {
-        uiTargetDevice = CLAMP(uiTargetDevice, 0, (uiNumDevices - 1));
-    }
+    uiTargetDevice = CLAMP(uiTargetDevice, 0, (uiNumDevices - 1));
     printf("  Using Device %u: ", uiTargetDevice);
     oclPrintDevName(LOGBOTH, cdDevices[uiTargetDevice]);
     ciErrNum = clGetDeviceInfo(cdDevices[uiTargetDevice], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(uiNumComputeUnits), &uiNumComputeUnits, NULL);
