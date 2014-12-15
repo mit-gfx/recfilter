@@ -321,6 +321,9 @@ public:
     /** Get the compilation target, inferred from HL_JIT_TARGET */
     Halide::Target target(void);
 
+    /** Set the target to debug mode to disable all code optimizations */
+    void set_debug_target(void);
+
     /** @name Generic handles to write scheduled for dimensions of internal functions */
     // {@
     VarTag full      (int i=-1);
@@ -469,6 +472,7 @@ public:
     VarTag split_var (void) const;
     int    check     (const VarTag &t)      const;
     int    check     (const VariableTag &t) const;
+    int    check_granularity(const VarTag &t) const;
     int    count     (void) const;
 
 private:
@@ -508,20 +512,20 @@ class Arguments {
 
 /** Generate an image of a given size with random entries */
 template<typename T>
-Halide::Image<T> generate_random_image(size_t w, size_t h=1, size_t c=1, size_t d=1) {
+Halide::Image<T> generate_random_image(size_t w, size_t h=0, size_t c=0, size_t d=0) {
     Halide::Image<T> image;
 
     int MIN_ELEMENT = 1;
     int MAX_ELEMENT = 1;
 
-    if (h<=1 && c<=1 && d<=1) {
-        image = Halide::Image<T>(w);
-    } else if (c<=1 && d<=1) {
-        image = Halide::Image<T>(w,h);
-    } else if (d<=1) {
-        image = Halide::Image<T>(w,h,c);
-    } else {
+    if (w && h && c && d) {
         image = Halide::Image<T>(w,h,c,d);
+    } else if (w && h && c) {
+        image = Halide::Image<T>(w,h,c);
+    } else if (w && h) {
+        image = Halide::Image<T>(w,h);
+    } else if (w) {
+        image = Halide::Image<T>(w);
     }
 
     if (image.dimensions() == 1) {

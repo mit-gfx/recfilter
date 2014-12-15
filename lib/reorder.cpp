@@ -233,64 +233,57 @@ static bool check_scheduling_tags(
     Function A = fA.func;
     Function B = fB.func;
 
-    bool same_func_tags = true;
-    bool same_pure_def_tags = true;
+    // A and B must have the same scheduling tags for the function itself
+    if (fA.func_category != fB.func_category) {
+        return false;
+    }
 
     vector<string> diff_vars;
-
     map<string,VarTag>::iterator it;
 
-    // A and B must have the same scheduling tags for the function itself
-    same_func_tags &= (fA.func_category == fB.func_category);
-
     // check pure def scheduling tags and make a list of different tags
-    same_pure_def_tags &= (fA.pure_var_category.size()==fB.pure_var_category.size());
+    bool same_pure_def_tags = (fA.pure_var_category.size()==fB.pure_var_category.size());
     for (it=fB.pure_var_category.begin(); it!=fB.pure_var_category.end(); it++) {
-        if (it->second != fA.pure_var_category[it->first]) {
+        if (!it->second.check_granularity(fA.pure_var_category[it->first])) {
             diff_vars.push_back(it->first);
-            same_pure_def_tags &= false;
+            same_pure_def_tags = false;
         }
     }
 
-    if (same_func_tags && !same_pure_def_tags && diff_vars.size()%2==0) {
+    // a single dimension transpose should fix the scheduling tags
+    if (!same_pure_def_tags && diff_vars.size()>1) {
         // check if transposing dimensions can fix the scheduling tags
         // loop over all combinations of transposes
         do {
-            vector< pair<string,string> > var_swaps;
-            for (int i=0; i<diff_vars.size(); i+=2) {
-                var_swaps.push_back(make_pair(diff_vars[i],diff_vars[i+1]));
-            }
-
-            bool same_pure_def_tags_after_dummy_swap = true;
-
-            // apply these swaps on dummy scheduling tags lists
+            // apply this swap on dummy scheduling tags lists
             map<string,VarTag> var_cat_A = fA.pure_var_category;
             map<string,VarTag> var_cat_B = fB.pure_var_category;
-            for (int i=0; i<var_swaps.size(); i++) {
-                string a = var_swaps[i].first;
-                string b = var_swaps[i].second;
-                VarTag temp = var_cat_B[a];
-                var_cat_B[a] = var_cat_B[b];
-                var_cat_B[b] = temp;
-            }
+
+            string a = diff_vars[0];
+            string b = diff_vars[1];
+            VarTag temp  = var_cat_B[a];
+            var_cat_B[a] = var_cat_B[b];
+            var_cat_B[b] = temp;
+
+            // check if this swap fixes the scheduling tags
+            bool same_pure_def_tags_after_dummy_swap = true;
             for (it=var_cat_B.begin(); it!=var_cat_B.end(); it++) {
-                same_pure_def_tags_after_dummy_swap &= (it->second == var_cat_A[it->first]);
+                same_pure_def_tags_after_dummy_swap &=
+                    it->second.check_granularity(var_cat_A[it->first]);
             }
 
-            // actually apply dimension transposes because they will fix the dimensions
+            // actually apply dimension transposes if the test run above
+            // suggests that scheduling tags will be fixed by the swap
             if (same_pure_def_tags_after_dummy_swap) {
-                for (int i=0; i<var_swaps.size(); i++) {
-                    string a = var_swaps[i].first;
-                    string b = var_swaps[i].second;
-                    transpose_function_dimensions(fB, a, b, func_list);
-                }
+                transpose_function_dimensions(fB, diff_vars[0],
+                        diff_vars[1], func_list);
                 same_pure_def_tags = true;
             }
 
         } while (!same_pure_def_tags && next_permutation(diff_vars.begin(), diff_vars.end()));
     }
 
-    return (same_func_tags && same_pure_def_tags);
+    return same_pure_def_tags;
 }
 
 

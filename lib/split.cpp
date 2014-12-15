@@ -1673,6 +1673,8 @@ void RecFilter::split(RecFilterDim x, int tx, RecFilterDim y, int ty, RecFilterD
 // -----------------------------------------------------------------------------
 
 void RecFilter::finalize(void) {
+    contents.ptr->finalized = true;
+
     map<string,RecFilterFunc>::iterator fit;
 
     if (contents.ptr->tiled) {
@@ -1711,7 +1713,13 @@ void RecFilter::finalize(void) {
             }
         }
 
-        // platform specific optimization
+        // no more optimizations if debug mode
+        if (contents.ptr->target.has_feature(Target::Debug)) {
+            cerr << "debug mode" << endl;
+            return;
+        }
+
+        // GPU optimization
         if (contents.ptr->target.has_gpu_feature()) {
             for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
                 RecFilterFunc& rF = fit->second;
@@ -1728,19 +1736,15 @@ void RecFilter::finalize(void) {
                 }
 
             }
-        }
-    }
+        } else { // CPU optimizations
 
-    // CPU optimizations to be performed with out without tiling
-    if (!contents.ptr->target.has_gpu_feature()) {
-        // inline all reindexing functions
-        for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-            if (fit->second.func_category == REINDEX) {
-                inline_func(fit->second.func.name());
-                fit = contents.ptr->func.begin();            // list changed, start all over again
+            // inline all reindexing functions
+            for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+                if (fit->second.func_category == REINDEX) {
+                    inline_func(fit->second.func.name());
+                    fit = contents.ptr->func.begin();            // list changed, start all over again
+                }
             }
         }
     }
-
-    contents.ptr->finalized = true;
 }

@@ -474,6 +474,10 @@ void RecFilter::compile_jit(string filename) {
     contents.ptr->compiled = true;
 }
 
+void RecFilter::set_debug_target(void) {
+    contents.ptr->target.set_feature(Target::Debug);
+}
+
 double RecFilter::realize(Buffer out, int iterations) {
     if (!contents.ptr->compiled) {
         compile_jit();
@@ -488,6 +492,7 @@ double RecFilter::realize(Buffer out, int iterations) {
         all_inline &= all_funcs[i].function().schedule().compute_level().is_inline();
     }
     for (int i=0; all_inline && i<all_funcs.size(); i++) {
+        cerr << "Warning: setting " << all_funcs[i].name() << " to compute root" << endl;
         all_funcs[i].compute_root();
     }
 
@@ -578,9 +583,7 @@ string RecFilter::print_schedule(void) const {
             }
             s << ";\n";
         }
-        s << "\n";
     }
-    s << "\n";
     return s.str();
 }
 

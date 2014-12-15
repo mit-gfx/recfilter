@@ -315,6 +315,14 @@ int VarTag::check(const VariableTag &t) const {
     return check(VarTag(t));
 }
 
+int VarTag::check_granularity(const VarTag &t) const {
+    int a = check(INNER) && t.check(INNER);
+    int b = check(TAIL ) && t.check(TAIL );
+    int c = check(FULL ) && t.check(FULL );
+    int d = check(OUTER) && t.check(OUTER);
+    return (a || b || c || d);
+}
+
 int VarTag::count(void) const {
     VariableTag t_count = static_cast<VariableTag>(static_cast<int>(tag) & 0x0000000f);
     int t_int;
