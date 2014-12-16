@@ -1,39 +1,35 @@
 MKDIR=mkdir -p
 BIN_DIR=../bin/
+RM=rm -f
+CP=cp -f
+MAKE=make -C
 
-all: scripts
-	make -C ../lib -j8
-	make -C test_correctness -j8
-	make -C boxcar
-	make -C gaussian_box -j8
-	make -C gaussian_vyv -j8
-	make -C benchmarks -j8
-	make -C ls_hist
-	make -C audio_filter
-	make -C cpu
-	make -C gpu
-	make -C opencl
+all:
+	$(MKDIR) $(BIN_DIR)
+	$(MAKE) ../lib -j8
+	$(MAKE) tests -j8
+	$(MAKE) boxcar
+	$(MAKE) gaussian_box -j8
+	$(MAKE) gaussian_vyv -j8
+	$(MAKE) benchmarks -j8
+	$(MAKE) ls_hist
+	$(MAKE) audio_filter
+	$(MAKE) cpu
+	$(MAKE) gpu
+	$(MAKE) opencl
+	$(CP) opencl_profile.sh $(BIN_DIR)/
+	$(CP) cuda_profile.sh $(BIN_DIR)/
 
 clean:
-	make -C ../lib clean
-	make -C boxcar clean
-	make -C ls_hist clean
-	make -C gaussian_box clean
-	make -C gaussian_vyv clean
-	make -C test_correctness clean
-	make -C benchmarks clean
-	make -C audio_filter clean
-	make -C cpu clean
-	make -C gpu clean
-	make -C opencl clean
-	rm -f $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh
-
-scripts: $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh
-
-$(BIN_DIR)/opencl_profile.sh: opencl_profile.sh
-	@$(MKDIR) $(BIN_DIR)
-	cp opencl_profile.sh $(BIN_DIR)/
-
-$(BIN_DIR)/cuda_profile.sh: cuda_profile.sh
-	@$(MKDIR) $(BIN_DIR)
-	cp cuda_profile.sh $(BIN_DIR)/
+	$(MAKE) ../lib clean
+	$(MAKE) tests clean
+	$(MAKE) boxcar clean
+	$(MAKE) ls_hist clean
+	$(MAKE) gaussian_box clean
+	$(MAKE) gaussian_vyv clean
+	$(MAKE) benchmarks clean
+	$(MAKE) audio_filter clean
+	$(MAKE) cpu clean
+	$(MAKE) gpu clean
+	$(MAKE) opencl clean
+	$(RM) $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh
