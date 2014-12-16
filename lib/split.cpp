@@ -1556,31 +1556,6 @@ void RecFilter::split(map<string,int> dim_tile) {
     }
 
     // change the original function to index into the final term
-    // if (contents.ptr->target.has_gpu_feature()) {
-    //     Function F_final = rF_final.func;
-    //     vector<string> args = F_final.args();
-    //     vector<Expr> values;
-    //     vector<Expr> call_args;
-    //     for (int i=0; i<args.size(); i++) {
-    //         call_args.push_back(Var(args[i]));
-    //     }
-    //     for (int i=0; i<F_final.outputs(); i++) {
-    //         values.push_back(Call::make(F_final, call_args, i));
-    //     }
-    //     F.clear_all_definitions();
-    //     F.define(args, values);
-
-    //     // remove the scheduling tags of the update defs
-    //     rF.func_category = REINDEX;
-    //     rF.callee_func = F_final.name();
-    //     rF.update_var_category.clear();
-    // } else {
-    //     rF = create_copy(rF_final, contents.ptr->name);
-    //     recfilter_func_list.erase(rF_final.func.name());
-    // }
-    // recfilter_func_list.insert(make_pair(rF.func.name(), rF));
-
-    // change the original function to index into the final term
     {
         Function F_final = rF_final.func;
         vector<string> args = F.args();
@@ -1711,38 +1686,39 @@ void RecFilter::finalize(void) {
             }
         }
 
-        // GPU optimization
-        if (contents.ptr->target.has_gpu_feature()) {
-            for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-                RecFilterFunc& rF = fit->second;
+        for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+            RecFilterFunc& rF = fit->second;
 
-                // move initialization to update def in intra tile computation stages
-                // add padding to intra tile terms to avoid bank conflicts
+            // move initialization to update def in intra tile computation stages
+            // add padding to intra tile terms to avoid bank conflicts
 
-                if (rF.func_category==INTRA_1 && rF.func.has_update_definition()) {
-                    move_init_to_update_def(rF, recfilter_split_info);
-                }
-                if (rF.func_category==INTRA_N && rF.func.has_update_definition()) {
-                    move_init_to_update_def(rF, recfilter_split_info);
+            if (rF.func_category==INTRA_1 && rF.func.has_update_definition()) {
+                move_init_to_update_def(rF, recfilter_split_info);
+            }
+            if (rF.func_category==INTRA_N && rF.func.has_update_definition()) {
+                move_init_to_update_def(rF, recfilter_split_info);
+                if (contents.ptr->target.has_gpu_feature()) {
                     add_padding_to_avoid_bank_conflicts(rF, recfilter_split_info, true);
                 }
-
-            }
-        } else { // CPU optimizations
-
-            // inline all reindexing functions
-            for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-                if (fit->second.func_category == REINDEX) {
-                    inline_func(fit->second.func.name());
-                    fit = contents.ptr->func.begin();            // list changed, start all over again
-                }
-            }
-
-            for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-                Func(fit->second.func).compute_root();
-                fit->second.pure_schedule.push_back("compute_root()");
             }
         }
+
+        /// else { // CPU optimizations
+
+        ///     // inline all reindexing functions
+        ///     for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+        ///             if (fit->second.func_category == REINDEX) {
+        ///                 inline_func(fit->second.func.name());
+        ///                 fit = contents.ptr->func.begin();            // list changed, start all over again
+        ///             }
+        ///         }
+
+        ///         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+        ///             Func(fit->second.func).compute_root();
+        ///             fit->second.pure_schedule.push_back("compute_root()");
+        ///         }
+        ///     }
     }
+
     contents.ptr->finalized = true;
 }

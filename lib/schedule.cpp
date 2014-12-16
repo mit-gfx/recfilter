@@ -85,7 +85,7 @@ map<int,VarOrRVar> RecFilterSchedule::var_by_tag(RecFilterFunc f, VarTag vtag) {
 
 // -----------------------------------------------------------------------------
 
-RecFilterSchedule& RecFilterSchedule::compute_globally() {
+RecFilterSchedule& RecFilterSchedule::compute_globally(void) {
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
@@ -103,7 +103,7 @@ RecFilterSchedule& RecFilterSchedule::compute_globally() {
     return *this;
 }
 
-RecFilterSchedule& RecFilterSchedule::compute_locally() {
+RecFilterSchedule& RecFilterSchedule::compute_locally(void) {
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
@@ -113,6 +113,8 @@ RecFilterSchedule& RecFilterSchedule::compute_locally() {
             continue;
         }
 
+        Var outer_var;
+
         // find the reindexing functions associated with this function
         // function that calls this function must be computed in the global mem
         Func callee_func;
@@ -120,18 +122,33 @@ RecFilterSchedule& RecFilterSchedule::compute_locally() {
             RecFilterFunc& rf = recfilter.internal_function(func_list[i]);
             if (rf.func_category == REINDEX && rf.callee_func==F.name()) {
                 if (callee_func.defined()) {
-                    cerr << F.name() << " cannot be computed in shared mem "
+                    cerr << F.name() << " cannot be computed locally in another function "
                         << "because it is called by multiple functions" << endl;
                     assert(false);
                 }
                 callee_func = Func(rf.func);
                 callee_func.compute_root();
                 rf.pure_schedule.push_back("compute_root()");
+
+                // compute the function inside the first outer var for CPU schedule
+                // compute the function inside the first GPU block var for GPU schedule
+                if (recfilter.target().has_gpu_feature()) {
+                    outer_var = Var::gpu_blocks();
+                } else{
+                    map<int,VarOrRVar> outer_vlist = var_by_tag(rf, VarTag(OUTER,0));
+                    if (outer_vlist.find(PURE_DEF) == outer_vlist.end()) {
+                        cerr << F.name() << " cannot be computed locally in another function "
+                            << "because the function calling it does not seem to have outer "
+                            << "variable where " << F.name() << " can be computed" << endl;
+                        assert(false);
+                    }
+                    outer_var = outer_vlist.find(PURE_DEF)->second.var;
+                }
             }
         }
 
         if (!callee_func.defined()) {
-            cerr << F.name() << " cannot be computed in shared mem "
+            cerr << F.name() << " cannot be computed in locally in another function "
                 << "because it is not called by any function" << endl;
             assert(false);
         }
@@ -140,17 +157,13 @@ RecFilterSchedule& RecFilterSchedule::compute_locally() {
         for (int i=0; i<func_list.size(); i++) {
             RecFilterFunc& rf = recfilter.internal_function(func_list[i]);
             if (rf.func_category==REINDEX && rf.caller_func==F.name()) {
-                Func(rf.func).compute_at(callee_func, Var::gpu_blocks());
-                stringstream s;
-                s << "compute_at(" << callee_func.name() << ", Var::gpu_blocks())";
-                rf.pure_schedule.push_back(s.str());
+                Func(rf.func).compute_at(callee_func, outer_var);
+                rf.pure_schedule.push_back("compute_at("+callee_func.name()+","+outer_var.name());
             }
         }
 
-        F.compute_at(callee_func, Var::gpu_blocks());
-        stringstream s;
-        s << "compute_at(" << callee_func.name() << ", Var::gpu_blocks())";
-        rF.pure_schedule.push_back(s.str());
+        F.compute_at(callee_func, outer_var);
+        rF.pure_schedule.push_back("compute_at("+callee_func.name()+","+outer_var.name());
     }
     return *this;
 }
