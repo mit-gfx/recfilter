@@ -289,40 +289,47 @@ static void extract_tails_from_each_scan(RecFilterFunc& rF_intra, vector<SplitIn
  * max in the first dimension; this serves to padding the shared memory buffer
  * which in turns helps resolve bank conflicts
  */
-static void add_padding_to_avoid_bank_conflicts(
-        RecFilterFunc rF,
-        vector<SplitInfo> split_info,
-        bool flag)
-{
-    // bank conflicts expected if there are scans in multiple dimensions
+static void add_padding_to_avoid_bank_conflicts(Function F, vector<SplitInfo> split_info) {
+    // bank conflicts expected only if there are some tiled scans
+    // else nothing to do
     if (split_info.size()<=1) {
         return;
     }
 
-    Function F = rF.func;
+    string var;
+    int tile_width = 0;
+    int tail_width = 0;
+    int padding    = 0;
 
-    // map inner var of first dimension to tile width +
-    // map inner vars of all other dimensions to 0
-    map<string,Expr> var_val;
-    for (int i=0; i<split_info.size(); i++) {
+    // find the first dimension with a tiled scan
+    for (int i=0; var.empty() && i<split_info.size(); i++) {
         if (split_info[i].num_scans>0) {
-            string x = split_info[i].inner_var.name();
-            if (var_val.empty()) {
-                var_val[x] = split_info[i].tile_width;
-                if (flag) {
-                    var_val[x] += split_info[i].filter_order*split_info[i].num_scans+1;
-                }
-            } else {
-                var_val[x] = 0;
-            }
+            var = split_info[i].inner_var.name();
+            tile_width = split_info[i].tile_width;
+            tail_width = split_info[i].filter_order*split_info[i].num_scans;
         }
     }
 
+    // bank conflicts expected only if there are some tiled scans
+    // else nothing to do
+    if (var.empty()) {
+        return;
+    }
+
+    // the total size of shared mem in this dimension must be an odd number
+    if (tile_width+tail_width % 2) {
+        padding = tile_width+tail_width+1;
+    } else {
+        padding = tile_width+tail_width+2;
+    }
+
+    // map inner var of first dimension to the extent computed above
+    // map inner vars of all other dimensions to 0
     vector<Expr> args;
     for (int i=0; i<F.args().size(); i++) {
         string a = F.args()[i];
-        if (var_val.find(a) != var_val.end()) {
-            args.push_back(var_val.find(a)->second);
+        if (a == var) {
+            args.push_back(padding);
         } else {
             args.push_back(Var(a));
         }
@@ -487,7 +494,7 @@ static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> 
                 } else {
                     values[j] += Cast::make(type,feedback[k]) *
                         select(rxi[filter_dim]>k,
-                            Call::make(F_intra,call_args,j), make_zero(type));
+                                Call::make(F_intra,call_args,j), make_zero(type));
                 }
             }
         }
@@ -1451,7 +1458,7 @@ void RecFilter::split(map<string,int> dim_tile) {
             // check that there are scans in this dimension
             if (contents.ptr->filter_info[i].scan_id.empty()) {
                 cerr << "No scans to tile in dimension "
-                     << contents.ptr->filter_info[i].var.name() << endl;
+                    << contents.ptr->filter_info[i].var.name() << endl;
                 assert(false);
             }
 
@@ -1707,7 +1714,7 @@ void RecFilter::finalize(void) {
             if (rF.func_category==INTRA_N && rF.func.has_update_definition()) {
                 convert_pure_def_into_first_update_def(rF, recfilter_split_info);
                 if (contents.ptr->target.has_gpu_feature()) {
-                    add_padding_to_avoid_bank_conflicts(rF, recfilter_split_info, true);
+                    add_padding_to_avoid_bank_conflicts(rF.func, recfilter_split_info);
                 }
             }
         }
