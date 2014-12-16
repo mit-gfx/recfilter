@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
         {
             cerr << "Non-tiled version, order = " << order << ", array size = " << width;
 
-            filter.intra_schedule().compute_in_global();
+            filter.intra_schedule().compute_globally();
 
             filter.compile_jit();
 
@@ -71,8 +71,8 @@ int main(int argc, char **argv) {
             cerr << "Tiled version, order = " << order << ", array size = " << width;
             filter.split(x, tile_width);
 
-            filter.intra_schedule().compute_in_global().parallel(filter.outer(0));
-            filter.inter_schedule().compute_in_global();
+            filter.intra_schedule().compute_globally().parallel(filter.outer(0));
+            filter.inter_schedule().compute_globally();
 
             filter.compile_jit();
 

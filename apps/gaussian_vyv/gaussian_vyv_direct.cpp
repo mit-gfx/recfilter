@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    F.intra_schedule().compute_in_global()
+    F.intra_schedule().compute_globally()
         .split    (F.full(0), VECTORIZE_WIDTH)
         .vectorize(F.full(0).split_var())
         .parallel (F.full(0));
@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
         } else {
 
 #if SPLIT
-            f.intra_schedule().compute_in_global()
+            f.intra_schedule().compute_globally()
                 .reorder_storage(f.full(), f.inner(), f.outer())
                 .reorder  (f.inner_scan(), f.full(), f.outer())
                 .split    (f.full(0), VECTORIZE_WIDTH)
@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
                 .parallel (f.outer(0))
                 ;
 
-            f.inter_schedule().compute_in_global()
+            f.inter_schedule().compute_globally()
                 .reorder_storage(f.full(), f.tail(), f.outer())
                 .reorder  (f.outer_scan(), f.tail(), f.full())
                 .split    (f.full(0), VECTORIZE_WIDTH)
@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
                 .parallel (f.full(0))
                 ;
 #else
-            f.intra_schedule().compute_in_global()
+            f.intra_schedule().compute_globally()
                 .split    (f.full(0), VECTORIZE_WIDTH)
                 .vectorize(f.full(0).split_var())
                 .parallel (f.full(0))

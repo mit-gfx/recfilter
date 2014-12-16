@@ -91,19 +91,19 @@ int main(int argc, char **argv) {
             .split(x.var(), x.var(), xi,VECTORIZE_WIDTH)
             .vectorize(xi).parallel(x.var()).parallel(y.var());
 
-        F_non_tiled.intra_schedule().compute_in_global()
+        F_non_tiled.intra_schedule().compute_globally()
             .reorder(F_non_tiled.inner_scan(), F_non_tiled.full())
             .split(F_non_tiled.full(0), VECTORIZE_WIDTH)
             .vectorize(F_non_tiled.full(0).split_var())
             .parallel(F_non_tiled.full(0));
 
-//        F_tiled.intra_schedule().compute_in_global()
+//        F_tiled.intra_schedule().compute_globally()
 //            .reorder  (F_tiled.inner_scan(), F_tiled.full())
 //            .split    (F_tiled.full(0), VECTORIZE_WIDTH)
 //            .vectorize(F_tiled.full(0).split_var())
 //            .parallel (F_tiled.full(0));
 //
-//        F_tiled.inter_schedule().compute_in_global()
+//        F_tiled.inter_schedule().compute_globally()
 //            .reorder  (F_tiled.outer_scan(), F_tiled.full())
 //            .split    (F_tiled.full(0), VECTORIZE_WIDTH)
 //            .vectorize(F_tiled.full(0).split_var())

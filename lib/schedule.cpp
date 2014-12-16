@@ -85,7 +85,7 @@ map<int,VarOrRVar> RecFilterSchedule::var_by_tag(RecFilterFunc f, VarTag vtag) {
 
 // -----------------------------------------------------------------------------
 
-RecFilterSchedule& RecFilterSchedule::compute_in_global() {
+RecFilterSchedule& RecFilterSchedule::compute_globally() {
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
@@ -103,7 +103,7 @@ RecFilterSchedule& RecFilterSchedule::compute_in_global() {
     return *this;
 }
 
-RecFilterSchedule& RecFilterSchedule::compute_in_shared() {
+RecFilterSchedule& RecFilterSchedule::compute_locally() {
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);

@@ -368,8 +368,8 @@ private:
 public:
     RecFilterSchedule(RecFilter& r, std::vector<std::string> fl);
 
-    RecFilterSchedule& compute_in_global();
-    RecFilterSchedule& compute_in_shared();
+    RecFilterSchedule& compute_globally();
+    RecFilterSchedule& compute_locally();
 
     RecFilterSchedule& split(VarTag v, int factor);
 
