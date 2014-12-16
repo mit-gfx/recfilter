@@ -69,6 +69,59 @@ static map<string, RecFilterFunc> recfilter_func_list;
 
 // -----------------------------------------------------------------------------
 
+/** Convert the pure def into the first update def leave the pure def undefined */
+static void convert_pure_def_into_first_update_def(RecFilterFunc& rF, vector<SplitInfo> split_info) {
+    assert(!split_info.empty());
+
+    Function F = rF.func;
+
+    vector<string> pure_args = F.args();
+    vector<Expr> values = F.values();
+    vector<UpdateDefinition> updates = F.updates();
+
+    // scheduling tags for the new update def are same as pure def
+    map<string,VarTag> update_var_category = rF.pure_var_category;
+
+    // leave the pure def undefined
+    vector<Expr> undef_values(F.outputs(), undef(split_info[0].type));
+    F.clear_all_definitions();
+    F.define(pure_args, undef_values);
+
+    // initialize the buffer in the first update def
+    // replace the scheduling tags of xi by rxi
+    {
+        vector<Expr> args;
+        for (int j=0; j<pure_args.size(); j++) {
+            args.push_back(Var(pure_args[j]));
+        }
+        for (int i=0; i<split_info.size(); i++) {
+            Var  xo   = split_info[i].outer_var;
+            Var  xi   = split_info[i].inner_var;
+            RVar rxi  = split_info[i].inner_rdom[ split_info[i].filter_dim ];
+            for (int j=0; j<args.size(); j++) {
+                args[j] = substitute(xi.name(), rxi, args[j]);
+            }
+            for (int j=0; j<values.size(); j++) {
+                values[j] = substitute(xi.name(), rxi, values[j]);
+            }
+            update_var_category.insert(make_pair(rxi.name(), update_var_category[xi.name()]));
+            update_var_category.erase(xi.name());
+        }
+        F.define_update(args, values);
+    }
+
+    // add all the other scans
+    for (int i=0; i<updates.size(); i++) {
+        F.define_update(updates[i].args, updates[i].values);
+    }
+
+    // add the scheduling tags for the new update def in front of tags for
+    // all other update defs
+    rF.update_var_category.insert(rF.update_var_category.begin(), update_var_category);
+}
+
+// -----------------------------------------------------------------------------
+
 
 /** @brief Weight coefficients (tail_size x tile_width) for
  * applying scans corresponding to split indices split_id1 to
@@ -145,58 +198,6 @@ static vector<FilterInfo> group_scans_by_dimension(Function F, vector<FilterInfo
     }
 
     return new_filter_info;
-}
-
-// -----------------------------------------------------------------------------
-
-static void move_init_to_update_def(RecFilterFunc& rF, vector<SplitInfo> split_info) {
-    assert(!split_info.empty());
-
-    Function F = rF.func;
-
-    vector<string> pure_args = F.args();
-    vector<Expr> values = F.values();
-    vector<UpdateDefinition> updates = F.updates();
-
-    // scheduling tags for the new update def are same as pure def
-    map<string,VarTag> update_var_category = rF.pure_var_category;
-
-    // leave the pure def undefined
-    vector<Expr> undef_values(F.outputs(), undef(split_info[0].type));
-    F.clear_all_definitions();
-    F.define(pure_args, undef_values);
-
-    // initialize the buffer in the first update def
-    // replace the scheduling tags of xi by rxi
-    {
-        vector<Expr> args;
-        for (int j=0; j<pure_args.size(); j++) {
-            args.push_back(Var(pure_args[j]));
-        }
-        for (int i=0; i<split_info.size(); i++) {
-            Var  xo   = split_info[i].outer_var;
-            Var  xi   = split_info[i].inner_var;
-            RVar rxi  = split_info[i].inner_rdom[ split_info[i].filter_dim ];
-            for (int j=0; j<args.size(); j++) {
-                args[j] = substitute(xi.name(), rxi, args[j]);
-            }
-            for (int j=0; j<values.size(); j++) {
-                values[j] = substitute(xi.name(), rxi, values[j]);
-            }
-            update_var_category.insert(make_pair(rxi.name(), update_var_category[xi.name()]));
-            update_var_category.erase(xi.name());
-        }
-        F.define_update(args, values);
-    }
-
-    // add all the other scans
-    for (int i=0; i<updates.size(); i++) {
-        F.define_update(updates[i].args, updates[i].values);
-    }
-
-    // add the scheduling tags for the new update def in front of tags for
-    // all other update defs
-    rF.update_var_category.insert(rF.update_var_category.begin(), update_var_category);
 }
 
 // -----------------------------------------------------------------------------
@@ -284,7 +285,15 @@ static void extract_tails_from_each_scan(RecFilterFunc& rF_intra, vector<SplitIn
 
 // -----------------------------------------------------------------------------
 
-static void add_padding_to_avoid_bank_conflicts(RecFilterFunc rF, vector<SplitInfo> split_info, bool flag) {
+/** Add an extra update def which assigns an undefined value to 1 pixel beyond the
+ * max in the first dimension; this serves to padding the shared memory buffer
+ * which in turns helps resolve bank conflicts
+ */
+static void add_padding_to_avoid_bank_conflicts(
+        RecFilterFunc rF,
+        vector<SplitInfo> split_info,
+        bool flag)
+{
     // bank conflicts expected if there are scans in multiple dimensions
     if (split_info.size()<=1) {
         return;
@@ -1693,10 +1702,10 @@ void RecFilter::finalize(void) {
             // add padding to intra tile terms to avoid bank conflicts
 
             if (rF.func_category==INTRA_1 && rF.func.has_update_definition()) {
-                move_init_to_update_def(rF, recfilter_split_info);
+                convert_pure_def_into_first_update_def(rF, recfilter_split_info);
             }
             if (rF.func_category==INTRA_N && rF.func.has_update_definition()) {
-                move_init_to_update_def(rF, recfilter_split_info);
+                convert_pure_def_into_first_update_def(rF, recfilter_split_info);
                 if (contents.ptr->target.has_gpu_feature()) {
                     add_padding_to_avoid_bank_conflicts(rF, recfilter_split_info, true);
                 }
@@ -1722,3 +1731,5 @@ void RecFilter::finalize(void) {
 
     contents.ptr->finalized = true;
 }
+
+

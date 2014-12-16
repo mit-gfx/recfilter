@@ -12,6 +12,7 @@ using std::pair;
 using std::make_pair;
 
 using namespace Halide;
+using namespace Halide::Internal;
 
 #define PURE_DEF  (-1)
 
@@ -27,14 +28,53 @@ static const VarOrRVar GPU_BLOCK[] = {
     VarOrRVar("__block_id_z",false),
 };
 
+// -----------------------------------------------------------------------------
+
+/** Remove the pure def of a Function and arithmetically add it to
+ * the expression of the first update def; leaving the pure def undefined */
+static void add_pure_def_to_first_update_def(Function f) {
+    vector<string> args   = f.args();
+    vector<Expr>   values = f.values();
+    vector<UpdateDefinition> updates = f.updates();
+
+    // nothing to do if function has no update defs
+    if (!updates.empty()) {
+
+        // add pure def to the first update def
+        for (int j=0; j<updates[0].values.size(); j++) {
+            // replace pure args by update def args in the pure value
+            Expr val = values[j];
+            for (int k=0; k<args.size(); k++) {
+                val = substitute(args[k], updates[0].args[k], val);
+            }
+
+            // remove let statements in the expression because we need to
+            // compare calling args
+            updates[0].values[j] = remove_lets(updates[0].values[j]);
+
+            // remove call to current pixel of the function
+            updates[0].values[j] = substitute_func_call_with_args(f.name(),
+                    updates[0].args, val, updates[0].values[j]);
+        }
+
+        // set all pure defs to zero or undef
+        for (int i=0; i<values.size(); i++) {
+            values[i] = undef(f.output_types()[i]);
+        }
+
+        f.clear_all_definitions();
+        f.define(args, values);
+        for (int i=0; i<updates.size(); i++) {
+            f.define_update(updates[i].args, updates[i].values);
+        }
+    }
+}
 
 // -----------------------------------------------------------------------------
 
 RecFilterSchedule::RecFilterSchedule(RecFilter& r, vector<string> fl) :
     recfilter(r), func_list(fl) {}
 
-
-// -----------------------------------------------------------------------------
 
 map< int,vector<VarOrRVar> > RecFilterSchedule::var_list_by_tag(RecFilterFunc f, VarTag vtag) {
     map< int,vector<VarOrRVar> > var_list;
@@ -94,7 +134,7 @@ RecFilterSchedule& RecFilterSchedule::compute_globally(void) {
         // compute_root to avoid extra kernel execution for initializing
         // the output buffer
         if (F.has_update_definition()) {
-            move_pure_def_to_update(F.function());
+            add_pure_def_to_first_update_def(F.function());
         }
 
         F.compute_root();
@@ -169,6 +209,13 @@ RecFilterSchedule& RecFilterSchedule::compute_locally(void) {
 }
 
 RecFilterSchedule& RecFilterSchedule::parallel(VarTag vtag) {
+    if (recfilter.target().has_gpu_feature()) {
+        cerr << "Cannot use RecFilterSchedule::parallel() if compilation "
+             << "target is GPU; use RecFilterSchedule::gpu_blocks() or "
+             << "RecFilterSchedule::gpu_threads()" << endl;
+        assert(false);
+    }
+
     if (vtag.check(SCAN)) {
         cerr << "Cannot create parallel threads from scan variable" << endl;
         assert(false);
@@ -271,6 +318,12 @@ RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag v1, VarTag v2) {
 }
 
 RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag v1, VarTag v2, VarTag v3) {
+    if (!recfilter.target().has_gpu_feature()) {
+        cerr << "Cannot use RecFilterSchedule::gpu_blocks() if compilation "
+             << "target is not GPU; use RecFilterSchedule::parallel()" << endl;
+        assert(false);
+    }
+
     if (v1.check(SCAN) || v2.check(SCAN) || v3.check(SCAN)) {
         cerr << "Cannot map a scan variable to parallel GPU blocks" << endl;
         assert(false);
@@ -350,6 +403,12 @@ RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag v1, VarTag v2) {
 }
 
 RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag v1, VarTag v2, VarTag v3) {
+    if (!recfilter.target().has_gpu_feature()) {
+        cerr << "Cannot use RecFilterSchedule::gpu_threads() if compilation "
+             << "target is not GPU; use RecFilterSchedule::parallel()" << endl;
+        assert(false);
+    }
+
     if (v1.check(SCAN) || v2.check(SCAN) || v3.check(SCAN)) {
         cerr << "Cannot map a scan variable to parallel threads" << endl;
         assert(false);
@@ -628,102 +687,3 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
     }
     return *this;
 }
-
-
-/// RecFilterSchedule& RecFilterSchedule::gpu_tile(vector< pair<VarTag,int> > vtag) {
-///     if (vtag.empty() || vtag.size()>3) {
-///         cerr << "GPU thread/block grid dimensions must be between 1 and 3" << endl;
-///         assert(false);
-///     }
-///
-///     for (int i=0; i<vtag.size(); i++) {
-///         if (vtag[i].first & SCAN) {
-///             cerr << "Cannot create parallel GPU tiles from a scan variable" << endl;
-///             assert(false);
-///         }
-///
-///         for (int j=i+1; j<vtag.size(); j++) {
-///             if (vtag[i].first == vtag[j].first) {
-///                 cerr << "Same variable tag mapped to multiple GPU block/thread tiling factors" << endl;
-///                 assert(false);
-///             }
-///         }
-///     }
-///
-///     for (int j=0; j<func_list.size(); j++) {
-///         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
-///         Func            F = Func(rF.func);
-///
-///         map< int,vector<pair<VarOrRVar,int> > > vars;
-///
-///         for (int i=0; i<vtag.size(); i++) {
-///             map<int, vector<VarOrRVar> > vars_x = var_list_by_tag(rF, vtag[i].first);
-///             map<int, vector<VarOrRVar> >::iterator vit;
-///             for (vit=vars_x.begin(); vit!=vars_x.end(); vit++) {
-///                 for (int k=0; k<vit->second.size(); k++) {
-///                     vars[vit->first].push_back(make_pair(vit->second[k], vtag[i].second));
-///                 }
-///             }
-///         }
-///
-///         map< int,vector< pair<VarOrRVar,int> > >::iterator vit;
-///         for (vit=vars.begin(); vit!=vars.end(); vit++) {
-///             int def = vit->first;
-///             vector< pair<VarOrRVar,int> > var_list = vit->second;
-///             stringstream s;
-///
-///             if (var_list.size()) {
-///                 s << "gpu_tile(";
-///                 for (int i=0; i<var_list.size(); i++) {
-///                     if (i>0) {
-///                         s << ",";
-///                     }
-///                     s << "Var(\"" << var_list[i].first.name() << "\")";
-///                 }
-///                 for (int i=0; i<var_list.size(); i++) {
-///                     s << var_list[i].second;
-///                 }
-///                 s << ")";
-///
-///                 // only support up to 3 variables
-///                 if (def==PURE_DEF) {
-///                     switch (var_list.size()) {
-///                         case 1: F.gpu_tile(var_list[0].first,
-///                                         var_list[0].second); break;
-///                         case 2: F.gpu_tile(var_list[0].first,
-///                                         var_list[1].first,
-///                                         var_list[0].second,
-///                                         var_list[1].second); break;
-///                         case 3: F.gpu_tile(var_list[0].first,
-///                                         var_list[1].first,
-///                                         var_list[2].first,
-///                                         var_list[0].second,
-///                                         var_list[1].second,
-///                                         var_list[2].second); break;
-///                         default:cerr << "Too many variables in gpu_tile()" << endl; assert(false); break;
-///                     }
-///                     rF.pure_schedule.push_back(s.str());
-///                 } else {
-///                     switch (var_list.size()) {
-///                         case 1: F.update(def).gpu_tile(var_list[0].first,
-///                                         var_list[0].second); break;
-///                         case 2: F.update(def).gpu_tile(var_list[0].first,
-///                                         var_list[1].first,
-///                                         var_list[0].second,
-///                                         var_list[1].second); break;
-///                         case 3: F.update(def).gpu_tile(var_list[0].first,
-///                                         var_list[1].first,
-///                                         var_list[2].first,
-///                                         var_list[0].second,
-///                                         var_list[1].second,
-///                                         var_list[2].second); break;
-///                         default:cerr << "Too many variables in gpu_tile()" << endl; assert(false); break;
-///                     }
-///                     rF.update_schedule[def].push_back(s.str());
-///                 }
-///             }
-///         }
-///     }
-///     return *this;
-/// }
-

@@ -681,44 +681,6 @@ public:
 
 // -----------------------------------------------------------------------------
 
-void move_pure_def_to_update(Function f) {
-    vector<string> args   = f.args();
-    vector<Expr>   values = f.values();
-    vector<UpdateDefinition> updates = f.updates();
-
-    // nothing to do if function has no update defs
-    if (!updates.empty()) {
-
-        // add pure def to the first update def
-        for (int j=0; j<updates[0].values.size(); j++) {
-            // replace pure args by update def args in the pure value
-            Expr val = values[j];
-            for (int k=0; k<args.size(); k++) {
-                val = substitute(args[k], updates[0].args[k], val);
-            }
-
-            // remove let statements in the expression because we need to
-            // compare calling args
-            updates[0].values[j] = remove_lets(updates[0].values[j]);
-
-            // remove call to current pixel of the function
-            updates[0].values[j] = substitute_func_call_with_args(f.name(),
-                    updates[0].args, val, updates[0].values[j]);
-        }
-
-        // set all pure defs to zero or undef
-        for (int i=0; i<values.size(); i++) {
-            values[i] = undef(f.output_types()[i]);
-        }
-
-        f.clear_all_definitions();
-        f.define(args, values);
-        for (int i=0; i<updates.size(); i++) {
-            f.define_update(updates[i].args, updates[i].values);
-        }
-    }
-}
-
 bool expr_depends_on_var(Expr expr, string var) {
     ExprDependsOnVar depends(var);
     expr.accept(&depends);
