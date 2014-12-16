@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
 
     // innermost: unrolled dimensions, then gpu_thread dimensions, then gpu_block dimensions
 
-    F.intra_schedule().compute_in_shared()
+    F.intra_schedule().compute_locally()
         .reorder_storage(F.tail(), F.inner(), F.outer())
         .unroll         (F.tail())
         .unroll         (F.inner_scan());
@@ -142,7 +142,7 @@ int main(int argc, char **argv) {
         .gpu_threads    (F.outer(0).split_var(), F.inner(0))
         .gpu_blocks     (F.outer(0), F.outer(1));
 
-    F.inter_schedule().compute_in_global()
+    F.inter_schedule().compute_globally()
         .reorder_storage(F.inner(), F.tail(), F.outer())
         .unroll         (F.outer_scan())
         .split          (F.outer(0), 2)
