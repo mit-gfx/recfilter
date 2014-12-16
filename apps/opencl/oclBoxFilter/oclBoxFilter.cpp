@@ -136,11 +136,12 @@ int main(int argc, char** argv)
     printf("Devices Available = %u\n", uiNumDevices);
     for (int i=0; i<uiNumDevices; i++) {
         ciErrNum = clGetDeviceInfo(cdDevices[i], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(uiNumComputeUnits), &uiNumComputeUnits, NULL);
-        printf("Device %u: # of Compute Units = %u ", i, uiNumComputeUnits);
+        printf("Device %u: ", i);
         oclPrintDevName(LOGBOTH, cdDevices[i]);
         oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+        printf(" Compute Units = %u\n", uiNumComputeUnits);
     }
-    printf("Using Device %u: ", uiTargetDevice);
+    printf("Using Device %u: \n", uiTargetDevice);
 
     //Create the context
     cxGPUContext = clCreateContext(0, uiNumDevsUsed, &cdDevices[uiTargetDevice], NULL, NULL, &ciErrNum);
