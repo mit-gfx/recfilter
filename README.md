@@ -10,17 +10,15 @@ Environment variable <code>HALIDE_DIR</code> must point to the base of Halide di
 ## Directory structure
 ```
 $(RECFILTER_DIR)
- |- paper/               (Paper draft)
- |- code/            
-    |- lib/              (RecFilter library)
-    |- apps/
-        |- cpu/          (CPU benchmarks in C/C++ with OpenMP)
-        |- opencl/       (GPU benchmarks in OpenCL)
-        |- gpu/          (GPU benchmarks in NVIDIA CUDA and NVIDIA Thrust)
-        |- summed_table/ (RecFilter implementation of summed area table)
-        |- boxcar/       (RecFilter implementation of box filter)
-        |- gaussian_vyv/ (RecFilter implementation of Vliet-Young-Verbeek approxmiation of Gaussian blur)
-        |- gaussian_box/ (RecFilter implementation of box filter approximation for Gaussian blur)
-        |- ls_hist/      (RecFilter implementation of median filter using smoothed local histograms)
-        |- audio_filter/ (RecFilter implementation of very high order 1D audio filters)
+ |- lib/              (RecFilter library)
+ |- apps/
+     |- cpu/          (CPU benchmarks in C/C++ with OpenMP)
+     |- opencl/       (GPU benchmarks in OpenCL)
+     |- gpu/          (GPU benchmarks in NVIDIA CUDA and NVIDIA Thrust)
+     |- summed_table/ (RecFilter implementation of summed area table)
+     |- boxcar/       (RecFilter implementation of box filter)
+     |- gaussian_vyv/ (RecFilter implementation of Vliet-Young-Verbeek approxmiation of Gaussian blur)
+     |- gaussian_box/ (RecFilter implementation of box filter approximation for Gaussian blur)
+     |- ls_hist/      (RecFilter implementation of median filter using smoothed local histograms)
+     |- audio_filter/ (RecFilter implementation of very high order 1D audio filters)
 ```
