@@ -104,8 +104,8 @@ static void convert_pure_def_into_first_update_def(RecFilterFunc& rF, vector<Spl
             for (int j=0; j<values.size(); j++) {
                 values[j] = substitute(xi.name(), rxi, values[j]);
             }
-            update_var_category.insert(make_pair(rxi.name(), update_var_category[xi.name()]));
             update_var_category.erase(xi.name());
+            update_var_category.insert(make_pair(rxi.name(), update_var_category[xi.name()]));
         }
         F.define_update(args, values);
     }
@@ -198,6 +198,42 @@ static vector<FilterInfo> group_scans_by_dimension(Function F, vector<FilterInfo
     }
 
     return new_filter_info;
+}
+
+// -----------------------------------------------------------------------------
+
+/** Make sure that all vars with tags INNER, OUTER or FULL have VarTag count in
+ * continuous increasing order - this continuity was broken during splitting where
+ * vars were replaced by inner/outer/tail vars */
+static void reassign_vartag_counts(map<string,VarTag>& var_tags) {
+    vector<VariableTag> ref_vartag = {INNER, OUTER, FULL};
+
+    for (int u=0; u<ref_vartag.size(); u++) {
+        VarTag ref(ref_vartag[u]);
+
+        map<int,string> var_count;
+
+        map<string,VarTag>::iterator vartag_it;
+        map<int,string>::iterator    count_it;
+
+        // extract the vars and put them in sorted order according to their count
+        for (vartag_it=var_tags.begin(); vartag_it!=var_tags.end(); vartag_it++) {
+            string var = vartag_it->first;
+            VarTag tag = vartag_it->second;
+            if (tag.check(ref) && !tag.check(SCAN)) {
+                int count = tag.count();
+                var_count.insert(make_pair(count,var));
+            }
+        }
+
+        // access the vars in sorted order
+        int count = 0;
+        for (count_it=var_count.begin(); count_it!=var_count.end(); count_it++) {
+            string var = count_it->second;
+            var_tags[ var ] = VarTag(ref,count);
+            count++;
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -344,7 +380,6 @@ static void add_padding_to_avoid_bank_conflicts(Function F, vector<SplitInfo> sp
 // -----------------------------------------------------------------------------
 
 static RecFilterFunc create_intra_tile_term(RecFilterFunc rF, vector<SplitInfo> split_info) {
-
     assert(!split_info.empty());
 
     Function F = rF.func;
@@ -593,20 +628,7 @@ static vector<RecFilterFunc> create_intra_tail_term(
         rf.func_category     = REINDEX;
         rf.callee_func       = rF_intra.func.name();
         rf.pure_var_category = rF_intra.pure_var_category;
-
-        // extract the vartag count of xi, change xi's tag to tail and decrement the
-        // count of all other INNER vars whose count is more than the count of xi
-        int count_xi = rf.pure_var_category[xi.name()].count();
         rf.pure_var_category[xi.name()] = TAIL;
-        map<string,VarTag>::iterator vit;
-        for (vit=rf.pure_var_category.begin(); vit!=rf.pure_var_category.end(); vit++) {
-            if (vit->first!=xi.name() && vit->second.check(INNER) && !vit->second.check(SCAN)) {
-                int count = vit->second.count();
-                if (count > count_xi) {
-                    rf.pure_var_category[vit->first] = VarTag(INNER,count-1);
-                }
-            }
-        }
 
         tail_functions_list.push_back(rf);
     }
@@ -733,22 +755,8 @@ static vector<RecFilterFunc> create_complete_tail_term(
         rf.update_var_category.push_back(rF_tail[k].pure_var_category);
         rf.update_var_category[0].insert(make_pair(rxo.x.name(), OUTER|SCAN));
         rf.update_var_category[0].insert(make_pair(rxo.y.name(), OUTER|SCAN));
-
-        // extract the vartag count of xo, decrement the count of all other
-        // OUTER vars whose count is more than the count of xo
-        int count_xo = rf.update_var_category[0][xo.name()].count();
         rf.update_var_category[0].erase(xo.name());
         rf.update_var_category[0].erase(xi.name());
-        map<string,VarTag>::iterator vit;
-        for (vit=rf.update_var_category[0].begin(); vit!=rf.update_var_category[0].end(); vit++) {
-            if (vit->second.check(OUTER) && !vit->second.check(SCAN)) {
-                int count = vit->second.count();
-                if (count>count_xo) {
-                    rf.update_var_category[0][vit->first] = VarTag(OUTER,count-1);
-                }
-            }
-        }
-
         rF_ctail.push_back(rf);
     }
 
@@ -1490,7 +1498,7 @@ void RecFilter::split(map<string,int> dim_tile) {
             }
             found = true;
 
-            // check that tile width is not same as image width
+            // no need to add a split if tile width is not same as image width
             assert(contents.ptr->filter_info[j].tile_width == tile_width);
             if (contents.ptr->filter_info[j].image_width == tile_width) {
                 continue;
@@ -1551,6 +1559,7 @@ void RecFilter::split(map<string,int> dim_tile) {
         }
     }
 
+    // return if there are no splits to apply
     if (recfilter_split_info.empty()) {
         return;
     }
@@ -1675,7 +1684,15 @@ void RecFilter::finalize(void) {
     map<string,RecFilterFunc>::iterator fit;
 
     if (contents.ptr->tiled) {
-        // inline all functions not required any mor
+        // reassign var tag counts for all functions
+        for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+            reassign_vartag_counts(fit->second.pure_var_category);
+            for (int i=0; i<fit->second.update_var_category.size(); i++) {
+                reassign_vartag_counts(fit->second.update_var_category[i]);
+            }
+        }
+
+        // inline all functions not required any more
         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
             if (fit->second.func_category == INLINE) {
                 inline_func(fit->second.func.name());
@@ -1705,7 +1722,7 @@ void RecFilter::finalize(void) {
                 if (funcs_to_merge.size()>1) {
                     string merged_name = funcs_to_merge[0] + "_merged";
                     merge_func(funcs_to_merge, merged_name);
-                    fit = contents.ptr->func.begin();            // list changed, start all over again
+                    fit = contents.ptr->func.begin();            // list changed, start again
                 }
             }
         }
