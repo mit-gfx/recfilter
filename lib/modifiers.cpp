@@ -29,15 +29,11 @@ void mutate_binary_operator(IRMutator *mutator, const T *op, Expr *expr) {
 class ExprDependsOnVar : public IRVisitor {
 private:
     using IRVisitor::visit;
-    void visit(const Variable *op) {
-        if (op->name==var)
-            result = true;
-    }
+    void visit(const Variable *op) { result = (op->name==var); }
     string var;
 public:
     bool result;
-    ExprDependsOnVar(string v) :
-        result(false), var(v) {}
+    ExprDependsOnVar(string v) : result(false), var(v) {}
 };
 
 // -----------------------------------------------------------------------------
@@ -47,8 +43,7 @@ class ExprDependsOnFunc : public IRVisitor {
 private:
     using IRVisitor::visit;
     void visit(const Call *op) {
-        if (op->call_type==Call::Halide && op->name==func_name)
-            result |= true;
+        result |= (op->call_type==Call::Halide && op->name==func_name);
 
         for (size_t i=0; i<op->args.size(); i++) {
             op->args[i].accept(this);
@@ -70,8 +65,7 @@ private:
 
 public:
     bool result;
-    ExprDependsOnFunc(string f) :
-        result(false), func_name(f) {}
+    ExprDependsOnFunc(string f) : result(false), func_name(f) {}
 };
 
 // -----------------------------------------------------------------------------
