@@ -1488,7 +1488,13 @@ void RecFilter::split(map<string,int> dim_tile) {
             if (x != contents.ptr->filter_info[j].var.name()) {
                 continue;
             }
+            found = true;
+
+            // check that tile width is not same as image width
             assert(contents.ptr->filter_info[j].tile_width == tile_width);
+            if (contents.ptr->filter_info[j].image_width == tile_width) {
+                continue;
+            }
 
             SplitInfo s;
 
@@ -1537,14 +1543,16 @@ void RecFilter::split(map<string,int> dim_tile) {
             s.outer_rdom = RDom(0, s.filter_order, 0, s.num_tiles, "r"+x+"o");
 
             recfilter_split_info.push_back(s);
-
-            found = true;
         }
         if (!found) {
             cerr << "Variable " << x << " does not correspond to any "
                 << "dimension of the recursive filter " << contents.ptr->name << endl;
             assert(false);
         }
+    }
+
+    if (recfilter_split_info.empty()) {
+        return;
     }
 
     // apply the actual splitting
@@ -1718,25 +1726,7 @@ void RecFilter::finalize(void) {
                 }
             }
         }
-
-        /// else { // CPU optimizations
-
-        ///     // inline all reindexing functions
-        ///     for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-        ///             if (fit->second.func_category == REINDEX) {
-        ///                 inline_func(fit->second.func.name());
-        ///                 fit = contents.ptr->func.begin();            // list changed, start all over again
-        ///             }
-        ///         }
-
-        ///         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-        ///             Func(fit->second.func).compute_root();
-        ///             fit->second.pure_schedule.push_back("compute_root()");
-        ///         }
-        ///     }
     }
 
     contents.ptr->finalized = true;
 }
-
-
