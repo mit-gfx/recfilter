@@ -38,35 +38,41 @@ static void add_pure_def_to_first_update_def(Function f) {
     vector<UpdateDefinition> updates = f.updates();
 
     // nothing to do if function has no update defs
-    if (!updates.empty()) {
+    // or if all pure defs are undefined
+    bool pure_def_undefined = true;
+    for (int i=0; i<values.size(); i++) {
+        pure_def_undefined &= equal(values[i], undef(values[i].type()));
+    }
+    if (pure_def_undefined || updates.empty()) {
+        return;
+    }
 
-        // add pure def to the first update def
-        for (int j=0; j<updates[0].values.size(); j++) {
-            // replace pure args by update def args in the pure value
-            Expr val = values[j];
-            for (int k=0; k<args.size(); k++) {
-                val = substitute(args[k], updates[0].args[k], val);
-            }
-
-            // remove let statements in the expression because we need to
-            // compare calling args
-            updates[0].values[j] = remove_lets(updates[0].values[j]);
-
-            // remove call to current pixel of the function
-            updates[0].values[j] = substitute_func_call_with_args(f.name(),
-                    updates[0].args, val, updates[0].values[j]);
+    // add pure def to the first update def
+    for (int j=0; j<updates[0].values.size(); j++) {
+        // replace pure args by update def args in the pure value
+        Expr val = values[j];
+        for (int k=0; k<args.size(); k++) {
+            val = substitute(args[k], updates[0].args[k], val);
         }
 
-        // set all pure defs to zero or undef
-        for (int i=0; i<values.size(); i++) {
-            values[i] = undef(f.output_types()[i]);
-        }
+        // remove let statements in the expression because we need to
+        // compare calling args
+        updates[0].values[j] = remove_lets(updates[0].values[j]);
 
-        f.clear_all_definitions();
-        f.define(args, values);
-        for (int i=0; i<updates.size(); i++) {
-            f.define_update(updates[i].args, updates[i].values);
-        }
+        // remove call to current pixel of the function
+        updates[0].values[j] = substitute_func_call_with_args(f.name(),
+                updates[0].args, val, updates[0].values[j]);
+    }
+
+    // set all pure defs to zero or undef
+    for (int i=0; i<values.size(); i++) {
+        values[i] = undef(f.output_types()[i]);
+    }
+
+    f.clear_all_definitions();
+    f.define(args, values);
+    for (int i=0; i<updates.size(); i++) {
+        f.define_update(updates[i].args, updates[i].values);
     }
 }
 
@@ -132,9 +138,13 @@ RecFilterSchedule& RecFilterSchedule::compute_globally(void) {
 
         // remove the initializations of all scans which are scheduled as
         // compute_root to avoid extra kernel execution for initializing
-        // the output buffer
+        // the output buffer for GPU schedule
         if (F.has_update_definition()) {
-            add_pure_def_to_first_update_def(F.function());
+            // for GPU schedules
+            //if (recfilter.target().has_gpu_feature())
+            {
+                add_pure_def_to_first_update_def(F.function());
+            }
         }
 
         F.compute_root();
@@ -187,23 +197,24 @@ RecFilterSchedule& RecFilterSchedule::compute_locally(void) {
             }
         }
 
-        if (!callee_func.defined()) {
-            cerr << F.name() << " cannot be computed in locally in another function "
-                << "because it is not called by any function" << endl;
-            assert(false);
-        }
+        if (callee_func.defined()) {
 
-        // functions called in this function should be computed at same level
-        for (int i=0; i<func_list.size(); i++) {
-            RecFilterFunc& rf = recfilter.internal_function(func_list[i]);
-            if (rf.func_category==REINDEX && rf.caller_func==F.name()) {
-                Func(rf.func).compute_at(callee_func, outer_var);
-                rf.pure_schedule.push_back("compute_at("+callee_func.name()+","+outer_var.name());
+            // functions called in this function should be computed at same level
+            for (int i=0; i<func_list.size(); i++) {
+                RecFilterFunc& rf = recfilter.internal_function(func_list[i]);
+                if (rf.func_category==REINDEX && rf.caller_func==F.name()) {
+                    Func(rf.func).compute_at(callee_func, outer_var);
+                    rf.pure_schedule.push_back("compute_at("+callee_func.name()+","+outer_var.name());
+                }
             }
-        }
 
-        F.compute_at(callee_func, outer_var);
-        rF.pure_schedule.push_back("compute_at("+callee_func.name()+","+outer_var.name());
+            F.compute_at(callee_func, outer_var);
+            rF.pure_schedule.push_back("compute_at("+callee_func.name()+","+outer_var.name());
+        } else {
+            cerr << "Warning: " << F.name() << " cannot be computed locally in "
+                << "another function because it is not called by any function" << endl;
+            compute_globally();
+        }
     }
     return *this;
 }
