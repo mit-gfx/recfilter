@@ -481,13 +481,20 @@ double RecFilter::realize(Buffer out, int iterations) {
 
     Func F(internal_function(contents.ptr->name).func);
 
-    // // upload all buffers to device if computed on GPU
-    // if (contents.ptr->target.has_gpu_feature()) {
-    //     map<string,Buffer> buff = extract_buffer_calls(F);
-    //     for (map<string,Buffer>::iterator b=buff.begin(); b!=buff.end(); b++) {
-    //         b->second.copy_to_dev();
-    //     }
-    // }
+    // allocate the buffer
+    vector<int> buffer_size;
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        buffer_size.push_back(contents.ptr->filter_info[i].image_width);
+    }
+    out = Buffer(contents.ptr->type, buffer_size);
+
+    // upload all buffers to device if computed on GPU
+    if (contents.ptr->target.has_gpu_feature()) {
+        map<string,Buffer> buff = extract_buffer_calls(F);
+        for (map<string,Buffer>::iterator b=buff.begin(); b!=buff.end(); b++) {
+            b->second.copy_to_dev();
+        }
+    }
 
     // run once to warmup the driver if profiling with multiple runs
     if (iterations>1) {

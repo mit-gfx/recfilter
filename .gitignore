@@ -1,0 +1,66 @@
+# Temporary directories
+_build/*
+.build/*
+build/*
+obj/*
+bin/*
+
+# Compiled source
+*.o
+*.lib
+*.a
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+*.obj
+*.dll
+*.so
+*.so.*
+*.dylib
+*.exe
+*.out
+*.app
+
+# Latex intermediate files
+*.aux
+*.ps
+*.dvi
+*.lof
+*.idx
+*.bbl
+*.bcf
+*.bak
+*.log
+*.out
+*.xml
+*.blg
+*.toc
+
+# Packages
+# it's better to unpack these files and commit the raw source
+# git has its own built in compression methods
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
