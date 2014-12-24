@@ -140,11 +140,7 @@ RecFilterSchedule& RecFilterSchedule::compute_globally(void) {
         // compute_root to avoid extra kernel execution for initializing
         // the output buffer for GPU schedule
         if (F.has_update_definition()) {
-            // for GPU schedules
-            //if (recfilter.target().has_gpu_feature())
-            {
-                add_pure_def_to_first_update_def(F.function());
-            }
+            add_pure_def_to_first_update_def(F.function());
         }
 
         F.compute_root();
@@ -170,7 +166,7 @@ RecFilterSchedule& RecFilterSchedule::compute_locally(void) {
         Func callee_func;
         for (int i=0; i<func_list.size(); i++) {
             RecFilterFunc& rf = recfilter.internal_function(func_list[i]);
-            if (rf.func_category == REINDEX && rf.callee_func==F.name()) {
+            if (rf.func_category==REINDEX && rf.callee_func==F.name()) {
                 if (callee_func.defined()) {
                     cerr << F.name() << " cannot be computed locally in another function "
                         << "because it is called by multiple functions" << endl;
@@ -198,18 +194,17 @@ RecFilterSchedule& RecFilterSchedule::compute_locally(void) {
         }
 
         if (callee_func.defined()) {
-
             // functions called in this function should be computed at same level
             for (int i=0; i<func_list.size(); i++) {
                 RecFilterFunc& rf = recfilter.internal_function(func_list[i]);
                 if (rf.func_category==REINDEX && rf.caller_func==F.name()) {
                     Func(rf.func).compute_at(callee_func, outer_var);
-                    rf.pure_schedule.push_back("compute_at("+callee_func.name()+","+outer_var.name());
+                    rf.pure_schedule.push_back("compute_at("+callee_func.name()+","+outer_var.name()+")");
                 }
             }
 
             F.compute_at(callee_func, outer_var);
-            rF.pure_schedule.push_back("compute_at("+callee_func.name()+","+outer_var.name());
+            rF.pure_schedule.push_back("compute_at("+callee_func.name()+","+outer_var.name()+")");
         } else {
             cerr << "Warning: " << F.name() << " cannot be computed locally in "
                 << "another function because it is not called by any function" << endl;
