@@ -65,11 +65,11 @@ INCLUDES  += -I$(INCDIR) -I$(OCLCOMMONDIR)/inc -I$(SHAREDDIR)/inc
 ifeq "$(strip $(HP_64))" ""
 	MACHINE := 32
 	USRLIBDIR := -L/usr/lib/
-	CUDA_LIB_DIR := $(CUDA_INSTALL_PATH)/lib
+	CUDA_LIB_DIR ?= $(CUDA_INSTALL_PATH)/lib
 else
 	MACHINE := 64
 	USRLIBDIR := -L/usr/lib64/
-	CUDA_LIB_DIR := $(CUDA_INSTALL_PATH)/lib64
+	CUDA_LIB_DIR ?= $(CUDA_INSTALL_PATH)/lib64
 endif
 
 
