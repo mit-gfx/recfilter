@@ -1,10 +1,9 @@
 ## CPU benchmarking applications
 
-| Application      | API      | Algorithm                            | Source          |
-|:---------------- |:---------|:-------------------------------------|:----------------|
-| gaussian_vyv_cpu | C/OpenMP | Vliet-Young-Verbeek 3rd order approx | [Survey] [demo] |
-| gaussian_box_cpu | C/OpenMP | Iterated box filter approx.          | [Survey] [demo] |
+| Application      | API      | Algorithm                                            | 
+|:---------------- |:---------|:-----------------------------------------------------|
+| gaussian_vyv_cpu | C, OpenMP | Vliet-Young-Verbeek 3rd order approximation         |
+| gaussian_box_cpu | C, OpenMP | Iterated box filter approximation with 3 box filters|
 
-
-[Survey]: http://www.ipol.im/pub/art/2013/87/
-[demo]: http://demo.ipol.im/demo/87/
+- [Paper](http://www.ipol.im/pub/art/2013/87/)
+- [demo](http://demo.ipol.im/demo/87/)
