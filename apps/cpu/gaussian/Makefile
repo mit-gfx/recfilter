@@ -105,20 +105,20 @@ all: $(BIN_DIR)/gaussian_box_cpu.app $(BIN_DIR)/gaussian_vyv_cpu.app
 
 $(BIN_DIR)/gaussian_box_cpu.app: $(GAUSSIAN_BOX_BENCH_OBJECTS)
 	$(MKDIR) $(BIN_DIR)
-	$(CC) $(LDFLAGS) -o $@ $(GAUSSIAN_BOX_BENCH_OBJECTS) $(LDLIBS)
+	$(CC) -o $@ $(GAUSSIAN_BOX_BENCH_OBJECTS) $(LDLIBS) $(LDFLAGS)
 
 $(BIN_DIR)/gaussian_vyv_cpu.app: $(GAUSSIAN_VYV_BENCH_OBJECTS)
 	$(MKDIR) $(BIN_DIR)
-	$(CC) $(LDFLAGS) -o $@ $(GAUSSIAN_VYV_BENCH_OBJECTS) $(LDLIBS) $(LDFLAGS)
+	$(CC) -o $@ $(GAUSSIAN_VYV_BENCH_OBJECTS) $(LDLIBS) $(LDFLAGS)
 
 gaussian_bench: $(GAUSSIAN_BENCH_OBJECTS)
-	$(CC) $(LDFLAGS) -o $@ $(GAUSSIAN_BENCH_OBJECTS) $(LDLIBS)
+	$(CC) -o $@ $(GAUSSIAN_BENCH_OBJECTS) $(LDLIBS) $(LDFLAGS)
 
 gaussian_demo: $(GAUSSIAN_DEMO_OBJECTS)
-	$(CC) $(LDFLAGS) -o $@ $(GAUSSIAN_DEMO_OBJECTS) $(LDLIBS)
+	$(CC) -o $@ $(GAUSSIAN_DEMO_OBJECTS) $(LDLIBS) $(LDFLAGS)
 
 imdiff: $(IMDIFF_OBJECTS)
-	$(CC) $(LDFLAGS) -o $@ $(IMDIFF_OBJECTS) $(LDLIBS)
+	$(CC) -o $@ $(IMDIFF_OBJECTS) $(LDLIBS) $(LDFLAGS)
 
 .c.o:
 	$(CC) -c $(ALLCFLAGS) $< -o $@

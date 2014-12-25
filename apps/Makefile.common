@@ -1,0 +1,25 @@
+CXX=g++ -std=c++11
+MKDIR=mkdir -p
+RM=rm -rf
+
+BIN_DIR=../../bin/
+
+RECFILTER_DIR=../../lib/
+RECFILTER_INC=$(RECFILTER_DIR)/recfilter.h
+RECFILTER_LIB=$(RECFILTER_DIR)/libRecFilter.a
+
+HALIDE_LIB=$(HALIDE_DIR)/bin/libHalide.a
+
+APPS := $(addprefix $(BIN_DIR)/,$(notdir $(SRC:.cpp=.app)))
+
+all: $(APPS)
+
+$(BIN_DIR)/%.app: %.cpp  $(RECFILTER_LIB) $(HALIDE_LIB) $(RECFILTER_INC)
+	@$(MKDIR) $(BIN_DIR)
+	$(CXX) -I$(RECFILTER_DIR) -I$(HALIDE_DIR)/include/ -g -Wall $< $(HALIDE_LIB) $(RECFILTER_LIB) -lz -lpthread -ldl -lncurses -o $@
+
+$(RECFILTER_LIB): $(RECFILTER_INC)
+	make -C $(RECFILTER_DIR) -j8
+
+clean:
+	$(RM) $(APPS)
