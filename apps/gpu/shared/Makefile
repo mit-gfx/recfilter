@@ -43,5 +43,5 @@ STATIC_LIB := libshrutil.a
 
 ROOTDIR := ../
 
-include ../common/common_opencl.mk
+include ../common/Makefile.common
 

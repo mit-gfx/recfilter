@@ -38,4 +38,4 @@ OPENCLFILE	:= RecursiveGaussian.cl
 
 CCFILES		:= oclRecursiveGaussian.cpp RecursiveGaussianHost.cpp
 
-include ../common/common_opencl.mk
+include ../common/Makefile.common

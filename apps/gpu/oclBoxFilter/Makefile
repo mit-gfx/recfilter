@@ -38,4 +38,4 @@ OPENCLFILE	:= BoxFilter.cl
 
 CCFILES		:= oclBoxFilter.cpp BoxFilterHost.cpp
 
-include ../common/common_opencl.mk
+include ../common/Makefile.common

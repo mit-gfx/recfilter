@@ -43,4 +43,4 @@ STATIC_LIB := liboclUtil.a
 
 ROOTDIR := ../
 
-include ../common/common_opencl.mk
+include ../common/Makefile.common

@@ -42,7 +42,8 @@ OSARCH= $(shell uname -m)
 
 # Basic directory setup for SDK
 # (override directories only if they are not already defined)
-ROOTDIR      := ../
+ROOTDIR      ?= ../
+SRCDIR		 ?= ./
 ROOTOBJDIR   := obj
 LIBDIR       := $(ROOTDIR)/shared/lib/
 SHAREDDIR    := $(ROOTDIR)/shared/
@@ -172,10 +173,10 @@ OBJS +=  $(patsubst %.c,$(OBJDIR)/%.c.o,$(notdir $(CFILES)))
 ################################################################################
 # Rules
 ################################################################################
-$(OBJDIR)/%.c.o : %.c
+$(OBJDIR)/%.c.o : $(SRCDIR)%.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-$(OBJDIR)/%.cpp.o : %.cpp
+$(OBJDIR)/%.cpp.o : $(SRCDIR)%.cpp
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 $(TARGET): makedirectories $(OBJS) Makefile clfiles
