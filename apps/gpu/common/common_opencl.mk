@@ -42,17 +42,15 @@ OSARCH= $(shell uname -m)
 
 # Basic directory setup for SDK
 # (override directories only if they are not already defined)
-SRCDIR     ?=
-ROOTDIR    ?= ../
-ROOTOBJDIR ?= obj
-LIBDIR     := $(ROOTDIR)/shared/lib/
-SHAREDDIR  := $(ROOTDIR)/shared/
-OCLROOTDIR := $(ROOTDIR)/
-OCLCOMMONDIR ?= $(ROOTDIR)/common/
-OCLBINDIR    ?= $(ROOTDIR)/../../bin/opencl
-BINDIR       ?= $(ROOTDIR)/../../bin/opencl
+ROOTDIR      := ../
+ROOTOBJDIR   := obj
+LIBDIR       := $(ROOTDIR)/shared/lib/
+SHAREDDIR    := $(ROOTDIR)/shared/
+OCLROOTDIR   := $(ROOTDIR)/
+OCLCOMMONDIR := $(ROOTDIR)/common/
+OCLBINDIR    := $(ROOTDIR)/../../bin/gpu
+BINDIR       := $(ROOTDIR)/../../bin/gpu
 OCLLIBDIR    := $(OCLCOMMONDIR)/lib
-INCDIR	     ?= .
 
 # Compilers
 CXX        := g++
@@ -60,7 +58,7 @@ CC         := gcc
 LINK       := g++ -fPIC
 
 # Includes
-INCLUDES  += -I$(INCDIR) -I$(OCLCOMMONDIR)/inc -I$(SHAREDDIR)/inc
+INCLUDES  += -I. -I$(OCLCOMMONDIR)/inc -I$(SHAREDDIR)/inc
 
 ifeq "$(strip $(HP_64))" ""
 	MACHINE := 32
@@ -74,28 +72,7 @@ endif
 
 
 # Warning flags
-CXXWARN_FLAGS := \
-	-W -Wall \
-	-Wimplicit \
-	-Wswitch \
-	-Wformat \
-	-Wchar-subscripts \
-	-Wparentheses \
-	-Wmultichar \
-	-Wtrigraphs \
-	-Wpointer-arith \
-	-Wcast-align \
-	-Wreturn-type \
-	-Wno-unused-function \
-	$(SPACE)
-
-CWARN_FLAGS := $(CXXWARN_FLAGS) \
-	-Wstrict-prototypes \
-	-Wmissing-prototypes \
-	-Wmissing-declarations \
-	-Wnested-externs \
-	-Wmain \
-
+CXXWARN_FLAGS := -Wall $(SPACE)
 
 # architecture flag for nvcc and gcc compilers build
 LIB_ARCH        := $(OSARCH)
@@ -139,8 +116,8 @@ else
 endif
 
 # Compiler-specific flags
-CXXFLAGS  := $(CXXWARN_FLAGS) $(CXX_ARCH_FLAGS)
-CFLAGS    := $(CWARN_FLAGS) $(CXX_ARCH_FLAGS)
+CXXFLAGS  := -Wall $(CXX_ARCH_FLAGS)
+CFLAGS    := -Wall $(CXX_ARCH_FLAGS)
 LINK      += $(CXX_ARCH_FLAGS)
 
 # Common flags
@@ -158,39 +135,13 @@ CXXFLAGS    += -fno-strict-aliasing
 CFLAGS      += -fno-strict-aliasing
 
 
-# OpenGL is used or not (if it is used, then it is necessary to include GLEW)
-ifeq ($(USEGLLIB),1)
-
-	ifneq ($(DARWIN),)
-		OPENGLLIB := -L/System/Library/Frameworks/OpenGL.framework/Libraries -lGL -lGLU $(SHAREDDIR)/lib/$(OSLOWER)/libGLEW.a
-	else
-		OPENGLLIB := -lGL -lGLU -lX11 -lXmu
-		ifeq "$(strip $(HP_64))" ""
-			OPENGLLIB += -lGLEW -L/usr/X11R6/lib
-		else
-			OPENGLLIB += -lGLEW_x86_64 -L/usr/X11R6/lib64
-		endif
-	endif
-
-	CUBIN_ARCH_FLAG := -m64
-endif
-
-ifeq ($(USEGLUT),1)
-	ifneq ($(DARWIN),)
-		OPENGLLIB += -framework GLUT
-		INCLUDES += -I/System/Library/Frameworks/OpenGL.framework/Headers
-	else
-		OPENGLLIB += -lglut
-	endif
-endif
-
 # Libs
 ifneq ($(DARWIN),)
-   LIB       := -L$(CUDA_LIB_DIR) -L${OCLLIBDIR} -L$(LIBDIR) -L$(SHAREDDIR)/lib/
-   LIB += -framework OpenCL -framework OpenGL ${OPENGLLIB} -framework AppKit ${ATF} ${LIB}
+   LIB := -L$(CUDA_LIB_DIR) -L${OCLLIBDIR} -L$(LIBDIR) -L$(SHAREDDIR)/lib/
+   LIB += -framework OpenCL -framework AppKit ${ATF} ${LIB}
 else
-   LIB       := ${USRLIBDIR} -L$(CUDA_LIB_DIR) -L${OCLLIBDIR} -L$(LIBDIR) -L$(SHAREDDIR)/lib/
-   LIB += -lOpenCL ${OPENGLLIB} ${LIB}
+   LIB := ${USRLIBDIR} -L$(CUDA_LIB_DIR) -L${OCLLIBDIR} -L$(LIBDIR) -L$(SHAREDDIR)/lib/
+   LIB += -lOpenCL ${LIB}
 endif
 
 
@@ -221,10 +172,10 @@ OBJS +=  $(patsubst %.c,$(OBJDIR)/%.c.o,$(notdir $(CFILES)))
 ################################################################################
 # Rules
 ################################################################################
-$(OBJDIR)/%.c.o : $(SRCDIR)%.c $(C_DEPS)
+$(OBJDIR)/%.c.o : %.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-$(OBJDIR)/%.cpp.o : $(SRCDIR)%.cpp $(C_DEPS)
+$(OBJDIR)/%.cpp.o : %.cpp
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 $(TARGET): makedirectories $(OBJS) Makefile clfiles

@@ -33,22 +33,9 @@
 #
 ################################################################################
 
-ROOTDIR := ../
-
-# Add source files here
 EXECUTABLE	:= oclRecursiveGaussian
 OPENCLFILE	:= RecursiveGaussian.cl
 
-# C/C++ source files (compiled with gcc / c++)
-SRCDIR		:= src/
 CCFILES		:= oclRecursiveGaussian.cpp RecursiveGaussianHost.cpp
-INCDIR		:= inc/
-
-# Additional compiler flags and LIBs to include
-USEGLLIB	:= 0
-USEGLUT		:= 0
-
-################################################################################
-# Rules and targets
 
 include ../common/common_opencl.mk

@@ -33,20 +33,9 @@
 #
 ################################################################################
 
-ROOTDIR := ../
-
-# Add source files here
 EXECUTABLE	:= oclBoxFilter
 OPENCLFILE	:= BoxFilter.cl
 
-# C/C++ source files (compiled with gcc / c++)
 CCFILES		:= oclBoxFilter.cpp BoxFilterHost.cpp
-
-# Additional compiler flags and LIBs to include
-USEGLLIB	:= 0
-USEGLUT		:= 0
-
-################################################################################
-# Rules and targets
 
 include ../common/common_opencl.mk
