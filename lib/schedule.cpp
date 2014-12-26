@@ -336,21 +336,21 @@ RecFilterSchedule& RecFilterSchedule::vectorize(VarTag vtag, int factor) {
             if (def==PURE_DEF) {
                 if (is_undef(F.values())) {
                     if (factor) {
-                        F.unroll(v, factor);
-                        rF.pure_schedule.push_back("unroll(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
+                        F.vectorize(v, factor);
+                        rF.pure_schedule.push_back("vectorize(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
                     } else {
-                        F.unroll(v);
-                        rF.pure_schedule.push_back("unroll(Var(\"" + v.name() + "\"))");
+                        F.vectorize(v);
+                        rF.pure_schedule.push_back("vectorize(Var(\"" + v.name() + "\"))");
                     }
                 }
             } else {
                 if (is_undef(F.update_values(def))) {
                     if (factor) {
-                        F.update(def).unroll(v, factor);
-                        rF.update_schedule[def].push_back("unroll(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
+                        F.update(def).vectorize(v, factor);
+                        rF.update_schedule[def].push_back("vectorize(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
                     } else {
-                        F.update(def).unroll(v);
-                        rF.update_schedule[def].push_back("unroll(Var(\"" + v.name() + "\"))");
+                        F.update(def).vectorize(v);
+                        rF.update_schedule[def].push_back("vectorize(Var(\"" + v.name() + "\"))");
                     }
                 }
             }
