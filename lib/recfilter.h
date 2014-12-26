@@ -345,7 +345,7 @@ public:
      * Preprocessor symbols are checked in attempt to detect whether the platform
      * is POSIX or Windows or Mac and defines millisecond_timer() accordingly.
      */
-    unsigned long millisecond_timer(void);
+    static unsigned long millisecond_timer(void);
 
 protected:
     /** Allow scheduler access to internal functions; only needed to append the

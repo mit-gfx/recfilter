@@ -14,9 +14,14 @@ APPS := $(addprefix $(BIN_DIR)/,$(notdir $(SRC:.cpp=.app)))
 
 all: $(APPS)
 
+CXXFLAGS ?=
+LDFLAGS  ?=
+CXXFLAGS += -I$(RECFILTER_DIR) -I$(HALIDE_DIR)/include/ -g -Wall
+LDFLAGS  += -lz -lpthread -ldl -lncurses
+
 $(BIN_DIR)/%.app: %.cpp  $(RECFILTER_LIB) $(HALIDE_LIB) $(RECFILTER_INC)
 	@$(MKDIR) $(BIN_DIR)
-	$(CXX) -I$(RECFILTER_DIR) -I$(HALIDE_DIR)/include/ -g -Wall $< $(HALIDE_LIB) $(RECFILTER_LIB) -lz -lpthread -ldl -lncurses -o $@
+	$(CXX) $(CXXFLAGS) $< $(HALIDE_LIB) $(RECFILTER_LIB) $(LDFLAGS) -o $@
 
 $(RECFILTER_LIB): $(RECFILTER_INC)
 	make -C $(RECFILTER_DIR) -j8
