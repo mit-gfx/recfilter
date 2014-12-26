@@ -17,7 +17,6 @@ all:
 	$(MAKE) cpu
 	$(MAKE) gpu
 	$(CP) opencl_profile.sh $(BIN_DIR)/
-	$(CP) cuda_profile.sh $(BIN_DIR)/
 
 clean:
 	$(MAKE) ../lib clean
@@ -30,4 +29,4 @@ clean:
 	$(MAKE) audio_filter clean
 	$(MAKE) cpu clean
 	$(MAKE) gpu clean
-	$(RM) $(BIN_DIR)/opencl_profile.sh $(BIN_DIR)/cuda_profile.sh
+	$(RM) $(BIN_DIR)/opencl_profile.sh

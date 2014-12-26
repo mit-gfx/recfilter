@@ -385,9 +385,9 @@ public:
     RecFilterSchedule& reorder_storage(VarTag x, VarTag y, VarTag z, VarTag w);
     RecFilterSchedule& reorder_storage(VarTag x, VarTag y, VarTag z, VarTag w, VarTag t);
 
-    RecFilterSchedule& unroll     (VarTag v);
-    RecFilterSchedule& parallel   (VarTag v);
-    RecFilterSchedule& vectorize  (VarTag v);
+    RecFilterSchedule& unroll     (VarTag v, int factor=0);
+    RecFilterSchedule& parallel   (VarTag v, int factor=0);
+    RecFilterSchedule& vectorize  (VarTag v, int factor=0);
     RecFilterSchedule& gpu_threads(VarTag v1);
     RecFilterSchedule& gpu_threads(VarTag v1, VarTag v2);
     RecFilterSchedule& gpu_threads(VarTag v1, VarTag v2, VarTag v3);

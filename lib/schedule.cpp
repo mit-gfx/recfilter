@@ -30,6 +30,23 @@ static const VarOrRVar GPU_BLOCK[] = {
 
 // -----------------------------------------------------------------------------
 
+/** Return true if all Expr in the vector are undef */
+static bool is_undef(vector<Expr> e) {
+    bool result = true;
+    for (int i=0; i<e.size(); i++) {
+        result &= equal(e[i], undef(e[i].type()));
+    }
+    return result;
+}
+
+/** Return true if all elements of the Tuple are undef */
+static bool is_undef(Tuple t) {
+    return is_undef(t.as_vector());
+}
+
+
+// -----------------------------------------------------------------------------
+
 /** Remove the pure def of a Function and arithmetically add it to
  * the expression of the first update def; leaving the pure def undefined */
 static void add_pure_def_to_first_update_def(Function f) {
@@ -39,10 +56,7 @@ static void add_pure_def_to_first_update_def(Function f) {
 
     // nothing to do if function has no update defs
     // or if all pure defs are undefined
-    bool pure_def_undefined = true;
-    for (int i=0; i<values.size(); i++) {
-        pure_def_undefined &= equal(values[i], undef(values[i].type()));
-    }
+    bool pure_def_undefined = is_undef(values);
     if (pure_def_undefined || updates.empty()) {
         return;
     }
@@ -214,7 +228,7 @@ RecFilterSchedule& RecFilterSchedule::compute_locally(void) {
     return *this;
 }
 
-RecFilterSchedule& RecFilterSchedule::parallel(VarTag vtag) {
+RecFilterSchedule& RecFilterSchedule::parallel(VarTag vtag, int factor) {
     if (recfilter.target().has_gpu_feature()) {
         cerr << "Cannot use RecFilterSchedule::parallel() if compilation "
              << "target is GPU; use RecFilterSchedule::gpu_blocks() or "
@@ -238,24 +252,34 @@ RecFilterSchedule& RecFilterSchedule::parallel(VarTag vtag) {
             int def = vit->first;
             VarOrRVar v = vit->second;
 
-            // no need to add scheduling to pure def if the function has update defs
-            // pure def is left undefined by construction
+            // only add scheduling to defs that are not undef
             if (def==PURE_DEF) {
-                if (!F.has_update_definition()) {
-                    F.parallel(v);
-                    rF.pure_schedule.push_back("parallel(Var(\"" + v.name() + "\"))");
+                if (is_undef(F.values())) {
+                    if (factor) {
+                        F.parallel(v, factor);
+                        rF.pure_schedule.push_back("parallel(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
+                    } else {
+                        F.parallel(v);
+                        rF.pure_schedule.push_back("parallel(Var(\"" + v.name() + "\"))");
+                    }
                 }
             } else {
-                F.update(def).parallel(v);
-                stringstream s;
-                rF.update_schedule[def].push_back("parallel(Var(\"" + v.name() + "\"))");
+                if (is_undef(F.update_values(def))) {
+                    if (factor) {
+                        F.update(def).parallel(v, factor);
+                        rF.update_schedule[def].push_back("parallel(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
+                    } else {
+                        F.update(def).parallel(v);
+                        rF.update_schedule[def].push_back("parallel(Var(\"" + v.name() + "\"))");
+                    }
+                }
             }
         }
     }
     return *this;
 }
 
-RecFilterSchedule& RecFilterSchedule::unroll(VarTag vtag) {
+RecFilterSchedule& RecFilterSchedule::unroll(VarTag vtag, int factor) {
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
@@ -268,16 +292,27 @@ RecFilterSchedule& RecFilterSchedule::unroll(VarTag vtag) {
             for (int i=0; i<vit->second.size(); i++) {
                 VarOrRVar v = vit->second[i];
 
-                // no need to add scheduling to pure def if the function has update defs
-                // pure def is left undefined by construction
+                // only add scheduling to defs that are not undef
                 if (def==PURE_DEF) {
-                    if (!F.has_update_definition()) {
-                        F.unroll(v);
-                        rF.pure_schedule.push_back("unroll(Var(\"" + v.name() + "\"))");
+                    if (is_undef(F.values())) {
+                        if (factor) {
+                            F.unroll(v, factor);
+                            rF.pure_schedule.push_back("unroll(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
+                        } else {
+                            F.unroll(v);
+                            rF.pure_schedule.push_back("unroll(Var(\"" + v.name() + "\"))");
+                        }
                     }
                 } else {
-                    F.update(def).unroll(v);
-                    rF.update_schedule[def].push_back("unroll(Var(\"" + v.name() + "\"))");
+                    if (is_undef(F.update_values(def))) {
+                        if (factor) {
+                            F.update(def).unroll(v, factor);
+                            rF.update_schedule[def].push_back("unroll(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
+                        } else {
+                            F.update(def).unroll(v);
+                            rF.update_schedule[def].push_back("unroll(Var(\"" + v.name() + "\"))");
+                        }
+                    }
                 }
             }
         }
@@ -285,7 +320,7 @@ RecFilterSchedule& RecFilterSchedule::unroll(VarTag vtag) {
     return *this;
 }
 
-RecFilterSchedule& RecFilterSchedule::vectorize(VarTag vtag) {
+RecFilterSchedule& RecFilterSchedule::vectorize(VarTag vtag, int factor) {
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
@@ -297,18 +332,27 @@ RecFilterSchedule& RecFilterSchedule::vectorize(VarTag vtag) {
             int def = vit->first;
             VarOrRVar v = vit->second;
 
-            // no need to add scheduling to pure def if the function has update defs
-            // pure def is left undefined by construction
+            // only add scheduling to defs that are not undef
             if (def==PURE_DEF) {
-                if (!F.has_update_definition()) {
-                    F.vectorize(v);
-                    rF.pure_schedule.push_back("vectorize(Var(\"" + v.name() + "\"))");
+                if (is_undef(F.values())) {
+                    if (factor) {
+                        F.unroll(v, factor);
+                        rF.pure_schedule.push_back("unroll(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
+                    } else {
+                        F.unroll(v);
+                        rF.pure_schedule.push_back("unroll(Var(\"" + v.name() + "\"))");
+                    }
                 }
             } else {
-                F.update(def).vectorize(v);
-                stringstream s;
-                s << "vectorize(Var(\"" << v.name() << "\"))";
-                rF.update_schedule[def].push_back("vectorize(Var(\"" + v.name() + "\"))");
+                if (is_undef(F.update_values(def))) {
+                    if (factor) {
+                        F.update(def).unroll(v, factor);
+                        rF.update_schedule[def].push_back("unroll(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
+                    } else {
+                        F.update(def).unroll(v);
+                        rF.update_schedule[def].push_back("unroll(Var(\"" + v.name() + "\"))");
+                    }
+                }
             }
         }
     }
@@ -383,16 +427,17 @@ RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag v1, VarTag v2, VarTag v3
                 s << "parallel(Var(\"" << v.name() << "\")).";
                 s << "rename(Var(\""   << v.name() << "\"), Var(\"" << GPU_BLOCK[block_id_x].name() << "\"))";
 
-                // no need to add scheduling to pure def if the function has update defs
-                // pure def is left undefined by construction
+                // only add scheduling to defs that are not undef
                 if (def==PURE_DEF) {
-                    if (!F.has_update_definition()) {
+                    if (is_undef(F.values())) {
                         F.parallel(v).rename(v, GPU_BLOCK[block_id_x]);
                         rF.pure_schedule.push_back(s.str());
                     }
                 } else {
-                    F.update(def).parallel(v).rename(v, GPU_BLOCK[block_id_x]);
-                    rF.update_schedule[def].push_back(s.str());
+                    if (is_undef(F.update_values(def))) {
+                        F.update(def).parallel(v).rename(v, GPU_BLOCK[block_id_x]);
+                        rF.update_schedule[def].push_back(s.str());
+                    }
                 }
             }
         }
@@ -462,16 +507,17 @@ RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag v1, VarTag v2, VarTag v
                 s << "parallel(Var(\"" << v.name() << "\")).";
                 s << "rename(Var(\""   << v.name() << "\"), Var(\"" << GPU_THREAD[thread_id_x].name() << "\"))";
 
-                // no need to add scheduling to pure def if the function has update defs
-                // pure def is left undefined by construction
+                // only add scheduling to defs that are not undef
                 if (def==PURE_DEF) {
-                    if (!F.has_update_definition()) {
+                    if (is_undef(F.values())) {
                         F.parallel(v).rename(v, GPU_THREAD[thread_id_x]);
                         rF.pure_schedule.push_back(s.str());
                     }
                 } else {
-                    F.update(def).parallel(v).rename(v, GPU_THREAD[thread_id_x]);
-                    rF.update_schedule[def].push_back(s.str());
+                    if (is_undef(F.update_values(def))) {
+                        F.update(def).parallel(v).rename(v, GPU_THREAD[thread_id_x]);
+                        rF.update_schedule[def].push_back(s.str());
+                    }
                 }
             }
         }
@@ -542,18 +588,19 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor) {
             s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name()
                 << "\"), Var(\"" << t.name() << "\"), " << factor << ")";
 
-            // no need to add scheduling to pure def if the function has update defs
-            // pure def is left undefined by construction
+            // only add scheduling to defs that are not undef
             if (def==PURE_DEF) {
-                if (!F.has_update_definition()) {
+                if (is_undef(F.values())) {
                     F.split(v,v,t,factor);
                     rF.pure_var_category.insert(make_pair(t.name(), vtag|SPLIT));
                     rF.pure_schedule.push_back(s.str());
                 }
             } else {
-                F.update(def).split(v,v,t,factor);
-                rF.update_var_category[def].insert(make_pair(t.name(), vtag|SPLIT));
-                rF.update_schedule[def].push_back(s.str());
+                if (is_undef(F.update_values(def))) {
+                    F.update(def).split(v,v,t,factor);
+                    rF.update_var_category[def].insert(make_pair(t.name(), vtag|SPLIT));
+                    rF.update_schedule[def].push_back(s.str());
+                }
             }
         }
     }
@@ -601,16 +648,17 @@ RecFilterSchedule& RecFilterSchedule::reorder(vector<VarTag> vtag) {
                 }
                 s << "))";
 
-                // no need to add scheduling to pure def if the function has update defs
-                // pure def is left undefined by construction
+                // only add scheduling to defs that are not undef
                 if (def==PURE_DEF) {
-                    if (!F.has_update_definition()) {
+                    if (is_undef(F.values())) {
                         F.reorder(var_list);
                         rF.pure_schedule.push_back(s.str());
                     }
                 } else {
-                    F.update(def).reorder(var_list);
-                    rF.update_schedule[def].push_back(s.str());
+                    if (is_undef(F.update_values(def))) {
+                        F.update(def).reorder(var_list);
+                        rF.update_schedule[def].push_back(s.str());
+                    }
                 }
             } else {
                 cerr << "VarTags provided to reorder() resulted in less than 2 variables" << endl;
