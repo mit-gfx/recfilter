@@ -1642,6 +1642,14 @@ void RecFilter::split(map<string,int> dim_tile) {
             rF.pure_schedule.push_back(s.str());
         }
 
+        // apply the bounds for the pure vars of the final result
+        // these were lost when the function was redefined above
+        for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+            Var v = contents.ptr->filter_info[i].var;
+            int w = contents.ptr->filter_info[i].image_width;
+            Func(F).bound(v, 0, w);
+        }
+
         recfilter_func_list.insert(make_pair(rF.func.name(), rF));
     }
 
