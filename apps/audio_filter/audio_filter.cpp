@@ -70,18 +70,19 @@ int main(int argc, char **argv) {
             assert(false);
         } else {
             F.intra_schedule().compute_globally().parallel(F.full(0));
-            F.compile_jit();
+            F.compile_jit("nontiled.html");
             time = F.realize(out, iterations);
-            cerr << "Ours non-tiled: \t" << time << " ms" << endl;
+            cerr << "Naive: " << time << " ms" << endl;
 
             F.split(x, tile_width);
             F.intra_schedule().compute_locally() .parallel(F.full(0)).parallel(F.outer(0));
             F.inter_schedule().compute_globally().parallel(F.full(0));
-            F.compile_jit();
+            F.compile_jit("tiled.html");
             time = F.realize(out, iterations);
-            cerr << "Ours tiled: \t" << time << " ms" << endl;
+            cerr << "Tiled: " << time << " ms" << endl;
         }
     }
+    return 0;
 
     // C++ non tiled implementation
     {
@@ -105,7 +106,7 @@ int main(int argc, char **argv) {
             time += double(end-start);
             delete [] out;
         }
-        cerr << "C++ non-tiled: \t" << time/double(iterations) << " ms" << endl;
+        cerr << "C++ naive: " << time/double(iterations) << " ms" << endl;
     }
 
     return 0;
