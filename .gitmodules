@@ -1,0 +1,3 @@
+[submodule "halide"]
+	path = halide
+	url = git@github.com:gchauras/halide

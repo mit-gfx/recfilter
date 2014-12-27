@@ -1,15 +1,14 @@
 # Recursive filtering using Halide
 
 ## Compiling and running
-You can obtain the Halide version by forking the modified [Halide](https://github.com/gchauras/Halide) repo.
+The [Halide](https://github.com/gchauras/Halide) version required for compiling this library is a submodule and it should download automatically.
 
-This modified version of the original [Halide](https://github.com/halide/Halide) repo is synced with the original Halide repo once a week. So you are not missing any cool Halide features.
-
-Environment variable <code>HALIDE_DIR</code> must point to the base of Halide directory that contains include and lib directories. The makefile in <code>code/</code> should build everything and place the executables in <code>code/bin</code>.
+The makefile in <code>code/</code> should build everything and place the executables in <code>code/bin</code>.
 
 ## Directory structure
 ```
 $(RECFILTER_DIR)
+ |- halide/           (Halide submodule)
  |- lib/              (RecFilter library)
  |- apps/
      |- cpu/          (CPU benchmarks in C/C++ with OpenMP)

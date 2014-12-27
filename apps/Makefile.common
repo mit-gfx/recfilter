@@ -2,13 +2,14 @@ CXX=g++ -std=c++11
 MKDIR=mkdir -p
 RM=rm -rf
 
-BIN_DIR=../../bin/
+BIN_DIR		  := ../../bin/
 
-RECFILTER_DIR=../../lib/
-RECFILTER_INC=$(RECFILTER_DIR)/recfilter.h
-RECFILTER_LIB=$(RECFILTER_DIR)/libRecFilter.a
+HALIDE_DIR 	  := ../../halide/
+HALIDE_LIB 	  := $(HALIDE_DIR)/bin/libHalide.a
 
-HALIDE_LIB=$(HALIDE_DIR)/bin/libHalide.a
+RECFILTER_DIR := ../../lib/
+RECFILTER_INC := $(RECFILTER_DIR)/recfilter.h
+RECFILTER_LIB := $(RECFILTER_DIR)/libRecFilter.a
 
 APPS := $(addprefix $(BIN_DIR)/,$(notdir $(SRC:.cpp=.app)))
 

@@ -16,43 +16,17 @@ int main(int argc, char **argv) {
     Arguments args(argc, argv);
 
     int width      = args.width;
-    int height     = 1;
+    int height     = 2;
     int tile_width = args.block;
     int iterations = args.iterations;
 
     Image<float> image = generate_random_image<float>(width,height);
 
-    vector<double> coeffs = {
-        1.0, // feedforward
-        1.0,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-        0.1,
-    };
-    int order = coeffs.size()-1;
+    int order = 3;
+    vector<double> coeffs(order+1, 0.1);
+    coeffs[0] = 1.0;
 
     cerr << "Order = " << order << ", array size = " << width << " channels = " << height << endl;
-
-    double time = 0.0;
 
     // Tiled implementation
     {
@@ -69,27 +43,31 @@ int main(int argc, char **argv) {
             cerr << "Filter only designed for CPU, change HL_JIT_TARGET to CPU target" << endl;
             assert(false);
         } else {
-            F.intra_schedule().compute_globally().parallel(F.full(0));
+            F.intra_schedule().compute_globally().parallel(F.full(0)).parallel(F.full(1));
             F.compile_jit("nontiled.html");
-            time = F.realize(out, iterations);
-            cerr << "Naive: " << time << " ms" << endl;
+            cerr << F << endl;
+            double time1 = F.realize(out, iterations);
 
             F.split(x, tile_width);
-            F.intra_schedule().compute_locally() .parallel(F.full(0)).parallel(F.outer(0));
-            F.inter_schedule().compute_globally().parallel(F.full(0));
+            F.intra_schedule().compute_locally() .vectorize(F.full(0)).parallel(F.outer(0));
+            F.inter_schedule().compute_globally().vectorize(F.full(0));
             F.compile_jit("tiled.html");
-            time = F.realize(out, iterations);
-            cerr << "Tiled: " << time << " ms" << endl;
+            cerr << F << endl;
+            double time2 = F.realize(out, iterations);
+
+            cerr << "Naive: " << time1 << " ms" << endl;
+            cerr << "Tiled: " << time2 << " ms" << endl;
         }
     }
     return 0;
 
     // C++ non tiled implementation
     {
+        unsigned long start, end;
         for (int n=0; n<iterations; n++) {
             float* out = new float[image.width() * image.height()];
 
-            unsigned long start = RecFilter::millisecond_timer();
+            start = RecFilter::millisecond_timer();
 #pragma omp parallel for
             for (int j=0; j<image.height(); j++) {
                 for (int i=0; i<image.width(); i++) {
@@ -101,12 +79,10 @@ int main(int argc, char **argv) {
                     }
                 }
             }
-            unsigned long end = RecFilter::millisecond_timer();
-
-            time += double(end-start);
+            end = RecFilter::millisecond_timer();
             delete [] out;
         }
-        cerr << "C++ naive: " << time/double(iterations) << " ms" << endl;
+        cerr << "C++ naive: " << double(end-start)/double(iterations) << " ms" << endl;
     }
 
     return 0;
