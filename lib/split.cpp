@@ -321,58 +321,54 @@ static void extract_tails_from_each_scan(RecFilterFunc& rF_intra, vector<SplitIn
 
 // -----------------------------------------------------------------------------
 
-/** Add an extra update def which assigns an undefined value to 1 pixel beyond the
- * max in the first dimension; this serves to padding the shared memory buffer
- * which in turns helps resolve bank conflicts
+/** Bank conflicts expected if there are one or more single tiled scan; add an
+ * extra update def which assigns an undefined value to column of pixels beyond
+ * the max in the first dimension; to pad the shared mem and avoid bank conflicts
  */
 static void add_padding_to_avoid_bank_conflicts(Function F, vector<SplitInfo> split_info) {
-    // bank conflicts expected only if there are some tiled scans
-    // else nothing to do
-    if (split_info.size()<=1) {
-        return;
-    }
-
     string var;
-    int tile_width = 0;
-    int tail_width = 0;
-    int padding    = 0;
+    int tile_width   = 0;
+    int filter_order = 0;
+    int num_scans    = 0;
+    int s_id         = -1;
 
-    // find the first dimension with a tiled scan
-    for (int i=0; var.empty() && i<split_info.size(); i++) {
-        if (split_info[i].num_scans>0) {
-            var = split_info[i].inner_var.name();
-            tile_width = split_info[i].tile_width;
-            tail_width = split_info[i].filter_order*split_info[i].num_scans;
+    // find the inner most dimension of shared mem storage
+    // that is also the inner var of one of the splits
+    for (int i=0; s_id<0 && i<F.args().size(); i++) {
+        string arg = F.args()[i];
+        for (int j=0; s_id<0 && j<split_info.size(); j++) {
+            if (arg == split_info[j].inner_var.name()) {
+                s_id = j;
+            }
         }
     }
 
-    // bank conflicts expected only if there are some tiled scans
-    // else nothing to do
-    if (var.empty()) {
-        return;
-    }
+    // find if the first dimension has a tiled scan
+    if (s_id>=0 && split_info[ s_id ].num_scans>0) {
+        var         = split_info[ s_id ].inner_var.name();
+        tile_width  = split_info[ s_id ].tile_width;
+        num_scans   = split_info[ s_id ].num_scans;
+        filter_order= split_info[ s_id ].filter_order;
 
-    // the total size of shared mem in this dimension must be an odd number
-    if (tile_width+tail_width % 2) {
-        padding = tile_width+tail_width+1;
-    } else {
-        padding = tile_width+tail_width+2;
-    }
+        // add an extra padding of 1
+        int shared_mem_width = tile_width + filter_order*num_scans;
+        int padding = shared_mem_width + 1;
 
-    // map inner var of first dimension to the extent computed above
-    // map inner vars of all other dimensions to 0
-    vector<Expr> args;
-    for (int i=0; i<F.args().size(); i++) {
-        string a = F.args()[i];
-        if (a == var) {
-            args.push_back(padding);
-        } else {
-            args.push_back(Var(a));
+        // map inner var of first dimension to the extent computed above
+        // map inner vars of all other dimensions to 0
+        vector<Expr> args;
+        for (int i=0; i<F.args().size(); i++) {
+            string a = F.args()[i];
+            if (a==var) {
+                args.push_back(padding);
+            } else {
+                args.push_back(Var(a));
+            }
         }
-    }
 
-    vector<Expr> undef_values(F.outputs(), undef(split_info[0].type));
-    F.define_update(args, undef_values);
+        vector<Expr> undef_values(F.outputs(), undef(split_info[0].type));
+        F.define_update(args, undef_values);
+    }
 
     // no need for scheduling tags for the last update def
 }
