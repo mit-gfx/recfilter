@@ -474,7 +474,7 @@ void RecFilter::compile_jit(string filename) {
     contents.ptr->compiled = true;
 }
 
-double RecFilter::realize(Buffer out, int iterations) {
+double RecFilter::realize(Buffer& out, int iterations) {
     if (!contents.ptr->compiled) {
         compile_jit();
     }
