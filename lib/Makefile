@@ -6,7 +6,7 @@ BUILD_DIR	  := _build
 
 HALIDE_DIR	  := ../halide
 HALIDE_INC 	  := $(HALIDE_DIR)/include/Halide.h
-HALIDE_SRC 	  := $(wildcard $(HALIDE_DIR)/src/*)
+HALIDE_MAKE   := $(HALIDE_DIR)/Makefile
 
 RECFILTER_LIB := libRecFilter.a
 RECFILTER_SRC := $(wildcard *.cpp)
@@ -23,8 +23,14 @@ $(RECFILTER_LIB): $(RECFILTER_OBJ)
 	ar q $(RECFILTER_LIB) $(RECFILTER_OBJ)
 	ranlib $(RECFILTER_LIB)
 
-$(HALIDE_INC): $(HALIDE_SRC)
+$(HALIDE_INC): $(HALIDE_MAKE)
 	make -C $(HALIDE_DIR) -j12
+
+$(HALIDE_MAKE):
+	pushd $(HALIDE_DIR)
+	git submodule init
+	git submodule update
+	popd
 
 clean:
 	$(RM) $(BUILD_DIR)
