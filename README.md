@@ -3,7 +3,7 @@
 ## Compiling and running
 The [Halide](https://github.com/gchauras/Halide) version required for compiling this library is a submodule and it should download automatically.
 
-The makefile in <code>code/</code> should build everything and place the executables in <code>code/bin</code>.
+The makefile in the base directory should build everything and place the executables in `bin`.
 
 ## Directory structure
 ```
