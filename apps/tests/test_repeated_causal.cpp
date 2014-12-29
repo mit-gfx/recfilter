@@ -40,8 +40,6 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    cerr << filter << endl;
-
     Buffer out(type_of<float>(),width,height);
     filter.realize(out);
 

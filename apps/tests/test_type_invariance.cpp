@@ -33,8 +33,6 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    cerr << filter << endl;
-
     Buffer out(type_of<int16_t>(),width,height);
     filter.realize(out);
 

@@ -46,9 +46,6 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    cerr << "\nGenerated Halide functions ... " << endl;
-    cerr << filter << endl;
-
     Buffer out(type_of<float>(),width,height);
     filter.realize(out);
 
