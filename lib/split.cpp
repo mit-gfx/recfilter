@@ -1748,6 +1748,22 @@ void RecFilter::finalize(void) {
             }
         }
     }
+    // check if any of the functions have a schedule
+    // true if all functions have default inline schedule
+    bool no_schedule_applied = true;
+    for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+        Function f = fit->second.func;
+        no_schedule_applied &= f.schedule().compute_level().is_inline();
+    }
+
+    // apply a default schedule to compute everything
+    // in global memory if no schedule has been used
+    if (no_schedule_applied) {
+        inter_schedule().compute_globally();
+        intra_schedule().compute_globally();
+        cerr << "Warning: Applied the following default schedule" << endl;
+        cerr << print_schedule() <<  endl;
+    }
 
     contents.ptr->finalized = true;
 }

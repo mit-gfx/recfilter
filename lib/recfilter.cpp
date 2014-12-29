@@ -536,8 +536,6 @@ string RecFilter::print_schedule(void) const {
     stringstream s;
     map<string,RecFilterFunc>::iterator f;
 
-    s << "// Function schedules \n\n";
-
     for (f=contents.ptr->func.begin(); f!=contents.ptr->func.end(); f++) {
         map<int,vector<string> >::iterator sit;
 
