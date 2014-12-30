@@ -11,7 +11,7 @@ using std::cerr;
 using std::endl;
 
 #define CHANNELS 1
-#define ORDER    9
+#define ORDER    1
 
 int main(int argc, char **argv) {
     Arguments args(argc, argv);
@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
 
     Image<float> image = generate_random_image<float>(width,CHANNELS);
 
-    vector<double> coeffs(ORDER+1, 0.1);
+    vector<double> coeffs(ORDER+1, 1);
     coeffs[0] = 1.0;
 
     cerr << "Order = " << ORDER << ", array size = " << width << " channels = " << CHANNELS << endl;
@@ -30,7 +30,6 @@ int main(int argc, char **argv) {
     // Tiled implementation
     {
         Buffer out;
-        Image<float> a, b;
 
         RecFilterDim x("x", width);
         RecFilterDim c("c", CHANNELS);
@@ -47,47 +46,40 @@ int main(int argc, char **argv) {
         F.intra_schedule().compute_globally().parallel(F.full(1));
         F.compile_jit("nontiled.html");
         double time1 = F.realize(out, iterations);
-        a = Image<float>(out);
 
         F.split(x, tile_width);
         F.intra_schedule().compute_locally() .vectorize(F.full(0)).parallel(F.outer(0));
         F.inter_schedule().compute_globally().vectorize(F.full(0));
         F.compile_jit("tiled.html");
         double time2 = F.realize(out, iterations);
-        b = Image<float>(out);
 
         cerr << "Naive: " << time1 << " ms" << endl;
-        cerr << a << endl;
         cerr << "Tiled: " << time2 << " ms" << endl;
-        cerr << b << endl;
     }
 
     // C++ non tiled implementation
     {
         unsigned long start, end, total;
+        int w = image.width();
+        int c = CHANNELS;
+
+        vector<float> out(image.width()*CHANNELS, 0.0f);
         for (int n=0; n<iterations; n++) {
-            Image<float> out(image.width(),CHANNELS);
+            std::copy(image.data(), image.data()+w*c, out.begin());
 
             start = RecFilter::millisecond_timer();
 #pragma omp parallel for
-            for (int j=0; j<CHANNELS; j++) {
-                for (int i=0; i<image.width(); i++) {
-                    out(i,j) = image(i,j);
-                }
-            }
-#pragma omp parallel for
-            for (int j=0; j<CHANNELS; j++) {
-                for (int i=0; i<image.width(); i++) {
+            for (int j=0; j<c; j++) {
+                for (int i=0; i<w; i++) {
                     float temp = 0.0f;
                     for (int k=0; k<ORDER+1; k++) {
-                        temp += (i-k>=0 ? coeffs[k]*out(i-k,j) : 0.0f);
+                        temp += (i-k>=0 ? coeffs[k]*out[j*w+i-k] : 0.0f);
                     }
-                    out(i,j) = temp;
+                    out[j*w+i] = temp;
                 }
             }
             end = RecFilter::millisecond_timer();
             total += (end-start);
-            cerr << out << endl;
         }
 
         cerr << "C++ naive: " << double(total)/double(iterations) << " ms" << endl;
