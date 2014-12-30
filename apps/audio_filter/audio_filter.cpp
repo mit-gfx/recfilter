@@ -69,19 +69,9 @@ int main(int argc, char **argv) {
             std::copy(image.data(), image.data()+w*c, out.begin());
 
             start = RecFilter::millisecond_timer();
-<<<<<<< HEAD
-            for (int j=0; j<CHANNELS; j++) {
-                for (int i=0; i<image.width(); i++) {
-                    out(i,j) = image(i,j);
-                }
-            }
-            for (int j=0; j<CHANNELS; j++) {
-                for (int i=0; i<image.width(); i++) {
-=======
 #pragma omp parallel for
             for (int j=0; j<c; j++) {
                 for (int i=0; i<w; i++) {
->>>>>>> master
                     float temp = 0.0f;
                     for (int k=0; k<ORDER+1; k++) {
                         temp += (i-k>=0 ? coeffs[k]*out[j*w+i-k] : 0.0f);
