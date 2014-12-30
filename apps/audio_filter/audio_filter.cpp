@@ -44,23 +44,20 @@ int main(int argc, char **argv) {
             assert(false);
         }
 
-        F.intra_schedule().compute_globally().parallel(F.full(1));
+        F.intra_schedule().compute_globally();
         F.compile_jit("nontiled.html");
         double time1 = F.realize(out, iterations);
-        a = Image<float>(out);
 
         F.split(x, tile_width);
-        F.intra_schedule().compute_locally() .vectorize(F.full(0)).parallel(F.outer(0));
-        F.inter_schedule().compute_globally().vectorize(F.full(0));
+        F.intra_schedule().compute_locally() ;
+        F.inter_schedule().compute_globally();
         F.compile_jit("tiled.html");
         double time2 = F.realize(out, iterations);
-        b = Image<float>(out);
 
         cerr << "Naive: " << time1 << " ms" << endl;
-        cerr << a << endl;
         cerr << "Tiled: " << time2 << " ms" << endl;
-        cerr << b << endl;
     }
+    return 0;
 
     // C++ non tiled implementation
     {
@@ -69,13 +66,11 @@ int main(int argc, char **argv) {
             Image<float> out(image.width(),CHANNELS);
 
             start = RecFilter::millisecond_timer();
-#pragma omp parallel for
             for (int j=0; j<CHANNELS; j++) {
                 for (int i=0; i<image.width(); i++) {
                     out(i,j) = image(i,j);
                 }
             }
-#pragma omp parallel for
             for (int j=0; j<CHANNELS; j++) {
                 for (int i=0; i<image.width(); i++) {
                     float temp = 0.0f;
