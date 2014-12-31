@@ -1,6 +1,6 @@
 SRC  := $(wildcard *.cpp)
 
-CXXFLAGS += -fopenmp
+CXXFLAGS += -fopenmp -O2
 LDFLAGS  += -lgomp
 
 include ../Makefile.common
