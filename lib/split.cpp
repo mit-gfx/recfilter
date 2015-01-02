@@ -398,8 +398,8 @@ static RecFilterFunc extract_tails_from_each_scan(
 
         rF_intra_tail.func = F_intra_tail;
         rF_intra_tail.func_category = REINDEX;
-        rF_intra_tail.var_category = rF_intra.var_category;
-        rF_intra_tail.var_category[tail_dimension_var] = TAIL;
+        rF_intra_tail.pure_var_category = rF_intra.pure_var_category;
+        rF_intra_tail.pure_var_category[tail_dimension_var] = TAIL;
     }
 
     // redefine the tail functions for each scans to index into the
@@ -725,7 +725,7 @@ static vector< vector<RecFilterFunc> > create_intra_tail_term(
             RecFilterFunc rf;
             rf.func = function;
             rf.func_category = INLINE;
-            rf.var_category = rF_intra.var_category;
+            rf.pure_var_category = rF_intra.pure_var_category;
 
             tail_functions_list[l].push_back(rf);
         }
