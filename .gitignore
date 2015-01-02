@@ -5,6 +5,9 @@ build/*
 obj/*
 bin/*
 
+# Ctags files
+tags
+
 # Compiled source
 *.o
 *.lib
