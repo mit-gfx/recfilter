@@ -104,8 +104,9 @@ static void convert_pure_def_into_first_update_def(RecFilterFunc& rF, vector<Spl
             for (int j=0; j<values.size(); j++) {
                 values[j] = substitute(xi.name(), rxi, values[j]);
             }
+            VarTag vc = update_var_category[xi.name()];
             update_var_category.erase(xi.name());
-            update_var_category.insert(make_pair(rxi.name(), update_var_category[xi.name()]));
+            update_var_category.insert(make_pair(rxi.name(), vc));
         }
         F.define_update(args, values);
     }
@@ -272,7 +273,7 @@ static RecFilterFunc extract_tails_from_each_scan(
             }
         }
     }
-    assert(tail_dimension_id>0);
+    assert(tail_dimension_id>=0);
 
     // add extra update steps to extract the tail after each scan copy in
     // memory outside tile boundaries in the dimension found above
@@ -714,13 +715,10 @@ static vector< vector<RecFilterFunc> > create_intra_tail_term(
             int scan_id = split_info[l].scan_id[k];
             int order   = split_info[l].filter_order;
 
-            vector<string> pure_args = F_intra.args();
-            vector<Expr> pure_values;
-            for (int i=0; i<F_intra.outputs(); i++) {
-                pure_values.push_back(undef(F_intra.output_types()[i]));
-            }
+            vector<string> args = F_intra.args();
+            vector<Expr>   values(F_intra.outputs(), undef(split_info[0].type));
 
-            function.define(pure_args, pure_values);
+            function.define(args, values);
 
             RecFilterFunc rf;
             rf.func = function;
