@@ -2,8 +2,8 @@ all:
 	make -C lib -j8
 	make -C apps
 
-doc:
-	doxygen
+doc: lib Doxyfile
+	doxygen Doxyfile
 
 clean:
 	make -C lib clean
