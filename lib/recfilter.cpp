@@ -475,10 +475,6 @@ void RecFilter::compile_jit(string filename) {
 }
 
 double RecFilter::realize(Buffer& out, int iterations) {
-    if (!contents.ptr->compiled) {
-        compile_jit();
-    }
-
     // check if any of the functions have a schedule
     // true if all functions have default inline schedule
     bool no_schedule_applied = true;
@@ -492,8 +488,12 @@ double RecFilter::realize(Buffer& out, int iterations) {
     if (no_schedule_applied) {
         inter_schedule().compute_globally();
         intra_schedule().compute_globally();
-        cerr << "Warning: Applied the following default schedule" << endl;
-        cerr << print_schedule() <<  endl;
+        cerr << "\nWarning: Applied the default schedule as follows\n" << endl;
+        cerr << print_schedule() << endl;
+    }
+
+    if (!contents.ptr->compiled) {
+        compile_jit();
     }
 
     Func F(internal_function(contents.ptr->name).func);
