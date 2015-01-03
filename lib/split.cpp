@@ -1822,39 +1822,29 @@ void RecFilter::finalize(void) {
             }
         }
 
-        // merge functions that reindex same previous result
-        // useful for all architectures
+        // check that all intra tile scans are reindexed by a unique function
         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
             RecFilterFunc rF = fit->second;
-
-            if (((rF.func_category==INTRA_1) || (rF.func_category==INTRA_N))
-                    && (rF.func.has_update_definition())) {
-                // get all functions that reindex the tail from intra tile computation
-                vector<string> funcs_to_merge;
+            if (rF.func_category==INTRA_1 || rF.func_category==INTRA_N) {
+                int num_reindexing_funcs = 0;
                 map<string,RecFilterFunc>::iterator git;
                 for (git=contents.ptr->func.begin(); git!=contents.ptr->func.end(); git++) {
-                    if ((git->second.func_category==REINDEX) &&
-                            (git->second.callee_func==rF.func.name())) {
-                        funcs_to_merge.push_back(git->second.func.name());
+                    if (git->second.func_category==REINDEX && git->second.callee_func==rF.func.name()) {
+                        num_reindexing_funcs++;
                     }
                 }
-
-                // merge these functions
-                // memory layout reshaping done inside merge routine
-                if (funcs_to_merge.size()>1) {
-                    string merged_name = funcs_to_merge[0] + "_merged";
-                    merge_func(funcs_to_merge, merged_name);
-                    fit = contents.ptr->func.begin();            // list changed, start again
+                if (num_reindexing_funcs>1) {
+                    cerr << rF.func.name() << " is reindexed by multiple functions. "
+                         << "This will make compute_locally schedules ambiguous" << endl;
+                    assert(false);
                 }
             }
         }
 
+        // move initialization to update def in intra tile computation stages
+        // add padding to intra tile terms to avoid bank conflicts
         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
             RecFilterFunc& rF = fit->second;
-
-            // move initialization to update def in intra tile computation stages
-            // add padding to intra tile terms to avoid bank conflicts
-
             if (rF.func_category==INTRA_1 && rF.func.has_update_definition()) {
                 convert_pure_def_into_first_update_def(rF, recfilter_split_info);
             }
