@@ -4,6 +4,7 @@ _build/*
 build/*
 obj/*
 bin/*
+doc/*
 
 # Ctags files
 tags
