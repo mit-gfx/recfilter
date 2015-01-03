@@ -418,7 +418,7 @@ static RecFilterFunc extract_tails_from_each_scan(
         for (int i=0; i<args.size(); i++) {
             call_args.push_back(Var(args[i]));
         }
-        call_args[tail_dimension_id] += tail_dimension_tile_width;
+        call_args[tail_dimension_id] += 0;
 
         for (int l=0; l<split_info.size(); l++) {
             int order = split_info[l].filter_order;
