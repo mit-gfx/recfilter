@@ -37,32 +37,29 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Func I("I");
     Func S("S");
 
     RecFilterDim x("x", width);
     RecFilterDim y("y", height);
 
-    I(x,y) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1));
-
     // convolve image with third derivative of three box filters
     S(x,y) =
-            ( 1.0 * I(x+0*box,y+0*box) +
-             -3.0 * I(x+1*box,y+0*box) +
-              3.0 * I(x+2*box,y+0*box) +
-             -1.0 * I(x+3*box,y+0*box) +
-             -3.0 * I(x+0*box,y+1*box) +
-              9.0 * I(x+1*box,y+1*box) +
-             -9.0 * I(x+2*box,y+1*box) +
-              3.0 * I(x+3*box,y+1*box) +
-              3.0 * I(x+0*box,y+2*box) +
-             -9.0 * I(x+1*box,y+2*box) +
-              9.0 * I(x+2*box,y+2*box) +
-             -3.0 * I(x+3*box,y+2*box) +
-             -1.0 * I(x+0*box,y+3*box) +
-              3.0 * I(x+1*box,y+3*box) +
-             -3.0 * I(x+2*box,y+3*box) +
-              1.0 * I(x+3*box,y+3*box)) / norm;
+            ( 1.0 * image(x+0*box,y+0*box) +
+             -3.0 * image(x+1*box,y+0*box) +
+              3.0 * image(x+2*box,y+0*box) +
+             -1.0 * image(x+3*box,y+0*box) +
+             -3.0 * image(x+0*box,y+1*box) +
+              9.0 * image(x+1*box,y+1*box) +
+             -9.0 * image(x+2*box,y+1*box) +
+              3.0 * image(x+3*box,y+1*box) +
+              3.0 * image(x+0*box,y+2*box) +
+             -9.0 * image(x+1*box,y+2*box) +
+              9.0 * image(x+2*box,y+2*box) +
+             -3.0 * image(x+3*box,y+2*box) +
+             -1.0 * image(x+0*box,y+3*box) +
+              3.0 * image(x+1*box,y+3*box) +
+             -3.0 * image(x+2*box,y+3*box) +
+              1.0 * image(x+3*box,y+3*box)) / norm;
 
     // ----------------------------------------------------------------------------------------------
 

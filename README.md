@@ -1,7 +1,7 @@
 # Recursive filtering using Halide
 
 ## Compiling and running
-The [Halide](https://github.com/gchauras/Halide) version required for compiling this library is a submodule and it should download automatically.
+The [Halide](https://github.com/gchauras/Halide) version required for compiling this library is a submodule and it should download automatically when you run `make` in the base directory.
 
 The makefile in the base directory should build everything and place the executables in `bin`.
 

@@ -241,7 +241,6 @@ ostream &operator<<(std::ostream &os, const RecFilterFunc &f) {
             s << "//\t" << it->first << "\t: " << it->second << "\n";
         }
         if (!f.update_var_category.empty()) {
-            s << "// \n";
             for (int i=0; i<f.update_var_category.size(); i++) {
                 s << "// Update def " << i << " tags \n";
                 for (it=f.update_var_category[i].begin(); it!=f.update_var_category[i].end(); it++) {

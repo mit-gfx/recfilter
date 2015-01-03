@@ -121,31 +121,6 @@ private:
     void finalize(void);
 
 public:
-    /**
-     * Merge multiple functions into a single function with mutiple outputs
-     * \param func_list list of functions to merge
-     * \param merged name of merged function
-     *
-     * Preconditions: functions to be merged must have
-     * - same pure args
-     * - scans with same update args and update domains in same order
-     *
-     * Side effects: all calls to the functions to be merged are replaced by the merged function
-     */
-    void merge_func(std::vector<std::string> func_list, std::string merged);
-
-    /** Reorder memory layout by swapping two dimensions of a function
-     *  \param func_name name of function whose dimensions have to be transposed
-     *  \param a variable name of the first dimension to be transposed
-     *  \param b variable name of the second dimension to be transposed
-     *
-     * Preconditions: none
-     *
-     * Side effects: dimensions are also transposed in all calls to the function
-     */
-    void transpose_dimensions(std::string func, std::string a, std::string b);
-
-public:
 
     /** Empty constructor */
     RecFilter(std::string name="");
@@ -273,27 +248,6 @@ public:
             );
     std::vector<RecFilter> cascade(
             std::vector<std::vector<int> > scan ///< list of scans for list of filters
-            );
-    // @}
-
-
-    /**@name Interleaving routines
-     *
-     * @brief Interleave two functions into a single function with output that contains
-     * the buffers of both the input functions.  The functions to be interleaved are
-     * searched in the dependency graph of functions required to compute the recursive filter
-     *
-     * Preconditions: functions to be interleaved must
-     * - have same args
-     * - be pure functions (no update defs)
-     */
-    // {@
-    void interleave_func(
-            std::string  func_a,    ///< name of first function to interleave
-            std::string  func_b,    ///< name of second function to interleave
-            std::string  merged,    ///< name of interleaved function
-            std::string  var,       ///< var to the used for interleaving
-            Halide::Expr stride     ///< interleaving stride
             );
     // @}
 

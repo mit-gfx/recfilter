@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
 
     filter.set_clamped_image_border();
 
-    filter(x, y) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1));
+    filter(x,y) = image(x,y);
 
     filter.add_filter(+x, {b0, W2[0], W2[1]});
     filter.add_filter(-x, {b0, W2[0], W2[1]});

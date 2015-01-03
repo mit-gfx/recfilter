@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
     RecFilterDim y("y", height);
 
     RecFilter filter;
-    filter(x, y) = image(clamp(x,0,image.width()-1),clamp(y,0,image.height()-1));
+    filter(x,y) = image(x,y);
 
     filter.add_filter(+x, {1.0, 1.0});
     filter.add_filter(+y, {1.0, 1.0});

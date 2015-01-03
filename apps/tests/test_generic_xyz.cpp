@@ -34,11 +34,7 @@ int main(int argc, char **argv) {
     RecFilterDim z("z", channels);
 
     RecFilter filter;
-    filter(x, y, z) = image(
-                clamp(x,0,image.width()-1),
-                clamp(y,0,image.height()-1),
-                clamp(z,0,image.channels()-1));
-
+    filter(x,y,z) = image(x,y,z);
     filter.add_filter(+x, {1.0f, W(0,0), W(0,1)});
     filter.add_filter(-x, {1.0f, W(1,0), W(1,1)});
     filter.add_filter(+y, {1.0f, W(2,0), W(2,1)});
