@@ -175,7 +175,7 @@ RecFilterSchedule& RecFilterSchedule::compute_locally(void) {
 
         Var outer_var;
 
-        // find the reindexing functions associated with this function
+        // find the reindexing function associated with this function
         // function that calls this function must be computed in the global mem
         Func callee_func;
         for (int i=0; i<func_list.size(); i++) {
@@ -213,12 +213,12 @@ RecFilterSchedule& RecFilterSchedule::compute_locally(void) {
                 RecFilterFunc& rf = recfilter.internal_function(func_list[i]);
                 if (rf.func_category==REINDEX && rf.caller_func==F.name()) {
                     Func(rf.func).compute_at(callee_func, outer_var);
-                    rf.pure_schedule.push_back("compute_at("+callee_func.name()+","+outer_var.name()+")");
+                    rf.pure_schedule.push_back("compute_at("+callee_func.name()+", Var(\""+outer_var.name()+"\"))");
                 }
             }
 
             F.compute_at(callee_func, outer_var);
-            rF.pure_schedule.push_back("compute_at("+callee_func.name()+","+outer_var.name()+")");
+            rF.pure_schedule.push_back("compute_at("+callee_func.name()+", Var(\""+outer_var.name()+"\"))");
         } else {
             cerr << "Warning: " << F.name() << " cannot be computed locally in "
                 << "another function because it is not called by any function" << endl;

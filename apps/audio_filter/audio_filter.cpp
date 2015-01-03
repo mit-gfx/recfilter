@@ -43,19 +43,20 @@ int main(int argc, char **argv) {
             assert(false);
         }
 
-        F.intra_schedule().compute_globally().parallel(F.full(1));
+        F.intra_schedule().compute_globally();
         F.compile_jit("nontiled.html");
         double time1 = F.realize(out, iterations);
 
         F.split(x, tile_width);
-        F.intra_schedule().compute_locally() .vectorize(F.full(0)).parallel(F.outer(0));
-        F.inter_schedule().compute_globally().vectorize(F.full(0));
+        F.intra_schedule().compute_locally() ;
+        F.inter_schedule().compute_globally();
         F.compile_jit("tiled.html");
         double time2 = F.realize(out, iterations);
 
         cerr << "Naive: " << time1 << " ms" << endl;
         cerr << "Tiled: " << time2 << " ms" << endl;
     }
+    return 0;
 
     // C++ non tiled implementation
     {
