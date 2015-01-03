@@ -341,9 +341,11 @@ static RecFilterFunc extract_tails_from_each_scan(
                     }
 
                     // same replacement in scheduling tags
-                    VarTag vc = update_var_category[scan_id][rxi[k].name()];
-                    new_update_var_category[scan_id].erase(rxi[k].name());
-                    new_update_var_category[scan_id].insert(make_pair(rxt[k].name(), vc));
+                    if (update_var_category[scan_id].find(rxi[k].name()) != update_var_category[scan_id].end()) {
+                        VarTag vc = update_var_category[scan_id][rxi[k].name()];
+                        new_update_var_category[scan_id].erase(rxi[k].name());
+                        new_update_var_category[scan_id].insert(make_pair(rxt[k].name(), vc));
+                    }
                 }
 
                 // swap the scan dimension and tail dimension to ensure that tails from
@@ -512,12 +514,7 @@ static RecFilterFunc create_intra_tile_term(
         Var x           = split_info[i].var;
         Var xi          = split_info[i].inner_var;
         Var xo          = split_info[i].outer_var;
-        RDom rx         = split_info[i].rdom;
-        RDom rxi        = split_info[i].inner_rdom;
         int tile_width  = split_info[i].tile_width;
-        int image_width = split_info[i].image_width;
-        int num_tiles   = split_info[i].num_tiles;
-        int filter_dim  = split_info[i].filter_dim;
 
         // replace x by xi in LHS pure args
         // replace x by tile*xo+xi in RHS values
@@ -1254,9 +1251,11 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
                     for (int u=0; u<args.size(); u++) {
                         args[u] = substitute(ryi[v].name(), ryt[v], args[u]);
                     }
-                    VarTag vc = uvar_category[ryi[v].name()];
-                    uvar_category.erase(ryi[v].name());
-                    uvar_category.insert(make_pair(ryt[v].name(), vc));
+                    if (uvar_category.find(ryi[v].name()) != uvar_category.end()) {
+                        VarTag vc = uvar_category[ryi[v].name()];
+                        uvar_category.erase(ryi[v].name());
+                        uvar_category.insert(make_pair(ryt[v].name(), vc));
+                    }
                 }
                 for (int v=0; v<ryi.dimensions(); v++) {
                     for (int u=0; u<values.size(); u++) {
@@ -1424,9 +1423,11 @@ static void add_all_residuals_to_final_result(
                 for (int u=0; u<values.size(); u++) {
                     values[u] = substitute(rxi[k].name(), rxt[k], values[u]);
                 }
-                VarTag v = new_update_var_category[curr_scan][rxi[k].name()];
-                new_update_var_category[curr_scan].erase(rxi[k].name());
-                new_update_var_category[curr_scan].insert(make_pair(rxt[k].name(), v));
+                if (new_update_var_category[curr_scan].find(rxi[k].name()) != new_update_var_category[curr_scan].end()) {
+                    VarTag v = new_update_var_category[curr_scan][rxi[k].name()];
+                    new_update_var_category[curr_scan].erase(rxi[k].name());
+                    new_update_var_category[curr_scan].insert(make_pair(rxt[k].name(), v));
+                }
 
                 // the new update runs the scan for the first t elements
                 // change the reduction domain of the original update to
@@ -1437,9 +1438,11 @@ static void add_all_residuals_to_final_result(
                 for (int u=0; u<updates[curr_scan].values.size(); u++) {
                     updates[curr_scan].values[u] = substitute(rxi[k].name(), rxf[k], updates[curr_scan].values[u]);
                 }
-                VarTag vc = update_var_category[curr_scan][rxi[k].name()];
-                update_var_category[curr_scan].erase(rxi[k].name());
-                update_var_category[curr_scan].insert(make_pair(rxf[k].name(), vc));
+                if (update_var_category[curr_scan].find(rxi[k].name()) != update_var_category[curr_scan].end()) {
+                    VarTag vc = update_var_category[curr_scan][rxi[k].name()];
+                    update_var_category[curr_scan].erase(rxi[k].name());
+                    update_var_category[curr_scan].insert(make_pair(rxf[k].name(), vc));
+                }
             }
 
             new_updates[curr_scan] = make_pair(args, values);
