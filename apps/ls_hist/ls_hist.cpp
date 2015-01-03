@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
         Func L("L_" + name);
 
         // pass image through histogram lookup table
-        L(x,y) = gaussIntegral(image(clamp(x,0,iw),clamp(y,0,ih)), BIN_CENTER(i), HIST_SIGMA);
+        L(x,y) = gaussIntegral(image(x,y), BIN_CENTER(i), HIST_SIGMA);
 
         // Gaussian filter using direct cognex blur
         Func G = gaussian_blur(L, GAUSS_SIGMA,

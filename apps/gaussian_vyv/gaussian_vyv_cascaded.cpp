@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
     RecFilter F;
     F.set_clamped_image_border();
 
-    F(x, y) = image(clamp(x,0,image.width()-1), clamp(y,0,image.height()-1));
+    F(x,y) = image(x,y);
 
     F.add_filter(+x, W1);
     F.add_filter(-x, W1);
