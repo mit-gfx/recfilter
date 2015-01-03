@@ -727,7 +727,7 @@ static vector< vector<RecFilterFunc> > create_intra_tail_term(
 
             RecFilterFunc rf;
             rf.func = function;
-            rf.func_category = REINDEX;
+            rf.func_category = INLINE;
             rf.pure_var_category = rF_intra.pure_var_category;
 
             tail_functions_list[l].push_back(rf);
@@ -803,7 +803,7 @@ static vector<RecFilterFunc> create_complete_tail_term(
                         }
                     }
                     else {
-                        args.push_back(simplify(num_tiles-1-rxo.y));
+                        args.push_back(num_tiles-1-rxo.y);
                         call_args_curr_tile.push_back(num_tiles-1-rxo.y);
                         for (int j=0; j<order; j++) {
                             call_args_prev_tile[j].push_back(min(num_tiles-rxo.y,num_tiles-1));
@@ -838,7 +838,7 @@ static vector<RecFilterFunc> create_complete_tail_term(
 
                 Expr val = Call::make(function, call_args_curr_tile, i) +
                     select(rxo.y>0, prev_tile_expr, make_zero(split_info.type));
-                values.push_back(simplify(val));
+                values.push_back(val);
             }
 
             function.define_update(args, values);
