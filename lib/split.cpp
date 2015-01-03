@@ -11,11 +11,9 @@ using std::cerr;
 using std::endl;
 using std::vector;
 using std::map;
-using std::set;
 using std::pair;
 using std::make_pair;
 using std::swap;
-using std::stringstream;
 
 // -----------------------------------------------------------------------------
 
@@ -1745,15 +1743,13 @@ void RecFilter::split(map<string,int> dim_tile) {
 
             Func(F).split(var, outer_var, inner_var, tile_width);
 
-            stringstream s;
-            s << "split(Var(\"" << var.name() << "\"), Var(\""
-                << outer_var.name() << "\"), Var(\"" << inner_var.name() << "\"), "
-                << tile_width << ")";
+            string s = "split(Var(\"" + var.name() + "\"), Var(\"" + outer_var.name()
+                + "\"), Var(\"" + inner_var.name() + "\"), " + int_to_string(tile_width) + ")";
 
             rF.pure_var_category.erase(var.name());
             rF.pure_var_category.insert(make_pair(inner_var.name(), VarTag(INNER,i)));
             rF.pure_var_category.insert(make_pair(outer_var.name(), VarTag(OUTER,i)));
-            rF.pure_schedule.push_back(s.str());
+            rF.pure_schedule.push_back(s);
         }
 
         // apply the bounds for the pure vars of the final result
