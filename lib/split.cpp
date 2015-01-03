@@ -14,6 +14,7 @@ using std::map;
 using std::set;
 using std::pair;
 using std::make_pair;
+using std::swap;
 using std::stringstream;
 
 // -----------------------------------------------------------------------------
@@ -299,6 +300,7 @@ static RecFilterFunc extract_tails_from_each_scan(
         for (int i=0; i<split_info.size(); i++) {
             int  dim   = split_info[i].filter_dim;
             int  order = split_info[i].filter_order;
+            Var  xi    = split_info[i].inner_var;
             RDom rxi   = split_info[i].inner_rdom;
             RDom rxt   = split_info[i].tail_rdom;
             int  tile  = split_info[i].tile_width;
@@ -316,13 +318,14 @@ static RecFilterFunc extract_tails_from_each_scan(
                 // copy the scheduling tags from the original update def
                 new_update_var_category[scan_id] = update_var_category[scan_id];
 
-                // find the arg of the undergoing the scan - the arg which uses rxi[dim]
+                // find the dimension the undergoing the scan
                 int scan_dimension = -1;
-                for (int u=0; scan_dimension<0 && u<args.size(); u++) {
-                    if (expr_depends_on_var(args[u], rxi[dim].name())) {
+                for (int u=0; scan_dimension<0 && pure_args.size(); u++) {
+                    if (xi.name() == pure_args[u]) {
                         scan_dimension = u;
                     }
                 }
+                assert(scan_dimension>=0);
 
                 // replace rxi by rxt (i.e. rxi.whatever by rxt.whatever)
                 // except for the dimension undergoing scan:
@@ -350,7 +353,7 @@ static RecFilterFunc extract_tails_from_each_scan(
 
                 // swap the scan dimension and tail dimension to ensure that tails from
                 // scans in any dimension are packed in the same dimension
-                std::swap(args[tail_dimension_id], args[scan_dimension]);
+                swap(args[tail_dimension_id], args[scan_dimension]);
 
                 // increment the offset where the tail from the next scan should be stored
                 next_tail_offset += order;
@@ -401,6 +404,7 @@ static RecFilterFunc extract_tails_from_each_scan(
 
         rF_intra_tail.func = F_intra_tail;
         rF_intra_tail.func_category = REINDEX;
+        rF_intra_tail.callee_func   = F_intra.name();
         rF_intra_tail.pure_var_category = rF_intra.pure_var_category;
         rF_intra_tail.pure_var_category[tail_dimension_var] = TAIL;
     }
@@ -420,11 +424,17 @@ static RecFilterFunc extract_tails_from_each_scan(
 
         for (int l=0; l<split_info.size(); l++) {
             int order = split_info[l].filter_order;
+            Var xi = split_info[l].inner_var;
+            Var yi = args[tail_dimension_id];
+            Var t  = unique_name(xi.name() + yi.name());
             for (int k=0; k<split_info[l].num_scans; k++) {
-                call_args[tail_dimension_id] += order;
                 for (int i=0; i<values.size(); i++) {
                     values[i] = Call::make(F_intra_tail, call_args, i);
+                    values[i] = substitute(xi.name(), t,  values[i]);
+                    values[i] = substitute(yi.name(), xi, values[i]);
+                    values[i] = substitute(t.name(),  yi, values[i]);
                 }
+                call_args[tail_dimension_id] += order;
                 Function ftail = rF_tail[l][k].func;
                 ftail.clear_all_definitions();
                 ftail.define(args, values);
@@ -719,7 +729,7 @@ static vector< vector<RecFilterFunc> > create_intra_tail_term(
 
             RecFilterFunc rf;
             rf.func = function;
-            rf.func_category = INLINE;
+            rf.func_category = REINDEX;
             rf.pure_var_category = rF_intra.pure_var_category;
 
             tail_functions_list[l].push_back(rf);
