@@ -1,6 +1,6 @@
-CXX=g++ -std=c++11
-MKDIR=mkdir -p
-RM=rm -rf
+MKDIR	:= mkdir -p
+RM		:= rm -rf
+CXX		:= g++ -std=c++11 -O3
 
 BUILD_DIR	  := _build
 

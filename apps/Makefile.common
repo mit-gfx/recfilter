@@ -1,6 +1,7 @@
-CXX=g++ -std=c++11
-MKDIR=mkdir -p
-RM=rm -rf
+MKDIR	:= mkdir -p
+BIN_DIR	:= ../bin
+RM		:= rm -f
+CXX		:= g++ -std=c++11 -O3
 
 BIN_DIR		  := ../../bin/
 
