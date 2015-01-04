@@ -1,10 +1,13 @@
-MKDIR=mkdir -p
-BIN_DIR=../bin/
-RM=rm -f
-CP=cp -f
-MAKE=make -C
+MKDIR	:= mkdir -p
+BIN_DIR	:= ../bin
+RM		:= rm -f
+CP		:= cp -f
+MAKE	:= make -C
 
-all:
+SCRIPTS 	:= $(wildcard *.sh)
+BIN_SCRIPTS := $(addprefix $(BIN_DIR)/,$(SCRIPTS))
+
+all: scripts
 	$(MKDIR) $(BIN_DIR)
 	$(MAKE) ../lib -j8
 	$(MAKE) tests -j8
@@ -16,9 +19,8 @@ all:
 	$(MAKE) audio_filter
 	$(MAKE) cpu
 	$(MAKE) gpu
-	$(CP) opencl_profile.sh $(BIN_DIR)/
 
-clean:
+clean: clean_scripts
 	$(MAKE) ../lib clean
 	$(MAKE) tests clean
 	$(MAKE) boxcar clean
@@ -29,4 +31,11 @@ clean:
 	$(MAKE) audio_filter clean
 	$(MAKE) cpu clean
 	$(MAKE) gpu clean
-	$(RM) $(BIN_DIR)/opencl_profile.sh
+
+$(BIN_DIR)/%.sh: %.sh
+	$(CP) $< $@
+
+scripts: $(BIN_SCRIPTS)
+
+clean_scripts:
+	$(RM) $(BIN_SCRIPTS)
