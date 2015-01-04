@@ -68,11 +68,22 @@ static map<string, RecFilterFunc> recfilter_func_list;
 
 // -----------------------------------------------------------------------------
 
-/** Convert the pure def into the first update def leave the pure def undefined */
-static void convert_pure_def_into_first_update_def(RecFilterFunc& rF, vector<SplitInfo> split_info) {
+/** Convert the pure def into the first update def and leave the pure def undefined
+ * \param[in,out] rF function to be modified
+ * \param[in] split_info tiling metadata
+ */
+static void convert_pure_def_into_first_update_def(
+        RecFilterFunc& rF,
+        vector<SplitInfo> split_info)
+{
     assert(!split_info.empty());
 
     Function F = rF.func;
+
+    // nothing needed if the function is pure
+    if (F.is_pure()) {
+        return;
+    }
 
     vector<string> pure_args = F.args();
     vector<Expr> values = F.values();
@@ -123,13 +134,20 @@ static void convert_pure_def_into_first_update_def(RecFilterFunc& rF, vector<Spl
 // -----------------------------------------------------------------------------
 
 
-/** @brief Weight coefficients (tail_size x tile_width) for
- * applying scans corresponding to split indices split_id1 to
- * split_id2 in the SplitInfo struct (defined in coefficients.cpp).
- * It is meaningful to apply subsequent scans on the tail of any scan
- * as it undergoes other scans only if they happen after the first
- * scan. The SpliInfo object stores the scans in reverse order, hence indices
- * into the SplitInfo object split_id1 and split_id2 must be decreasing
+/** Weight coefficients (tail_size x tile_width) for applying scans corresponding
+ * to split indices split_id1 to split_id2 in split_info object; it is meaningful
+ * to apply subsequent scans on the tail of any scan as it undergoes other scans
+ * only if they happen after the first scan.
+ *
+ * Preconditions:
+ * - split_id1 and split_id2 must be decreasing because spli_info stores
+ *   scans in reverse order
+ *
+ * \param[in] s tiling metadata for the current dimension
+ * \param[in] split_id1 index of one of the scans in the current dimension
+ * \param[in] split_id2 index of one of the scans in the current dimension
+ * \param[in] clamp_border adjust coefficients for clamped image borders
+ * \returns matrix of coefficients
  */
 Image<double> tail_weights(SplitInfo s, int split_id1, int split_id2, bool clamp_border=false) {
     assert(split_id1 >= split_id2);
@@ -162,8 +180,13 @@ Image<double> tail_weights(SplitInfo s, int split_id1, int split_id2, bool clamp
     return matrix_transpose(R);
 }
 
-/** @brief Weight coefficients (tail_size x tile_width) for
- * applying scan's corresponding to split indices split_id1
+/** Weight coefficients (tail_size x tile_width) for applying scan's corresponding
+ * to split indices split_id1
+ *
+ * \param[in] s tiling metadata for the current dimension
+ * \param[in] split_id index of one of the scans in the current dimension
+ * \param[in] clamp_border adjust coefficients for clamped image borders
+ * \returns matrix of coefficients
  */
 Image<double> tail_weights(SplitInfo s, int split_id1, bool clamp_border=false) {
     return tail_weights(s, split_id1, split_id1, clamp_border);
@@ -171,6 +194,14 @@ Image<double> tail_weights(SplitInfo s, int split_id1, bool clamp_border=false) 
 
 // -----------------------------------------------------------------------------
 
+/**
+ * Reorder the update defs such that update defs in first dimension come first,
+ * followed by next dimension and so on; this can be performed because dimensions
+ * are separable and this allows clean tiling semantics
+ *
+ * \param[in] F function containing scans in multiple dimensions
+ * \param[in] filter_info scan info aboout all dimensions
+*/
 static vector<FilterInfo> group_scans_by_dimension(Function F, vector<FilterInfo> filter_info) {
     vector<string> args = F.args();
     vector<Expr>  values = F.values();
@@ -204,7 +235,10 @@ static vector<FilterInfo> group_scans_by_dimension(Function F, vector<FilterInfo
 
 /** Make sure that all vars with tags INNER, OUTER or FULL have VarTag count in
  * continuous increasing order - this continuity was broken during splitting where
- * vars were replaced by inner/outer/tail vars */
+ * vars were replaced by inner/outer/tail vars
+ *
+ * \param[in,out] var_tags list of variable tags to be modified
+ */
 static void reassign_vartag_counts(map<string,VarTag>& var_tags) {
     vector<VariableTag> ref_vartag = {INNER, OUTER, FULL};
 
@@ -244,6 +278,9 @@ static void reassign_vartag_counts(map<string,VarTag>& var_tags) {
  * to ensure subsequent scans do not overwrite the tails from previous scans; the
  * tails from all the scans are packed into the same dimension - the innermost
  * tiled dimension
+ * \param[in,out] rF_intra intra tile term that computes intra tile scans
+ * \param[in,out] rF_tail list of empty tail functions for each scan of each dimension
+ * \param[in] split_info tiling metadata
  */
 static RecFilterFunc extract_tails_from_each_scan(
         RecFilterFunc& rF_intra,
@@ -377,6 +414,48 @@ static RecFilterFunc extract_tails_from_each_scan(
                 rF_intra.update_var_category.push_back(new_update_var_category[i]);
             }
         }
+
+        // add a final update def to resolve bank conflicts
+        // add one pixel to the innermost split dimension
+        {
+            int innermost_tiled_dim_id = -1;
+            int innermost_tiled_dim_buffer_width = 0;
+
+            // find the innermost tiled dimension
+            for (int i=0; i<F_intra.args().size(); i++) {
+                string arg = F_intra.args()[i];
+                for (int j=0; innermost_tiled_dim_id<0 && j<split_info.size(); j++) {
+                    if (arg==split_info[j].inner_var.name()) {
+                        innermost_tiled_dim_id = j;
+                        innermost_tiled_dim_buffer_width = split_info[j].tile_width;
+                    }
+                }
+            }
+            assert(innermost_tiled_dim_id>=0);
+
+            // if this dimension is the same in which the tails have been packed
+            // then the width of the buffer is the tile width plus all the tails
+            if (innermost_tiled_dim_id == tail_dimension_id) {
+                for (int j=0; j<split_info.size(); j++) {
+                    int tail_width = split_info[j].filter_order * split_info[j].num_scans;
+                    innermost_tiled_dim_buffer_width += tail_width;
+                }
+            }
+
+            vector<Expr> args;
+            vector<Expr> values;
+            for (int i=0; i<F_intra.args().size(); i++) {
+                if (i==innermost_tiled_dim_id) {
+                    args.push_back(innermost_tiled_dim_buffer_width);
+                } else {
+                    args.push_back(Var(F_intra.args()[i]));
+                }
+            }
+            for (int i=0; i<F_intra.outputs(); i++) {
+                values.push_back(undef(F_intra.output_types()[i]));
+            }
+            F_intra.define_update(args, values);
+        }
     }
 
     // copy the extended buffer into a separate function, this is the function
@@ -441,60 +520,6 @@ static RecFilterFunc extract_tails_from_each_scan(
     }
 
     return rF_intra_tail;
-}
-
-// -----------------------------------------------------------------------------
-
-/** Bank conflicts expected if there are one or more single tiled scan; add an
- * extra update def which assigns an undefined value to column of pixels beyond
- * the max in the first dimension; to pad the shared mem and avoid bank conflicts
- */
-static void add_padding_to_avoid_bank_conflicts(Function F, vector<SplitInfo> split_info) {
-    string var;
-    int tile_width   = 0;
-    int filter_order = 0;
-    int num_scans    = 0;
-    int s_id         = -1;
-
-    // find the inner most dimension of shared mem storage
-    // that is also the inner var of one of the splits
-    for (int i=0; s_id<0 && i<F.args().size(); i++) {
-        string arg = F.args()[i];
-        for (int j=0; s_id<0 && j<split_info.size(); j++) {
-            if (arg == split_info[j].inner_var.name()) {
-                s_id = j;
-            }
-        }
-    }
-
-    // find if the first dimension has a tiled scan
-    if (s_id>=0 && split_info[ s_id ].num_scans>0) {
-        var         = split_info[ s_id ].inner_var.name();
-        tile_width  = split_info[ s_id ].tile_width;
-        num_scans   = split_info[ s_id ].num_scans;
-        filter_order= split_info[ s_id ].filter_order;
-
-        // add an extra padding of 1
-        int shared_mem_width = tile_width + filter_order*num_scans;
-        int padding = shared_mem_width + 1;
-
-        // map inner var of first dimension to the extent computed above
-        // map inner vars of all other dimensions to 0
-        vector<Expr> args;
-        for (int i=0; i<F.args().size(); i++) {
-            string a = F.args()[i];
-            if (a==var) {
-                args.push_back(padding);
-            } else {
-                args.push_back(Var(a));
-            }
-        }
-
-        vector<Expr> undef_values(F.outputs(), undef(split_info[0].type));
-        F.define_update(args, undef_values);
-    }
-
-    // no need for scheduling tags for the last update def
 }
 
 // -----------------------------------------------------------------------------
@@ -1185,6 +1210,14 @@ static void add_residual_to_tails(
 
 // -----------------------------------------------------------------------------
 
+/**
+ * \param[in] rF_intra intra tile term that computes intra tile scans
+ * \param[in] rF_tail  list of tail functions for each scan of current dimension
+ * \param[in] rF_tail_prev list of tail functions for each scan of prev dimension
+ * \param[in] split_info      tiling metadata for current dimension
+ * \param[in] split_info_prev tiling metadata for previous dimension
+ * \returns list of intra-tile functions that compute inter-dimension residuals
+ */
 static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
         RecFilterFunc         rF_intra,
         vector<RecFilterFunc> rF_tail,
@@ -1377,7 +1410,17 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
 
 // -----------------------------------------------------------------------------
 
-static void add_all_residuals_to_final_result(
+/**
+ * Add the residuals to the final result: the residual from each scan is available
+ * is a separate Func and the final result applies all the scans within tiles;
+ * modify this such that the residuals of each scan are added to the first k
+ * elements of the tile before applying the scan, the scan itself begins from
+ * element k+1 and propagates the effect of residuals to the whole tile.
+ * \param[in,out] rF final term that computes intra tile scans without residuals
+ * \param[in] rF_deps list of residual functions for each scan of each dimension
+ * \param[in] split_info tiling metadata
+ */
+static void add_residuals_to_final_result(
         RecFilterFunc& rF,
         vector< vector<RecFilterFunc> > rF_deps,
         vector<SplitInfo> split_info)
@@ -1470,6 +1513,40 @@ static void add_all_residuals_to_final_result(
         }
         F.define_update(updates[i].args, updates[i].values);
         rF.update_var_category.push_back(update_var_category[i]);
+    }
+
+    // add a final update def to resolve bank conflicts
+    // add one pixel to the innermost split dimension
+    {
+        int innermost_tiled_dim_id = -1;
+        int innermost_tiled_dim_buffer_width = 0;
+
+        // find the innermost tiled dimension
+        for (int i=0; i<F.args().size(); i++) {
+            string arg = F.args()[i];
+            for (int j=0; innermost_tiled_dim_id<0 && j<split_info.size(); j++) {
+                if (arg==split_info[j].inner_var.name()) {
+                    innermost_tiled_dim_id = j;
+                    innermost_tiled_dim_buffer_width = split_info[j].tile_width;
+                }
+            }
+        }
+        assert(innermost_tiled_dim_id>=0);
+
+        vector<Expr> args;
+        vector<Expr> values;
+        for (int i=0; i<F.args().size(); i++) {
+            if (i==innermost_tiled_dim_id) {
+                args.push_back(innermost_tiled_dim_buffer_width);
+            } else {
+                args.push_back(Var(F.args()[i]));
+            }
+        }
+        args[innermost_tiled_dim_id] = innermost_tiled_dim_buffer_width;
+        for (int i=0; i<F.outputs(); i++) {
+            values.push_back(undef(F.output_types()[i]));
+        }
+        F.define_update(args, values);
     }
 }
 
@@ -1687,7 +1764,7 @@ void RecFilter::split(map<string,int> dim_tile) {
         RecFilterFunc rF_intra_tail = extract_tails_from_each_scan(rF_intra, rF_tail, recfilter_split_info);
 
         // add all the residuals to the final term
-        add_all_residuals_to_final_result(rF_final, rF_deps, recfilter_split_info);
+        add_residuals_to_final_result(rF_final, rF_deps, recfilter_split_info);
 
         // add the intra, final and tail terms to the list functions
         recfilter_func_list.insert(make_pair(rF_intra.func.name(), rF_intra));
@@ -1831,7 +1908,7 @@ void RecFilter::finalize(void) {
                 }
                 if (num_reindexing_funcs>1) {
                     cerr << rF.func.name() << " is reindexed by multiple functions. "
-                         << "This will make compute_locally schedules ambiguous" << endl;
+                        << "This will make compute_locally schedules ambiguous" << endl;
                     assert(false);
                 }
             }
@@ -1841,14 +1918,8 @@ void RecFilter::finalize(void) {
         // add padding to intra tile terms to avoid bank conflicts
         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
             RecFilterFunc& rF = fit->second;
-            if (rF.func_category==INTRA_1 && rF.func.has_update_definition()) {
+            if (rF.func_category==INTRA_1 || rF.func_category==INTRA_N) {
                 convert_pure_def_into_first_update_def(rF, recfilter_split_info);
-            }
-            if (rF.func_category==INTRA_N && rF.func.has_update_definition()) {
-                convert_pure_def_into_first_update_def(rF, recfilter_split_info);
-                if (contents.ptr->target.has_gpu_feature()) {
-                    add_padding_to_avoid_bank_conflicts(rF.func, recfilter_split_info);
-                }
             }
         }
     }
