@@ -33,6 +33,7 @@ clean: clean_scripts
 	$(MAKE) gpu clean
 
 $(BIN_DIR)/%.sh: %.sh
+	$(MKDIR) $(BIN_DIR)
 	$(CP) $< $@
 
 scripts: $(BIN_SCRIPTS)

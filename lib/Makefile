@@ -21,12 +21,10 @@ $(RECFILTER_LIB): $(RECFILTER_OBJ)
 	ar q $(RECFILTER_LIB) $(RECFILTER_OBJ)
 	ranlib $(RECFILTER_LIB)
 
-$(HALIDE_INC): $(HALIDE_SRC)
+$(HALIDE_INC): $(HALIDE_MAKE)
 	make -C $(HALIDE_DIR) -j12
 
-$(HALIDE_SRC): halide_clone
-
-halide_clone:
+$(HALIDE_MAKE):
 	cd $(HALIDE_DIR)
 	git submodule init
 	git submodule update
