@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
     ImageParam image(type_of<int16_t>(), 2);
     image.set(random_image);
 
-    vector<double> W = {1.0, -1.0};
+    vector<float> W = {1.0, -1.0};
 
     RecFilterDim x("x", width), y("y", height);
 

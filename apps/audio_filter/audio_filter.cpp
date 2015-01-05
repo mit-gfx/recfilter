@@ -20,12 +20,12 @@ int main(int argc, char **argv) {
 
     Image<float> image = generate_random_image<float>(width,CHANNELS);
 
-    std::vector<double> coeffs(ORDER+1, 1);
+    std::vector<float> coeffs(ORDER+1, 1);
     coeffs[0] = 1.0;
 
     Buffer out;
 
-    double time1, time2;
+    float time1, time2;
 
     RecFilterDim x("x", width);
     RecFilterDim c("c", CHANNELS);

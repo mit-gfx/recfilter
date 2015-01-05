@@ -29,9 +29,9 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    double sigma = 5.0;
-    vector<double> W1 = gaussian_weights(sigma, 1);
-    vector<double> W2 = gaussian_weights(sigma, 2);
+    float sigma = 5.0;
+    vector<float> W1 = gaussian_weights(sigma, 1);
+    vector<float> W2 = gaussian_weights(sigma, 2);
 
     RecFilterDim x("x", width);
     RecFilterDim y("y", height);
@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
     F2.compile_jit("hl_stmt.html");
 
     Buffer out(type_of<float>(), width, height);
-    double time = F2.realize(out, iterations);
+    float time = F2.realize(out, iterations);
     cerr << width << "\t" << time << endl;
 
     // ----------------------------------------------------------------------------------------------

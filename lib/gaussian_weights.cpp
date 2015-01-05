@@ -29,7 +29,7 @@ static int factorial(int k) {
  *  See "Recursive Gaussian derivative filters" [van Vliet et al. 1998]
  *  for details on derivation.
  */
-static double qs(const double& s) {
+static float qs(const float& s) {
     return 0.00399341 + 0.4715161 * s;
 }
 
@@ -51,7 +51,7 @@ static double qs(const double& s) {
  *  See "Recursive Gaussian derivative filters" [van Vliet et al. 1998]
  *  for details on derivation.
  */
-static std::complex<double> ds(const std::complex<double>& d, const double& s) {
+static std::complex<double> ds(const std::complex<double>& d, const float& s) {
     double q = qs(s);
     return std::polar(std::pow(std::abs(d), 1.0/q), std::arg(d)/q);
 }
@@ -66,7 +66,7 @@ static std::complex<double> ds(const std::complex<double>& d, const double& s) {
  *  @param[in] d Real pole of a stable recursive filter
  *  @param[in] s Sigma support of the true Gaussian filter
  *  @return Rescaled real pole of the recursive filter approximation
- *  @tparam double Sigma value type
+ *  @tparam float Sigma value type
  *
  *  Code taken from "GPU efficient recursive filtering and summed area tables"
  *  [Nehab et al. 2011]
@@ -74,7 +74,7 @@ static std::complex<double> ds(const std::complex<double>& d, const double& s) {
  *  See "Recursive Gaussian derivative filters" [van Vliet et al. 1998]
  *  for details on derivation.
  */
-static double ds(const double& d, const double& s ) {
+static float ds(const float& d, const float& s ) {
     return std::pow(d, 1.0/qs(s));
 }
 
@@ -94,9 +94,9 @@ static double ds(const double& d, const double& s ) {
  *  See "Recursive Gaussian derivative filters" [van Vliet et al. 1998]
  *  for details on derivation.
  */
-static void weights1(const double& s, double& b0, double& a1) {
-    const double d3 = 1.86543;
-    double d = ds(d3, s);
+static void weights1(const float& s, float& b0, float& a1) {
+    const float d3 = 1.86543;
+    float d = ds(d3, s);
     b0 = -(1.0-d)/d;
     a1 = -1.0/d;
 }
@@ -118,12 +118,12 @@ static void weights1(const double& s, double& b0, double& a1) {
  *  See "Recursive Gaussian derivative filters" [van Vliet et al. 1998]
  *  for details on derivation.
  */
-static void weights2(const double& s, double& b0, double& a1, double& a2) {
+static void weights2(const float& s, float& b0, float& a1, float& a2) {
     const std::complex<double> d1(1.41650, 1.00829);
     std::complex<double> d = ds(d1, s);
-    double n2 = std::abs(d);
+    float n2 = std::abs(d);
     n2 *= n2;
-    double re = std::real(d);
+    float re = std::real(d);
     b0 = (1.0-2.0*re+n2)/n2;
     a1 = -2.0*re/n2;
     a2 = 1.0/n2;
@@ -141,9 +141,9 @@ static void weights2(const double& s, double& b0, double& a1, double& a2) {
  *  Coefficients equivalent to applying a first order recursive filter followed
  *  by second order filter
  */
-static void weights3(const double& s, double& b0, double& a1, double& a2, double& a3) {
-    double b10, b20;
-    double a11, a21, a22;
+static void weights3(const float& s, float& b0, float& a1, float& a2, float& a3) {
+    float b10, b20;
+    float a11, a21, a22;
     weights1(s, b10, a11);
     weights2(s, b20, a21, a22);
     a1 = a11+a21;
@@ -153,9 +153,9 @@ static void weights3(const double& s, double& b0, double& a1, double& a2, double
 }
 
 
-vector<double> gaussian_weights(double sigma, int order) {
-    double b0 = 0.0;
-    vector<double> a(order+1, 0.0);
+vector<float> gaussian_weights(float sigma, int order) {
+    float b0 = 0.0;
+    vector<float> a(order+1, 0.0);
 
     switch(order) {
         case 1: weights1(sigma, a[0], a[1]); break;
@@ -170,44 +170,44 @@ vector<double> gaussian_weights(double sigma, int order) {
     return a;
 }
 
-Expr gaussian(Expr x, double mu, double sigma) {
-    Expr xx = Internal::Cast::make(type_of<double>(),x);
+Expr gaussian(Expr x, float mu, float sigma) {
+    Expr xx = Internal::Cast::make(type_of<float>(),x);
     Expr y = (xx - mu) / sigma;
     return Halide::fast_exp(-0.5*y*y) / (sigma * 2.50662827463);
 }
-Expr gaussDerivative(Expr x, double mu, double sigma) {
-    Expr xx = Internal::Cast::make(type_of<double>(),x);
+Expr gaussDerivative(Expr x, float mu, float sigma) {
+    Expr xx = Internal::Cast::make(type_of<float>(),x);
     Expr y = (xx - mu) / sigma;
     return (mu - xx) * Halide::fast_exp(-0.5*y*y) / (sigma*sigma*sigma * 2.50662827463);
 }
-Expr gaussIntegral(Expr x, double mu, double sigma) {
-    Expr xx = Internal::Cast::make(type_of<double>(),x);
+Expr gaussIntegral(Expr x, float mu, float sigma) {
+    Expr xx = Internal::Cast::make(type_of<float>(),x);
     return 0.5 * ( 1.0 + Halide::erf((xx-mu) / (sigma * 1.41421356237)) );
 }
-double gaussian(double x, double mu, double sigma) {
-    double y = (x - mu) / sigma;
+float gaussian(float x, float mu, float sigma) {
+    float y = (x - mu) / sigma;
     return (std::exp(-0.5*y*y) / (sigma * 2.50662827463));
 }
-double gaussDerivative(double x, double mu, double sigma) {
-    double y = (x - mu) / sigma;
+float gaussDerivative(float x, float mu, float sigma) {
+    float y = (x - mu) / sigma;
     return ((mu - x) * std::exp(-0.5*y*y) / (sigma*sigma*sigma * 2.50662827463));
 }
-double gaussIntegral(double x, double mu, double sigma) {
+float gaussIntegral(float x, float mu, float sigma) {
     return (0.5 * ( 1.0 + erf((x-mu) / (sigma * 1.41421356237)) ));
 }
 
-int gaussian_box_filter(int k, double sigma) {
-    double sum = 0.0;
-    double alpha = 0.005;
-    int sum_limit = int(std::floor((double(k)-1.0)/2.0));
+int gaussian_box_filter(int k, float sigma) {
+    float sum = 0.0;
+    float alpha = 0.005;
+    int sum_limit = int(std::floor((float(k)-1.0)/2.0));
     for (int i=0; i<=sum_limit; i++) {
         int f_k   = factorial(k);
         int f_i   = factorial(i);
         int f_k_i = factorial(k-i);
         int f_k_1 = factorial(k-1);
-        double f   = double(f_k / (f_i*f_k_i));
-        double p   = std::pow(-1.0,i)/double(f_k_1);
-        sum      += p * f * std::pow((double(k)/2.0-i), k-1);
+        float f   = float(f_k / (f_i*f_k_i));
+        float p   = std::pow(-1.0,i)/float(f_k_1);
+        sum      += p * f * std::pow((float(k)/2.0-i), k-1);
     }
     sum = std::sqrt(2.0*M_PI) * (sum+alpha) * sigma;
     return int(std::ceil(sum));

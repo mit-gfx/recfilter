@@ -160,7 +160,7 @@ public:
      * \param iterations number of profiling iterations
      * \returns computation time in milliseconds (not including device-host transfers)
      */
-    double realize(Halide::Buffer& out, int iterations=1);
+    float realize(Halide::Buffer& out, int iterations=1);
     // @}
 
 
@@ -176,8 +176,8 @@ public:
      * - first argument must of of the form +x, -x or x where x is a RecFilterDim object
      */
     // {@
-    void add_filter(RecFilterDim x, std::vector<double> coeff);
-    void add_filter(RecFilterDimAndCausality x, std::vector<double> coeff);
+    void add_filter(RecFilterDim x, std::vector<float> coeff);
+    void add_filter(RecFilterDimAndCausality x, std::vector<float> coeff);
     // @}
 
     /** @name Image boundary conditions
@@ -528,7 +528,7 @@ std::ostream &operator<<(std::ostream &s, Halide::Image<T> image) {
     else if (image.dimensions() == 2) {
         for (size_t y=image.min(1); y<image.min(1)+image.extent(1); y++) {
             for (size_t x=image.min(0); x<image.min(0)+image.extent(0); x++) {
-                s << std::setw(precision) << double(image(x,y)) << " ";
+                s << std::setw(precision) << float(image(x,y)) << " ";
             }
             s << "\n";
         }
@@ -537,7 +537,7 @@ std::ostream &operator<<(std::ostream &s, Halide::Image<T> image) {
         for (size_t z=image.min(2); z<image.min(2)+image.extent(2); z++) {
             for (size_t y=image.min(1); y<image.min(1)+image.extent(1); y++) {
                 for (size_t x=image.min(0); x<image.min(0)+image.extent(0); x++) {
-                    s << std::setw(precision) << double(image(x,y,z)) << " ";
+                    s << std::setw(precision) << float(image(x,y,z)) << " ";
                 }
                 s << "\n";
             }
@@ -549,7 +549,7 @@ std::ostream &operator<<(std::ostream &s, Halide::Image<T> image) {
             for (size_t z=image.min(2); z<image.min(2)+image.extent(2); z++) {
                 for (size_t y=image.min(1); y<image.min(1)+image.extent(1); y++) {
                     for (size_t x=image.min(0); x<image.min(0)+image.extent(0); x++) {
-                        s << std::setw(precision) << double(image(x,y,z,w)) << " ";
+                        s << std::setw(precision) << float(image(x,y,z,w)) << " ";
                     }
                     s << "\n";
                 }
@@ -565,97 +565,66 @@ std::ostream &operator<<(std::ostream &s, Halide::Image<T> image) {
 
 /** Compare ref and Halide solutions and print the mean square error */
 template <typename T>
-struct CheckResult {
-    Halide::Image<T> ref;   ///< reference solution
-    Halide::Image<T> out;   ///< Halide solution
-    CheckResult(
-            Halide::Image<T> r,
-            Halide::Image<T> o) :
-        ref(r), out(o) {}
+class CheckResult {
+public:
+    float max_diff;             ///< max diff percentage
+    float mean_diff;            ///< mean diff percentage
+    Halide::Image<T> ref;       ///< reference solution
+    Halide::Image<T> out;       ///< Halide solution
+    Halide::Image<float> diff;  ///< pixel wise diff
+
+    CheckResult(Halide::Image<T> r, Halide::Image<T> o)
+        : ref(r), out(o), max_diff(0.0), mean_diff(0.0)
+    {
+        assert(r.width()   == o.width());
+        assert(r.height()  == o.height());
+        assert(r.channels()== o.channels());
+
+        int width   = r.width();
+        int height  = r.height();
+        int channels= r.channels();
+
+        diff = Halide::Image<float>(width, height, channels);
+
+        for (int z=0; z<channels; z++) {
+            for (int y=0; y<height; y++) {
+                for (int x=0; x<width; x++) {
+                    diff(x,y,z) = r(x,y,z) - o(x,y,z);
+                    float re   = 100.0 * std::abs(diff(x,y,z)) / (r(x,y,z) + 1e-9);
+                    mean_diff += re;
+                    max_diff   = std::max(re, max_diff);
+                }
+            }
+        }
+        mean_diff /= float(width*height*channels);
+    }
 };
 
 /** Compare ref and Halide solutions and print the verbose difference */
 template <typename T>
-struct CheckResultVerbose {
-    Halide::Image<T> ref;   ///< reference solution
-    Halide::Image<T> out;   ///< Halide solution
-    CheckResultVerbose(
-            Halide::Image<T> r,
-            Halide::Image<T> o) :
-        ref(r), out(o) {}
+class CheckResultVerbose : public CheckResult<T> {
+public:
+    CheckResultVerbose(Halide::Image<T> r, Halide::Image<T> o) :
+        CheckResult<T>(r,o) {}
 };
 
 
 /** Print the synopsis of checking error */
 template<typename T>
 std::ostream &operator<<(std::ostream &s, const CheckResult<T> &v) {
-    assert(v.ref.width()   == v.out.width());
-    assert(v.ref.height()  == v.out.height());
-    assert(v.ref.channels()== v.out.channels());
-
-    int width = v.ref.width();
-    int height = v.ref.height();
-    int channels = v.ref.channels();
-
-    Halide::Image<double> diff(width, height, channels);
-
-    double re      = 0.0;
-    double max_re  = 0.0;
-    double mean_re = 0.0;
-
-    for (int z=0; z<channels; z++) {
-        for (int y=0; y<height; y++) {
-            for (int x=0; x<width; x++) {
-                diff(x,y,z) = v.ref(x,y,z) - v.out(x,y,z);
-                re       = std::abs(diff(x,y,z)) / v.ref(x,y,z);
-                mean_re += re;
-                max_re   = std::max(re, max_re);
-            }
-        }
-    }
-    mean_re /= double(width*height*channels);
-
-    s << "Max  relative error = " << 100.0*max_re << " % \n";
-    s << "Mean relative error = " << 100.0*mean_re << " % \n\n";
-
+    s << "Max  relative error = " << v.max_diff << " % \n";
+    s << "Mean relative error = " << v.mean_diff << " % \n\n";
     return s;
 }
 
 /** Print the result and synopsis of checking error */
 template<typename T>
 std::ostream &operator<<(std::ostream &s, const CheckResultVerbose<T> &v) {
-    assert(v.ref.width()   == v.out.width());
-    assert(v.ref.height()  == v.out.height());
-    assert(v.ref.channels()== v.out.channels());
-
-    int width = v.ref.width();
-    int height = v.ref.height();
-    int channels = v.ref.channels();
-
-    Halide::Image<double> diff(width, height, channels);
-
-    double re      = 0.0;
-    double max_re  = 0.0;
-    double mean_re = 0.0;
-
-    for (int z=0; z<channels; z++) {
-        for (int y=0; y<height; y++) {
-            for (int x=0; x<width; x++) {
-                diff(x,y,z) = (v.ref(x,y,z) - v.out(x,y,z));
-                re       = std::abs(diff(x,y,z)) / v.ref(x,y,z);
-                mean_re += re;
-                max_re   = std::max(re, max_re);
-            }
-        }
-    }
-    mean_re /= double(width*height*channels);
-
     s << "Reference" << "\n" << v.ref << "\n";
     s << "Halide output" << "\n" << v.out << "\n";
-    s << "Difference " << "\n" << diff << "\n";
-    s << "Max  relative error = " << 100.0*max_re << " % \n";
-    s << "Mean relative error = " << 100.0*mean_re << " % \n\n";
-
+    s << "Difference " << "\n" << v.diff << "\n";
+    s << "Max  relative error = " << v.max_diff << " % \n";
+    s << "Mean relative error = " << v.mean_diff << " % \n\n";
     return s;
 }
 

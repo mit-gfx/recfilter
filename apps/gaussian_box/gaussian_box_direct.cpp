@@ -30,10 +30,10 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    double time  = 0.0;
-    double sigma = 5.0;
+    float time  = 0.0;
+    float sigma = 5.0;
     int    box   = gaussian_box_filter(3, sigma); // approx Gaussian with 3 box filters
-    double norm  = std::pow(box, 3*2);            // normalizing factor
+    float norm  = std::pow(box, 3*2);            // normalizing factor
 
     // ----------------------------------------------------------------------------------------------
 

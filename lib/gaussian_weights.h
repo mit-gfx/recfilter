@@ -7,18 +7,18 @@
 #include <Halide.h>
 
 /**@name Compute the Gaussian, derivative of Gaussian and integral of Gaussian
- * @param[in] x input (double or Halide::Expr)
+ * @param[in] x input (float or Halide::Expr)
  * @param[in] mu mean of the Gaussian function
  * @param[in] sigma sigma support of the true Gaussian filter
  */
 // @ {
-double gaussian       (double x, double mu, double sigma);
-double gaussDerivative(double x, double mu, double sigma);
-double gaussIntegral  (double x, double mu, double sigma);
+float gaussian       (float x, float mu, float sigma);
+float gaussDerivative(float x, float mu, float sigma);
+float gaussIntegral  (float x, float mu, float sigma);
 
-Halide::Expr gaussian       (Halide::Expr x, double mu, double sigma);
-Halide::Expr gaussDerivative(Halide::Expr x, double mu, double sigma);
-Halide::Expr gaussIntegral  (Halide::Expr x, double mu, double sigma);
+Halide::Expr gaussian       (Halide::Expr x, float mu, float sigma);
+Halide::Expr gaussDerivative(Halide::Expr x, float mu, float sigma);
+Halide::Expr gaussIntegral  (Halide::Expr x, float mu, float sigma);
 // @}
 
 
@@ -30,7 +30,7 @@ Halide::Expr gaussIntegral  (Halide::Expr x, double mu, double sigma);
  *
  * @return vector with feedforward coeff as first element and rest feedback coeff
  */
-std::vector<double> gaussian_weights(double sigma, int order);
+std::vector<float> gaussian_weights(float sigma, int order);
 
 /**
  * @brief Compute the size of a box filter that approximates a Gaussian
@@ -43,7 +43,7 @@ std::vector<double> gaussian_weights(double sigma, int order);
  * @param[in] sigma sigma support of the true Gaussian filter
  * @return box filter width
  */
-int gaussian_box_filter(int k, double sigma);
+int gaussian_box_filter(int k, float sigma);
 
 
 /** @brief Apply Gaussian filter on an input image
@@ -59,12 +59,12 @@ Halide::Image<T> reference_gaussian(Halide::Image<T> in, T sigma) {
     Halide::Image<T> ref(width,height);
     for (int y=0; y<height; y++) {
         for (int x=0; x<width; x++) {
-            double a = 0.0;
-            double w = 0.0;
+            float a = 0.0;
+            float w = 0.0;
             for (int j=0; j<height; j++) {
                 for (int i=0; i<width; i++) {
-                    double d = (x-i)*(x-i) + (y-j)*(y-j);
-                    double g = gaussian(std::sqrt(d), 0.0, sigma);
+                    float d = (x-i)*(x-i) + (y-j)*(y-j);
+                    float g = gaussian(std::sqrt(d), 0.0, sigma);
                     a += g * in(i,j);
                     w += g;
                 }

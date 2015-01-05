@@ -28,8 +28,8 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    double sigma = 5.0;
-    vector<double> W3 = gaussian_weights(sigma, 3);
+    float sigma = 5.0;
+    vector<float> W3 = gaussian_weights(sigma, 3);
 
     RecFilterDim x("x", width);
     RecFilterDim y("y", height);
@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
 
 
     // ----------------------------------------------------------------------------------------------
-    double time = 0.0;
+    float time = 0.0;
 
     RecFilter f = cascaded_filters[cascaded_filters.size()-1];
 

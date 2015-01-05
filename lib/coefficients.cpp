@@ -5,23 +5,23 @@
 
 using namespace Halide;
 
-Image<double> matrix_B(
-        Image<double> feedfwd_coeff,
-        Image<double> feedback_coeff,
+Image<float> matrix_B(
+        Image<float> feedfwd_coeff,
+        Image<float> feedback_coeff,
         int scan_id,
         int tile_width,
         bool clamp_border)
 {
     int filter_order = feedback_coeff.height();
 
-    double feedfwd = feedfwd_coeff(scan_id);
+    float feedfwd = feedfwd_coeff(scan_id);
 
-    std::vector<double> feedback(filter_order);
+    std::vector<float> feedback(filter_order);
     for (int i=0; i<filter_order; i++) {
         feedback[i] = feedback_coeff(scan_id, i);
     }
 
-    Image<double> C(tile_width, tile_width);
+    Image<float> C(tile_width, tile_width);
 
     // initialize
     for (int x=0; x<tile_width; x++) {
@@ -34,7 +34,7 @@ Image<double> matrix_B(
     for (int y=0; y<tile_width; y++) {
         for (int x=0; x<tile_width; x++) {
             for (int j=0; j<filter_order; j++) {
-                double a = 0.0;
+                float a = 0.0;
                 if (clamp_border) {
                     a = (y-j-1>=0 ? C(x,y-j-1)*feedback[j] : (x==0 ? feedback[j] : 0.0));
                 } else {
@@ -48,19 +48,19 @@ Image<double> matrix_B(
     return C;
 }
 
-Image<double> matrix_R(
-        Image<double> feedback_coeff,
+Image<float> matrix_R(
+        Image<float> feedback_coeff,
         int scan_id,
         int tile_width)
 {
     int filter_order = feedback_coeff.height();
 
-    std::vector<double> weights(filter_order);
+    std::vector<float> weights(filter_order);
     for (int i=0; i<filter_order; i++) {
         weights[i] = feedback_coeff(scan_id, i);
     }
 
-    Image<double> C(filter_order, tile_width);
+    Image<float> C(filter_order, tile_width);
 
     for (int x=0; x<filter_order; x++) {
         for (int y=0; y<tile_width; y++) {
@@ -82,8 +82,8 @@ Image<double> matrix_R(
     return C;
 }
 
-Image<double> matrix_transpose(Image<double> A) {
-    Image<double> B(A.height(),A.width());
+Image<float> matrix_transpose(Image<float> A) {
+    Image<float> B(A.height(),A.width());
     for (int y=0; y<B.height(); y++) {
         for (int x=0; x<B.width(); x++) {
             B(x,y) = A(y,x);
@@ -92,14 +92,14 @@ Image<double> matrix_transpose(Image<double> A) {
     return B;
 }
 
-Image<double> matrix_mult(Image<double> A, Image<double> B) {
+Image<float> matrix_mult(Image<float> A, Image<float> B) {
     assert(A.width() == B.height());
 
     int num_rows = A.height();
     int num_cols = B.width();
     int num_common = A.width();
 
-    Image<double> C(num_cols, num_rows);
+    Image<float> C(num_cols, num_rows);
 
     for (int i=0; i<C.width(); i++) {
         for (int j=0; j<C.height(); j++) {
@@ -116,8 +116,8 @@ Image<double> matrix_mult(Image<double> A, Image<double> B) {
     return C;
 }
 
-Image<double> matrix_antidiagonal(int size) {
-    Image<double> C(size, size);
+Image<float> matrix_antidiagonal(int size) {
+    Image<float> C(size, size);
 
     for (int i=0; i<C.width(); i++) {
         for (int j=0; j<C.height(); j++) {
