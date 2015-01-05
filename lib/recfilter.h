@@ -574,7 +574,7 @@ public:
     Halide::Image<float> diff;  ///< pixel wise diff
 
     CheckResult(Halide::Image<T> r, Halide::Image<T> o)
-        : ref(r), out(o), max_diff(0.0), mean_diff(0.0)
+        : max_diff(0.0), mean_diff(0.0), ref(r), out(o)
     {
         assert(r.width()   == o.width());
         assert(r.height()  == o.height());
