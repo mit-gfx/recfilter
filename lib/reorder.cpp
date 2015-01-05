@@ -197,7 +197,7 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
             bool causal = contents.ptr->filter_info[dim].scan_causal[idx];
             int order   = contents.ptr->filter_info[dim].filter_order;
 
-            vector<double> coeff;
+            vector<float> coeff;
             coeff.push_back(contents.ptr->feedfwd_coeff(scan_id));
             for (int u=0; u<order; u++) {
                 coeff.push_back(contents.ptr->feedback_coeff(scan_id,u));

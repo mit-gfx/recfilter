@@ -56,8 +56,8 @@ struct SplitInfo {
     vector<bool> scan_causal;           ///< causal or anticausal flag for each scan
     vector<int>  scan_id;               ///< scan or update definition id of each scan
 
-    Halide::Image<double> feedfwd_coeff; ///< Feedforward coeffs (from RecFilterContents)
-    Halide::Image<double> feedback_coeff;///< Feedback coeffs  (from RecFilterContents)
+    Halide::Image<float> feedfwd_coeff; ///< Feedforward coeffs (from RecFilterContents)
+    Halide::Image<float> feedback_coeff;///< Feedback coeffs  (from RecFilterContents)
 };
 
 /** Tiling info for each dimension of the filter */
@@ -149,29 +149,29 @@ static void convert_pure_def_into_first_update_def(
  * \param[in] clamp_border adjust coefficients for clamped image borders
  * \returns matrix of coefficients
  */
-Image<double> tail_weights(SplitInfo s, int split_id1, int split_id2, bool clamp_border=false) {
+Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2, bool clamp_border=false) {
     assert(split_id1 >= split_id2);
 
     int  tile_width  = s.tile_width;
     int  scan_id     = s.scan_id[split_id1];
     bool scan_causal = s.scan_causal[split_id1];
 
-    Image<double> R = matrix_R(s.feedback_coeff, scan_id, tile_width);
+    Image<float> R = matrix_R(s.feedback_coeff, scan_id, tile_width);
 
     // accummulate weight coefficients because of all subsequent scans
     // traversal is backwards because SplitInfo contains scans in the
     // reverse order
     for (int j=split_id1-1; j>=split_id2; j--) {
         if (scan_causal != s.scan_causal[j]) {
-            Image<double> B = matrix_B(s.feedfwd_coeff,
+            Image<float> B = matrix_B(s.feedfwd_coeff,
                     s.feedback_coeff, s.scan_id[j], tile_width, clamp_border);
-            Image<double> I = matrix_antidiagonal(R.height());
+            Image<float> I = matrix_antidiagonal(R.height());
             R = matrix_mult(I, R);
             R = matrix_mult(B, R);
             R = matrix_mult(I, R);
         }
         else {
-            Image<double> B = matrix_B(s.feedfwd_coeff,
+            Image<float> B = matrix_B(s.feedfwd_coeff,
                     s.feedback_coeff, s.scan_id[j], tile_width, false);
             R = matrix_mult(B, R);
         }
@@ -188,7 +188,7 @@ Image<double> tail_weights(SplitInfo s, int split_id1, int split_id2, bool clamp
  * \param[in] clamp_border adjust coefficients for clamped image borders
  * \returns matrix of coefficients
  */
-Image<double> tail_weights(SplitInfo s, int split_id1, bool clamp_border=false) {
+Image<float> tail_weights(SplitInfo s, int split_id1, bool clamp_border=false) {
     return tail_weights(s, split_id1, split_id1, clamp_border);
 }
 
@@ -595,8 +595,8 @@ static RecFilterFunc create_intra_tile_term(
         bool clamped_border = s.clamped_border;
         int  dimension   = -1;
 
-        double feedfwd = s.feedfwd_coeff(i);
-        vector<double> feedback(filter_order,0.0);
+        float feedfwd = s.feedfwd_coeff(i);
+        vector<float> feedback(filter_order,0.0);
         for (int j=0; j<s.feedback_coeff.height(); j++) {
             feedback[j] = s.feedback_coeff(i,j);
         }
@@ -791,7 +791,7 @@ static vector<RecFilterFunc> create_complete_tail_term(
         Function function(func_name + DASH + int_to_string(split_info.scan_id[k])
                 + DASH + SUB);
 
-        Image<double> weight = tail_weights(split_info, k);
+        Image<float> weight = tail_weights(split_info, k);
 
         // pure definition
         {
@@ -968,11 +968,11 @@ static vector<RecFilterFunc> create_tail_residual_term(
         for (int j=u+1; j<F_ctail.size(); j++) {
 
             // weight matrix for accumulating completed tail elements from scan u to scan j
-            Image<double> weight = tail_weights(split_info, j, u);
+            Image<float> weight = tail_weights(split_info, j, u);
 
             // weight matrix for accumulating completed tail elements from scan u to scan j
             // for a tile that is clamped on all borders
-            Image<double> c_weight = weight;
+            Image<float> c_weight = weight;
             if (split_info.clamped_border) {
                 c_weight = tail_weights(split_info, j, u, true);
             }
@@ -1097,8 +1097,8 @@ static vector<RecFilterFunc> create_final_residual_term(
 
         // weight matrix for accumulating completed tail elements
         // of scan after applying only current scan
-        // Image<double> weight = tail_weights(split_info, j);
-        Image<double> weight(order, order);
+        // Image<float> weight = tail_weights(split_info, j);
+        Image<float> weight(order, order);
         for (int u=0; u<order; u++) {
             for (int v=0; v<order; v++) {
                 weight(u,v) = ((u+v<order) ? split_info.feedback_coeff(split_info.scan_id[j], u+v) : 0.0);
@@ -1334,12 +1334,12 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
 
             // weight matrix for accumulating completed tail elements
             // of scan after applying all subsequent scans
-            Image<double> weight  = tail_weights(split_info_prev, k, 0);
+            Image<float> weight  = tail_weights(split_info_prev, k, 0);
 
             // weight matrix for accumulating completed tail elements
             // of scan after applying all subsequent scans
             // for a tile that is clamped on all borders
-            Image<double> c_weight = weight;
+            Image<float> c_weight = weight;
             if (split_info_prev.clamped_border) {
                 c_weight= tail_weights(split_info_prev, k, 0, true);
             }

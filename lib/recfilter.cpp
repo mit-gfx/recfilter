@@ -101,8 +101,8 @@ RecFilter::RecFilter(string name) {
     contents.ptr->finalized      = false;
     contents.ptr->compiled       = false;
     contents.ptr->clamped_border = false;
-    contents.ptr->feedfwd_coeff  = Image<double>(0);
-    contents.ptr->feedback_coeff = Image<double>(0,0);
+    contents.ptr->feedfwd_coeff  = Image<float>(0);
+    contents.ptr->feedback_coeff = Image<float>(0,0);
 
     contents.ptr->target = get_jit_target_from_environment();
     if (contents.ptr->target.to_string().empty()) {
@@ -220,11 +220,11 @@ void RecFilter::set_clamped_image_border(void) {
     contents.ptr->clamped_border = true;
 }
 
-void RecFilter::add_filter(RecFilterDim x, vector<double> coeff) {
+void RecFilter::add_filter(RecFilterDim x, vector<float> coeff) {
     add_filter(RecFilterDimAndCausality(x,true), coeff);
 }
 
-void RecFilter::add_filter(RecFilterDimAndCausality x, vector<double> coeff) {
+void RecFilter::add_filter(RecFilterDimAndCausality x, vector<float> coeff) {
     RecFilterFunc& rf = internal_function(contents.ptr->name);
     Function        f = rf.func;
 
@@ -242,8 +242,8 @@ void RecFilter::add_filter(RecFilterDimAndCausality x, vector<double> coeff) {
 
     bool causal = x.causal();
 
-    double feedfwd = coeff[0];
-    vector<double> feedback;
+    float feedfwd = coeff[0];
+    vector<float> feedback;
     feedback.insert(feedback.begin(), coeff.begin()+1, coeff.end());
 
     // filter order and csausality
@@ -317,8 +317,8 @@ void RecFilter::add_filter(RecFilterDimAndCausality x, vector<double> coeff) {
     // add the coeff of the newly added scan as the last row of coeff
     int num_scans = f.updates().size();
     int max_order = contents.ptr->feedback_coeff.height();
-    Image<double> feedfwd_coeff(num_scans);
-    Image<double> feedback_coeff(num_scans, std::max(max_order,scan_order));
+    Image<float> feedfwd_coeff(num_scans);
+    Image<float> feedback_coeff(num_scans, std::max(max_order,scan_order));
     for (int j=0; j<num_scans-1; j++) {
         feedfwd_coeff(j) = contents.ptr->feedfwd_coeff(j);
         for (int i=0; i<contents.ptr->feedback_coeff.height(); i++) {
@@ -474,7 +474,7 @@ void RecFilter::compile_jit(string filename) {
     contents.ptr->compiled = true;
 }
 
-double RecFilter::realize(Buffer& out, int iterations) {
+float RecFilter::realize(Buffer& out, int iterations) {
     // check if any of the functions have a schedule
     // true if all functions have default inline schedule
     bool no_schedule_applied = true;
@@ -530,7 +530,7 @@ double RecFilter::realize(Buffer& out, int iterations) {
         out.free_dev_buffer();
     }
 
-    return double(time_end-time_start)/double(iterations);
+    return float(time_end-time_start)/float(iterations);
 }
 
 Target RecFilter::target(void) {

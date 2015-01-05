@@ -147,10 +147,10 @@ struct RecFilterContents {
     std::map<std::string, RecFilterFunc> func;
 
     /** Feed forward coeffs, only one for each scan */
-    Halide::Image<double> feedfwd_coeff;
+    Halide::Image<float> feedfwd_coeff;
 
     /** Feedback coeffs (num_scans x max_order) order j-th coeff of i-th scan is (i+1,j) */
-    Halide::Image<double> feedback_coeff;
+    Halide::Image<float> feedback_coeff;
 
     /** Compilation and execution target */
     Halide::Target target;
