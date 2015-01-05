@@ -124,13 +124,15 @@ int main(int argc, char **argv) {
 
     // innermost: unrolled dimensions, then gpu_thread dimensions, then gpu_block dimensions
 
+    int unroll_w = 4;
+    int tiles_per_warp = 4;
+
     F.intra_schedule().compute_locally()
         .reorder_storage(F.tail(), F.inner(), F.outer())
-        .unroll         (F.tail())
         .unroll         (F.inner_scan());
 
     F.intra_schedule(1)
-        .split          (F.inner(1), 8)
+        .split          (F.inner(1), unroll_w)
         .unroll         (F.inner(1).split_var())
         .reorder        (F.inner_scan(), F.inner(1).split_var(), F.tail(), F.inner(), F.outer())
         .gpu_threads    (F.inner(0), F.inner(1))

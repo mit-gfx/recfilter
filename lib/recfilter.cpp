@@ -571,7 +571,7 @@ string RecFilter::print_schedule(void) const {
                 }
             }
             for (int i=0; i<str.size(); i++) {
-                if (f->second.update_schedule.empty()) {
+                if (str.size()<2) {
                     s << "." << str[i];
                 } else {
                     s << "\n    ." << str[i];
