@@ -75,13 +75,12 @@ int main(int argc, char **argv) {
 
     cerr << F << endl;
 
-    cerr << "\nJIT compilation ... " << endl;
     F.compile_jit("stmt.html");
 
-    cerr << "\nRunning ... " << endl;
-    Buffer out(type_of<float>(), width, height);
-    float time = F.realize(out, iter);
+    float time = F.profile(iter);
     cerr << width << "\t" << time << endl;
+
+    Realization out = F.realize();
 
     // ----------------------------------------------------------------------------------------------
 

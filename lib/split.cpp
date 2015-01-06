@@ -1915,7 +1915,6 @@ void RecFilter::finalize(void) {
         }
 
         // move initialization to update def in intra tile computation stages
-        // add padding to intra tile terms to avoid bank conflicts
         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
             RecFilterFunc& rF = fit->second;
             if (rF.func_category==INTRA_N) {

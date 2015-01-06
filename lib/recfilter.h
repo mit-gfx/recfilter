@@ -108,17 +108,26 @@ private:
      * indicated by the */
     std::map<int,Halide::VarOrRVar> internal_func_vars(RecFilterFunc f, VarTag vtag, uint vidx);
 
-    /** @brief Inline all calls to a given function
+    /** Inline all calls to a given function
      *
      * Preconditions:
      * - function must not have any update definitions
      *
      * Side effects: function is completely removed from the filters depedency graph
-     * */
+     *
+     * \param[in] func_name name of function to inline
+     */
     void inline_func(std::string func_name);
 
     /** Finalize the filter; triggers automatic function transformations and cleanup */
     void finalize(void);
+
+    /** Perform chores before realizing: compile the filter if not already done, upload
+     * buffers to device and allocate buffers for realization
+     *
+     * \returns realization object that contains allocated buffers
+     */
+    Halide::Realization create_realization(void);
 
 public:
 
@@ -156,11 +165,15 @@ public:
     void compile_jit(std::string filename="");
 
     /** Compute the filter
-     * \param out output buffer that holds the result, should be allocated by caller
-     * \param iterations number of profiling iterations
-     * \returns computation time in milliseconds (not including device-host transfers)
+     * \returns Realization object that contains all the buffers
      */
-    float realize(Halide::Buffer& out, int iterations=1);
+    Halide::Realization realize(void);
+
+    /** Profile the filter
+     * \param iterations number of profiling iterations
+     * \returns computation time in milliseconds
+     */
+    float profile(int iterations);
     // @}
 
 

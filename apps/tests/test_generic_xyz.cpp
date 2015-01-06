@@ -46,10 +46,7 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Buffer out(type_of<float>(),width,height,channels);
-    filter.realize(out);
-
-    // ----------------------------------------------------------------------------------------------
+    Realization out = filter.realize();
 
     cerr << "\nChecking difference ... " << endl;
     Image<float> hl_out(out);

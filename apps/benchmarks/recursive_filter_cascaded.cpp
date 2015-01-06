@@ -224,12 +224,10 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    cerr << "\nJIT compilation ... " << endl;
     filtery.compile_jit("stmt.html");
 
-    cerr << "\nRunning ... " << endl;
-    Buffer out(type_of<float>(), width, height);
-    filtery.realize(out, iter);
+    Realization out = filtery.realize();
+    float time = filtery.profile(iter);
 
     // ----------------------------------------------------------------------------------------------
 

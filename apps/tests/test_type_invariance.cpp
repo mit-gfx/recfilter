@@ -33,10 +33,7 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    Buffer out(type_of<int16_t>(),width,height);
-    filter.realize(out);
-
-    // ----------------------------------------------------------------------------------------------
+    Realization out = filter.realize();
 
     cerr << "\nChecking difference ... " << endl;
     Image<int16_t> hl_out(out);

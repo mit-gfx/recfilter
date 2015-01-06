@@ -100,15 +100,13 @@ int main(int argc, char **argv) {
 
     RecFilter f = cascaded_filters[cascaded_filters.size()-1];
 
-    Buffer out(type_of<float>(), width, height);
-
     f.compile_jit("tiled.html");
     F.compile_jit("nontiled.html");
 
-    time = F.realize(out, iterations);
+    time = F.profile(iterations);
     cerr << "non_tiled_direct\t" << width << "\t" << time << endl;
 
-    time = f.realize(out, iterations);
+    time = f.profile(iterations);
     cerr << "tiled_xy_cascaded\t" << width << "\t" << time << endl;
 
     return 0;

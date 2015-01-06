@@ -68,10 +68,8 @@ int main(int argc, char **argv) {
 
     cerr << "width\ttime (ms)" << endl;
 
-    F2.compile_jit("hl_stmt.html");
-
-    Buffer out(type_of<float>(), width, height);
-    float time = F2.realize(out, iterations);
+    Realization out = F2.realize();
+    float time = F2.profile(iterations);
     cerr << width << "\t" << time << endl;
 
     // ----------------------------------------------------------------------------------------------

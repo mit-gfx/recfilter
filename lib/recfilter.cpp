@@ -474,7 +474,7 @@ void RecFilter::compile_jit(string filename) {
     contents.ptr->compiled = true;
 }
 
-float RecFilter::realize(Buffer& out, int iterations) {
+Realization RecFilter::create_realization(void) {
     // check if any of the functions have a schedule
     // true if all functions have default inline schedule
     bool no_schedule_applied = true;
@@ -496,16 +496,8 @@ float RecFilter::realize(Buffer& out, int iterations) {
         compile_jit();
     }
 
-    Func F(internal_function(contents.ptr->name).func);
-
-    // allocate the buffer
-    vector<int> buffer_size;
-    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-        buffer_size.push_back(contents.ptr->filter_info[i].image_width);
-    }
-    out = Buffer(contents.ptr->type, buffer_size);
-
     // upload all buffers to device if computed on GPU
+    Func F(internal_function(contents.ptr->name).func);
     if (contents.ptr->target.has_gpu_feature()) {
         map<string,Buffer> buff = extract_buffer_calls(F);
         for (map<string,Buffer>::iterator b=buff.begin(); b!=buff.end(); b++) {
@@ -513,21 +505,51 @@ float RecFilter::realize(Buffer& out, int iterations) {
         }
     }
 
-    // run once to warmup the driver if profiling with multiple runs
-    if (iterations>1) {
-        F.realize(out);
+    // allocate the buffer
+    vector<int> buffer_size;
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        buffer_size.push_back(contents.ptr->filter_info[i].image_width);
     }
 
-    unsigned long time_start = millisecond_timer();
-    for (int i=0; i<iterations; i++) {
-        F.realize(out);
+    // create a realization object
+    vector<Buffer> buffers;
+    for (int i=0; i<F.outputs(); i++) {
+        buffers.push_back(Buffer(contents.ptr->type, buffer_size));
     }
-    unsigned long time_end = millisecond_timer();
 
-    // copy result to CPU if computed on GPU
+    return Realization(buffers);;
+}
+
+Realization RecFilter::realize(void) {
+    Func F(internal_function(contents.ptr->name).func);
+    Realization R = create_realization();
+    F.realize(R);
+    return R;
+}
+
+float RecFilter::profile(int iterations) {
+    Func F(internal_function(contents.ptr->name).func);
+    Realization R = create_realization();
+
+    unsigned long time_start, time_end;
+
     if (contents.ptr->target.has_gpu_feature()) {
-        out.copy_to_host();
-        out.free_dev_buffer();
+        int pre_runs = 10;                      // run a few times for warmup
+        for (int i=0; i<pre_runs; i++) {
+            F.realize(R);
+        }
+
+        time_start = millisecond_timer();
+        for (int i=0; i<iterations; i++) {
+            F.realize(R);
+        }
+        time_end = millisecond_timer();
+    } else {
+        time_start = millisecond_timer();
+        for (int i=0; i<iterations; i++) {
+            F.realize(R);
+        }
+        time_end = millisecond_timer();
     }
 
     return float(time_end-time_start)/float(iterations);
@@ -620,14 +642,14 @@ unsigned long RecFilter::millisecond_timer(void) {
     static SYSTEMTIME t;
     GetSystemTime(&t);
     return (unsigned long)((unsigned long)t.wMilliseconds
-        + 1000*((unsigned long)t.wSecond
-        + 60*((unsigned long)t.wMinute
-        + 60*((unsigned long)t.wHour
-        + 24*(unsigned long)t.wDay))));
+            + 1000*((unsigned long)t.wSecond
+                + 60*((unsigned long)t.wMinute
+                    + 60*((unsigned long)t.wHour
+                        + 24*(unsigned long)t.wDay))));
 }
 #elif defined(_APPLE_) || defined(__APPLE__) || \
-      defined(APPLE)   || defined(_APPLE)    || defined(__APPLE) || \
-      defined(unix)    || defined(__unix__)  || defined(__unix)
+    defined(APPLE)   || defined(_APPLE)    || defined(__APPLE) || \
+defined(unix)    || defined(__unix__)  || defined(__unix)
 #include <unistd.h>
 #include <sys/time.h>
 unsigned long RecFilter::millisecond_timer(void) {

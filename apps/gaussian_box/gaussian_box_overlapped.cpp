@@ -81,21 +81,13 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    cerr << "\nJIT compilation ... " << endl;
-    filter.func().compile_jit();
-
-    Buffer hl_out_buff(type_of<float>(), width,height);
-    {
-        filter.func().realize(hl_out_buff);
-    }
-    hl_out_buff.copy_to_host();
-    hl_out_buff.free_dev_buffer();
+    Realization out = filter.realize();
 
     // ----------------------------------------------------------------------------------------------
 
     if (!nocheck) {
         cerr << "\nChecking difference ...\n" << endl;
-        Image<float> hl_out(hl_out_buff);
+        Image<float> hl_out(out);
         Image<float> ref = reference_gaussian<float>(random_image, sigma);
         cerr << "Difference with true Gaussian \n" << CheckResultVerbose<float>(ref,hl_out) << endl;
     }

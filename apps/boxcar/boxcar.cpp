@@ -58,28 +58,13 @@ int main(int argc, char **argv) {
     {
     }
 
-    // ----------------------------------------------------------------------------------------------
-
-    cerr << "\nJIT compilation ... " << endl;
-    B.compile_jit();
-
-    Buffer hl_out_buff(type_of<float>(), width,height);
-    {
-        for (int k=0; k<iterations; k++) {
-            B.realize(hl_out_buff);
-            if (k < iterations-1) {
-                hl_out_buff.free_dev_buffer();
-            }
-        }
-    }
-    hl_out_buff.copy_to_host();
-    hl_out_buff.free_dev_buffer();
+    Realization out = B.realize();
 
     // ----------------------------------------------------------------------------------------------
 
     if (!nocheck) {
         cerr << "\nChecking difference ... " << endl;
-        Image<float> hl_out(hl_out_buff);
+        Image<float> hl_out(out);
         Image<float> ref(width,height);
 
         for (int y=0; y<height; y++) {

@@ -83,24 +83,13 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    // realize the median filter
-
-    cerr << "\nJIT compilation ... " << endl;
-    Median.compile_jit();
-
-    Buffer hl_out_buff(type_of<float>(), width,height);
-    {
-        Median.realize(hl_out_buff);
-        hl_out_buff.free_dev_buffer();
-    }
-    hl_out_buff.copy_to_host();
-    hl_out_buff.free_dev_buffer();
+    Realization out = Median.realize();
 
     // ----------------------------------------------------------------------------------------------
 
     if (!nocheck) {
         cerr << "\nChecking difference ... " << endl;
-        Image<float> hl_out(hl_out_buff);
+        Image<float> hl_out(out);
     }
 
     return 0;

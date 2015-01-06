@@ -61,12 +61,10 @@ int main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------
 
-    cerr << "\nJIT compilation ... " << endl;
     filter.compile_jit("hl_stmt.html");
 
-    cerr << "\nRunning ... " << endl;
-    Buffer out(type_of<float>(), width, height);
-    filter.realize(out, iter);
+    Realization out = filter.realize();
+    float time = filter.profile(iter);
 
     // ----------------------------------------------------------------------------------------------
 

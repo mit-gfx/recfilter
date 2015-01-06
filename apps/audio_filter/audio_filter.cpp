@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
         F.add_filter(+x, coeffs);
         F.intra_schedule().compute_globally();
         F.compile_jit("nontiled.html");
-        time1 = F.realize(out, iterations);
+        time1 = F.profile(iterations);
     }
 
     // tiled implementation
@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
         F.intra_schedule().compute_locally() ;
         F.inter_schedule().compute_globally();
         F.compile_jit("tiled.html");
-        time2 = F.realize(out, iterations);
+        time2 = F.profile(iterations);
     }
 
     std::cerr << "\nOrder = " << ORDER << ", array = (" << width << ", " << CHANNELS << ")\n"

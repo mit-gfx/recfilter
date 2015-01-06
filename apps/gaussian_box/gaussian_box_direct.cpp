@@ -107,7 +107,8 @@ int main(int argc, char **argv) {
 //            .parallel (F_tiled.full(0));
 //
 //        time = F_tiled.realize(out, iterations);
-        time = F_non_tiled.realize(out, iterations);
+        Realization out = F_non_tiled.realize();
+        time = F_non_tiled.profile(iterations);
         cerr << "non_tiled_direct\t" << width << "\t" << time << endl;
         cerr << "tiled_direct\t" << width << "\t" << time << endl;
     }
