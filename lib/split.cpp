@@ -1918,7 +1918,7 @@ void RecFilter::finalize(void) {
         // add padding to intra tile terms to avoid bank conflicts
         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
             RecFilterFunc& rF = fit->second;
-            if (rF.func_category==INTRA_1 || rF.func_category==INTRA_N) {
+            if (rF.func_category==INTRA_N) {
                 convert_pure_def_into_first_update_def(rF, recfilter_split_info);
             }
         }
