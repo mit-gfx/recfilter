@@ -124,30 +124,33 @@ int main(int argc, char **argv) {
 
     // innermost: unrolled dimensions, then gpu_thread dimensions, then gpu_block dimensions
 
-    int unroll_w = 4;
+    int unroll_w = 8;
     int tiles_per_warp = 4;
-
-    F.intra_schedule().compute_locally()
-        .reorder_storage(F.tail(), F.inner(), F.outer())
-        .unroll         (F.inner_scan());
+    int vectorize = 4;
 
     F.intra_schedule(1)
+        .compute_locally()
+        .reorder_storage(F.inner(), F.outer())
+        .unroll         (F.inner_scan())
         .split          (F.inner(1), unroll_w)
         .unroll         (F.inner(1).split_var())
-        .reorder        (F.inner_scan(), F.inner(1).split_var(), F.tail(), F.inner(), F.outer())
+        .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
         .gpu_threads    (F.inner(0), F.inner(1))
         .gpu_blocks     (F.outer(0), F.outer(1));
 
     F.intra_schedule(2)
-        .split          (F.outer(0), 4)
-        .reorder        (F.inner_scan(), F.tail(), F.inner(), F.outer(0).split_var(), F.outer())
+        .compute_locally()
+        .reorder_storage(F.inner(), F.tail(), F.outer())
+        .unroll         (F.inner_scan())
+        .split          (F.outer(0), tiles_per_warp)
+        .reorder        (F.inner_scan(), F.inner(), F.outer(0).split_var(), F.outer())
         .gpu_threads    (F.outer(0).split_var(), F.inner(0))
         .gpu_blocks     (F.outer(0), F.outer(1));
 
     F.inter_schedule().compute_globally()
         .reorder_storage(F.inner(), F.tail(), F.outer())
         .unroll         (F.outer_scan())
-        .split          (F.outer(0), 2)
+        .split          (F.outer(0), tiles_per_warp)
         .reorder        (F.outer_scan(), F.inner(), F.tail(), F.outer(0).split_var(), F.outer())
         .gpu_threads    (F.inner(0), F.outer(0).split_var())
         .gpu_blocks     (F.outer(0));
@@ -155,7 +158,7 @@ int main(int argc, char **argv) {
     cerr << F << endl;
 
     cerr << "\nJIT compilation ... " << endl;
-    F.compile_jit("hl_stmt.html");
+    F.compile_jit("stmt.html");
 
     cerr << "\nRunning ... " << endl;
     Buffer out(type_of<float>(), width, height);
