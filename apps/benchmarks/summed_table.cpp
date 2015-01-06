@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
         .gpu_blocks     (F.outer(0), F.outer(1));
 
     F.intra_schedule(2).compute_locally()
-        .reorder_storage(F.tail(), F.inner(), F.outer())
+        .reorder_storage(F.inner(), F.outer())
         .unroll         (F.inner_scan())
         .split          (F.outer(0), tiles_per_warp_intra)
         .reorder        (F.inner_scan(), F.inner(), F.tail(), F.outer(0).split_var(), F.outer())
