@@ -32,14 +32,22 @@ unsigned int rgbaFloat4ToUint(float4 rgba, float fScale)
     uiPackedPix |= 0xFF000000 & (((unsigned int)(rgba.w * fScale)) << 24);
     return uiPackedPix;
 }
+uchar4 rgbaFloat4ToUchar4(float4 rgba, float fScale)
+{
+    uchar4 uiPackedPix;
+    uiPackedPix.x |= (unsigned char)(rgba.x * fScale);
+    uiPackedPix.y |= (unsigned char)(rgba.y * fScale);
+    uiPackedPix.z |= (unsigned char)(rgba.z * fScale);
+    uiPackedPix.w |= (unsigned char)(rgba.w * fScale);
+    return uiPackedPix;
+}
 
 
 // Row summation filter kernel with rescaling, using LMEM
 // USELMEM switch passed in via OpenCL clBuildProgram call options string at app runtime
 //*****************************************************************
 // Row summation filter kernel with rescaling, using LMEM
-__kernel void BoxRowsLmem( __global const uchar4* uc4Source, __global unsigned int* uiDest,
-                           __local uchar4* uc4LocalData,
+__kernel void BoxRowsLmem( __global uchar4* uc4Source, __local uchar4* uc4LocalData,
                            unsigned int uiWidth, unsigned int uiHeight, int iRadius, int iRadiusAligned,
                            float fScale, unsigned int uiNumOutputPix)
 {
@@ -79,19 +87,19 @@ __kernel void BoxRowsLmem( __global const uchar4* uc4Source, __global unsigned i
         }
 
         // Use inline function to scale and convert registers to packed RGBA values in a uchar4, and write back out to GMEM
-        uiDest[iGlobalOffset] = rgbaFloat4ToUint(f4Sum, fScale);
+        //uiDest[iGlobalOffset] = rgbaFloat4ToUint(f4Sum, fScale);
+        uc4Source[iGlobalOffset] = rgbaFloat4ToUchar4(f4Sum, fScale);
     }
 }
 
 
 // Column kernel using coalesced global memory reads
 //*****************************************************************
-__kernel void BoxColumns(__global unsigned int* uiInputImage, __global unsigned int* uiOutputImage,
-                         unsigned int uiWidth, unsigned int uiHeight, int iRadius, float fScale)
+__kernel void BoxColumns(__global unsigned int* uiInputImage, unsigned int uiWidth,
+        unsigned int uiHeight, int iRadius, float fScale)
 {
 	size_t globalPosX = get_global_id(0);
     uiInputImage = &uiInputImage[globalPosX];
-    uiOutputImage = &uiOutputImage[globalPosX];
 
     // do left edge
     float4 f4Sum;
@@ -100,12 +108,12 @@ __kernel void BoxColumns(__global unsigned int* uiInputImage, __global unsigned 
     {
         f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
     }
-    uiOutputImage[0] = rgbaFloat4ToUint(f4Sum, fScale);
+    uiInputImage[0] = rgbaFloat4ToUint(f4Sum, fScale);
     for(int y = 1; y < iRadius + 1; y++)
     {
         f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
         f4Sum -= rgbaUintToFloat4(uiInputImage[0]);
-        uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+        uiInputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
     }
 
     // main loop
@@ -113,7 +121,7 @@ __kernel void BoxColumns(__global unsigned int* uiInputImage, __global unsigned 
     {
         f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
         f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
-        uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+        uiInputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
     }
 
     // do right edge
@@ -121,6 +129,6 @@ __kernel void BoxColumns(__global unsigned int* uiInputImage, __global unsigned 
     {
         f4Sum += rgbaUintToFloat4(uiInputImage[(uiHeight - 1) * uiWidth]);
         f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
-        uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+        uiInputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
     }
 }

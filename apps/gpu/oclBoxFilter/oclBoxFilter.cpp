@@ -31,7 +31,7 @@
 #define REFRESH_DELAY	  10 //ms
 
 cl_uint uiNumOutputPix = 64;                   // Default output pix per workgroup... may be modified depending HW/OpenCl caps
-cl_uint iRadius = 10;                         // initial radius of 2D box filter mask
+cl_uint iRadius = 1;                         // initial radius of 2D box filter mask
 float fScale = 1.0f/(2.0f * iRadius + 1.0f);  // precalculated GV rescaling value
 cl_int iRadiusAligned;
 
@@ -42,7 +42,6 @@ unsigned int uiImageWidth = 0;      // Image width
 unsigned int uiImageHeight = 0;     // Image height
 unsigned int* uiInput = NULL;       // Host buffer to hold input image data
 unsigned int* uiOutput = NULL;      // Host buffer to hold output image data
-unsigned int* uiTemp = NULL;        // Host buffer to hold intermediate image data
 
 // app configuration parms
 const char* cProcessor [] = {"OpenCL GPU", "Host C++ CPU"};
@@ -65,9 +64,6 @@ cl_kernel ckBoxRowsLmem=0;          // OpenCL Kernel for row sum (using lmem)
 cl_kernel ckBoxRowsTex=0;           // OpenCL Kernel for row sum (using 2d Image/texture)
 cl_kernel ckBoxColumns=0;           // OpenCL for column sum and normalize
 cl_mem cmDevBufIn=0;                // OpenCL device memory object (buffer or 2d Image) for input data
-cl_mem cmDevBufTemp=0;              // OpenCL device memory temp buffer object
-cl_mem cmDevBufOut=0;               // OpenCL device memory output buffer object
-cl_mem cmCL_PBO=0;					// OpenCL representation of GL pixel buffer
 cl_image_format InputFormat;        // OpenCL format descriptor for 2D image useage
 cl_sampler RowSampler=0;            // Image Sampler for box filter processing with texture (2d Image)
 size_t szBuffBytes;                 // Size of main image buffers
@@ -147,7 +143,7 @@ int main(int argc, char** argv)
     cqCommandQueue = clCreateCommandQueue(cxGPUContext, cdDevices[uiTargetDevice], 0, &ciErrNum);
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
 
-    int min_w = 64;
+    int min_w = 16;
     int max_w = 4096;
     int inc_w = 32;
 
@@ -162,23 +158,16 @@ int main(int argc, char** argv)
         szBuffBytes = uiImageWidth * uiImageHeight * sizeof (unsigned int);
         uiInput = (unsigned int*)malloc(szBuffBytes);
         uiOutput= (unsigned int*)malloc(szBuffBytes);
-        uiTemp  = (unsigned int*)malloc(szBuffBytes);
 
         srand(0);
         for (int x=0; x<uiImageWidth; x++) {
             for (int y=0; y<uiImageHeight; y++) {
-                uiInput[uiImageWidth*y + x] = rand() % 255;
+                uiInput[uiImageWidth*y + x] = 10; //rand() % 255;
             }
         }
 
-        cmDevBufIn = clCreateBuffer(cxGPUContext, CL_MEM_READ_WRITE, szBuffBytes, NULL, &ciErrNum);
-        oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
-
         // Allocate the OpenCL intermediate and result buffer memory objects on the device GMEM
-        cmDevBufTemp = clCreateBuffer(cxGPUContext, CL_MEM_READ_WRITE, szBuffBytes, NULL, &ciErrNum);
-        oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
-
-        cmDevBufOut = clCreateBuffer(cxGPUContext, CL_MEM_WRITE_ONLY, szBuffBytes, NULL, &ciErrNum);
+        cmDevBufIn = clCreateBuffer(cxGPUContext, CL_MEM_READ_WRITE, szBuffBytes, NULL, &ciErrNum);
         oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
 
         // Read the OpenCL kernel source in from file
@@ -248,35 +237,29 @@ int main(int argc, char** argv)
 void ResetKernelArgs(unsigned int uiWidth, unsigned int uiHeight, int r, float fScale)
 {
     // Set the Argument values for the row kernel
+    // (lmem version)
+    iRadiusAligned = ((r + 15)/16) * 16;
+    if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + r))
     {
-        // (lmem version)
-        iRadiusAligned = ((r + 15)/16) * 16;
-        if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + r))
-        {
-            uiNumOutputPix = (cl_uint)szMaxWorkgroupSize - iRadiusAligned - r;
-        }
-        ciErrNum = clSetKernelArg(ckBoxRowsLmem, 0, sizeof(cl_mem), (void*)&cmDevBufIn);
-        ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 1, sizeof(cl_mem), (void*)&cmDevBufTemp);
-        ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 2, (iRadiusAligned + uiNumOutputPix + r) * sizeof(cl_uchar4), NULL);
-        ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 3, sizeof(unsigned int), (void*)&uiWidth);
-        ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 4, sizeof(unsigned int), (void*)&uiHeight);
-        ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 5, sizeof(int), (void*)&r);
-        ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 6, sizeof(int), (void*)&iRadiusAligned);
-        ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 7, sizeof(float), (void*)&fScale);
-        ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 8, sizeof(unsigned int), (void*)&uiNumOutputPix);
-        oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
-        //        printf("clSetKernelArg (0-8) ckBoxRowsLmem...\n");
+        uiNumOutputPix = (cl_uint)szMaxWorkgroupSize - iRadiusAligned - r;
     }
+    ciErrNum = clSetKernelArg (ckBoxRowsLmem, 0, sizeof(cl_mem), (void*)&cmDevBufIn);
+    ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 1, (iRadiusAligned + uiNumOutputPix + r) * sizeof(cl_uchar4), NULL);
+    ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 2, sizeof(unsigned int), (void*)&uiWidth);
+    ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 3, sizeof(unsigned int), (void*)&uiHeight);
+    ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 4, sizeof(int), (void*)&r);
+    ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 5, sizeof(int), (void*)&iRadiusAligned);
+    ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 6, sizeof(float), (void*)&fScale);
+    ciErrNum |= clSetKernelArg(ckBoxRowsLmem, 7, sizeof(unsigned int), (void*)&uiNumOutputPix);
+    oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
 
     // Set the Argument values for the column kernel
-    ciErrNum  = clSetKernelArg(ckBoxColumns, 0, sizeof(cl_mem), (void*)&cmDevBufTemp);
-    ciErrNum |= clSetKernelArg(ckBoxColumns, 1, sizeof(cl_mem), (void*)&cmDevBufOut);
-    ciErrNum |= clSetKernelArg(ckBoxColumns, 2, sizeof(unsigned int), (void*)&uiWidth);
-    ciErrNum |= clSetKernelArg(ckBoxColumns, 3, sizeof(unsigned int), (void*)&uiHeight);
-    ciErrNum |= clSetKernelArg(ckBoxColumns, 4, sizeof(int), (void*)&r);
-    ciErrNum |= clSetKernelArg(ckBoxColumns, 5, sizeof(float), (void*)&fScale);
+    ciErrNum  = clSetKernelArg(ckBoxColumns, 0, sizeof(cl_mem), (void*)&cmDevBufIn);
+    ciErrNum |= clSetKernelArg(ckBoxColumns, 1, sizeof(unsigned int), (void*)&uiWidth);
+    ciErrNum |= clSetKernelArg(ckBoxColumns, 2, sizeof(unsigned int), (void*)&uiHeight);
+    ciErrNum |= clSetKernelArg(ckBoxColumns, 3, sizeof(int), (void*)&r);
+    ciErrNum |= clSetKernelArg(ckBoxColumns, 4, sizeof(float), (void*)&fScale);
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
-    //    printf("clSetKernelArg (0-5) ckBoxColumns...\n\n");
 }
 
 // OpenCL computation function for GPU:
@@ -286,20 +269,25 @@ double BoxFilterGPU(int numBoxFilterIterations, unsigned int uiWidth, unsigned i
 {
     double dKernelTime = 0.0;
 
+    // Copy input data from host to device because it was overwritten
+    {
+        // lmem version
+        ciErrNum = clEnqueueWriteBuffer(cqCommandQueue, cmDevBufIn, CL_TRUE, 0, szBuffBytes, uiInput, 0, NULL, NULL);
+        oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+
+        // Set global and local work sizes for row kernel
+        szLocalWorkSize[0] = (size_t)(iRadiusAligned + uiNumOutputPix + iRadius);   // Workgroup padded left and right
+        szLocalWorkSize[1] = 1;
+        szGlobalWorkSize[0] = szLocalWorkSize[0] * DivUp((size_t)uiImageWidth, (size_t)uiNumOutputPix);
+        szGlobalWorkSize[1] = uiImageHeight;
+    }
+
     // Sync host and start computation timer
     clFinish(cqCommandQueue);
     shrDeltaT(0);
 
     // perform box filter iterations
     for (int j=0; j<numBoxFilterIterations; j++) {
-        // swap input and output buffers after the first iteration because the
-        // second iterations needs to use the resulf of the first as input
-        if (j > 0) {
-            cl_mem c_temp = cmDevBufIn;
-            cmDevBufIn = cmDevBufOut;
-            cmDevBufOut= c_temp;
-        }
-
         // Launch row kernel
         // lmem Version
         ciErrNum = clEnqueueNDRangeKernel(cqCommandQueue, ckBoxRowsLmem, 2, NULL,
@@ -320,18 +308,18 @@ double BoxFilterGPU(int numBoxFilterIterations, unsigned int uiWidth, unsigned i
         // sync host and return computation time
         clFinish(cqCommandQueue);
 
-        // ciErrNum = clEnqueueReadBuffer(cqCommandQueue, cmDevBufOut, CL_TRUE, 0, szBuffBytes, uiOutput, 0, NULL, NULL);
-        // for (int x=0; x<uiImageWidth; x++) {
-        //     for (int y=0; y<uiImageHeight; y++) {
-        //         printf("%04d,%04d ", uiInput[uiImageWidth*y + x], uiOutput[uiImageWidth*y + x]);
-        //     }
-        //     printf("\n");
-        // }
-        // printf("--\n");
+        ciErrNum = clEnqueueReadBuffer(cqCommandQueue, cmDevBufIn, CL_TRUE, 0, szBuffBytes, uiOutput, 0, NULL, NULL);
+        for (int x=0; x<uiImageWidth; x++) {
+            for (int y=0; y<uiImageHeight; y++) {
+                printf("%04d ", uiOutput[uiImageWidth*y + x] & 0x000000ff);
+            }
+            printf("\n");
+        }
+        printf("--\n");
     }
+    exit(0);
+    clFinish(cqCommandQueue);
     dKernelTime = shrDeltaT(0);
-
-    //exit(0);
 
     return dKernelTime;
 }
@@ -340,20 +328,6 @@ double BoxFilterGPU(int numBoxFilterIterations, unsigned int uiWidth, unsigned i
 //*****************************************************************************
 void TestNoGL(int numBoxFilterIterations)
 {
-    // Copy input data from host to device
-    {
-        // lmem version
-        ciErrNum = clEnqueueWriteBuffer(cqCommandQueue, cmDevBufIn, CL_TRUE, 0, szBuffBytes, uiInput, 0, NULL, NULL);
-        oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
-
-        // Set global and local work sizes for row kernel
-        szLocalWorkSize[0] = (size_t)(iRadiusAligned + uiNumOutputPix + iRadius);   // Workgroup padded left and right
-        szLocalWorkSize[1] = 1;
-        szGlobalWorkSize[0] = szLocalWorkSize[0] * DivUp((size_t)uiImageWidth, (size_t)uiNumOutputPix);
-        szGlobalWorkSize[1] = uiImageHeight;
-    }
-    clFinish(cqCommandQueue);
-
     // run once to warm up the opencl driver
     BoxFilterGPU (numBoxFilterIterations, uiImageWidth, uiImageHeight, iRadius, fScale);
     clFinish(cqCommandQueue);
@@ -378,16 +352,12 @@ void Cleanup()
     if(cSourceCL)     { free(cSourceCL);                   cSourceCL=0;      }
     if(uiInput)       { free(uiInput);                     uiInput=0;        }
     if(uiOutput)      { free(uiOutput);                    uiOutput=0;       }
-    if(uiTemp)        { free(uiTemp);                      uiTemp=0;         }
     if(ckBoxColumns)  { clReleaseKernel(ckBoxColumns);     ckBoxColumns=0;   }
     if(ckBoxRowsTex)  { clReleaseKernel(ckBoxRowsTex);     ckBoxRowsTex=0;   }
     if(ckBoxRowsLmem) { clReleaseKernel(ckBoxRowsLmem);    ckBoxRowsLmem=0;  }
     if(cpProgram)     { clReleaseProgram(cpProgram);       cpProgram=0;      }
     if(RowSampler)    { clReleaseSampler(RowSampler);      RowSampler=0;     }
     if(cmDevBufIn)    { clReleaseMemObject(cmDevBufIn);    cmDevBufIn=0;     }
-    if(cmDevBufTemp)  { clReleaseMemObject(cmDevBufTemp);  cmDevBufTemp=0;   }
-    if(cmDevBufOut)   { clReleaseMemObject(cmDevBufOut);   cmDevBufOut=0;    }
-    if(cmCL_PBO)      { clReleaseMemObject(cmCL_PBO);      cmCL_PBO=0;       }
 }
 
 void Exit(int exitcode)
