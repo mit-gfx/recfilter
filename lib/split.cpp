@@ -455,6 +455,11 @@ static RecFilterFunc extract_tails_from_each_scan(
                 values.push_back(undef(F_intra.output_types()[i]));
             }
             F_intra.define_update(args, values);
+
+            // add scheduling tags for the last update def
+            map<string,VarTag> uvar_category = rF_intra.pure_var_category;
+            uvar_category.erase(F_intra.args()[innermost_tiled_dim_id]);
+            rF_intra.update_var_category.push_back(uvar_category);
         }
     }
 
@@ -1547,6 +1552,11 @@ static void add_residuals_to_final_result(
             values.push_back(undef(F.output_types()[i]));
         }
         F.define_update(args, values);
+
+        // add scheduling tags for the last update def
+        map<string,VarTag> uvar_category = rF.pure_var_category;
+        uvar_category.erase(F.args()[innermost_tiled_dim_id]);
+        rF.update_var_category.push_back(uvar_category);
     }
 }
 

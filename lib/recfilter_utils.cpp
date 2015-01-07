@@ -29,24 +29,23 @@ static string clean_var_names(string str) {
 // -----------------------------------------------------------------------------
 
 Arguments::Arguments(int argc, char** argv) :
-    width  (4096),
-    block  (32),
+    width    (4096),
+    min_width(4096),
+    max_width(4096),
+    block     (32),
     iterations(1),
-    threads(192),
     nocheck(false)
 {
     string app_name = argv[0];
     string desc = "\nUsage\n " + app_name + " ";
     desc.append(string(
-                "[-width|-w w] [-tile|-block|-b|-t b] [-thread n] [-iter i] [-nocheck] [-help]\n\n"
-                "\twidth    width of input image [default = 4096]\n"
-                "\ttile     tile width for splitting each dimension image [default = 32]\n"
-                "\tthread   maximum threads per tile [default = 192]\n"
-                "\tnocheck  do not check against reference solution [default = false]\n"
-                "\titer     number of profiling iterations [default = 1]\n"
-                "\thelp     show help message\n"
-                )
-            );
+        "[-width|-w w] [-tile|-t b] [-thread n] [-iter i] [-nocheck] [-help]\n\n"
+        "\twidth    image width, set 0 to run all image widths and force --nocheck [default = 4096]\n"
+        "\ttile     tile width for splitting each dimension image [default = 32]\n"
+        "\tnocheck  do not check against reference solution, forced to true if width is 0 [default = false]\n"
+        "\titer     number of profiling iterations [default = 1]\n"
+        "\thelp     show help message\n"
+        ));
 
     try {
         for (int i=1; i<argc; i++) {
@@ -67,13 +66,6 @@ Arguments::Arguments(int argc, char** argv) :
                     throw runtime_error("-iter requires a int value");
             }
 
-            else if (!option.compare("-thread") || !option.compare("--thread")) {
-                if ((i+1) < argc)
-                    threads = atoi(argv[++i]);
-                else
-                    throw runtime_error("-thread requires a int value");
-            }
-
             else if (!option.compare("-w") || !option.compare("--w") || !option.compare("-width") || !option.compare("--width")) {
                 if ((i+1) < argc) {
                     width = atoi(argv[++i]);
@@ -82,13 +74,12 @@ Arguments::Arguments(int argc, char** argv) :
                     throw runtime_error("-width requires an integer value");
             }
 
-            else if (!option.compare("-b") || !option.compare("--b") || !option.compare("-block") || !option.compare("--block") ||
-                    !option.compare("-t") || !option.compare("--t") || !option.compare("-tile") || !option.compare("--tile"))
+            else if (!option.compare("-t") || !option.compare("--t") || !option.compare("-tile") || !option.compare("--tile"))
             {
                 if ((i+1) < argc)
                     block = atoi(argv[++i]);
                 else
-                    throw runtime_error("-block requires an integer value");
+                    throw runtime_error("-tile requires an integer value");
             }
 
             else {
@@ -96,8 +87,18 @@ Arguments::Arguments(int argc, char** argv) :
             }
         }
 
-        if (width%block)
+        if (width%block) {
             throw runtime_error("Width should be a multiple of block size");
+        }
+
+        if (width) {
+            max_width = width;
+            min_width = width;
+        } else {
+            min_width = 2*block;
+            max_width = (4096/block)*block;
+            nocheck   = true;
+        }
 
     } catch (runtime_error & e) {
         cerr << endl << e.what() << endl << desc << endl;

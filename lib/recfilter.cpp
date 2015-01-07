@@ -534,7 +534,7 @@ float RecFilter::profile(int iterations) {
     unsigned long time_start, time_end;
 
     if (contents.ptr->target.has_gpu_feature()) {
-        int pre_runs = 10;                      // run a few times for warmup
+        int pre_runs = (iterations>1 ? 1 : 0);      // warm up runs
         for (int i=0; i<pre_runs; i++) {
             F.realize(R);
         }

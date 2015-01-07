@@ -461,9 +461,10 @@ std::ostream &operator<<(std::ostream &s, const Halide::Internal::Function &f);
 class Arguments {
     public:
         int width;       ///< image width
+        int max_width;   ///< max image width
+        int min_width;   ///< min image width
         int block;       ///< block size
         int iterations;  ///< profiling iterations
-        int threads;     ///< maximum threads per GPU tile
         bool nocheck;    ///< skip check Halide result against reference solution
 
         /** Parse command line args from number of args and list of args */
