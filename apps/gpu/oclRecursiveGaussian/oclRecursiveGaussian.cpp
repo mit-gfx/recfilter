@@ -83,7 +83,7 @@ const char* cExecutableName;
 // OpenCL functionality
 double GPUGaussianFilterRGBA(GaussParms* pGP);
 void GPUGaussianSetCommonArgs(GaussParms* pGP);
-void TestNoGL(int iCycles);
+void TestNoGL();
 
 // Helpers
 void Cleanup();
@@ -98,13 +98,10 @@ int main(int argc, char** argv)
     cl_uint uiTargetDevice = 0;	        // Default Device to compute on
     cl_uint uiNumComputeUnits;          // Number of compute units (SM's on NV GPU)
 
-    if (argc >= 2) {
-        iCycles = atoi(argv[1]);
-        if (argc == 3) {
-            uiTargetDevice = atoi(argv[2]);
-        }
+    if (argc == 2) {
+        uiTargetDevice = atoi(argv[2]);
     } else {
-        printf("Usage: oclBoxFilter [number of runs] [OpenCL device]");
+        printf("Usage: oclBoxFilter [OpenCL device]");
         exit(EXIT_FAILURE);
     }
 
@@ -138,7 +135,11 @@ int main(int argc, char** argv)
     cqCommandQueue = clCreateCommandQueue(cxGPUContext, cdDevices[uiTargetDevice], 0, &ciErrNum);
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
 
-    for (int N=64; N<=8192; N+=64)
+    int min_w = 64;
+    int max_w = 4096;
+    int inc_w = 32;
+
+    for (int N=min_w; N<=max_w; N+=inc_w)
     {
         // Find the path from the exe to the image file and load the image
 //        cPathAndName = shrFindFilePath(cImageFile, argv[0]);
@@ -244,7 +245,7 @@ int main(int argc, char** argv)
 
         // Start main GLUT rendering loop for processing and rendering,
         // or otherwise run No-GL Q/A test sequence
-        TestNoGL(iCycles);
+        TestNoGL();
 
         Cleanup();
     }
@@ -252,7 +253,7 @@ int main(int argc, char** argv)
     Exit(EXIT_SUCCESS);
 }
 
-void TestNoGL(int iCycles)
+void TestNoGL()
 {
     // Warmup call to assure OpenCL driver is awake
     GPUGaussianFilterRGBA(&oclGP);
