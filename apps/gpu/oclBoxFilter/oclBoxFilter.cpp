@@ -147,7 +147,7 @@ int main(int argc, char** argv)
     cqCommandQueue = clCreateCommandQueue(cxGPUContext, cdDevices[uiTargetDevice], 0, &ciErrNum);
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
 
-    int min_w = 16;
+    int min_w = 64;
     int max_w = 4096;
     int inc_w = 32;
 
