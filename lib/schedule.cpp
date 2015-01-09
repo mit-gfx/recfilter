@@ -435,10 +435,10 @@ RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag v1, VarTag v2, VarTag v3
                     if (!is_pure_undef(F.values())) {
                         F.parallel(v).rename(v, GPU_BLOCK[block_id_x]);
                         rF.pure_schedule.push_back(s.str());
-                    } else {
-                        F.gpu_single_thread();
-                        rF.pure_schedule.push_back("gpu_single_thread()");
-                    }
+                    } //else {
+                        //F.gpu_single_thread();
+                        //rF.pure_schedule.push_back("gpu_single_thread()");
+                    //}
                 } else {
                     if (!is_update_undef(F.update_values(def))) {
                         F.update(def).parallel(v).rename(v, GPU_BLOCK[block_id_x]);
