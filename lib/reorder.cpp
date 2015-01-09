@@ -61,8 +61,19 @@ void RecFilter::inline_func(string func_name) {
     if (contents.ptr->name == func_name) {
         return;
     }
+
+    // all the functions in this recfilter
+    vector<Func> func_list;
+    map<string,RecFilterFunc>::iterator f = contents.ptr->func.begin();
+    map<string,RecFilterFunc>::iterator fe= contents.ptr->func.end();
+    while (f!=fe) {
+        func_list.push_back(Func(f->second.func));
+        f++;
+    }
+
+    // inline this function in all the functions of this filter
     Function F = internal_function(func_name).func;
-    inline_function(F, funcs());
+    inline_function(F, func_list);
     contents.ptr->func.erase(func_name);
 }
 
@@ -145,7 +156,7 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
     vector<RecFilter> recfilters;
 
     for (int i=0; i<scans.size(); i++) {
-        RecFilter rf(func().name() + "_" + int_to_string(i));
+        RecFilter rf(contents.ptr->name + "_" + int_to_string(i));
 
         // set the image border conditions
         if (contents.ptr->clamped_border) {
@@ -155,11 +166,11 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
         // same pure def as original filter for the first
         // subsequent filters call the result of prev recfilter
         if (i == 0) {
-            rf(args) = func().values();
+            rf(args) = as_func().values();
         } else {
             vector<Expr> call_args;
             vector<Expr> pure_values;
-            Function f_prev = recfilters[i-1].func().function();
+            Function f_prev = recfilters[i-1].as_func().function();
             for (int j=0; j<args.size(); j++) {
                 call_args.push_back(args[j]);
             }

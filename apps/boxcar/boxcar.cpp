@@ -30,7 +30,7 @@ template<typename T>
 RecFilter box_filter (int iterations, int filter_radius, int width, int height, int tile_width, Image<T> I);
 RecFilter box_filter (int iterations, int filter_radius, int width, int height, int tile_width, RecFilter I);
 RecFilter box_filter (int iterations, int filter_radius, int width, int height, int tile_width, Func I);
-Expr finite_diff_expr(int iterations, int filter_radius, int width, int height, Func I, Var x, Var y);
+Expr finite_diff_expr(int iterations, int filter_radius, int width, int height, Func I,      Expr x, Expr y);
 
 // -----------------------------------------------------------------------------
 
@@ -69,22 +69,25 @@ RecFilter box_filter(int iterations, int filter_radius, int width, int height, i
 
     int B = filter_radius;
 
-    Var u("u"), xo("xo"), xi("xi"), xii("xii");
-    Var v("v"), yo("yo"), yi("yi"), yii("yii");
-
     RecFilterDim x("x", width);
     RecFilterDim y("y", height);
 
-    Func      S("S");
+    Var xo("xo"), xi("xi"), xii("xii");
+    Var yo("yo"), yi("yi"), yii("yii");
+
+    Var u = x.var();
+    Var v = y.var();
+
+    RecFilter S("S");
     RecFilter F("Box");
 
-    S(u,v) = finite_diff_expr(iterations, B, width, height, I, u, v);
+    S(x,y) = I(x,y);                // k order intergral image
+    S.add_filter(x, coeff);         // k = num of box filter iterations
+    S.add_filter(y, coeff);
 
-    F(x,y) = S(x,y);                // k order intergral image
-    F.add_filter(x, coeff);         // k = num of box filter iterations
-    F.add_filter(y, coeff);
+    F(x,y) = finite_diff_expr(iterations, B, width, height, S.as_func(), x, y);
 
-    F.split(x, tile_width, y, tile_width);
+    S.split(x, tile_width, y, tile_width);
 
     // -------------------------------------------------------------------------
 
@@ -96,14 +99,14 @@ RecFilter box_filter(int iterations, int filter_radius, int width, int height, i
         exit(EXIT_FAILURE);
     }
 
-    S.compute_root()
+    F.compute_globally()
         .split(u, xo, xi, 32)
         .split(v, yo, yi, 32)
         .split(yi,yi, yii,4).unroll(yii)
         .reorder(yii,xi,yi,xo,yo)
         .gpu(xo,yo,xi,yi);
 
-    F.intra_schedule(1).compute_locally()
+    S.intra_schedule(1).compute_locally()
         .reorder_storage(F.inner(), F.outer())
         .unroll         (F.inner_scan())
         .split          (F.inner(1), unroll_w)
@@ -112,7 +115,7 @@ RecFilter box_filter(int iterations, int filter_radius, int width, int height, i
         .gpu_threads    (F.inner(0), F.inner(1))
         .gpu_blocks     (F.outer(0), F.outer(1));
 
-    F.intra_schedule(2).compute_locally()
+    S.intra_schedule(2).compute_locally()
         .reorder_storage(F.tail(), F.inner(), F.outer())
         .unroll         (F.inner_scan())
         .split          (F.outer(0), tiles_per_warp)
@@ -120,7 +123,7 @@ RecFilter box_filter(int iterations, int filter_radius, int width, int height, i
         .gpu_threads    (F.inner(0), F.outer(0).split_var())
         .gpu_blocks     (F.outer(0), F.outer(1));
 
-    F.inter_schedule().compute_globally()
+    S.inter_schedule().compute_globally()
         .reorder_storage(F.inner(), F.tail(), F.outer())
         .unroll         (F.outer_scan())
         .split          (F.outer(0), tiles_per_warp)
@@ -128,12 +131,10 @@ RecFilter box_filter(int iterations, int filter_radius, int width, int height, i
         .gpu_threads    (F.inner(0), F.outer(0).split_var())
         .gpu_blocks     (F.outer(0));
 
-    cout << F << endl;
-
     return F;
 }
 
-Expr finite_diff_expr(int iterations, int filter_radius, int width, int height, Func I, Var x, Var y) {
+Expr finite_diff_expr(int iterations, int filter_radius, int width, int height, Func I, Expr x, Expr y) {
     int B = filter_radius;
     int z = (2*B+1)*(2*B+1);
 
@@ -154,7 +155,7 @@ RecFilter box_filter(int iterations, int filter_radius, int width, int height, i
 }
 
 RecFilter box_filter(int iterations, int filter_radius, int width, int height, int tile_width, RecFilter I) {
-    return box_filter(iterations, filter_radius, width, height, tile_width, I.func());
+    return box_filter(iterations, filter_radius, width, height, tile_width, I.as_func());
 }
 
 template<typename T>

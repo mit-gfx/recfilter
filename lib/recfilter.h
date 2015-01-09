@@ -200,18 +200,19 @@ public:
     void set_clamped_image_border(void);
     // @}
 
-
-    /**@name Dependency graph of the recursive filter
-     * @brief Return only the final recursive filter as Halide function,
-     * or any function in required to compute the complete filter (searches
-     * the dependency graph by function name) or all the functions in the
-     * dependency graph
+    /** Cast the recfilter as a Halide::Func; this returns the function that holds
+     * the final result of this filter; useful for extracting the result of this
+     * function to use as input to other Halide Func
      */
-    // {@
-    Halide::Func func(void);
+    Halide::Func as_func(void);
+
+    /**
+     * Extract the constituent function by name, useful for debugging:
+     * - realize only a particular stage for correctness or profiling
+     * - debugging/testing schedules by using Halide's scheduling primitives directly
+     *   on the function instead of the high level collective scheduling
+     */
     Halide::Func func(std::string func_name);
-    std::vector<Halide::Func> funcs(void);
-    // @}
 
 
     /**@name Tiling routines
@@ -273,15 +274,32 @@ public:
     std::string print_hl_code  (void) const;
     // @}
 
-    /**@name Generic handles to write schedules for internal functions */
+    /**@name Scheduling handles for non-tiled filters */
     // {@
 
-    /** Extract a handle to schedule intra-tile functions
+    /** Extract a handle to schedule the filter (if not tiled)
+     *
+     * \param[in] id pure/update def id, negative for pure def, else id-th update def
+     * \return scheduling handle of the pure/update def to directly use Halide API
+     */
+    Halide::Stage schedule(int id=-1);
+
+    /** Specify the filter (if not tiled) to be computed in global memory
+     *
+     *  \return scheduling handle to directly use Halide API
+     */
+    Halide::Stage compute_globally(void);
+    // @}
+
+    /**@name Collective scheduling: generic handles for scheduling for tiled filter */
+    // {@
+
+    /** Extract a handle to schedule intra-tile functions if the filter is tiled
      * \param id 0 for all intra tile functions, 1 for nD intra-tile functions, otherwise 1D intra-tile functions
      */
     RecFilterSchedule intra_schedule(int id=0);
 
-    /** Extract a handle to schedule intra-tile functions */
+    /** Extract a handle to schedule intra-tile functions if the filter is tiled */
     RecFilterSchedule inter_schedule(void);
     // @}
 

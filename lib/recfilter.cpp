@@ -60,7 +60,7 @@ RecFilterRefVar ::operator Expr(void) { return this->operator[](0); }
 RecFilterRefExpr::operator Expr(void) { return this->operator[](0); }
 
 Expr RecFilterRefVar::operator[](int i) {
-    Function main_func = rf.func().function();
+    Function main_func = rf.as_func().function();
     vector<Expr> expr_args;
     for (int j=0; j<args.size(); j++) {
         expr_args[j] = args[j];
@@ -74,7 +74,7 @@ Expr RecFilterRefVar::operator[](int i) {
 }
 
 Expr RecFilterRefExpr::operator[](int i) {
-    Function main_func = rf.func().function();
+    Function main_func = rf.as_func().function();
     vector<Expr> expr_args;
     for (int j=0; j<args.size(); j++) {
         expr_args[j] = args[j];
@@ -356,7 +356,32 @@ void RecFilter::add_filter(RecFilterDimAndCausality x, vector<float> coeff) {
 
 // -----------------------------------------------------------------------------
 
+Stage RecFilter::schedule(int id) {
+    if (contents.ptr->tiled) {
+        cerr << "Filter is tiled, use RecFilter::intra_schedule() "
+             << "and RecFilter::inter_schedule()\n" << endl;
+        assert(false);
+    }
+    return (id<0 ? Stage(as_func()) : as_func().update(id));
+}
+
+Stage RecFilter::compute_globally(void) {
+    if (contents.ptr->tiled) {
+        cerr << "Filter is tiled, use RecFilter::intra_schedule() "
+             << "and RecFilter::inter_schedule()\n" << endl;
+        assert(false);
+    }
+    return as_func().compute_root();
+}
+
+
 RecFilterSchedule RecFilter::intra_schedule(int id) {
+    if (!contents.ptr->tiled) {
+        cerr << "\nNo intra-tile terms to schedule in a non-tiled filter" << endl;
+        cerr << "Use RecFilter::schedule() and Halide scheduling API\n" << endl;
+        assert(false);
+    }
+
     vector<string> func_list;
 
     map<string,RecFilterFunc>::iterator f_it = contents.ptr->func.begin();
@@ -395,6 +420,12 @@ RecFilterSchedule RecFilter::intra_schedule(int id) {
 }
 
 RecFilterSchedule RecFilter::inter_schedule(void) {
+    if (!contents.ptr->tiled) {
+        cerr << "\nNo inter-tile terms to schedule in a non-tiled filter" << endl;
+        cerr << "Use RecFilter::schedule() and Halide scheduling API\n" << endl;
+        assert(false);
+    }
+
     vector<string> func_list;
 
     map<string,RecFilterFunc>::iterator f_it = contents.ptr->func.begin();
@@ -421,7 +452,7 @@ VarTag RecFilter::outer_scan(void)  { return VarTag(OUTER|SCAN);   }
 
 // -----------------------------------------------------------------------------
 
-Func RecFilter::func(void) {
+Func RecFilter::as_func(void) {
     return Func(internal_function(contents.ptr->name).func);
 }
 
@@ -434,17 +465,6 @@ Func RecFilter::func(string func_name) {
         cerr << "recursive filter " << contents.ptr->name << endl;
         assert(false);
     }
-}
-
-vector<Func> RecFilter::funcs(void) {
-    vector<Func> func_list;
-    map<string,RecFilterFunc>::iterator f = contents.ptr->func.begin();
-    map<string,RecFilterFunc>::iterator fe= contents.ptr->func.end();
-    while (f!=fe) {
-        func_list.push_back(Func(f->second.func));
-        f++;
-    }
-    return func_list;
 }
 
 RecFilterFunc& RecFilter::internal_function(string func_name) {
@@ -486,8 +506,12 @@ Realization RecFilter::create_realization(void) {
     // apply a default schedule to compute everything
     // in global memory if no schedule has been used
     if (no_schedule_applied) {
-        inter_schedule().compute_globally();
-        intra_schedule().compute_globally();
+        if (contents.ptr->tiled) {
+            inter_schedule().compute_globally();
+            intra_schedule().compute_globally();
+        } else {
+            compute_globally();
+        }
         cerr << "\nWarning: Applied the default schedule as follows\n" << endl;
         cerr << print_schedule() << endl;
     }

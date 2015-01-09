@@ -680,10 +680,10 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        // no need to reorder storage if the function is not compute
+        // no need to reorder storage if the function is not compute at root level
         // don't reorder storage of final result
         if (!rF.func.schedule().compute_level().is_root() ||
-                rF.func.name()==recfilter.func().name()) {
+                rF.func.name()==recfilter.name()) {
             continue;
         }
 
