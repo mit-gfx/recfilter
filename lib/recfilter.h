@@ -465,6 +465,7 @@ class Arguments {
         int min_width;   ///< min image width
         int block;       ///< block size
         int iterations;  ///< profiling iterations
+        int filter_reps; ///< filter iterations (multiple applications of the filter)
         bool nocheck;    ///< skip check Halide result against reference solution
 
         /** Parse command line args from number of args and list of args */

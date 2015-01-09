@@ -6,6 +6,16 @@
 #include <iostream>
 #include <Halide.h>
 
+/**
+ * Feed forward and feedback coefficients for computing n integrals of image,
+ * single intergal is summed area table and multiple integrals are multiple
+ * applications of summed area table
+ *
+ * \param[in] iterations number of integrals
+ * \returns coeff of IIR filter that computes multiple integrals
+ */
+std::vector<float> integral_image_coeff(int iterations);
+
 /**@name Compute the Gaussian, derivative of Gaussian and integral of Gaussian
  * @param[in] x input (float or Halide::Expr)
  * @param[in] mu mean of the Gaussian function
@@ -39,11 +49,11 @@ std::vector<float> gaussian_weights(float sigma, int order);
  * Rau and McClellan, IEEE Trans. on Signal Processing 1997
  * http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=554310
  *
- * @param[in] k number of repeated applications of box filter
+ * @param[in] iterations number of repeated applications of box filter
  * @param[in] sigma sigma support of the true Gaussian filter
  * @return box filter width
  */
-int gaussian_box_filter(int k, float sigma);
+int gaussian_box_filter(int iterations, float sigma);
 
 
 /** @brief Apply Gaussian filter on an input image

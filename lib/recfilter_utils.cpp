@@ -39,9 +39,10 @@ Arguments::Arguments(int argc, char** argv) :
     string app_name = argv[0];
     string desc = "\nUsage\n " + app_name + " ";
     desc.append(string(
-        "[-width|-w w] [-tile|-t b] [-thread n] [-iter i] [-nocheck] [-help]\n\n"
+        "[-width|-w w] [-tile|-t b] [-filter n] [-iter i] [-nocheck] [-help]\n\n"
         "\twidth    image width, set 0 to run all image widths and force --nocheck [default = 4096]\n"
         "\ttile     tile width for splitting each dimension image [default = 32]\n"
+        "\tfilter   number of repeated filter applications on same input [default = 1]\n"
         "\tnocheck  do not check against reference solution, forced to true if width is 0 [default = false]\n"
         "\titer     number of profiling iterations [default = 1]\n"
         "\thelp     show help message\n"
@@ -59,11 +60,18 @@ Arguments::Arguments(int argc, char** argv) :
                 nocheck = true;
             }
 
+            else if (!option.compare("-filter") || !option.compare("--filter")) {
+                if ((i+1) < argc)
+                    filter_reps = atoi(argv[++i]);
+                else
+                    throw runtime_error("-filter requires an integer value");
+            }
+
             else if (!option.compare("-iter") || !option.compare("--iter")) {
                 if ((i+1) < argc)
                     iterations = atoi(argv[++i]);
                 else
-                    throw runtime_error("-iter requires a int value");
+                    throw runtime_error("-iter requires an integer value");
             }
 
             else if (!option.compare("-w") || !option.compare("--w") || !option.compare("-width") || !option.compare("--width")) {

@@ -4,14 +4,20 @@ using namespace Halide;
 
 using std::vector;
 
-/// Compute the factorial of an integer
-static int factorial(int k) {
+/** Compute the factorial of an integer */
+static inline int factorial(int k) {
     assert(k>=0);
     int r = 1;
     for (int i=1; i<=k; i++) {
         r *= i;
     }
     return r;
+}
+
+/** Compute the i-th binomial coeff of the expansion of (1-r*x)^n */
+static inline float binomial_coeff(int n, int i, float r) {
+    int n_choose_i = factorial(n)/(factorial(i)*factorial(n-i));
+    return (pow(-r,i)*float(n_choose_i));
 }
 
 /**
@@ -211,4 +217,18 @@ int gaussian_box_filter(int k, float sigma) {
     }
     sum = std::sqrt(2.0*M_PI) * (sum+alpha) * sigma;
     return int(std::ceil(sum));
+}
+
+vector<float> integral_image_coeff(int n) {
+    vector<float> coeff(n+1, 0.0f);
+
+    // set feedforward coeff = 1.0f
+    coeff[0] = 1.0f;
+
+    // feedback coeff are binomial expansion of (1-x)^n multiplied by -1
+    for (int i=1; i<=n; i++) {
+        coeff[i] = -1.0f * binomial_coeff(n,i,1.0f);
+    }
+
+    return coeff;
 }
