@@ -119,8 +119,8 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
                 bool causal_a = scan_causal[scan_a];
                 bool causal_b = scan_causal[scan_b];
                 if (dim_a==dim_b && causal_a!=causal_b && scan_b<scan_a) {
-                    cerr << "Scans " << scan_a << " " << scan_b << " cannot"
-                        << " be reordered" << endl;
+                    cerr << "Scans " << scan_a << " " << scan_b << " cannot be reordered"
+                        << " during cascading because they have opposite causality" << endl;
                     assert(false);
                 }
             }
@@ -223,33 +223,37 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
     return recfilters;
 }
 
-RecFilter RecFilter::cascade(vector<int> a) {
-    vector<vector<int> > scans;
-    scans.push_back(a);
-    vector<RecFilter> filters = cascade(scans);
-    return filters[0];
+vector<RecFilter> RecFilter::cascade(vector<int> a, vector<int> b) {
+    return cascade({a,b});
+};
+
+vector<RecFilter> RecFilter::cascade_by_causality(void) {
+    vector<int> causal_scans;
+    vector<int> anticausal_scans;
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        for (int j=contents.ptr->filter_info[i].num_scans-1; j>=0; j--) {
+            int id = contents.ptr->filter_info[i].scan_id[j];
+            bool c = contents.ptr->filter_info[i].scan_causal[j];
+            if (c) {
+                causal_scans.push_back(id);
+            } else {
+                anticausal_scans.push_back(id);
+            }
+        }
+    }
+    return cascade({causal_scans, anticausal_scans});
 }
 
-vector<RecFilter> RecFilter::cascade(vector<int> a, vector<int> b) {
-    vector<vector<int> > scans;
-    scans.push_back(a);
-    scans.push_back(b);
+vector<RecFilter> RecFilter::cascade_by_dimension(void) {
+    vector< vector<int> > scans;
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        vector<int> dim_scans;
+        for (int j=contents.ptr->filter_info[i].num_scans-1; j>=0; j--) {
+            dim_scans.push_back(contents.ptr->filter_info[i].scan_id[j]);
+        }
+        if (!dim_scans.empty()) {
+            scans.push_back(dim_scans);
+        }
+    }
     return cascade(scans);
-};
-
-vector<RecFilter> RecFilter::cascade(vector<int> a, vector<int> b, vector<int> c) {
-    vector<vector<int> > scans;
-    scans.push_back(a);
-    scans.push_back(b);
-    scans.push_back(c);
-    return cascade(scans);
-};
-
-vector<RecFilter> RecFilter::cascade(vector<int> a, vector<int> b, vector<int> c, vector<int> d) {
-    vector<vector<int> > scans;
-    scans.push_back(a);
-    scans.push_back(b);
-    scans.push_back(c);
-    scans.push_back(d);
-    return cascade(scans);
-};
+}

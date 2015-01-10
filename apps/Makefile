@@ -12,6 +12,7 @@ all: scripts
 	$(MAKE) ../lib
 	$(MAKE) tests
 	$(MAKE) box_filter
+	$(MAKE) bspline_interp
 	$(MAKE) gaussian_vyv
 	$(MAKE) benchmarks
 	$(MAKE) ls_hist
@@ -23,6 +24,7 @@ clean: clean_scripts
 	$(MAKE) ../lib 		 clean
 	$(MAKE) tests 		 clean
 	$(MAKE) box_filter 	 clean
+	$(MAKE) bspline_interp clean
 	$(MAKE) ls_hist 	 clean
 	$(MAKE) gaussian_vyv clean
 	$(MAKE) benchmarks 	 clean

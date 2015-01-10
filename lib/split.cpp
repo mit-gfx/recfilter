@@ -1862,6 +1862,16 @@ void RecFilter::split(map<string,int> dim_tile) {
     recfilter_split_info.clear();
 }
 
+void RecFilter::split_all_dimensions(int tx) {
+    map<string,int> dim_tile;
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        if (contents.ptr->filter_info[i].num_scans) {
+            dim_tile.insert(make_pair(contents.ptr->filter_info[i].var.name(),tx));
+        }
+    }
+    split(dim_tile);
+}
+
 void RecFilter::split(RecFilterDim x, int tx) {
     map<string,int> dim_tile;
     dim_tile[x.var().name()] = tx;

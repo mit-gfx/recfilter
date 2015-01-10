@@ -224,7 +224,7 @@ public:
      * - tile width must be a multiple of image width for each dimension
      */
     // {@
-    void split(int tx);
+    void split_all_dimensions(int tx);
     void split(RecFilterDim x, int tx);
     void split(RecFilterDim x, int tx, RecFilterDim y, int ty);
     void split(RecFilterDim x, int tx, RecFilterDim y, int ty, RecFilterDim z, int tz);
@@ -232,37 +232,48 @@ public:
     // @}
 
 
-    /** @name Reorder scans in the filter or cascade them to produce multiple filters
-     *  @brief uses list of list of scans as argument, producing a list of
-     *  recursive filters each containing the respective list of scans
+    /** @name Cascading API
+     *
+     *  Cascade them to produce multiple filters using list of list of scans and
+     *  producing a list of recursive filters each ccomputes the corresponding list
+     *  of scans in an overlapped fashion
      *
      *  Preconditions:
      *  - list of list of scans spans all the scans of the original filter
      *  - no scan is repeated in the list of list of scans
-     *  - the relative order of reverse causality scans in same dimension remains same
+     *  - the relative order of scans with respect to causality remains preserved
+     *
+     *  \param a list of scans for first filter
+     *  \param b list of scans for second filter
+     *
+     *  \return two cascaded filters
      */
     // {@
-    RecFilter cascade(
-            std::vector<int> a      ///< reordered list of scans of the filter
-            );
-    std::vector<RecFilter> cascade(
-            std::vector<int> a,     ///< list of scans for first filter
-            std::vector<int> b      ///< list of scans for second filter
-            );
-    std::vector<RecFilter> cascade(
-            std::vector<int> a,     ///< list of scans for first filter
-            std::vector<int> b,     ///< list of scans for second filter
-            std::vector<int> c      ///< list of scans for third filter
-            );
-    std::vector<RecFilter> cascade(
-            std::vector<int> a,     ///< list of scans for first filter
-            std::vector<int> b,     ///< list of scans for second filter
-            std::vector<int> c,     ///< list of scans for third filter
-            std::vector<int> d      ///< list of scans for fourth filter
-            );
-    std::vector<RecFilter> cascade(
-            std::vector<std::vector<int> > scan ///< list of scans for list of filters
-            );
+    std::vector<RecFilter> cascade(std::vector<int> a, std::vector<int> b);
+
+    /**
+     *  Cascade them to produce multiple filters using list of list of scans and
+     *  producing a list of recursive filters each ccomputes the corresponding list
+     *  of scans in an overlapped fashion
+     *
+     *  Preconditions:
+     *  - list of list of scans spans all the scans of the original filter
+     *  - no scan is repeated in the list of list of scans
+     *  - the relative order of scans with respect to causality remains preserved
+     *
+     *  \param scan list of list of scans, each inner list becomes a separate filter
+     *
+     *  \return list of cascaded filters
+     */
+    std::vector<RecFilter> cascade(std::vector<std::vector<int> > scan);
+
+    /** Computing all causal scans in all dimensions in an overlapped fashion
+     * and all anticausal scans in an overlapped fashion and cascade the two groups */
+    std::vector<RecFilter> cascade_by_causality(void);
+
+    /** Compute all scans in the same dimension in an overlapped fashion and cascade
+     * different dimensions */
+    std::vector<RecFilter> cascade_by_dimension(void);
     // @}
 
 
