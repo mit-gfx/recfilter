@@ -68,6 +68,171 @@ static map<string, RecFilterFunc> recfilter_func_list;
 
 // -----------------------------------------------------------------------------
 
+/** Check if the output buffers of two functions can be merged or interleaved
+ * \param A first function to be merged/interleaved
+ * \param B second function to be merged/interleaved
+ */
+static bool merge_feasible(Function A, Function B) {
+    bool can_merge = true;
+
+    // pure definitions must have same args
+    can_merge &= (A.args().size() == B.args().size());
+    for (int i=0; can_merge && i<A.args().size(); i++) {
+        can_merge &= (A.args()[i] == B.args()[i]);
+    }
+    if (!can_merge) {
+        cerr << "Functions to be merged must have same args in pure defs" << endl;
+        assert(false);
+    }
+
+    // number of update defs must be same
+    can_merge &= (A.updates().size()==B.updates().size());
+    if (!can_merge) {
+        cerr << A << B << endl;
+        cerr << "Functions to be merged must have same number of update defs" << endl;
+        assert(false);
+    }
+
+    // all update def args must be same
+    for (int i=0; i<A.updates().size(); i++) {
+        vector<Expr> a_args = A.updates()[i].args;
+        vector<Expr> b_args = B.updates()[i].args;
+        for (int j=0; j<a_args.size(); j++) {
+            can_merge &= equal(a_args[j],b_args[j]);
+        }
+    }
+
+    if (!can_merge) {
+        cerr << "Functions to be merged must have same args in each update def" << endl;
+        assert(false);
+    }
+
+    // A must not depend upon B and B must not depend upon A
+    for (int i=0; can_merge && i<A.values().size(); i++) {
+        can_merge &= (!expr_depends_on_func(A.values()[i], B.name()));
+        if (!can_merge) {
+            cerr << "Functions to be merged must not call each other" << endl;
+            assert(false);
+        }
+    }
+
+    for (int i=0; can_merge && i<B.values().size(); i++) {
+        can_merge &= (!expr_depends_on_func(B.values()[i], A.name()));
+        if (!can_merge) {
+            cerr << "Functions to be merged must not call each other" << endl;
+            assert(false);
+        }
+    }
+
+    return can_merge;
+}
+
+// -----------------------------------------------------------------------------
+
+/** Merge two functions to create a new function which contains the outputs
+ * of both the functions in a Tuple; and replace calls to the two original
+ * functions by the merged function in all calls in
+ */
+static void merge(
+        RecFilterFunc& fA, ///< first function to be merged
+        RecFilterFunc& fB  ///< second function to be merged
+        )
+{
+    Function A = fA.func;
+    Function B = fB.func;
+
+    int num_outputs_A = 0;
+    vector<string> args;
+    vector<Expr> values;
+    vector<UpdateDefinition> updates;
+
+    if (!B.has_pure_definition()) { // simple use A
+        return;
+    }
+
+    if (A.has_pure_definition()) {
+        args = A.args();
+        values = A.values();
+        updates = A.updates();
+        num_outputs_A = values.size();
+
+        merge_feasible(A,B);
+
+        // add B's pure defs
+        values.insert(values.end(), B.values().begin(), B.values().end());
+
+        // redefine A
+        A.clear_all_definitions();
+        A.define(args, values);
+
+        // add B's update defs
+        for (int i=0; i<B.updates().size(); i++) {
+            vector<Expr> v = B.updates()[i].values;
+            for (int j=0; j<v.size(); j++) {
+                v[j] = substitute_func_call(B.name(), A, v[j]);
+                v[j] = increment_value_index_in_func_call(A.name(), num_outputs_A, v[j]);
+                updates[i].values.push_back(v[j]);
+            }
+        }
+
+        for (int i=0; i<updates.size(); i++) {
+            A.define_update(updates[i].args, updates[i].values);
+        }
+
+    } else {
+        args = B.args();
+        values = B.values();
+        updates = B.updates();
+        num_outputs_A = 0;
+
+        // redefine A
+        A.clear_all_definitions();
+        A.define(args, values);
+
+        for (int i=0; i<updates.size(); i++) {
+            for (int j=0; j<updates[i].values.size(); j++) {
+                Expr v = updates[i].values[j];
+                v = substitute_func_call(B.name(), A, v);
+                v = increment_value_index_in_func_call(A.name(), num_outputs_A, v);
+                updates[i].values[j] = v;
+            }
+        }
+
+        for (int i=0; i<updates.size(); i++) {
+            A.define_update(updates[i].args, updates[i].values);
+        }
+
+        fA.func_category       = fB.func_category;
+        fA.pure_var_category   = fB.pure_var_category;
+        fA.update_var_category = fB.update_var_category;
+        fA.caller_func         = fB.caller_func;
+        fA.callee_func         = fB.callee_func;
+    }
+
+    // mutate B to index into A
+    vector<string> b_args = B.args();
+    vector<Expr> b_call_args;
+    vector<Expr> b_values;
+    for (int i=0; i<B.args().size(); i++) {
+        b_call_args.push_back(Var(B.args()[i]));
+    }
+    for (int i=0; i<B.values().size(); i++) {
+        b_values.push_back(Call::make(A, b_call_args, i+num_outputs_A));
+    }
+
+    B.clear_all_definitions();
+    B.define(b_args, b_values);
+
+    // copy the scheduling tags
+    fB.func_category = INLINE;
+    fB.pure_var_category.clear();
+    fB.update_var_category.clear();
+    fB.caller_func.clear();
+    fB.callee_func.clear();
+}
+
+// -----------------------------------------------------------------------------
+
 /** Convert the pure def into the first update def and leave the pure def undefined
  * \param[in,out] rF function to be modified
  * \param[in] split_info tiling metadata
@@ -1238,6 +1403,7 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
     int tile = split_info.tile_width;
     int num_tiles = split_info.num_tiles;
 
+    Var  y    = split_info_prev.var;
     Var  yi   = split_info_prev.inner_var;
     Var  yo   = split_info_prev.outer_var;
     RDom ryi  = split_info_prev.inner_rdom;
@@ -1253,6 +1419,10 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
     for (int i=0; i<rF_tail_prev.size(); i++) {
         F_tail_prev.push_back(rF_tail_prev[i].func);
     }
+
+    RecFilterFunc rF, rF_sub;
+    rF    .func = Function(F_intra.name() + DASH + INTER_TILE_TAIL_SUM + DASH + x.name() + DASH + y.name());
+    rF_sub.func = Function(F_intra.name() + DASH + INTER_TILE_TAIL_SUM + DASH + x.name() + DASH + y.name() + DASH + SUB);
 
     // add the residual term of previous dimension to the completed
     // tail of current dimension
@@ -1289,7 +1459,9 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
             int first_scan = split_info_prev.scan_id[0]+1;
             int last_scan  = split_info.scan_id[j];
 
-            for (int i=first_scan; i<=last_scan; i++) {
+            // add all the scans from the intra tile term only for the scans
+            // numbered between first_scan and last_scan
+            for (int i=0; i<F_intra.updates().size(); i++) {
                 map<string, VarTag> uvar_category = rF_intra.update_var_category[i];
                 vector<Expr> args = F_intra.updates()[i].args;
                 vector<Expr> values = F_intra.updates()[i].values;
@@ -1303,10 +1475,16 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
                         uvar_category.insert(make_pair(ryt[v].name(), vc));
                     }
                 }
-                for (int v=0; v<ryi.dimensions(); v++) {
+                if (i>=first_scan && i<=last_scan) {
+                    for (int v=0; v<ryi.dimensions(); v++) {
+                        for (int u=0; u<values.size(); u++) {
+                            values[u] = substitute_func_call(F_intra.name(), F_tail_prev_scanned_sub, values[u]);
+                            values[u] = substitute(ryi[v].name(), ryt[v], values[u]);
+                        }
+                    }
+                } else {
                     for (int u=0; u<values.size(); u++) {
-                        values[u] = substitute_func_call(F_intra.name(), F_tail_prev_scanned_sub, values[u]);
-                        values[u] = substitute(ryi[v].name(), ryt[v], values[u]);
+                        values[u] = undef(values[u].type());
                     }
                 }
                 F_tail_prev_scanned_sub.define_update(args, values);
@@ -1397,8 +1575,11 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
             }
 
             // add the genertaed recfilter function to the global list
-            generated_func.push_back(rF_tail_prev_scanned);
-            generated_func.push_back(rF_tail_prev_scanned_sub);
+            // generated_func.push_back(rF_tail_prev_scanned);
+            // generated_func.push_back(rF_tail_prev_scanned_sub);
+
+            merge(rF_sub, rF_tail_prev_scanned_sub);
+            merge(rF,     rF_tail_prev_scanned);
         }
 
         // redefine the pure def to include residuals from prev dimensions
@@ -1410,6 +1591,9 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
             F_tail[j].define_update(updates[i].args, updates[i].values);
         }
     }
+
+    generated_func.push_back(rF_sub);
+    generated_func.push_back(rF);
     return generated_func;
 }
 
