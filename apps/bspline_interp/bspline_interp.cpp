@@ -52,6 +52,7 @@ int main(int argc, char **argv) {
 
         int tiles_per_warp = 2;
         int unroll_w       = 8;
+        cerr << F << endl;
 
         F.intra_schedule(1).compute_locally()
             .reorder_storage(F.inner(), F.outer())
@@ -79,7 +80,7 @@ int main(int argc, char **argv) {
             .gpu_blocks     (F.outer(0));
 
         cerr << F << endl;
-        //F.compile_jit("stmt.html");
+        F.compile_jit("stmt.html");
 
         float time = F.profile(iter);
 

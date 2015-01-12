@@ -1325,6 +1325,15 @@ static vector<RecFilterFunc> create_final_residual_term(
 
 // -----------------------------------------------------------------------------
 
+/**
+ * Add the residuals to complete the tails of a particular dimension, the residual
+ * for each tail is provided as a separate function which has to be simply added
+ * to the corresponding tail - this residual includes contributions from all tails
+ * of all scans preceeding itself
+ * \param[in,out] rF_tail tails of each scan of given dimension
+ * \param[in] rF_deps residuals to be added to each of the tails
+ * \param[in] split_info tiling metadata of this dimension
+ */
 static void add_residual_to_tails(
         vector<RecFilterFunc> rF_tail,
         vector<RecFilterFunc> rF_deps,
@@ -1381,12 +1390,21 @@ static void add_residual_to_tails(
 // -----------------------------------------------------------------------------
 
 /**
+ * Compute the residuals due to one dimension on residuals of another dimension;
+ * this involves taking all the tails of the previous dimension and applying all
+ * the scans of the current dimension and another other dimension in between -
+ * number of functions generated is number of scans in prev dimension times
+ * number of scans in current dimension; all these functions are lumped
+ * together as a tuple to allow simultaneous computation.
+ *
  * \param[in] rF_intra intra tile term that computes intra tile scans
- * \param[in] rF_tail  list of tail functions for each scan of current dimension
- * \param[in] rF_tail_prev list of tail functions for each scan of prev dimension
+ * \param[in,out] rF_tail  tails for each scan of current dimension, residuals
+ * are added to these functions
+ * \param[in] rF_tail_prev tails for each scan of prev dimension
  * \param[in] split_info      tiling metadata for current dimension
  * \param[in] split_info_prev tiling metadata for previous dimension
- * \returns list of intra-tile functions that compute inter-dimension residuals
+ * \returns function that computes the cross dimension residuals and
+ * and another function that reindexes it (useful for computing in locally)
  */
 static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
         RecFilterFunc         rF_intra,
@@ -1419,6 +1437,7 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
     for (int i=0; i<rF_tail_prev.size(); i++) {
         F_tail_prev.push_back(rF_tail_prev[i].func);
     }
+    vector<RecFilterFunc> generated_functions;
 
     RecFilterFunc rF, rF_sub;
     rF    .func = Function(F_intra.name() + DASH + INTER_TILE_TAIL_SUM + DASH + x.name() + DASH + y.name());
@@ -1441,7 +1460,6 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
             // scheduling tags: copy func type as F_intra, pure def tags from the
             // tail function or F_intra (both same) copy update tags from F_intra
             rF_tail_prev_scanned_sub.func = F_tail_prev_scanned_sub;
-            rF_tail_prev_scanned_sub.func_category = INTRA_1;
             rF_tail_prev_scanned_sub.pure_var_category = rF_tail_prev[k].pure_var_category;
 
             // pure def simply calls the completed tail
@@ -1489,6 +1507,7 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
                 }
                 F_tail_prev_scanned_sub.define_update(args, values);
 
+                rF_tail_prev_scanned_sub.func_category = INTRA_1;
                 rF_tail_prev_scanned_sub.update_var_category.push_back(uvar_category);
             }
 
@@ -1508,11 +1527,7 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
                 }
                 F_tail_prev_scanned.define(F_tail_prev_scanned_sub.args(), values);
 
-                // copy the scheduling tags of the scan
                 rF_tail_prev_scanned.func = F_tail_prev_scanned;
-                rF_tail_prev_scanned.func_category     = REINDEX;
-                rF_tail_prev_scanned.pure_var_category = rF_tail_prev_scanned_sub.pure_var_category;
-                rF_tail_prev_scanned.callee_func       = rF_tail_prev_scanned_sub.func.name();
             }
 
             // weight matrix for accumulating completed tail elements
@@ -1573,13 +1588,19 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
                     pure_values[i] += simplify(select(first_tile, make_zero(split_info.type), wt*val));
                 }
             }
+            rF_tail_prev_scanned.func_category     = REINDEX;
+            rF_tail_prev_scanned.pure_var_category = rF_tail_prev_scanned_sub.pure_var_category;
+            rF_tail_prev_scanned.callee_func       = rF_tail_prev_scanned_sub.func.name();
 
             // add the genertaed recfilter function to the global list
-            // generated_func.push_back(rF_tail_prev_scanned);
-            // generated_func.push_back(rF_tail_prev_scanned_sub);
-
+#define combine 1
+#if combine
             merge(rF_sub, rF_tail_prev_scanned_sub);
             merge(rF,     rF_tail_prev_scanned);
+#else
+            generated_functions.push_back(rF_tail_prev_scanned_sub);
+            generated_functions.push_back(rF_tail_prev_scanned);
+#endif
         }
 
         // redefine the pure def to include residuals from prev dimensions
@@ -1592,9 +1613,58 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
         }
     }
 
-    generated_func.push_back(rF_sub);
-    generated_func.push_back(rF);
-    return generated_func;
+    // scheduling tags for the reindexing function
+#if combine
+    rF.func_category = REINDEX;
+    rF_sub.func_category = INTRA_1;
+    rF.callee_func = rF_sub.func.name();
+    generated_functions = {rF, rF_sub};
+#endif
+
+    // remove all undef()'ed update definitions from each function
+    for (int i=0; i<generated_functions.size(); i++) {
+        RecFilterFunc& rf= generated_functions[i];
+        Function f = generated_functions[i].func;
+
+        vector<string> args = f.args();
+        vector<Expr> values = f.values();
+        vector<UpdateDefinition> updates = f.updates();
+
+        vector< map<string,VarTag> > uvar_category = rf.update_var_category;
+
+        f.clear_all_definitions();
+        f.define(args, values);
+        rf.update_var_category.clear();
+
+        for (int j=0; j<updates.size(); j++) {
+            vector<Expr> u_args = updates[j].args;
+            vector<Expr> u_vals = updates[j].values;
+            bool is_undef = true;
+            for (int k=0; k<u_vals.size(); k++) {
+                is_undef &= equal(u_vals[k], undef(u_vals[k].type()));
+            }
+            if (!is_undef) {
+                f.define_update(u_args, u_vals);
+                rf.update_var_category.push_back(uvar_category[j]);
+            }
+        }
+
+        // add padding on the innermost inner var to avoid bank conflicts
+        {
+            vector<Expr> u_args;
+            vector<Expr> u_vals(f.outputs(), undef(split_info.type));
+            for (int i=0; i<f.args().size(); i++) {
+                if (f.args()[i] == xi.name()) {
+                    u_args.push_back(tile);
+                } else {
+                    u_args.push_back(Var(f.args()[i]));
+                }
+            }
+            f.define_update(u_args,u_vals);
+        }
+    }
+
+    return generated_functions;
 }
 
 // -----------------------------------------------------------------------------
@@ -1777,11 +1847,10 @@ static vector< vector<RecFilterFunc> > split_scans(
         // add the residuals from split up scans in all previous
         // dimensions to this scan
         for (int j=0; j<i; j++) {
-            vector<RecFilterFunc> gen_func = add_prev_dimension_residual_to_tails(
+            vector<RecFilterFunc> g = add_prev_dimension_residual_to_tails(
                     F_intra, F_ctail, F_ctail_list[j], split_info[i], split_info[j]);
-
-            for (int k=0; k<gen_func.size(); k++) {
-                recfilter_func_list.insert(make_pair(gen_func[k].func.name(), gen_func[k]));
+            for (int k=0; k<g.size(); k++) {
+                recfilter_func_list.insert(make_pair(g[k].func.name(), g[k]));
             }
         }
 
@@ -1799,8 +1868,11 @@ static vector< vector<RecFilterFunc> > split_scans(
             recfilter_func_list.insert(make_pair(F_deps[j].func.name(), F_deps[j]));
         }
 
+        // store the complete tail terms, used in next dimension
         F_ctail_list.push_back(F_ctailw);
-        F_deps_list .push_back(F_deps);
+
+        // store the residuals to the added to the final result
+        F_deps_list.push_back(F_deps);
     }
 
     return F_deps_list;
@@ -2023,19 +2095,39 @@ void RecFilter::split(map<string,int> dim_tile) {
             rF.pure_schedule.push_back(s);
         }
 
-        // apply the bounds for the pure vars of the final result
-        // these were lost when the function was redefined above
-        for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-            Var v = contents.ptr->filter_info[i].var;
-            int w = contents.ptr->filter_info[i].image_width;
-            Func(F).bound(v, 0, w);
-        }
-
         recfilter_func_list.insert(make_pair(rF.func.name(), rF));
     }
 
     // add all the generated RecFilterFuncs
     contents.ptr->func.insert(recfilter_func_list.begin(), recfilter_func_list.end());
+
+    // apply bounds on all dimensions of all functions
+    for (int i=0; i<recfilter_split_info.size(); i++) {
+        string x = recfilter_split_info[i].var.name();
+        string xi= recfilter_split_info[i].inner_var.name();
+        string xo= recfilter_split_info[i].outer_var.name();
+        int    w = recfilter_split_info[i].image_width;
+        int    tw= recfilter_split_info[i].tile_width;
+        int    nt= w/tw;
+
+        map<string,RecFilterFunc>::iterator fit;
+        for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+            if (fit->second.func_category == INLINE) {
+                continue;
+            }
+            Func F(fit->second.func);
+            for (int j=0; j<F.args().size(); j++) {
+                string v = F.args()[j].name();
+                VarTag vt= fit->second.pure_var_category[v];
+                if (v==x) { //if (vt.check(FULL)) {
+                    F.bound(v,0,w);
+                }
+                //else if (v==xo) { //else if (vt.check(OUTER)) {
+                //    F.bound(v,0,nt);
+                //}
+            }
+        }
+    }
 
     contents.ptr->tiled = true;
 
