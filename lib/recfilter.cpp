@@ -33,9 +33,6 @@ using namespace Halide::Internal;
 RecFilterRefVar::RecFilterRefVar(RecFilter r, std::vector<RecFilterDim> a) :
     rf(r), args(a) {}
 
-RecFilterRefExpr::RecFilterRefExpr(RecFilter r, std::vector<Expr> a) :
-    rf(r), args(a) {}
-
 void RecFilterRefVar::operator=(Expr pure_def) {
     rf.define(args, vec(pure_def));
 }
@@ -49,44 +46,30 @@ void RecFilterRefVar::operator=(vector<Expr> pure_def) {
 }
 
 void RecFilterRefVar::operator=(FuncRefVar pure_def) {
-    rf.define(args, vec(Expr(pure_def)));
+    rf.define(args, {Expr(pure_def)});
 }
 
 void RecFilterRefVar::operator=(FuncRefExpr pure_def) {
-    rf.define(args, vec(Expr(pure_def)));
+    rf.define(args, {Expr(pure_def)});
 }
 
-RecFilterRefVar ::operator Expr(void) { return this->operator[](0); }
-RecFilterRefExpr::operator Expr(void) { return this->operator[](0); }
-
-Expr RecFilterRefVar::operator[](int i) {
-    Function main_func = rf.as_func().function();
-    vector<Expr> expr_args;
-    for (int j=0; j<args.size(); j++) {
-        expr_args[j] = args[j];
-    }
-    if (i>=main_func.outputs()) {
-        cerr << "Could not find output buffer " << i
-             << " in recursive filter " << rf.name();
-        assert(false);
-    }
-    return Call::make(main_func, expr_args, i);
-}
-
-Expr RecFilterRefExpr::operator[](int i) {
-    Function main_func = rf.as_func().function();
-    vector<Expr> expr_args;
-    for (int j=0; j<args.size(); j++) {
-        expr_args[j] = args[j];
-    }
-    if (i>=main_func.outputs()) {
-        cerr << "Could not find output buffer " << i
-             << " in recursive filter " << rf.name();
-        assert(false);
-    }
-    return Call::make(main_func, expr_args, i);
-}
-
+/// RecFilterRefVar ::operator Expr(void) {
+///     return this->operator[](0);
+/// }
+///
+/// Expr RecFilterRefVar::operator[](int i) {
+///     Function main_func = rf.as_func().function();
+///     vector<Expr> expr_args;
+///     for (int j=0; j<args.size(); j++) {
+///         expr_args[j] = args[j];
+///     }
+///     if (i>=main_func.outputs()) {
+///         cerr << "Could not find output buffer " << i
+///              << " in recursive filter " << rf.name();
+///         assert(false);
+///     }
+///     return Call::make(main_func, expr_args, i);
+/// }
 
 // -----------------------------------------------------------------------------
 
@@ -132,18 +115,18 @@ RecFilterRefVar RecFilter::operator()(vector<RecFilterDim> x) {
     return RecFilterRefVar(*this, x);
 }
 
-RecFilterRefExpr RecFilter::operator()(Expr x) {
-    return RecFilterRefExpr(*this,vec(x));
-}
-RecFilterRefExpr RecFilter::operator()(Expr x, Expr y) {
-    return RecFilterRefExpr(*this,vec(x,y));
-}
-RecFilterRefExpr RecFilter::operator()(Expr x, Expr y, Expr z) {
-    return RecFilterRefExpr(*this,vec(x,y,z));
-}
-RecFilterRefExpr RecFilter::operator()(vector<Expr> x) {
-    return RecFilterRefExpr(*this, x);
-}
+/// RecFilterRefExpr RecFilter::operator()(Expr x) {
+///     return RecFilterRefExpr(*this,vec(x));
+/// }
+/// RecFilterRefExpr RecFilter::operator()(Expr x, Expr y) {
+///     return RecFilterRefExpr(*this,vec(x,y));
+/// }
+/// RecFilterRefExpr RecFilter::operator()(Expr x, Expr y, Expr z) {
+///     return RecFilterRefExpr(*this,vec(x,y,z));
+/// }
+/// RecFilterRefExpr RecFilter::operator()(vector<Expr> x) {
+///     return RecFilterRefExpr(*this, x);
+/// }
 
 void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
     assert(contents.ptr);
@@ -453,6 +436,10 @@ VarTag RecFilter::outer_scan(void)  { return VarTag(OUTER|SCAN);   }
 // -----------------------------------------------------------------------------
 
 Func RecFilter::as_func(void) {
+    if (contents.ptr->func.empty()) {
+        cerr << "Filter " << contents.ptr->name << " not defined" << endl;
+        assert(false);
+    }
     return Func(internal_function(contents.ptr->name).func);
 }
 
@@ -485,7 +472,7 @@ void RecFilter::compile_jit(string filename) {
         finalize();
     }
 
-    Func F(internal_function(contents.ptr->name).func);
+    Func F = as_func();
     if (!filename.empty()) {
         F.compile_to_lowered_stmt(filename, HTML, contents.ptr->target);
     }
@@ -503,6 +490,7 @@ Realization RecFilter::create_realization(void) {
         Function f = fit->second.func;
         no_schedule_applied &= f.schedule().compute_level().is_inline();
     }
+
     // apply a default schedule to compute everything
     // in global memory if no schedule has been used
     if (no_schedule_applied) {
@@ -512,13 +500,13 @@ Realization RecFilter::create_realization(void) {
         } else {
             compute_globally();
         }
-        cerr << "\nWarning: Applied the default schedule as follows\n" << endl;
-        cerr << print_schedule() << endl;
+        cerr << "Warning: Applied default schedule to filter "
+             << contents.ptr->name << endl;
     }
 
-    if (!contents.ptr->compiled) {
-        compile_jit();
-    }
+    // recompile the filter
+    contents.ptr->compiled = false;
+    compile_jit();
 
     // upload all buffers to device if computed on GPU
     Func F(internal_function(contents.ptr->name).func);

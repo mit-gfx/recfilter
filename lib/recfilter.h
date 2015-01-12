@@ -20,7 +20,7 @@ class RecFilter;
 class RecFilterDim;
 class RecFilterDimAndCausality;
 class RecFilterRefVar;
-class RecFilterRefExpr;
+/// class RecFilterRefExpr;
 
 class FuncTag;
 class VarTag;
@@ -146,10 +146,10 @@ public:
     RecFilterRefVar  operator()(RecFilterDim x, RecFilterDim y);
     RecFilterRefVar  operator()(RecFilterDim x, RecFilterDim y, RecFilterDim z);
     RecFilterRefVar  operator()(std::vector<RecFilterDim> x);
-    RecFilterRefExpr operator()(Halide::Expr x);
-    RecFilterRefExpr operator()(Halide::Expr x, Halide::Expr y);
-    RecFilterRefExpr operator()(Halide::Expr x, Halide::Expr y, Halide::Expr z);
-    RecFilterRefExpr operator()(std::vector<Halide::Expr> x);
+    /// RecFilterRefExpr operator()(Halide::Expr x);
+    /// RecFilterRefExpr operator()(Halide::Expr x, Halide::Expr y);
+    /// RecFilterRefExpr operator()(Halide::Expr x, Halide::Expr y, Halide::Expr z);
+    /// RecFilterRefExpr operator()(std::vector<Halide::Expr> x);
     // @}
 
     /** Add a pure definition to the recursive filter
@@ -234,11 +234,12 @@ public:
 
     /** @name Cascading API
      *
-     *  Cascade them to produce multiple filters using list of list of scans and
+     *  Cascade the filter to produce multiple filters using list of list of scans and
      *  producing a list of recursive filters each ccomputes the corresponding list
      *  of scans in an overlapped fashion
      *
      *  Preconditions:
+     *  - filter must not be tiled
      *  - list of list of scans spans all the scans of the original filter
      *  - no scan is repeated in the list of list of scans
      *  - the relative order of scans with respect to causality remains preserved
@@ -252,11 +253,12 @@ public:
     std::vector<RecFilter> cascade(std::vector<int> a, std::vector<int> b);
 
     /**
-     *  Cascade them to produce multiple filters using list of list of scans and
+     *  Cascade the filter to produce multiple filters using list of list of scans and
      *  producing a list of recursive filters each ccomputes the corresponding list
      *  of scans in an overlapped fashion
      *
      *  Preconditions:
+     *  - filter must not be tiled
      *  - list of list of scans spans all the scans of the original filter
      *  - no scan is repeated in the list of list of scans
      *  - the relative order of scans with respect to causality remains preserved
@@ -268,12 +270,74 @@ public:
     std::vector<RecFilter> cascade(std::vector<std::vector<int> > scan);
 
     /** Computing all causal scans in all dimensions in an overlapped fashion
-     * and all anticausal scans in an overlapped fashion and cascade the two groups */
-    std::vector<RecFilter> cascade_by_causality(void);
+     * and all anticausal scans in an overlapped fashion and cascade the two groups
+     *
+     *  Preconditions:
+     *  - filter must not be tiled
+     *
+     * \returns list of cascaded filters
+     */
+     std::vector<RecFilter> cascade_by_causality(void);
 
     /** Compute all scans in the same dimension in an overlapped fashion and cascade
-     * different dimensions */
+     * different dimensions
+     *
+     *  Preconditions:
+     *  - filter must not be tiled
+     *
+     * \returns list of cascaded filters
+     */
     std::vector<RecFilter> cascade_by_dimension(void);
+
+    /** Cascade a higher order filter into multiple lower order filters
+     *
+     * Preconditions:
+     * - filter must not be tiled
+     * - all scans in the given filter must have the same order
+     * - list of lower orders must add up the to order of given filter
+     *
+     * Precautions:
+     * - all lower order filters will have coefficients 1.0 and the last
+     *   filter will have coefficients not equal to 1.0; this can lead to
+     *   numerical issues
+     *
+     * \param orders list of low orders to be used for cascading
+     * \returns lower order filters
+     */
+    std::vector<RecFilter> cascade_by_order(std::vector<int> orders);
+
+    /** Cascade a higher order filter into two lower order filters
+     *
+     * Preconditions:
+     * - filter must not be tiled
+     * - all scans in the given filter must have the same order
+     * - lower orders must add up the to order of given filter
+     *
+     * Precautions:
+     * - first lower order filter will have coefficients 1.0 and the second
+     *   filter will have coefficients not equal to 1.0; this can lead to
+     *   numerical issues
+     *
+     * \param order_a order of first filter after cascading
+     * \param order_b order of second filter after cascading
+     *
+     * \returns pair of lower order filters
+     */
+    std::vector<RecFilter> cascade_by_order(int order_a, int order_b);
+
+    /** Overlap a given filter with the current filter
+     *
+     * Preconditions:
+     * - filter must not be tiled
+     * - given filter must have same number of dimensions in the same order
+     * - each scan of each dimension of given filter must have same causality
+     *
+     * \param fA filter to be overlapped with current filter
+     * \param name name of the overlapped filter (optional)
+     *
+     * \returns overlapped computation of all scans in both filters
+     */
+    RecFilter overlap_to_higher_order_filter(RecFilter fA, std::string name="O");
     // @}
 
 
@@ -422,29 +486,29 @@ public:
     /** Use this as the left-hand-side of a definition for a Func with multiple outputs */
     void operator=(std::vector<Halide::Expr> pure_def);
 
-    /** Use this RecFilterRefVar as a call to the internal recfilter output */
-    operator Halide::Expr(void);
-
-    /** Use this RecFilterRefVar as a call to the one of the output buffers of
-     * the internal recfilter */
-    Halide::Expr operator[](int);
+///    /** Use this RecFilterRefVar as a call to the internal recfilter output */
+///    operator Halide::Expr(void);
+///
+///     /** Use this RecFilterRefVar as a call to the one of the output buffers of
+///      * the internal recfilter */
+///     Halide::Expr operator[](int);
 };
 
-class RecFilterRefExpr {
-private:
-    RecFilter rf;
-    std::vector<Halide::Expr> args;
-
-public:
-    RecFilterRefExpr(RecFilter r, std::vector<Halide::Expr> a);
-
-    /** Use this RecFilterRefVar as a call to the internal recfilter output */
-    operator Halide::Expr(void);
-
-    /** Use this RecFilterRefVar as a call to the one of the output buffers of
-     * the internal recfilter */
-    Halide::Expr operator[](int);
-};
+/// class RecFilterRefExpr {
+/// private:
+///     RecFilter rf;
+///     std::vector<Halide::Expr> args;
+///
+/// public:
+///     RecFilterRefExpr(RecFilter r, std::vector<Halide::Expr> a);
+///
+///     /** Use this RecFilterRefVar as a call to the internal recfilter output */
+///     operator Halide::Expr(void);
+///
+///     /** Use this RecFilterRefVar as a call to the one of the output buffers of
+///      * the internal recfilter */
+///     Halide::Expr operator[](int);
+/// };
 
 // -----------------------------------------------------------------------------
 

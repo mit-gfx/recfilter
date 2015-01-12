@@ -13,6 +13,74 @@ using std::map;
 
 // -----------------------------------------------------------------------------
 
+template<typename T>
+vector<T> extract_row(Image<T> img, int i) {
+    vector<T> res;
+    for (int j=0; j<img.height(); j++) {
+        res.push_back(img(i,j));
+    }
+    return res;
+}
+
+static vector<float> cascade_feedback_coeff(vector<float> a, vector<float> b) {
+    assert(a.size()<=b.size());
+
+    for (int i=0; i<a.size(); i++) {
+        a[i] = -a[i];
+    }
+    for (int i=0; i<b.size(); i++) {
+        b[i] = -b[i];
+    }
+
+    a.insert(a.begin(), 1.0f);
+    b.insert(b.begin(), 1.0f);
+
+    vector<float> c(a.size()-b.size()+1, 0.0f);
+
+    for (int i=0; i<c.size(); i++) {
+
+        // TODO fill in
+    }
+
+    c.erase(c.begin());
+    for (int i=0; i<c.size(); i++) {
+        c[i] = -c[i];
+    }
+
+    return c;
+}
+
+static vector<float> overlap_feedback_coeff(vector<float> a, vector<float> b) {
+    for (int i=0; i<a.size(); i++) {
+        a[i] = -a[i];
+    }
+    for (int i=0; i<b.size(); i++) {
+        b[i] = -b[i];
+    }
+
+    a.insert(a.begin(), 1.0f);
+    b.insert(b.begin(), 1.0f);
+
+    vector<float> c(a.size()+b.size()-1, 0.0f);
+
+    for (int i=0; i<c.size(); i++) {
+        for (int j=0; j<=i; j++) {
+            if (j<a.size() && i-j<b.size()) {
+                c[i] += a[j]*b[i-j];
+            }
+        }
+    }
+
+    c.erase(c.begin());
+    for (int i=0; i<c.size(); i++) {
+        c[i] = -c[i];
+    }
+
+    return c;
+}
+
+// -----------------------------------------------------------------------------
+
 /** Inline a pure function in a list of other functions
  * \param f function to be inlined
  * \param func_list list of functions in which calls to first parameter must be inlined
@@ -80,6 +148,12 @@ void RecFilter::inline_func(string func_name) {
 // -----------------------------------------------------------------------------
 
 vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
+    if (contents.ptr->tiled || contents.ptr->compiled || contents.ptr->finalized) {
+        cerr << "Cascading directive cascade() cannot be used after "
+            << "the filter is already tiled, compiled or realized" << endl;
+        assert(false);
+    }
+
     // check that the order does not violate
     {
         map<int, bool> scan_causal;
@@ -224,10 +298,22 @@ vector<RecFilter> RecFilter::cascade(vector<vector<int> > scans) {
 }
 
 vector<RecFilter> RecFilter::cascade(vector<int> a, vector<int> b) {
+    if (contents.ptr->tiled || contents.ptr->compiled || contents.ptr->finalized) {
+        cerr << "Cascading directive cascade() cannot be used after "
+             << "the filter is already tiled, compiled or realized" << endl;
+        assert(false);
+    }
+
     return cascade({a,b});
-};
+}
 
 vector<RecFilter> RecFilter::cascade_by_causality(void) {
+    if (contents.ptr->tiled || contents.ptr->compiled || contents.ptr->finalized) {
+        cerr << "Cascading directive cascade_by_causality() cannot be used after "
+             << "the filter is already tiled, compiled or realized" << endl;
+        assert(false);
+    }
+
     vector<int> causal_scans;
     vector<int> anticausal_scans;
     for (int i=0; i<contents.ptr->filter_info.size(); i++) {
@@ -245,6 +331,12 @@ vector<RecFilter> RecFilter::cascade_by_causality(void) {
 }
 
 vector<RecFilter> RecFilter::cascade_by_dimension(void) {
+    if (contents.ptr->tiled || contents.ptr->compiled || contents.ptr->finalized) {
+        cerr << "Cascading directive cascade() cannot be used after "
+             << "the filter is already tiled, compiled or realized" << endl;
+        assert(false);
+    }
+
     vector< vector<int> > scans;
     for (int i=0; i<contents.ptr->filter_info.size(); i++) {
         vector<int> dim_scans;
@@ -256,4 +348,294 @@ vector<RecFilter> RecFilter::cascade_by_dimension(void) {
         }
     }
     return cascade(scans);
+}
+
+vector<RecFilter> RecFilter::cascade_by_order(vector<int> orders) {
+    if (contents.ptr->tiled || contents.ptr->compiled || contents.ptr->finalized) {
+        cerr << "Cascading directive cascade_by_order() cannot be used after "
+             << "the filter is already tiled, compiled or realized" << endl;
+        assert(false);
+    }
+
+    // nothing to do if only one order is provided
+    if (orders.size()<=1) {
+        return {*this};
+    }
+
+    vector<RecFilter> filters;
+    RecFilter ftemp = *this;
+    for (int i=0; i<orders.size()-1; i++) {
+        int order_a = orders[i];
+        int order_b = 0;
+        for (int j=i+1; j<orders.size(); j++) {
+            order_b += orders[j];
+        }
+        vector<RecFilter> f = ftemp.cascade_by_order(order_a, order_b);
+        filters.push_back(f[0]);
+        ftemp = f[1];
+    }
+    return filters;
+}
+
+vector<RecFilter> RecFilter::cascade_by_order(int order_a, int order_b) {
+    if (contents.ptr->tiled || contents.ptr->compiled || contents.ptr->finalized) {
+        cerr << "Cascading directive cascade_by_order() cannot be used after "
+             << "the filter is already tiled, compiled or realized" << endl;
+        assert(false);
+    }
+
+    // check that all scans in the filter have the same order
+    int filter_order = 0;
+
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        if (filter_order>0 && filter_order!=contents.ptr->filter_info[i].filter_order) {
+            cerr << "Cascading directive cascade_by_order() cannot be used because "
+                 << "all scans in all dimensions do not have the same order" << endl;
+            assert(false);
+        }
+        filter_order = contents.ptr->filter_info[i].filter_order;
+    }
+
+    // check that provided orders are positive
+    if (order_a<=0 || order_b<=0) {
+        cerr << "Cascading directive cascade_by_order() cannot be used because "
+            << "provided orders are not greater than 0" << endl;
+        assert(false);
+    }
+
+    if (order_a+order_b != filter_order) {
+        cerr << "Cascading directive cascade_by_order() cannot be used because "
+            << "provided orders do not add up to filter order" << endl;
+        assert(false);
+    }
+
+    // create the two cascaded filters with the same content
+    RecFilter fA(contents.ptr->name + "_" + int_to_string(order_a));
+    RecFilter fB(contents.ptr->name + "_" + int_to_string(order_b));
+
+    // set border conditions
+    if (contents.ptr->clamped_border) {
+        fA.set_clamped_image_border();
+        fB.set_clamped_image_border();
+    }
+
+    // create filter dimensions
+    vector<RecFilterDim> filter_dim;
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        string var= contents.ptr->filter_info[i].var.name();
+        int width = contents.ptr->filter_info[i].image_width;
+        filter_dim.push_back(RecFilterDim(var, width));
+    }
+
+    // define A
+    fA.define(filter_dim, as_func().function().values());
+
+    // create a call to the result of this filter
+    vector<Expr> result_A;
+    {
+        Function A = fA.as_func().function();
+        vector<Expr> call_args;
+        for (int i=0; i<A.args().size(); i++) {
+            call_args.push_back(A.args()[i]);
+        }
+        for (int i=0; i<A.outputs(); i++) {
+            result_A.push_back(Call::make(A, call_args, i));
+        }
+    }
+
+    // define B
+    fB.define(filter_dim, result_A);
+
+    // add scans into both A and B
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        int  filter_order = contents.ptr->filter_info[i].filter_order;
+        int  filter_dim   = contents.ptr->filter_info[i].filter_dim;
+        int  num_scans    = contents.ptr->filter_info[i].num_scans;
+        int  image_width  = contents.ptr->filter_info[i].image_width;
+        int  tile_width   = contents.ptr->filter_info[i].tile_width;
+        Var  var          = contents.ptr->filter_info[i].var;
+        RDom rdom         = contents.ptr->filter_info[i].rdom;
+
+        RecFilterDim x(var.name(), image_width);
+
+        for (int j=0; j<num_scans; j++) {
+            bool scan_causal = contents.ptr->filter_info[i].scan_causal[j];
+            int  scan_id     = contents.ptr->filter_info[i].scan_id[j];
+
+            // feedforward coeff coeff of B is assumed 1.0
+            float ff_a = contents.ptr->feedfwd_coeff(scan_id);
+            float ff_b = 1.0f;
+
+            // feedback coeff of B are assumed 1.0
+            vector<float> fb = extract_row<float>(contents.ptr->feedback_coeff,scan_id);
+            vector<float> fb_b(order_b, 1.0f);
+            vector<float> fb_a = cascade_feedback_coeff(fb, fb_b);
+
+            // add the feedfowrd coeff to the list of coeff
+            fb_a.insert(fb_a.begin(), ff_a);
+            fb_b.insert(fb_b.begin(), ff_b);
+
+            if (scan_causal) {
+                fA.add_filter(+x, fb_a);
+                fB.add_filter(+x, fb_b);
+            } else {
+                fA.add_filter(-x, fb_a);
+                fB.add_filter(-x, fb_b);
+            }
+        }
+    }
+
+    return {fA,fB};
+}
+
+RecFilter RecFilter::overlap_to_higher_order_filter(RecFilter fB, string overlap_name) {
+    if (contents.ptr->tiled || contents.ptr->compiled || contents.ptr->finalized) {
+        cerr << "Overlapping directive overlap() cannot be used after "
+             << "the filter is already tiled, compiled or realized" << endl;
+        assert(false);
+    }
+
+    Function A = as_func().function();
+    Function B = fB.as_func().function();
+
+    // extract the input of B
+    vector<Expr> input_B = B.values();
+
+    // create a call to the result of A
+    vector<Expr> result_A;
+    {
+        vector<Expr> call_args;
+        for (int i=0; i<A.args().size(); i++) {
+            call_args.push_back(Var(A.args()[i]));
+        }
+        for (int i=0; i<A.outputs(); i++) {
+            result_A.push_back(Call::make(A, call_args, i));
+        }
+    }
+
+    // check that result of A if same as input of B
+    if (input_B.size() == result_A.size()) {
+        for (int i=0; i<result_A.size(); i++) {
+            if (!equal(input_B[i], result_A[i])) {
+                cerr << "Filters cannot be overlapped because the input to second "
+                    << "does not match the output of the first" << endl;
+                assert(false);
+            }
+        }
+    } else {
+        cerr << "Filters cannot be overlapped because the number of inputs to second "
+            << "does not match the number of outputs of the first" << endl;
+        assert(false);
+    }
+
+    // check that each scans of A matches the corresponding scan of B
+    vector<RecFilterDim> filter_dim;
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        string var= contents.ptr->filter_info[i].var.name();
+        int width = contents.ptr->filter_info[i].image_width;
+        filter_dim.push_back(RecFilterDim(var, width));
+    }
+
+    // check that both filters have same border clamping
+    bool border_clamp_a = contents.ptr->clamped_border;
+    bool border_clamp_b = fB.contents.ptr->clamped_border;
+    if (border_clamp_a != border_clamp_b) {
+        cerr << "Filters cannot be overlapped because one clamps image border while the other does not" << endl;
+        assert(false);
+    }
+
+    // check that both filters have same type
+    if (contents.ptr->type != fB.contents.ptr->type) {
+        cerr << "Filters cannot be overlapped because they have different types" << endl;
+        assert(false);
+    }
+
+    // define the overlapped filter with the input of A
+    RecFilter AB(overlap_name);
+    AB.define(filter_dim, A.values());
+
+    // clamp borders if needed
+    if (border_clamp_a) {
+        AB.set_clamped_image_border();
+    }
+
+    // feedback and feedforward coeff of both scans of both filters
+    Image<float> feedfwd_a = contents.ptr->feedfwd_coeff;
+    Image<float> feedfwd_b = fB.contents.ptr->feedfwd_coeff;
+    Image<float> feedback_a= contents.ptr->feedback_coeff;
+    Image<float> feedback_b= fB.contents.ptr->feedback_coeff;
+
+    // add the scans
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        int  filter_dim_a   = contents.ptr->filter_info[i].filter_dim;
+        int  num_scans_a    = contents.ptr->filter_info[i].num_scans;
+        int  image_width_a  = contents.ptr->filter_info[i].image_width;
+        int  tile_width_a   = contents.ptr->filter_info[i].tile_width;
+        Var  var_a          = contents.ptr->filter_info[i].var;
+        RDom rdom_a         = contents.ptr->filter_info[i].rdom;
+
+        int  filter_dim_b   = fB.contents.ptr->filter_info[i].filter_dim;
+        int  num_scans_b    = fB.contents.ptr->filter_info[i].num_scans;
+        int  image_width_b  = fB.contents.ptr->filter_info[i].image_width;
+        int  tile_width_b   = fB.contents.ptr->filter_info[i].tile_width;
+        Var  var_b          = fB.contents.ptr->filter_info[i].var;
+        RDom rdom_b         = fB.contents.ptr->filter_info[i].rdom;
+
+        // check each dimension is identical
+        if (num_scans_a != num_scans_b) {
+            cerr << "Filters cannot be overlapped because they have different num scans in dimension " << i << endl;
+            assert(false);
+        }
+        if (image_width_a != image_width_b ) {
+            cerr << "Filters cannot be overlapped because they have different image width in dimension " << i << endl;
+            assert(false);
+        }
+        if (tile_width_a != tile_width_b) {
+            cerr << "Filters cannot be overlapped because they have different tile width in dimension " << i << endl;
+            assert(false);
+        }
+        if (!equal(rdom_a.x.min(),rdom_b.x.min()) && equal(rdom_a.x.extent(),rdom_b.x.extent())) {
+            cerr << "Filters cannot be overlapped because they have different scan domain in dimension " << i << endl;
+            assert(false);
+        }
+        // no need to ensure that Var are same because only the image width matters
+
+        RecFilterDim x(var_a.name(), image_width_a);
+
+        for (int j=0; j<num_scans_a; j++) {
+            bool scan_causal_a = contents.ptr->filter_info[i].scan_causal[j];
+            int  scan_id_a     = contents.ptr->filter_info[i].scan_id[j];
+            bool scan_causal_b = fB.contents.ptr->filter_info[i].scan_causal[j];
+            int  scan_id_b     = fB.contents.ptr->filter_info[i].scan_id[j];
+
+            // check each scan is identical
+            if (scan_causal_a != scan_causal_b) {
+                cerr << "Filters cannot be overlapped because they have different causality in scan "
+                    << j << " of dimension " << i << endl;
+                assert(false);
+            }
+            if (scan_id_a != scan_id_b) {
+                cerr << "Filters cannot be overlapped because they have different scan indices in scan "
+                    << j << " of dimension " << i << endl;
+                assert(false);
+            }
+
+            // feedforward coeff
+            float ff = feedfwd_a(scan_id_a) * feedfwd_b(scan_id_b);
+
+            // feedback coeff of the two scans
+            vector<float> fb_a = extract_row<float>(feedback_a, scan_id_a);
+            vector<float> fb_b = extract_row<float>(feedback_b, scan_id_b);
+            vector<float> coeff = overlap_feedback_coeff(fb_a, fb_b);
+
+            // add the feedfowrd coeff to the list of coeff
+            coeff.insert(coeff.begin(), ff);
+            if (scan_causal_a) {
+                AB.add_filter(x, coeff);
+            } else {
+                AB.add_filter(-x, coeff);
+            }
+        }
+    }
+    return AB;
 }
