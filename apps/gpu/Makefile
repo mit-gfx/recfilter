@@ -35,14 +35,11 @@
 
 
 all:
-	$(MAKE) -C common
-	$(MAKE) -C shared
-	$(MAKE) -C oclRecursiveGaussian
+	$(MAKE) -C nvGaussian
 	$(MAKE) -C nvBoxFilter
 	$(MAKE) -C summedTableThrust
 
 clean:
-	$(MAKE) -C common clean
-	$(MAKE) -C oclRecursiveGaussian clean
+	$(MAKE) -C nvGaussian clean
 	$(MAKE) -C nvBoxFilter clean
 	$(MAKE) -C summedTableThrust clean
