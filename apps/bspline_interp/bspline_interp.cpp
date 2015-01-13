@@ -1,3 +1,26 @@
+/**
+ *
+ * \file bspline_interp.cpp
+ *
+ * Bspline interpolation using IIR filters:
+ * - bicubic bspline interpolation using first order 2D causal-anticausal overlapped
+ * - biquintic bspline interpolation using second order 2D causal-anticausal overlapped
+ * - biquintic bspline interpolation using two cascaded second order 1D causal-anticausal overlapped
+ *
+ * Biquintic Kernel Matrix
+ *     [ 1/120  13/60  11/20 13/60  1/120 0;
+ *      -1/24   -5/12    0    5/12  1/24  0;
+ *       1/12    1/6   -1/2   1/6   1/12  0;
+ *      -1/12    1/6     0   -1/6   1/12  0;
+ *       1/24   -1/6    1/4  -1/6   1/24  0;
+ *      -1/120   1/24  -1/12  1/12 -1/24 1/120];
+ *
+ * IIR filter weights may not be inccurate for the bicubic and biquintic filters,
+ * these are just used for performance evaluation
+ */
+
+
+
 #include <iostream>
 #include <Halide.h>
 
@@ -12,6 +35,8 @@ using std::cerr;
 using std::cout;
 using std::endl;
 
+template<typename T>
+void check(RecFilter F, vector<float> filter_coeff, Image<T> image);
 
 int main(int argc, char **argv) {
     Arguments args(argc, argv);
@@ -23,11 +48,14 @@ int main(int argc, char **argv) {
     int max_w      = args.max_width;
     int inc_w      = tile_width;
 
-    Log log("bicubic_bspline.perflog");
-    log << "Width\tOurs" << endl;
+    Log log("bspline_filter.perflog");
+    log << "Width\tBicubic\tBiquintic\tBiquintic_cascaded" << endl;
 
+    vector<string> filter_name = {"Bicubic", "Biquintic", "Biquintic_cascaded"};
+
+    // possibly inaccurate coeff, only for measuring performance
     const float a = 2.0f-std::sqrt(3.0f);
-    vector<float> filter_coeff = { 1+a, -a};
+    vector<vector<float> > bspline_coeff = {{1+a, -a}, {1+a, -a}, {1+a, -a, 0.1f}};
 
     // Profile the filter for all image widths
     for (int in_w=min_w; in_w<=max_w; in_w+=inc_w) {
@@ -39,105 +67,128 @@ int main(int argc, char **argv) {
         RecFilterDim x("x", width);
         RecFilterDim y("y", height);
 
-        RecFilter F;
+        vector<float> runtime(3, 0.0f);
 
-        F.set_clamped_image_border();
+        // run all three filters separately and record the runtimes
+        for (int j=0; j<3; j++) {
+            RecFilter F(filter_name[j]);
 
-        F(x,y) = image(x,y);
-        F.add_filter(+x, filter_coeff);
-        F.add_filter(-x, filter_coeff);
-        F.add_filter(+y, filter_coeff);
-        F.add_filter(-y, filter_coeff);
+            vector<float> filter_coeff = bspline_coeff[j];
 
-        F.split(x, tile_width, y, tile_width);
+            F.set_clamped_image_border();
 
-        // ---------------------------------------------------------------------
+            F(x,y) = image(x,y);
+            F.add_filter(+x, filter_coeff);
+            F.add_filter(-x, filter_coeff);
+            F.add_filter(+y, filter_coeff);
+            F.add_filter(-y, filter_coeff);
 
-        int tiles_per_warp = 2;
-        int unroll_w       = 8;
-        cerr << F << endl;
+            // same schedule for bicubic and biquintic, different schedule for biquintic cascaded
+            if (j==0 && j==1) {
 
-        F.intra_schedule(1).compute_locally()
-            .reorder_storage(F.inner(), F.outer())
-            .unroll         (F.inner_scan())
-            .split          (F.inner(1), unroll_w)
-            .unroll         (F.inner(1).split_var())
-            .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
-            .gpu_threads    (F.inner(0), F.inner(1))
-            .gpu_blocks     (F.outer(0), F.outer(1));
+                F.split(x, tile_width, y, tile_width);
 
-        F.intra_schedule(2).compute_locally()
-            .reorder_storage(F.tail(), F.inner(), F.outer())
-            .unroll         (F.inner_scan())
-            .split          (F.outer(0), tiles_per_warp)
-            .reorder        (F.inner_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
-            .gpu_threads    (F.inner(0), F.outer(0).split_var())
-            .gpu_blocks     (F.outer(0), F.outer(1));
+                // ---------------------------------------------------------------------
 
-        F.inter_schedule().compute_globally()
-            .reorder_storage(F.inner(), F.tail(), F.outer())
-            .unroll         (F.outer_scan())
-            .split          (F.outer(0), tiles_per_warp)
-            .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
-            .gpu_threads    (F.inner(0), F.outer(0).split_var())
-            .gpu_blocks     (F.outer(0));
+                int tiles_per_warp = 2;
+                int unroll_w       = 8;
 
-        cerr << F << endl;
-        F.compile_jit("stmt.html");
+                F.intra_schedule(1).compute_locally()
+                    .reorder_storage(F.inner(), F.outer())
+                    .unroll         (F.inner_scan())
+                    .split          (F.inner(1), unroll_w)
+                    .unroll         (F.inner(1).split_var())
+                    .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
+                    .gpu_threads    (F.inner(0), F.inner(1))
+                    .gpu_blocks     (F.outer(0), F.outer(1));
 
-        float time = F.profile(iter);
+                F.intra_schedule(2).compute_locally()
+                    .reorder_storage(F.tail(), F.inner(), F.outer())
+                    .unroll         (F.inner_scan())
+                    .split          (F.outer(0), tiles_per_warp)
+                    .reorder        (F.inner_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
+                    .gpu_threads    (F.inner(0), F.outer(0).split_var())
+                    .gpu_blocks     (F.outer(0), F.outer(1));
 
-        cerr << width << "\t" << time << " ms" << endl;
-        log  << width << "\t" << RecFilter::throughput(time,width*width) << endl;
+                F.inter_schedule().compute_globally()
+                    .reorder_storage(F.inner(), F.tail(), F.outer())
+                    .unroll         (F.outer_scan())
+                    .split          (F.outer(0), tiles_per_warp)
+                    .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
+                    .gpu_threads    (F.inner(0), F.outer(0).split_var())
+                    .gpu_blocks     (F.outer(0));
 
-        // ---------------------------------------------------------------------
-
-        if (!nocheck) {
-            cerr << "\nChecking difference ... " << endl;
-            Realization out = F.realize();
-            Image<float> hl_out(out);
-            Image<float> ref(width,height);
-
-            float b0 = (filter_coeff.size()>=0 ? filter_coeff[0] : 0.0f);
-            float a1 = (filter_coeff.size()>=1 ? filter_coeff[1] : 0.0f);
-            float a2 = (filter_coeff.size()>=2 ? filter_coeff[2] : 0.0f);
-
-            for (int y=0; y<height; y++) {
-                for (int x=0; x<width; x++) {
-                    ref(x,y) = image(x,y);
-                }
+                cerr << F << endl;
+                F.compile_jit("stmt.html");
             }
-            for (int y=0; y<height; y++) {
-                for (int x=0; x<width; x++) {
-                    ref(x,y) = b0*ref(x,y)
-                        + a1*ref(std::max(x-1,0),y)
-                        + a2*ref(std::max(x-2,0),y);
-                }
+            else {
+                //vector<RecFilter> fc = F.cascade_by_dimension();
             }
-            for (int y=0; y<height; y++) {
-                for (int x=0; x<width; x++) {
-                    ref(x,y) = b0*ref(x,y)
-                        + a1*ref(x,std::max(y-1,0))
-                        + a2*ref(x,std::max(y-2,0));
-                }
+
+            runtime[j] = F.profile(iter);
+
+            if (!nocheck) {
+                check<float>(F, filter_coeff, image);
             }
-            for (int y=0; y<height; y++) {
-                for (int x=0; x<width; x++) {
-                    ref(width-1-x,y) = b0*ref(width-1-x,y)
-                        + a1*ref(width-1-std::max(x-1,0),y)
-                        + a2*ref(width-1-std::max(x-2,0),y);
-                }
-            }
-            for (int y=0; y<height; y++) {
-                for (int x=0; x<width; x++) {
-                    ref(x,height-1-y) = b0*ref(x,height-1-y)
-                        + a1*ref(x,height-1-std::max(y-1,0))
-                        + a2*ref(x,height-1-std::max(y-2,0));
-                }
-            }
-            cout << CheckResultVerbose<float>(ref,hl_out) << endl;
         }
+
+        cerr << width << "\t" << runtime[0] << "\t" << runtime[1] << "\t" << runtime[2] << endl;
+        log  << width
+            << "\t" << RecFilter::throughput(runtime[0], width*width)
+            << "\t" << RecFilter::throughput(runtime[1], width*width)
+            << "\t" << RecFilter::throughput(runtime[2], width*width) << endl;
     }
 
     return 0;
+}
+
+template<typename T>
+void check(RecFilter F, vector<float> filter_coeff, Image<T> image) {
+    cerr << "\nChecking difference ... " << endl;
+
+    int width = image.width();
+    int height = image.height();
+
+    Realization out = F.realize();
+    Image<float> hl_out(out);
+    Image<float> ref(width,height);
+
+    float b0 = (filter_coeff.size()>=0 ? filter_coeff[0] : 0.0f);
+    float a1 = (filter_coeff.size()>=1 ? filter_coeff[1] : 0.0f);
+    float a2 = (filter_coeff.size()>=2 ? filter_coeff[2] : 0.0f);
+
+    for (int y=0; y<height; y++) {
+        for (int x=0; x<width; x++) {
+            ref(x,y) = image(x,y);
+        }
+    }
+    for (int y=0; y<height; y++) {
+        for (int x=0; x<width; x++) {
+            ref(x,y) = b0*ref(x,y)
+                + a1*ref(std::max(x-1,0),y)
+                + a2*ref(std::max(x-2,0),y);
+        }
+    }
+    for (int y=0; y<height; y++) {
+        for (int x=0; x<width; x++) {
+            ref(x,y) = b0*ref(x,y)
+                + a1*ref(x,std::max(y-1,0))
+                + a2*ref(x,std::max(y-2,0));
+        }
+    }
+    for (int y=0; y<height; y++) {
+        for (int x=0; x<width; x++) {
+            ref(width-1-x,y) = b0*ref(width-1-x,y)
+                + a1*ref(width-1-std::max(x-1,0),y)
+                + a2*ref(width-1-std::max(x-2,0),y);
+        }
+    }
+    for (int y=0; y<height; y++) {
+        for (int x=0; x<width; x++) {
+            ref(x,height-1-y) = b0*ref(x,height-1-y)
+                + a1*ref(x,height-1-std::max(y-1,0))
+                + a2*ref(x,height-1-std::max(y-2,0));
+        }
+    }
+    cout << CheckResultVerbose<float>(ref,hl_out) << endl;
 }

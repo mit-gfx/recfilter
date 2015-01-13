@@ -1,3 +1,9 @@
+/**
+ * \file summed_table.cpp
+ *
+ * Summed area table using overlapped computation
+ */
+
 #include <iostream>
 #include <Halide.h>
 
