@@ -180,9 +180,11 @@ int main(int argc, char** argv)
 
     unsigned long time_end = millisecond_timer();
 
-    double time = double(time_end-time_start)/double(num_runs);
+    double millisec = double(time_end-time_start)/double(num_runs);
 
-    std::cerr << width << "\t" << (width*width)/(1000.0f*time*float(2^30)) << std::endl;
+    float throughput = (width*width*1000.0f)/(millisec*1024*1024);
+    std::cerr << width << throughput << std::endl;
+
     // std::cerr << width << "\t" << time << std::endl;
   }
   return 0;

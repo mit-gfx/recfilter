@@ -1,8 +1,7 @@
 #include "timing.h"
 
 float throughput(float runtime, int pixels) {
-    int gibipixels = 2^30;
-    return float(pixels) / float(gibipixels*runtime*1000.0f);
+    return (pixels*1000.0f)/(runtime*1024*1024);
 }
 
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)

@@ -268,7 +268,8 @@ void TestNoGL()
     dProcessingTime /= (double)iCycles;
 
     // fprintf(stderr, "%u\t%f\n", uiImageWidth, dProcessingTime*1000);
-    fprintf(stderr, "%d\t%f\n", uiImageWidth, (uiImageWidth*uiImageWidth)/(1000.0f*dProcessingTime*float(2^30)));
+    float throughput = (uiImageWidth*uiImageWidth*1000.0f)/(dProcessingTime*1024*1024);
+    fprintf(stderr, "%d\t%f\n", uiImageWidth, throughput);
 }
 
 // Function to set common kernel args that only change outside of GLUT loop
