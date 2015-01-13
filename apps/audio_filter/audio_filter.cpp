@@ -2,6 +2,7 @@
 #include <Halide.h>
 
 #include "recfilter.h"
+#include "timing.h"
 
 #define MAX_ORDER 50
 
@@ -65,8 +66,8 @@ int main(int argc, char **argv) {
              << "tiled " << time_tiled[time_tiled.size()-1] << " ms" << endl;
 
         log << order << "\t"
-            << RecFilter::throughput(time_naive[time_naive.size()-1], width) << "\t"
-            << RecFilter::throughput(time_tiled[time_tiled.size()-1], width) << endl;
+            << throughput(time_naive[time_naive.size()-1], width) << "\t"
+            << throughput(time_tiled[time_tiled.size()-1], width) << endl;
     }
 
     return 0;

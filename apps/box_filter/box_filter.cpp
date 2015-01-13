@@ -13,6 +13,7 @@
 #include <Halide.h>
 
 #include "recfilter.h"
+#include "timing.h"
 #include "gaussian_weights.h"
 
 using namespace Halide;
@@ -60,8 +61,8 @@ int main(int argc, char **argv) {
 
         float time = D.profile(iter);
 
-        cerr << in_w << " " << time << " ms" << endl;
-        log  << in_w << " " << RecFilter::throughput(time,in_w*in_w) << endl;
+        cerr << in_w << "\t" << time << " ms" << endl;
+        log  << in_w << "\t" << throughput(time,in_w*in_w) << endl;
 
         if (!nocheck) {
             check_result(D, image);

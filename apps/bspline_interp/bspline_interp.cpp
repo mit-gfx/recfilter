@@ -25,6 +25,7 @@
 #include <Halide.h>
 
 #include "recfilter.h"
+#include "timing.h"
 
 using namespace Halide;
 
@@ -134,9 +135,9 @@ int main(int argc, char **argv) {
 
         cerr << width << "\t" << runtime[0] << "\t" << runtime[1] << "\t" << runtime[2] << endl;
         log  << width
-            << "\t" << RecFilter::throughput(runtime[0], width*width)
-            << "\t" << RecFilter::throughput(runtime[1], width*width)
-            << "\t" << RecFilter::throughput(runtime[2], width*width) << endl;
+            << "\t" << throughput(runtime[0], width*width)
+            << "\t" << throughput(runtime[1], width*width)
+            << "\t" << throughput(runtime[2], width*width) << endl;
     }
 
     return 0;

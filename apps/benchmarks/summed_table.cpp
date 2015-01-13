@@ -8,6 +8,7 @@
 #include <Halide.h>
 
 #include "recfilter.h"
+#include "timing.h"
 
 using namespace Halide;
 
@@ -87,7 +88,7 @@ int main(int argc, char **argv) {
         float time = F.profile(iter);
 
         cerr << width << "\t" << time << " ms" << endl;
-        log  << width << "\t" << RecFilter::throughput(time,width*width) << endl;
+        log  << width << "\t" << throughput(time,width*width) << endl;
 
         // ---------------------------------------------------------------------
 
