@@ -529,7 +529,7 @@ Realization RecFilter::create_realization(void) {
         buffers.push_back(Buffer(contents.ptr->type, buffer_size));
     }
 
-    return Realization(buffers);;
+    return Realization(buffers);
 }
 
 Realization RecFilter::realize(void) {
@@ -645,6 +645,11 @@ string RecFilter::print_hl_code(void) const {
     string b = print_functions();
     string c = print_schedule();
     return a+b+c;
+}
+
+float RecFilter::throughput(float runtime_millisec, int pixels) {
+    int gibipixels = 2^30;
+    return float(pixels) / float(gibipixels*runtime_millisec*1000.0f);
 }
 
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)

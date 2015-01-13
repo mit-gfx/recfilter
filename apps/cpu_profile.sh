@@ -14,7 +14,7 @@ if [ $# -ge 1 ]
 then
     HL_PROFILE=1 HL_JIT_TARGET=x86-64 $@ 2> $TFILE
 
-    $HL_PROFILER -top 1000000 -sort t < $TFILE
+    $HL_PROFILER -overhead 0 -top 1000000 -sort t < $TFILE
 
     rm -f $TFILE
 

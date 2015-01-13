@@ -23,6 +23,9 @@ int main(int argc, char **argv) {
     vector<float> time_naive;
     vector<float> time_tiled;
 
+    Log log("audio_filter.perflog");
+    log << "Order\tNaive\tTiled" << endl;
+
     for (int order=1; order<MAX_ORDER; order++) {
         std::vector<float> coeffs(order+1, 0.01);
         coeffs[0] = 1.0;
@@ -60,6 +63,10 @@ int main(int argc, char **argv) {
         cerr << "Order=" << order << " "
              << "naive " << time_naive[time_naive.size()-1] << " "
              << "tiled " << time_tiled[time_tiled.size()-1] << " ms" << endl;
+
+        log << order << "\t"
+            << RecFilter::throughput(time_naive[time_naive.size()-1], width) << "\t"
+            << RecFilter::throughput(time_tiled[time_tiled.size()-1], width) << endl;
     }
 
     return 0;

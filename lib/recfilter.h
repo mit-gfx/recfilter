@@ -1,6 +1,7 @@
 #ifndef _RECURSIVE_FILTER_H_
 #define _RECURSIVE_FILTER_H_
 
+#include <fstream>
 #include <iomanip>
 #include <vector>
 #include <string>
@@ -392,6 +393,13 @@ public:
     VarTag outer_scan(void);
     // @}
 
+    /** Compute the throughput in Gibipixels = 2^30 pixels
+     * \param runtime running time in milliseconds
+     * \param pixels number of pixels
+     * \returns throughput in GiP/s
+     */
+    static float throughput(float runtime, int pixels);
+
     /**
      * Millisecond-precision timer function
      * \return Clock value in milliseconds
@@ -563,6 +571,32 @@ class Arguments {
 
         /** Parse command line args from number of args and list of args */
         Arguments(int argc, char** argv);
+};
+
+// ----------------------------------------------------------------------------
+
+/** Logging utility */
+class Log {
+private:
+    std::fstream out;
+public:
+    Log(std::string filename) {
+        if (!filename.empty()) {
+            out.open(filename, std::ios_base::out);
+            if (!out.is_open()) {
+                std::cerr << "Could not open " << filename << " for logging" << std::endl;
+                assert(false);
+            }
+        }
+    }
+
+    template<typename T>
+    std::fstream& operator<<(T x) {
+        if (out.is_open()) {
+            out << x;
+        }
+        return out;
+    }
 };
 
 // ----------------------------------------------------------------------------

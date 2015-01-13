@@ -23,6 +23,9 @@ int main(int argc, char **argv) {
     int max_w      = args.max_width;
     int inc_w      = tile_width;
 
+    Log log("bicubic_bspline.perflog");
+    log << "Width\tOurs" << endl;
+
     const float a = 2.0f-std::sqrt(3.0f);
     vector<float> filter_coeff = { 1+a, -a};
 
@@ -84,7 +87,8 @@ int main(int argc, char **argv) {
 
         float time = F.profile(iter);
 
-        cerr << "Width " << width << " " << time << " ms" << endl;
+        cerr << width << "\t" << time << " ms" << endl;
+        log  << width << "\t" << RecFilter::throughput(time,width*width) << endl;
 
         // ---------------------------------------------------------------------
 

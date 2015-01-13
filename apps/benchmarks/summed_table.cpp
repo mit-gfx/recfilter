@@ -23,6 +23,9 @@ int main(int argc, char **argv) {
     int max_w      = args.max_width;
     int inc_w      = tile_width;
 
+    Log log("summed_table.perflog");
+    log << "Width\tOurs" << endl;
+
     // Profile the filter for all image widths
     for (int in_w=min_w; in_w<=max_w; in_w+=inc_w) {
         int width = in_w;
@@ -77,7 +80,8 @@ int main(int argc, char **argv) {
 
         float time = F.profile(iter);
 
-        cerr << "Width " << width << " " << time << " ms" << endl;
+        cerr << width << "\t" << time << " ms" << endl;
+        log  << width << "\t" << RecFilter::throughput(time,width*width) << endl;
 
         // ---------------------------------------------------------------------
 
