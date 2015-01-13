@@ -143,16 +143,9 @@ int main(int argc, char** argv)
 {
   size_t num_runs = 100;
 
-  if (argc == 2) {
-    num_runs = atoi(argv[1]);
-  } else {
-      std::cerr << "Usage: nv_summed_area_table.app [number of runs]" << std::endl;
-      return -1;
-  }
+  std::cerr << "Width\tSummed_table_Thrust" << std::endl;
 
-  std::cerr << "width\ttime (ms)" << std::endl;
-
-  for (int width=64; width<=8192; width+=64)
+  for (int width=64; width<=4096; width+=32)
   {
     size_t m = width;
     size_t n = width;
@@ -189,7 +182,8 @@ int main(int argc, char** argv)
 
     double time = double(time_end-time_start)/double(num_runs);
 
-    std::cerr << width << "\t" << time << std::endl;
+    std::cerr << width << "\t" << (width*width)/(1000.0f*time*float(2^30)) << std::endl;
+    // std::cerr << width << "\t" << time << std::endl;
   }
   return 0;
 }

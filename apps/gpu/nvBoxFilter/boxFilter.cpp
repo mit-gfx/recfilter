@@ -120,7 +120,8 @@ void runBenchmark(int image_width, int iterations)
     // Get average computation time
     dProcessingTime /= (double)iCycles;
 
-    fprintf(stderr, "Width %d\t%f ms\n", width, dProcessingTime);
+    // fprintf(stderr, "Width %d\t%f ms\n", width, dProcessingTime);
+    fprintf(stderr, "%d\t%f\n", width, (width*width)/(1000.0f*dProcessingTime*float(2^30)));
 }
 
 bool checkCUDAProfile(int dev, int min_runtime, int min_compute)

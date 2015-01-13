@@ -267,7 +267,8 @@ void TestNoGL()
     // Get round-trip and average computation time
     dProcessingTime /= (double)iCycles;
 
-    fprintf(stderr, "%u\t%f\n", uiImageWidth, dProcessingTime*1000);
+    // fprintf(stderr, "%u\t%f\n", uiImageWidth, dProcessingTime*1000);
+    fprintf(stderr, "%d\t%f\n", uiImageWidth, (uiImageWidth*uiImageWidth)/(1000.0f*dProcessingTime*float(2^30)));
 }
 
 // Function to set common kernel args that only change outside of GLUT loop

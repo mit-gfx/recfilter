@@ -4,7 +4,7 @@
 #include "recfilter.h"
 #include "timing.h"
 
-#define MAX_ORDER 50
+#define MAX_ORDER 40
 
 using namespace Halide;
 
