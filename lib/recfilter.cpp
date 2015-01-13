@@ -78,7 +78,7 @@ RecFilter::RecFilter(string name) {
     if (name.empty()) {
         contents.ptr->name = unique_name("R");
     } else {
-        contents.ptr->name = name;
+        contents.ptr->name = unique_name(name);
     }
     contents.ptr->tiled          = false;
     contents.ptr->finalized      = false;

@@ -22,32 +22,32 @@ vector<T> extract_row(Image<T> img, int i) {
     return res;
 }
 
-static vector<float> cascade_feedback_coeff(vector<float> a, vector<float> b) {
-    assert(a.size()<=b.size());
+static vector<float> cascade_feedback_coeff(vector<float> c, int order) {
+    assert(c.size()>order);
 
-    for (int i=0; i<a.size(); i++) {
-        a[i] = -a[i];
+    int order_a = c.size()-order;
+
+    for (int i=0; i<c.size(); i++) {
+        c[i] = -c[i];
     }
+    c.insert(c.begin(), 1.0f);
+
+    vector<float> b(order+1, 0.0f);
+
+    for (int i=0; i<b.size(); i++) {
+        float bsum = 0.0f;
+        for (int j=i-1; j>=i-order_a && j>=0; j--) {
+            bsum += b[j];
+        }
+        b[i] = c[i] + bsum;
+    }
+
+    b.erase(b.begin());
     for (int i=0; i<b.size(); i++) {
         b[i] = -b[i];
     }
 
-    a.insert(a.begin(), 1.0f);
-    b.insert(b.begin(), 1.0f);
-
-    vector<float> c(a.size()-b.size()+1, 0.0f);
-
-    for (int i=0; i<c.size(); i++) {
-
-        // TODO fill in
-    }
-
-    c.erase(c.begin());
-    for (int i=0; i<c.size(); i++) {
-        c[i] = -c[i];
-    }
-
-    return c;
+    return b;
 }
 
 static vector<float> overlap_feedback_coeff(vector<float> a, vector<float> b) {
@@ -363,17 +363,24 @@ vector<RecFilter> RecFilter::cascade_by_order(vector<int> orders) {
     }
 
     vector<RecFilter> filters;
-    RecFilter ftemp = *this;
-    for (int i=0; i<orders.size()-1; i++) {
-        int order_a = orders[i];
-        int order_b = 0;
-        for (int j=i+1; j<orders.size(); j++) {
-            order_b += orders[j];
-        }
-        vector<RecFilter> f = ftemp.cascade_by_order(order_a, order_b);
-        filters.push_back(f[0]);
-        ftemp = f[1];
+
+    // cascade into two filters of orders order[0] and SUM(order[1 .. n])
+    int order_a = orders[0];
+    int order_b = 0;
+    for (int j=1; j<orders.size(); j++) {
+        order_b += orders[j];
     }
+    vector<RecFilter> f = cascade_by_order(order_a, order_b);
+    filters.push_back(f[0]);
+
+    // cascade the second filter recursively with remaining orders
+    vector<int> orders_rem = orders;
+    orders_rem.erase(orders_rem.begin());
+    vector<RecFilter> frem = f[1].cascade_by_order(orders_rem);
+
+    // store the rest of the filters obtained
+    filters.insert(filters.end(), frem.begin(), frem.end());
+
     return filters;
 }
 
@@ -382,6 +389,10 @@ vector<RecFilter> RecFilter::cascade_by_order(int order_a, int order_b) {
         cerr << "Cascading directive cascade_by_order() cannot be used after "
              << "the filter is already tiled, compiled or realized" << endl;
         assert(false);
+    }
+
+    if (order_a>order_b) {
+        std::swap(order_a,order_b);
     }
 
     // check that all scans in the filter have the same order
@@ -410,8 +421,8 @@ vector<RecFilter> RecFilter::cascade_by_order(int order_a, int order_b) {
     }
 
     // create the two cascaded filters with the same content
-    RecFilter fA(contents.ptr->name + "_" + int_to_string(order_a));
-    RecFilter fB(contents.ptr->name + "_" + int_to_string(order_b));
+    RecFilter fA(contents.ptr->name + "_o" + int_to_string(order_a));
+    RecFilter fB(contents.ptr->name + "_o" + int_to_string(order_b));
 
     // set border conditions
     if (contents.ptr->clamped_border) {
@@ -436,25 +447,18 @@ vector<RecFilter> RecFilter::cascade_by_order(int order_a, int order_b) {
         Function A = fA.as_func().function();
         vector<Expr> call_args;
         for (int i=0; i<A.args().size(); i++) {
-            call_args.push_back(A.args()[i]);
+            call_args.push_back(Var(A.args()[i]));
         }
         for (int i=0; i<A.outputs(); i++) {
             result_A.push_back(Call::make(A, call_args, i));
         }
     }
 
-    // define B
-    fB.define(filter_dim, result_A);
-
-    // add scans into both A and B
+    // add scans into both A, assuming its feedfwd and feedback coeff are 1.0f
     for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-        int  filter_order = contents.ptr->filter_info[i].filter_order;
-        int  filter_dim   = contents.ptr->filter_info[i].filter_dim;
-        int  num_scans    = contents.ptr->filter_info[i].num_scans;
-        int  image_width  = contents.ptr->filter_info[i].image_width;
-        int  tile_width   = contents.ptr->filter_info[i].tile_width;
-        Var  var          = contents.ptr->filter_info[i].var;
-        RDom rdom         = contents.ptr->filter_info[i].rdom;
+        int image_width = contents.ptr->filter_info[i].image_width;
+        int num_scans   = contents.ptr->filter_info[i].num_scans;
+        Var var         = contents.ptr->filter_info[i].var;
 
         RecFilterDim x(var.name(), image_width);
 
@@ -462,25 +466,53 @@ vector<RecFilter> RecFilter::cascade_by_order(int order_a, int order_b) {
             bool scan_causal = contents.ptr->filter_info[i].scan_causal[j];
             int  scan_id     = contents.ptr->filter_info[i].scan_id[j];
 
-            // feedforward coeff coeff of B is assumed 1.0
-            float ff_a = contents.ptr->feedfwd_coeff(scan_id);
-            float ff_b = 1.0f;
+            // feedforward coeff is assumed 1.0
+            float ff = 1.0f;
 
             // feedback coeff of B are assumed 1.0
-            vector<float> fb = extract_row<float>(contents.ptr->feedback_coeff,scan_id);
-            vector<float> fb_b(order_b, 1.0f);
-            vector<float> fb_a = cascade_feedback_coeff(fb, fb_b);
+            vector<float> fb(order_a, 1.0f);
 
-            // add the feedfowrd coeff to the list of coeff
-            fb_a.insert(fb_a.begin(), ff_a);
-            fb_b.insert(fb_b.begin(), ff_b);
+            // add the feedfowrd coeff to the list of feedback coeff
+            fb.insert(fb.begin(), ff);
 
             if (scan_causal) {
-                fA.add_filter(+x, fb_a);
-                fB.add_filter(+x, fb_b);
+                fA.add_filter(+x, fb);
             } else {
-                fA.add_filter(-x, fb_a);
-                fB.add_filter(-x, fb_b);
+                fA.add_filter(-x, fb);
+            }
+        }
+    }
+
+    // A is completely defined, now define B using result of A
+    fB.define(filter_dim, result_A);
+
+    // add scans into B
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        int image_width = contents.ptr->filter_info[i].image_width;
+        int num_scans   = contents.ptr->filter_info[i].num_scans;
+        Var var         = contents.ptr->filter_info[i].var;
+
+        RecFilterDim x(var.name(), image_width);
+
+        for (int j=0; j<num_scans; j++) {
+            bool scan_causal = contents.ptr->filter_info[i].scan_causal[j];
+            int  scan_id     = contents.ptr->filter_info[i].scan_id[j];
+
+            // feedforward coeff coeff of B is same as feedfwd coeff
+            // of filter because feefwd of A was assumed 1.0f
+            float ff = contents.ptr->feedfwd_coeff(scan_id);
+
+            // feedback coeff of assuming feedback coeff of A are assumed 1.0
+            vector<float> fb = extract_row<float>(contents.ptr->feedback_coeff,scan_id);
+            fb = cascade_feedback_coeff(fb, order_b);
+
+            // add the feedfowrd coeff to the list of feedback coeff
+            fb.insert(fb.begin(), ff);
+
+            if (scan_causal) {
+                fB.add_filter(+x, fb);
+            } else {
+                fB.add_filter(-x, fb);
             }
         }
     }
