@@ -394,6 +394,7 @@ double boxFilter(float *d_src, float *d_temp, float *d_dest, int width, int heig
 
         // sync host and stop computation timer_kernel
         checkCudaErrors(cudaDeviceSynchronize());
+        checkCudaErrors(cudaThreadSynchronize());
         dKernelTime += sdkGetTimerValue(&timer);
 
         if (iterations > 1)

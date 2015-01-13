@@ -139,3 +139,87 @@ __kernel void RecursiveGaussianRGBA(__global const unsigned int* uiDataIn, __glo
         uiDataOut -= iWidth;  // move to previous row
     }
 }
+
+//------------------------------------------------------------------------------------------------
+
+float rgbaUintToFloat(const unsigned int u)
+{
+    float r = u;
+    return r;
+}
+unsigned int rgbaFloatToUint(const float r)
+{
+    unsigned int u= r;
+    return u;
+}
+
+// Recursive Gaussian filter for single float channel for benchmarking purposes
+// created by converting float4 to float, and replacing rgbaUintToFloat4 by rgbaUIntToFloat
+__kernel void RecursiveGaussian(__global const unsigned int* uiDataIn, __global unsigned int* uiDataOut,
+                                int iWidth, int iHeight,
+                                float a0, float a1,
+                                float a2, float a3,
+                                float b1, float b2,
+                                float coefp, float coefn)
+{
+    // compute X pixel location and check in-bounds
+    unsigned int X = mul24(get_group_id(0), get_local_size(0)) + get_local_id(0);
+	if (X >= iWidth) return;
+
+    // advance global pointers to correct column for this work item and x position
+    uiDataIn += X;
+    uiDataOut += X;
+
+    // start forward filter pass
+    float xp = (float)0.0f;  // previous input
+    float yp = (float)0.0f;  // previous output
+    float yb = (float)0.0f;  // previous output by 2
+
+#ifdef CLAMP_TO_EDGE
+    xp = rgbaUintToFloat(*uiDataIn);
+    yb = xp * (float)coefp;
+    yp = yb;
+#endif
+
+    for (int Y = 0; Y < iHeight; Y++)
+    {
+        float xc = rgbaUintToFloat(*uiDataIn);
+        float yc = (xc * a0) + (xp * a1) - (yp * b1) - (yb * b2);
+		*uiDataOut = rgbaFloatToUint(yc);
+        xp = xc;
+        yb = yp;
+        yp = yc;
+        uiDataIn += iWidth;     // move to next row
+        uiDataOut += iWidth;    // move to next row
+    }
+
+    // reset global pointers to point to last element in column for this work item and x position
+    uiDataIn -= iWidth;
+    uiDataOut -= iWidth;
+
+    // start reverse filter pass: ensures response is symmetrical
+    float xn = (float)0.0f;
+    float xa = (float)0.0f;
+    float yn = (float)0.0f;
+    float ya = (float)0.0f;
+
+#ifdef CLAMP_TO_EDGE
+    xn = rgbaUintToFloat(*uiDataIn);
+    xa = xn;
+    yn = xn * (float)coefn;
+    ya = yn;
+#endif
+
+    for (int Y = iHeight - 1; Y > -1; Y--)
+    {
+        float xc = rgbaUintToFloat(*uiDataIn);
+        float yc = (xn * a2) + (xa * a3) - (yn * b1) - (ya * b2);
+        xa = xn;
+        xn = xc;
+        ya = yn;
+        yn = yc;
+		*uiDataOut = rgbaFloatToUint(rgbaUintToFloat(*uiDataOut) + yc);
+        uiDataIn -= iWidth;   // move to previous row
+        uiDataOut -= iWidth;  // move to previous row
+    }
+}

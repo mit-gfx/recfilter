@@ -217,6 +217,7 @@ int main(int argc, char** argv)
 
         // Create kernels
         ckRecursiveGaussianRGBA = clCreateKernel(cpProgram, "RecursiveGaussianRGBA", &ciErrNum);
+        // ckRecursiveGaussianRGBA = clCreateKernel(cpProgram, "RecursiveGaussian", &ciErrNum);
         oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
         ckTranspose = clCreateKernel(cpProgram, "Transpose", &ciErrNum);
         oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
