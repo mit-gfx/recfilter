@@ -4,7 +4,7 @@
 
 #include <Halide.h>
 
-#include "gaussian_weights.h"
+#include "iir_coeff.h"
 #include "recfilter.h"
 
 #define MAX_THREAD 192

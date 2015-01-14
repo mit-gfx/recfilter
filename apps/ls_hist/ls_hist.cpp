@@ -3,7 +3,7 @@
 
 #include "recfilter.h"
 
-#include "gaussian_weights.h"
+#include "iir_coeff.h"
 
 #define WARP_SIZE   32
 #define MAX_THREADS 192

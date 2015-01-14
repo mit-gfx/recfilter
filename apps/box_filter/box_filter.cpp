@@ -14,7 +14,7 @@
 
 #include "recfilter.h"
 #include "timing.h"
-#include "gaussian_weights.h"
+#include "iir_coeff.h"
 
 using namespace Halide;
 
