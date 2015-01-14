@@ -216,6 +216,8 @@ main(int argc, char **argv)
         return -1;
     }
 
+    fprintf(stderr, "Width\tBox_%d_NVIDIA\n", iterations);
+
     int devID = findCudaDevice(argc, (const char **)argv);
 
     int min_w = 64;

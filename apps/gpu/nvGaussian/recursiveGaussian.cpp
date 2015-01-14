@@ -138,6 +138,8 @@ main(int argc, char **argv)
     // Benchmark or AutoTest mode detected, no OpenGL
     findCudaDevice(argc, (const char **)argv);
 
+    fprintf(stderr, "Width\tGaussian_NVIDIA\n");
+
     int min_w = 64;
     int max_w = 4096;
     int inc_w = 32;

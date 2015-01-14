@@ -183,7 +183,7 @@ int main(int argc, char** argv)
     double millisec = double(time_end-time_start)/double(num_runs);
 
     float throughput = (width*width*1000.0f)/(millisec*1024*1024);
-    std::cerr << width << throughput << std::endl;
+    std::cerr << width << "\t" << throughput << std::endl;
 
     // std::cerr << width << "\t" << time << std::endl;
   }
