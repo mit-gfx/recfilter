@@ -1,39 +1,38 @@
 #ifndef _TIMING_H_
 #define _TIMING_H_
 
-#include <fstream>
 #include <iostream>
-#include <cstdlib>
+#include <fstream>
 #include <string>
 
 /** Logging utility */
 class Log {
 private:
-    std::fstream out;
+    std::ofstream fout;
+
 public:
     Log(std::string filename) {
         if (!filename.empty()) {
-            out.open(filename, std::ios_base::out);
-            if (!out.is_open()) {
-                std::cerr << "Could not open " << filename << " for logging" << std::endl;
-                exit(EXIT_FAILURE);
-            }
+            fout.open(filename);
         }
     }
 
     template<typename T>
-    std::fstream& operator<<(T x) {
-        if (out.is_open()) {
-            out << x;
+    std::ostream& operator<<(T x) {
+        if (fout.is_open()) {
+            fout << x;
+            return fout;
+        } else {
+            std::cerr << x;
+            return std::cerr;
         }
-        return out;
     }
 };
 
 /** Compute the throughput in Gibipixels = 2^30 pixels
  * \param runtime running time in milliseconds
  * \param pixels number of pixels
- * \returns throughput in GiP/s
+ * \returns throughput in MiP/s
  */
 float throughput(float runtime, int pixels);
 

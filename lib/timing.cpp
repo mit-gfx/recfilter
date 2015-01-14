@@ -12,10 +12,10 @@ unsigned long millisecond_timer(void) {
     GetSystemTime(&t);
     return (unsigned long)((unsigned long)t.wMilliseconds
             + 1000*((unsigned long)t.wSecond
-                + 60*((unsigned long)t.wMinute
-                    + 60*((unsigned long)t.wHour
-                        + 24*(unsigned long)t.wDay))));
-}
+            + 60*((unsigned long)t.wMinute
+            + 60*((unsigned long)t.wHour
+            + 24*(unsigned long)t.wDay))));
+
 #elif defined(_APPLE_) || defined(__APPLE__) || \
     defined(APPLE)   || defined(_APPLE)    || defined(__APPLE) || \
 defined(unix)    || defined(__unix__)  || defined(__unix)
