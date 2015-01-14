@@ -232,3 +232,61 @@ vector<float> integral_image_coeff(int n) {
 
     return coeff;
 }
+
+vector<float> cascade_feedback_coeff(vector<float> c, int order) {
+    assert(c.size()>order);
+
+    int order_a = c.size()-order;
+
+    for (int i=0; i<c.size(); i++) {
+        c[i] = -c[i];
+    }
+    c.insert(c.begin(), 1.0f);
+
+    vector<float> b(order+1, 0.0f);
+
+    for (int i=0; i<b.size(); i++) {
+        float bsum = 0.0f;
+        for (int j=i-1; j>=i-order_a && j>=0; j--) {
+            bsum += b[j];
+        }
+        b[i] = c[i] + bsum;
+    }
+
+    b.erase(b.begin());
+    for (int i=0; i<b.size(); i++) {
+        b[i] = -b[i];
+    }
+
+    return b;
+}
+
+vector<float> overlap_feedback_coeff(vector<float> a, vector<float> b) {
+    for (int i=0; i<a.size(); i++) {
+        a[i] = -a[i];
+    }
+    for (int i=0; i<b.size(); i++) {
+        b[i] = -b[i];
+    }
+
+    a.insert(a.begin(), 1.0f);
+    b.insert(b.begin(), 1.0f);
+
+    vector<float> c(a.size()+b.size()-1, 0.0f);
+
+    for (int i=0; i<c.size(); i++) {
+        for (int j=0; j<=i; j++) {
+            if (j<a.size() && i-j<b.size()) {
+                c[i] += a[j]*b[i-j];
+            }
+        }
+    }
+
+    c.erase(c.begin());
+    for (int i=0; i<c.size(); i++) {
+        c[i] = -c[i];
+    }
+
+    return c;
+}
+

@@ -1,10 +1,32 @@
-#ifndef _GAUSSIAN_WEIGHTS_H_
-#define _GAUSSIAN_WEIGHTS_H_
+#ifndef _IIR_FILTER_COEFFICIENTS_H_
+#define _IIR_FILTER_COEFFICIENTS_H_
 
 #include <cmath>
 #include <complex>
 #include <iostream>
 #include <Halide.h>
+
+/**
+ * Compute the feedback coefficients of a filter of given order which
+ * can be used to cascade a higher order filter into two lower order
+ * order filters such that the coefficients of one of the lower order
+ * filter are all 1.0
+ *
+ * \param[in] order order of lower order filter
+ * \param[in] c feedback coefficients of higher order filter
+ * \return feedback coefficients of lower filter order
+ */
+std::vector<float> cascade_feedback_coeff(std::vector<float> c, int order);
+
+/**
+ * Compute the coefficients of a higher order filter that is equivalent
+ * to two cascaded lower order filters of given coefficients
+ *
+ * \param[in] a coefficients of first lower order filter
+ * \param[in] a coefficients of second lower order filter
+ * \returns coefficients of higher order filter
+ */
+std::vector<float> overlap_feedback_coeff(std::vector<float> a, std::vector<float> b);
 
 /**
  * Feed forward and feedback coefficients for computing n integrals of image,
@@ -15,6 +37,8 @@
  * \returns coeff of IIR filter that computes multiple integrals
  */
 std::vector<float> integral_image_coeff(int iterations);
+
+
 
 /**@name Compute the Gaussian, derivative of Gaussian and integral of Gaussian
  * @param[in] x input (float or Halide::Expr)
@@ -85,4 +109,4 @@ Halide::Image<T> reference_gaussian(Halide::Image<T> in, T sigma) {
     return ref;
 }
 
-#endif // _GAUSSIAN_WEIGHTS_H_
+#endif // _IIR_FILTER_COEFFICIENTS_H_
