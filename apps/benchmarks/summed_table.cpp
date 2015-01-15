@@ -54,44 +54,46 @@ int main(int argc, char **argv) {
 
         // ---------------------------------------------------------------------
 
-        int order    = 1;
-        int n_scans  = 2;
-        int ws       = 32;
-        int unroll_w = ws/4;
-        int intra_tiles_per_warp = ws / (order*n_scans);
-        int inter_tiles_per_warp = 4;
+        if (F.target().has_gpu_feature()) {
+            int order    = 1;
+            int n_scans  = 2;
+            int ws       = 32;
+            int unroll_w = ws/4;
+            int intra_tiles_per_warp = ws / (order*n_scans);
+            int inter_tiles_per_warp = 4;
 
-        F.intra_schedule(1).compute_locally()
-            .reorder_storage(F.inner(), F.outer())
-            .unroll         (F.inner_scan())
-            .split          (F.inner(1), unroll_w)
-            .unroll         (F.inner(1).split_var())
-            .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
-            .gpu_threads    (F.inner(0), F.inner(1))
-            .gpu_blocks     (F.outer(0), F.outer(1));
+            F.intra_schedule(1).compute_locally()
+                .reorder_storage(F.inner(), F.outer())
+                .unroll         (F.inner_scan())
+                .split          (F.inner(1), unroll_w)
+                .unroll         (F.inner(1).split_var())
+                .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
+                .gpu_threads    (F.inner(0), F.inner(1))
+                .gpu_blocks     (F.outer(0), F.outer(1));
 
-        F.intra_schedule(2).compute_locally()
-            .reorder_storage(F.tail(), F.inner(), F.outer())
-            .unroll         (F.inner_scan())
-            .split          (F.outer(0), intra_tiles_per_warp)
-            .reorder        (F.inner_scan(), F.inner(), F.outer(0).split_var(), F.tail(), F.outer())
-            .fuse           (F.inner(0), F.outer(0).split_var())
-            .fuse           (F.inner(0), F.tail())
-            .gpu_threads    (F.inner(0))
-            .gpu_blocks     (F.outer(0), F.outer(1));
+            F.intra_schedule(2).compute_locally()
+                //.reorder_storage(F.tail(), F.inner(), F.outer())
+                .unroll         (F.inner_scan())
+                .split          (F.outer(0), intra_tiles_per_warp)
+                .reorder        (F.inner_scan(), F.inner(), F.tail(), F.outer(0).split_var(), F.outer())
+                .fuse           (F.inner(0), F.outer(0).split_var())
+                .fuse           (F.inner(0), F.tail())
+                .gpu_threads    (F.inner(0))
+                .gpu_blocks     (F.outer(0), F.outer(1));
 
-        F.inter_schedule().compute_globally()
-            .reorder_storage(F.inner(), F.tail(), F.outer())
-            .unroll         (F.outer_scan())
-            .split          (F.outer(0), inter_tiles_per_warp)
-            .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
-            .gpu_threads    (F.inner(0), F.outer(0).split_var())
-            .gpu_blocks     (F.outer(0));
+            F.inter_schedule().compute_globally()
+                .reorder_storage(F.inner(), F.tail(), F.outer())
+                .unroll         (F.outer_scan())
+                .split          (F.outer(0), inter_tiles_per_warp)
+                .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
+                .gpu_threads    (F.inner(0), F.outer(0).split_var())
+                .gpu_blocks     (F.outer(0));
 
-        float time = F.profile(iter);
+            float time = F.profile(iter);
 
-        cerr << width << "\t" << time << " ms" << endl;
-        log  << width << "\t" << throughput(time,width*width) << endl;
+            cerr << width << "\t" << time << " ms" << endl;
+            log  << width << "\t" << throughput(time,width*width) << endl;
+        }
 
         // ---------------------------------------------------------------------
 
