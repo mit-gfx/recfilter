@@ -1425,7 +1425,7 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
     RDom ryi  = split_info_prev.inner_rdom;
     RDom ryt  = split_info_prev.tail_rdom;
     int  num_tiles_prev = split_info_prev.num_tiles;
-    int  filter_order_prev = split_info_prev.filter_order;
+    int  filter_dim_prev = split_info_prev.filter_dim;
 
     Function F_intra = rF_intra.func;
     vector<Function> F_tail;
@@ -1490,8 +1490,13 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
                     }
                     if (uvar_category.find(ryi[v].name()) != uvar_category.end()) {
                         VarTag vc = uvar_category[ryi[v].name()];
-                        uvar_category.erase(ryi[v].name());
-                        uvar_category.insert(make_pair(ryt[v].name(), vc));
+                        if (v == filter_dim_prev) {
+                            uvar_category.erase(ryi[v].name());
+                            uvar_category.insert(make_pair(ryt[v].name(), TAIL));
+                        } else {
+                            uvar_category.erase(ryi[v].name());
+                            uvar_category.insert(make_pair(ryt[v].name(), vc));
+                        }
                     }
                 }
                 if (i>=first_scan && i<=last_scan) {
@@ -1613,6 +1618,10 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
     RecFilterFunc rF;
     RecFilterFunc rF_reidx;
     {
+        // interleave the functions by adding an extra dimension
+        Var c("c");
+
+        // interleaved result and a reindexing function
         Function F(rF_intra.func.name() + DASH + y.name()+ DASH + x.name() + DASH + SUB);
         Function F_reidx(rF_intra.func.name() + DASH + y.name()+ DASH + x.name());
 
@@ -1622,14 +1631,17 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
         rF.pure_var_category   = intra_tile_funcs[0].pure_var_category;
         rF.update_var_category = intra_tile_funcs[0].update_var_category;
 
+        // add the extra dimension in the scheduling args
+        rF.pure_var_category.insert(make_pair(c.name(), VarTag(INNER,0)));
+        for (int i=0; i<rF.update_var_category.size(); i++) {
+            rF.update_var_category[i].insert(make_pair(c.name(), VarTag(INNER,0)));
+        }
+
         // scheduling tags for the reindexing function
         rF_reidx.func          = F_reidx;
         rF_reidx.func_category = REINDEX;
         rF_reidx.pure_var_category = rF.pure_var_category;
         rF_reidx.callee_func   = F.name();
-
-        // interleave the functions by adding an extra dimension
-        Var c("c");
 
         vector<string> args = intra_tile_funcs[0].func.args();
         vector<Expr> values = intra_tile_funcs[0].func.values();
@@ -1766,8 +1778,8 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
 
         // never expose the extra dimension to the user, fuse it with the
         // interleaving dimension
-        Func(F).fuse(yi,c,yi);
-        Func(F_reidx).fuse(yi,c,yi);
+        // Func(F).fuse(yi,c,yi);
+        // Func(F_reidx).fuse(yi,c,yi);
     }
 
     return {rF, rF_reidx};

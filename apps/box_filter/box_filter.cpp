@@ -78,45 +78,53 @@ RecFilter integral_image(int order, int width, int height, int tile_width, Image
     RecFilterDim x("x", width);
     RecFilterDim y("y", height);
 
-    RecFilter S("S");
+    stringstream s;
+    s << "IntImg_" << order;
 
-    S(x,y) = I(x,y);                // k order intergral image
-    S.add_filter(x, coeff);         // k = num of box filter iterations
-    S.add_filter(y, coeff);
+    RecFilter F(s.str());
 
-    S.split(x, tile_width, y, tile_width);
+    F(x,y) = I(x,y);                // k order intergral image
+    F.add_filter(x, coeff);         // k = num of box filter iterations
+    F.add_filter(y, coeff);
+
+    F.split(x, tile_width, y, tile_width);
 
     // -------------------------------------------------------------------------
 
-    int tiles_per_warp = 2;
-    int unroll_w       = 8;
+    int n_scans  = 2;
+    int ws       = 32;
+    int unroll_w = ws/4;
+    int intra_tiles_per_warp = ws / (order*n_scans);
+    int inter_tiles_per_warp = 4;
 
-    S.intra_schedule(1).compute_locally()
-        .reorder_storage(S.inner(), S.outer())
-        .unroll         (S.inner_scan())
-        .split          (S.inner(1), unroll_w)
-        .unroll         (S.inner(1).split_var())
-        .reorder        (S.inner_scan(), S.inner(1).split_var(), S.inner(), S.outer())
-        .gpu_threads    (S.inner(0), S.inner(1))
-        .gpu_blocks     (S.outer(0), S.outer(1));
+    F.intra_schedule(1).compute_locally()
+        .reorder_storage(F.inner(), F.outer())
+        .unroll         (F.inner_scan())
+        .split          (F.inner(1), unroll_w)
+        .unroll         (F.inner(1).split_var())
+        .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
+        .gpu_threads    (F.inner(0), F.inner(1))
+        .gpu_blocks     (F.outer(0), F.outer(1));
 
-    S.intra_schedule(2).compute_locally()
-        .reorder_storage(S.tail(), S.inner(), S.outer())
-        .unroll         (S.inner_scan())
-        .split          (S.outer(0), tiles_per_warp)
-        .reorder        (S.inner_scan(), S.tail(), S.outer(0).split_var(), S.inner(), S.outer())
-        .gpu_threads    (S.inner(0), S.outer(0).split_var())
-        .gpu_blocks     (S.outer(0), S.outer(1));
+    F.intra_schedule(2).compute_locally()
+        .reorder_storage(F.tail(), F.inner(), F.outer())
+        .unroll         (F.inner_scan())
+        .split          (F.outer(0), intra_tiles_per_warp)
+        .reorder        (F.inner_scan(), F.inner(), F.outer(0).split_var(), F.tail(), F.outer())
+        .fuse           (F.inner(0), F.outer(0).split_var())
+        .fuse           (F.inner(0), F.tail())
+        .gpu_threads    (F.inner(0))
+        .gpu_blocks     (F.outer(0), F.outer(1));
 
-    S.inter_schedule().compute_globally()
-        .reorder_storage(S.inner(), S.tail(), S.outer())
-        .unroll         (S.outer_scan())
-        .split          (S.outer(0), tiles_per_warp)
-        .reorder        (S.outer_scan(), S.tail(), S.outer(0).split_var(), S.inner(), S.outer())
-        .gpu_threads    (S.inner(0), S.outer(0).split_var())
-        .gpu_blocks     (S.outer(0));
+    F.inter_schedule().compute_globally()
+        .reorder_storage(F.inner(), F.tail(), F.outer())
+        .unroll         (F.outer_scan())
+        .split          (F.outer(0), inter_tiles_per_warp)
+        .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
+        .gpu_threads    (F.inner(0), F.outer(0).split_var())
+        .gpu_blocks     (F.outer(0));
 
-    return S;
+    return F;
 }
 
 RecFilter derivative_image(int order, int filter_radius, int width, int height, int tile_width, Func I) {

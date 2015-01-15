@@ -50,7 +50,8 @@ int main(int argc, char **argv) {
     int inc_w      = tile_width;
 
     // vector<string> filters = {"Bicubic", "Biquintic", "Biquintic_cascaded"};
-    vector<string> filters = {"Bicubic"};
+    // vector<string> filters = {"Bicubic", "Biquintic"};
+    vector<string> filters = {"Bicubic", };
 
     // possibly inaccurate coeff, only for measuring performance
     const float a = 2.0f-std::sqrt(3.0f);
@@ -94,8 +95,12 @@ int main(int argc, char **argv) {
 
                 F.split(x, tile_width, y, tile_width);
 
-                int tiles_per_warp = 4;
-                int unroll_w       = 8;
+                int order    = (j==0 ? 1 : 2);
+                int n_scans  = 4;
+                int ws       = 32;
+                int unroll_w = ws/4;
+                int intra_tiles_per_warp = ws / (order*n_scans);
+                int inter_tiles_per_warp = 4;
 
                 F.intra_schedule(1).compute_locally()
                     .reorder_storage(F.inner(), F.outer())
@@ -109,15 +114,17 @@ int main(int argc, char **argv) {
                 F.intra_schedule(2).compute_locally()
                     .reorder_storage(F.tail(), F.inner(), F.outer())
                     .unroll         (F.inner_scan())
-                    .split          (F.outer(0), tiles_per_warp)
-                    .reorder        (F.inner_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
-                    .gpu_threads    (F.inner(0), F.outer(0).split_var())
+                    .split          (F.outer(0), intra_tiles_per_warp)
+                    .reorder        (F.inner_scan(), F.inner(), F.outer(0).split_var(), F.tail(), F.outer())
+                    .fuse           (F.inner(0), F.outer(0).split_var())
+                    .fuse           (F.inner(0), F.tail())
+                    .gpu_threads    (F.inner(0))
                     .gpu_blocks     (F.outer(0), F.outer(1));
 
                 F.inter_schedule().compute_globally()
                     .reorder_storage(F.inner(), F.tail(), F.outer())
                     .unroll         (F.outer_scan())
-                    .split          (F.outer(0), tiles_per_warp)
+                    .split          (F.outer(0), inter_tiles_per_warp)
                     .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
                     .gpu_threads    (F.inner(0), F.outer(0).split_var())
                     .gpu_blocks     (F.outer(0));

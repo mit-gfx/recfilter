@@ -551,6 +551,44 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(VarTag x, VarTag y, VarTag
     return reorder_storage({x,y,z,w,t});
 }
 
+RecFilterSchedule& RecFilterSchedule::fuse(VarTag vtag1, VarTag vtag2) {
+    for (int j=0; j<func_list.size(); j++) {
+        RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
+        Func            F = Func(rF.func);
+
+        map<int,VarOrRVar> vars1 = var_by_tag(rF, vtag1);
+        map<int,VarOrRVar> vars2 = var_by_tag(rF, vtag2);
+        map<int,VarOrRVar>::iterator vit;
+
+        for (vit=vars1.begin(); vit!=vars1.end(); vit++) {
+            int def = vit->first;
+            VarOrRVar v1 = vit->second;
+            if (vars2.find(def) != vars2.end()) {
+                VarOrRVar v2 = vars2.find(def)->second;
+
+                string s = "fuse(Var(\"" + v1.name() + "\"), Var(\"" + v2.name()
+                    + "\"), Var(\"" + v1.name() + "\"))";
+
+                // only add scheduling to defs that are not undef
+                if (def==PURE_DEF) {
+                    if (!is_undef(F.values())) {
+                        F.fuse(v1,v2,v1);
+                        rF.pure_var_category.erase(v2.name());
+                        rF.pure_schedule.push_back(s);
+                    }
+                } else {
+                    if (!is_undef(F.update_values(def))) {
+                        F.update(def).fuse(v1,v2,v1);
+                        rF.update_var_category[def].erase(v2.name());
+                        rF.update_schedule[def].push_back(s);
+                    }
+                }
+            }
+        }
+    }
+    return *this;
+}
+
 RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor) {
     if (vtag.check(SPLIT)) {
         cerr << "Cannot split a variable which was created by split scheduling ops" << endl;
