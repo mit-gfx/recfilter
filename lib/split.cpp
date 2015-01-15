@@ -1413,8 +1413,6 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
         SplitInfo split_info,
         SplitInfo split_info_prev)
 {
-    vector<RecFilterFunc> generated_functions;
-
     Var x    = split_info.var;
     Var xi   = split_info.inner_var;
     Var xo   = split_info.outer_var;
@@ -1427,6 +1425,7 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
     RDom ryi  = split_info_prev.inner_rdom;
     RDom ryt  = split_info_prev.tail_rdom;
     int  num_tiles_prev = split_info_prev.num_tiles;
+    int  filter_order_prev = split_info_prev.filter_order;
 
     Function F_intra = rF_intra.func;
     vector<Function> F_tail;
@@ -1438,6 +1437,11 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
         F_tail_prev.push_back(rF_tail_prev[i].func);
     }
 
+    // this stage will generate lots of functions that perform
+    // scans within tiles and a reindexing function for each of
+    // these scanning functions, store them separately
+    vector<RecFilterFunc> intra_tile_funcs;
+    vector<RecFilterFunc> reindex_funcs;
 
     // add the residual term of previous dimension to the completed
     // tail of current dimension
@@ -1588,8 +1592,8 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
             rF_tail_prev_scanned.pure_var_category = rF_tail_prev_scanned_sub.pure_var_category;
             rF_tail_prev_scanned.callee_func       = rF_tail_prev_scanned_sub.func.name();
 
-            generated_functions.push_back(rF_tail_prev_scanned_sub);
-            generated_functions.push_back(rF_tail_prev_scanned);
+            intra_tile_funcs.push_back(rF_tail_prev_scanned_sub);
+            reindex_funcs   .push_back(rF_tail_prev_scanned);
         }
 
         // redefine the pure def to include residuals from prev dimensions
@@ -1602,50 +1606,166 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
         }
     }
 
-    // remove all undef()'ed update definitions from each function
-    for (int i=0; i<generated_functions.size(); i++) {
-        RecFilterFunc& rf= generated_functions[i];
-        Function f = generated_functions[i].func;
+    // the list of intra tile scans functions and reindexing functions read the same
+    // data and compute similar things, interleave them into a single function
+    // also create a function to reindex the interleaved function
+    RecFilterFunc rF;
+    RecFilterFunc rF_reidx;
+    {
+        Function F(rF_intra.func.name() + DASH + y.name()+ DASH + x.name() + DASH + SUB);
+        Function F_reidx(rF_intra.func.name() + DASH + y.name()+ DASH + x.name());
 
-        vector<string> args = f.args();
-        vector<Expr> values = f.values();
-        vector<UpdateDefinition> updates = f.updates();
+        // copy scheduling tags from any of the functions
+        rF.func          = F;
+        rF.func_category = INTRA_1;
+        rF.pure_var_category   = intra_tile_funcs[0].pure_var_category;
+        rF.update_var_category = intra_tile_funcs[0].update_var_category;
 
-        vector< map<string,VarTag> > uvar_category = rf.update_var_category;
+        // scheduling tags for the reindexing function
+        rF_reidx.func          = F_reidx;
+        rF_reidx.func_category = REINDEX;
+        rF_reidx.pure_var_category = rF.pure_var_category;
+        rF_reidx.callee_func   = F.name();
 
-        f.clear_all_definitions();
-        f.define(args, values);
-        rf.update_var_category.clear();
+        // interleave the functions by adding an extra dimension
+        Var c("c");
 
-        for (int j=0; j<updates.size(); j++) {
-            vector<Expr> u_args = updates[j].args;
-            vector<Expr> u_vals = updates[j].values;
-            bool is_undef = true;
-            for (int k=0; k<u_vals.size(); k++) {
-                is_undef &= equal(u_vals[k], undef(u_vals[k].type()));
+        vector<string> args = intra_tile_funcs[0].func.args();
+        vector<Expr> values = intra_tile_funcs[0].func.values();
+        vector<UpdateDefinition> updates = intra_tile_funcs[0].func.updates();;
+
+        // interleaving dimension
+        int dimension = -1;
+        for (int j=0; j<args.size(); j++) {
+            if (args[j] == yi.name()) {
+                dimension = j;
             }
-            if (!is_undef) {
-                f.define_update(u_args, u_vals);
-                rf.update_var_category.push_back(uvar_category[j]);
+        }
+        if (dimension<0) {
+            cerr << "Could not interleave functions because interleaving dimension not found" << endl;
+            assert(false);
+        }
+
+        // create a dummy definition for the interleaved function its defintion becomes available
+        // and other substitutions can be made
+        F.define(args,values);
+
+        // change the pure values to read from all the functions to be interleaved
+        for (int i=0; i<intra_tile_funcs.size(); i++) {
+            Function f = intra_tile_funcs[i].func;
+            for (int j=0; j<values.size(); j++) {
+                values[j] = simplify(select(c==i, f.values()[j], values[j]));
             }
         }
 
-        // add padding on the innermost inner var to avoid bank conflicts
-        {
-            vector<Expr> u_args;
-            vector<Expr> u_vals(f.outputs(), undef(split_info.type));
-            for (int i=0; i<f.args().size(); i++) {
-                if (f.args()[i] == xi.name()) {
-                    u_args.push_back(tile);
-                } else {
-                    u_args.push_back(Var(f.args()[i]));
+        // replace all calls to the functions to be interleaved by the interleaved function
+        for (int i=0; i<intra_tile_funcs.size(); i++) {
+            Function f = intra_tile_funcs[i].func;
+            for (int k=0; k<updates.size(); k++) {
+                for (int j=0; j<updates[k].values.size(); j++) {
+                    Expr v1  = substitute_func_call(f.name(), F, updates[k].values[j]);
+                    Expr v2  = substitute_func_call(f.name(), F, f.updates()[k].values[j]);
+                    updates[k].values[j] = simplify(select(c==i, v2, v1));
                 }
             }
-            f.define_update(u_args,u_vals);
         }
+
+        // add the extra dimension and redefine the function
+        args.insert(args.begin()+dimension, c.name());
+        F.clear_all_definitions();
+        F.define(args,values);
+        for (int k=0; k<updates.size(); k++) {
+            updates[k].args.insert(updates[k].args.begin()+dimension, c);
+            for (int j=0; j<updates[k].values.size(); j++) {
+                Expr v = insert_arg_in_func_call(F.name(), dimension, c, updates[k].values[j]);
+                updates[k].values[j] = v;
+            }
+            F.define_update(updates[k].args, updates[k].values);
+        }
+
+        // create the reindexing function
+        {
+            vector<Expr> call_args;
+            vector<Expr> values;
+            for (int j=0; j<F.args().size(); j++) {
+                call_args.push_back(Var(F.args()[j]));
+            }
+            for (int j=0; j<F.values().size(); j++) {
+                values.push_back(Call::make(F,call_args,j));
+            }
+            F_reidx.define(F.args(), values);
+        }
+
+        // change all functions to index into the interleaved function
+        // and mark them as inline
+        for (int i=0; i<intra_tile_funcs.size(); i++) {
+            RecFilterFunc& rf = intra_tile_funcs[i];
+            Function f        = rf.func;
+
+            vector<string> args = f.args();
+            vector<Expr> call_args;
+            vector<Expr> values;
+
+            for (int j=0; j<args.size(); j++) {
+                if (args[j] == yi.name()) {
+                    call_args.push_back(Var(yi));
+                } else {
+                    call_args.push_back(Var(args[j]));
+                }
+            }
+            call_args.insert(call_args.begin()+dimension, i);
+            for (int j=0; j<f.values().size(); j++) {
+                values.push_back(Call::make(F_reidx, call_args, j));
+            }
+            f.clear_all_definitions();
+            f.define(args, values);
+            rf.func_category = INLINE;
+            rf.pure_var_category.clear();
+            rf.update_var_category.clear();
+            rf.callee_func.clear();
+            rf.caller_func.clear();
+        }
+
+        // convert all all reindexing functions to inline
+        for (int i=0; i<reindex_funcs.size(); i++) {
+            reindex_funcs[i].func_category = INLINE;
+            reindex_funcs[i].pure_var_category.clear();
+            reindex_funcs[i].update_var_category.clear();
+            reindex_funcs[i].callee_func.clear();
+            reindex_funcs[i].caller_func.clear();
+        }
+
+        // remove all undef()'ed update definitions from each function
+//        {
+//            vector<string> args = F.args();
+//            vector<Expr> values = F.values();
+//            vector<UpdateDefinition> updates = F.updates();
+//
+//            vector< map<string,VarTag> > uvar_category = rF.update_var_category;
+//
+//            F.clear_all_definitions();
+//            F.define(args, values);
+//            rF.update_var_category.clear();
+//
+//            for (int j=0; j<updates.size(); j++) {
+//                vector<Expr> u_args = updates[j].args;
+//                vector<Expr> u_vals = updates[j].values;
+//                bool all_undef = is_undef(u_vals);
+//                if (!all_undef) {
+//                    for (int k=0; k<u_vals.size(); k++) {
+//                        if (is_undef(u_vals[k])) {
+//                            u_vals[k] = Call::make(F,u_args,k);
+//                        }
+//                    }
+//                    F.define_update(u_args, u_vals);
+//                    rF.update_var_category.push_back(uvar_category[j]);
+//                }
+//            }
+//            cerr << F << endl;
+//        }
     }
 
-    return generated_functions;
+    return {rF, rF_reidx};
 }
 
 // -----------------------------------------------------------------------------
