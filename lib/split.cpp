@@ -1478,7 +1478,8 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
             int last_scan  = split_info.scan_id[j];
 
             // add all the scans from the intra tile term only for the scans
-            // numbered between first_scan and last_scan
+            // numbered between first_scan and last_scan, for other scans
+            // create LHS = RHS like update defs
             for (int i=0; i<F_intra.updates().size(); i++) {
                 map<string, VarTag> uvar_category = rF_intra.update_var_category[i];
                 vector<Expr> args = F_intra.updates()[i].args;
@@ -1502,7 +1503,7 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
                     }
                 } else {
                     for (int u=0; u<values.size(); u++) {
-                        values[u] = undef(values[u].type());
+                        values[u] = Call::make(F_tail_prev_scanned_sub, args, u);
                     }
                 }
                 F_tail_prev_scanned_sub.define_update(args, values);
@@ -1735,34 +1736,38 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
             reindex_funcs[i].caller_func.clear();
         }
 
-        // remove all undef()'ed update definitions from each function
-//        {
-//            vector<string> args = F.args();
-//            vector<Expr> values = F.values();
-//            vector<UpdateDefinition> updates = F.updates();
-//
-//            vector< map<string,VarTag> > uvar_category = rF.update_var_category;
-//
-//            F.clear_all_definitions();
-//            F.define(args, values);
-//            rF.update_var_category.clear();
-//
-//            for (int j=0; j<updates.size(); j++) {
-//                vector<Expr> u_args = updates[j].args;
-//                vector<Expr> u_vals = updates[j].values;
-//                bool all_undef = is_undef(u_vals);
-//                if (!all_undef) {
-//                    for (int k=0; k<u_vals.size(); k++) {
-//                        if (is_undef(u_vals[k])) {
-//                            u_vals[k] = Call::make(F,u_args,k);
-//                        }
-//                    }
-//                    F.define_update(u_args, u_vals);
-//                    rF.update_var_category.push_back(uvar_category[j]);
-//                }
-//            }
-//            cerr << F << endl;
-//        }
+        // remove all redundant update defs where LHS = RHS
+        {
+            vector<string> args = F.args();
+            vector<Expr> values = F.values();
+            vector<UpdateDefinition> updates = F.updates();
+
+            vector< map<string,VarTag> > uvar_category = rF.update_var_category;
+
+            F.clear_all_definitions();
+            F.define(args, values);
+            rF.update_var_category.clear();
+
+            for (int j=0; j<updates.size(); j++) {
+                vector<Expr> u_args = updates[j].args;
+                vector<Expr> u_vals = updates[j].values;
+                bool lhs_equals_rhs = true;
+                for (int k=0; k<u_vals.size(); k++) {
+                    Expr lhs = Call::make(F, u_args, k);
+                    Expr rhs = u_vals[k];
+                    lhs_equals_rhs &= equal(lhs,rhs);
+                }
+                if (!lhs_equals_rhs) {
+                    F.define_update(u_args, u_vals);
+                    rF.update_var_category.push_back(uvar_category[j]);
+                }
+            }
+        }
+
+        // never expose the extra dimension to the user, fuse it with the
+        // interleaving dimension
+        Func(F).fuse(yi,c,yi);
+        Func(F_reidx).fuse(yi,c,yi);
     }
 
     return {rF, rF_reidx};
