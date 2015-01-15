@@ -49,14 +49,19 @@ int main(int argc, char **argv) {
     int max_w      = args.max_width;
     int inc_w      = tile_width;
 
-    Log log("bspline_filter.perflog");
-    log << "Width\tBicubic\tBiquintic\tBiquintic_cascaded" << endl;
-
-    vector<string> filter_name = {"Bicubic", "Biquintic", "Biquintic_cascaded"};
+    // vector<string> filters = {"Bicubic", "Biquintic", "Biquintic_cascaded"};
+    vector<string> filters = {"Bicubic"};
 
     // possibly inaccurate coeff, only for measuring performance
     const float a = 2.0f-std::sqrt(3.0f);
     vector<vector<float> > bspline_coeff = {{1+a, -a}, {1+a, -a}, {1+a, -a, 0.1f}};
+
+    Log log("bspline_filter.perflog");
+    log << "Width";
+    for (int j=0; j<filters.size(); j++) {
+        log << "\t" << filters[j];
+    }
+    log << "\n";
 
     // Profile the filter for all image widths
     for (int in_w=min_w; in_w<=max_w; in_w+=inc_w) {
@@ -71,8 +76,8 @@ int main(int argc, char **argv) {
         vector<float> runtime(3, 0.0f);
 
         // run all three filters separately and record the runtimes
-        for (int j=0; j<3; j++) {
-            RecFilter F(filter_name[j]);
+        for (int j=0; j<filters.size(); j++) {
+            RecFilter F(filters[j]);
 
             vector<float> filter_coeff = bspline_coeff[j];
 
@@ -85,13 +90,11 @@ int main(int argc, char **argv) {
             F.add_filter(-y, filter_coeff);
 
             // same schedule for bicubic and biquintic, different schedule for biquintic cascaded
-            if (j==0 && j==1) {
+            if (j==0 || j==1) {
 
                 F.split(x, tile_width, y, tile_width);
 
-                // ---------------------------------------------------------------------
-
-                int tiles_per_warp = 2;
+                int tiles_per_warp = 4;
                 int unroll_w       = 8;
 
                 F.intra_schedule(1).compute_locally()
@@ -191,5 +194,5 @@ void check(RecFilter F, vector<float> filter_coeff, Image<T> image) {
                 + a2*ref(x,height-1-std::max(y-2,0));
         }
     }
-    cout << CheckResultVerbose<float>(ref,hl_out) << endl;
+    cout << CheckResult<float>(ref,hl_out) << endl;
 }

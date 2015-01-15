@@ -1413,7 +1413,7 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
         SplitInfo split_info,
         SplitInfo split_info_prev)
 {
-    vector<RecFilterFunc> generated_func;
+    vector<RecFilterFunc> generated_functions;
 
     Var x    = split_info.var;
     Var xi   = split_info.inner_var;
@@ -1437,11 +1437,7 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
     for (int i=0; i<rF_tail_prev.size(); i++) {
         F_tail_prev.push_back(rF_tail_prev[i].func);
     }
-    vector<RecFilterFunc> generated_functions;
 
-    RecFilterFunc rF, rF_sub;
-    rF    .func = Function(F_intra.name() + DASH + INTER_TILE_TAIL_SUM + DASH + x.name() + DASH + y.name());
-    rF_sub.func = Function(F_intra.name() + DASH + INTER_TILE_TAIL_SUM + DASH + x.name() + DASH + y.name() + DASH + SUB);
 
     // add the residual term of previous dimension to the completed
     // tail of current dimension
@@ -1592,15 +1588,8 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
             rF_tail_prev_scanned.pure_var_category = rF_tail_prev_scanned_sub.pure_var_category;
             rF_tail_prev_scanned.callee_func       = rF_tail_prev_scanned_sub.func.name();
 
-            // add the genertaed recfilter function to the global list
-#define combine 1
-#if combine
-            merge(rF_sub, rF_tail_prev_scanned_sub);
-            merge(rF,     rF_tail_prev_scanned);
-#else
             generated_functions.push_back(rF_tail_prev_scanned_sub);
             generated_functions.push_back(rF_tail_prev_scanned);
-#endif
         }
 
         // redefine the pure def to include residuals from prev dimensions
@@ -1612,14 +1601,6 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
             F_tail[j].define_update(updates[i].args, updates[i].values);
         }
     }
-
-    // scheduling tags for the reindexing function
-#if combine
-    rF.func_category = REINDEX;
-    rF_sub.func_category = INTRA_1;
-    rF.callee_func = rF_sub.func.name();
-    generated_functions = {rF, rF_sub};
-#endif
 
     // remove all undef()'ed update definitions from each function
     for (int i=0; i<generated_functions.size(); i++) {

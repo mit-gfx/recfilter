@@ -30,22 +30,6 @@ static const VarOrRVar GPU_BLOCK[] = {
 
 // -----------------------------------------------------------------------------
 
-/** Return true if all Expr in the vector are undef */
-static bool is_undef(vector<Expr> e) {
-    bool result = true;
-    for (int i=0; i<e.size(); i++) {
-        result &= equal(e[i], undef(e[i].type()));
-    }
-    return result;
-}
-
-/** Return true if all elements of the Tuple are undef */
-static bool is_undef(Tuple t) {
-    return is_undef(t.as_vector());
-}
-
-// -----------------------------------------------------------------------------
-
 /** Remove the pure def of a Function and arithmetically add it to
  * the expression of the first update def; leaving the pure def undefined */
 static void add_pure_def_to_first_update_def(Function f) {

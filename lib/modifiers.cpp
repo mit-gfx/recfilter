@@ -675,6 +675,22 @@ public:
 
 // -----------------------------------------------------------------------------
 
+bool is_undef(Expr e) {
+    return equal(e, undef(e.type()));
+}
+
+bool is_undef(Tuple t) {
+    return is_undef(t.as_vector());
+}
+
+bool is_undef(vector<Expr> e) {
+    bool result = true;
+    for (int i=0; i<e.size(); i++) {
+        result &= is_undef(e[i]);
+    }
+    return result;
+}
+
 bool expr_depends_on_var(Expr expr, string var) {
     ExprDependsOnVar depends(var);
     expr.accept(&depends);
@@ -783,3 +799,4 @@ map<string, Buffer> extract_buffer_calls(Func func) {
 
     return extract.buff_list;
 }
+

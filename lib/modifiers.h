@@ -3,6 +3,14 @@
 
 #include <Halide.h>
 
+/** Return true if all Expr in the vector are undef */
+bool is_undef(Halide::Expr e);
+
+/** Return true if all Expr in the vector are undef */
+bool is_undef(std::vector<Halide::Expr> e);
+
+/** Return true if all elements of the Tuple are undef */
+bool is_undef(Halide::Tuple t);
 
 /** Check if a given expression depends upon a variable */
 bool expr_depends_on_var(

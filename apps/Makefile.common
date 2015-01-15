@@ -5,6 +5,8 @@ CXX		:= g++ -std=c++11 -O3
 
 BIN_DIR		  := ../../bin/
 
+CUDA_PATH	  := /usr/local/cuda
+
 HALIDE_DIR 	  := ../../halide/
 HALIDE_LIB 	  := $(HALIDE_DIR)/bin/libHalide.a
 
@@ -18,7 +20,7 @@ all: $(APPS)
 CXXFLAGS ?=
 LDFLAGS  ?=
 CXXFLAGS += -I$(RECFILTER_DIR) -I$(HALIDE_DIR)/include/ -g -Wall
-LDFLAGS  += -lz -lpthread -ldl -lncurses
+LDFLAGS  += -L$(CUDA_PATH)/nvvm/lib64 -lz -lpthread -ldl -lncurses -lnvvm
 
 $(BIN_DIR)/%: %.cpp  $(RECFILTER_LIB) $(HALIDE_LIB)
 	@$(MKDIR) $(BIN_DIR)
