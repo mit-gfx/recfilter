@@ -177,7 +177,17 @@ Image<float> tail_weights(SplitInfo s, int split_id1, int split_id2, bool clamp_
         }
     }
 
-    return matrix_transpose(R);
+    Image<float> Rt = matrix_transpose(R);
+
+    // trim the matrix retaining only first k rows
+    Image<float> Z(tile_width, s.filter_order);
+    for (int j=0; j<Z.height(); j++) {
+        for (int i=0; i<Z.width(); i++) {
+            Z(i,j) = Rt(i,j);
+        }
+    }
+
+    return Z;
 }
 
 /** Weight coefficients (tail_size x tile_width) for applying scan's corresponding
