@@ -1,5 +1,5 @@
 /**
- * \file box_filter.cpp
+ * \file box_filter.h
  *
  * Iterated box filters using IIR formulation
  * - single iteration is computed as summed are table followed by finite differencing
@@ -13,7 +13,6 @@
 #include <Halide.h>
 
 #include "recfilter.h"
-#include "timing.h"
 #include "iir_coeff.h"
 
 using namespace Halide;
@@ -24,56 +23,50 @@ using std::stringstream;
 using std::cerr;
 using std::endl;
 
-template<typename T>
-void check_result(RecFilter, Image<T> image);
+/** Compute an order n integral image */
+RecFilter integral_image(
+        int order,          ///< order of integral image
+        int width,          ///< width of image
+        int height,         ///< height of image
+        int tile_width,     ///< tile width for tiling the intergal image
+        ImageParam I        ///< input image expressed as a Func
+        );
 
-RecFilter integral_image(int order, int width, int height, int tile_width, ImageParam I);
-RecFilter derivative_image(int order, int filter_radius, int width, int height, int tile_width, Func I);
+/** Compute an order n integral image */
+RecFilter integral_image(
+        int order,          ///< order of integral image
+        int width,          ///< width of image
+        int height,         ///< height of image
+        int tile_width,     ///< tile width for tiling the intergal image
+        Func I              ///< input image expressed as a Func
+        );
 
+/** Compute a n-times box filter from an n-order intergal image */
+RecFilter derivative_image(
+        int order,          ///< order of box filter
+        int filter_radius,  ///< box filter radius
+        int width,          ///< width of image
+        int height,         ///< height of image
+        int tile_width,     ///< tile width for tiling
+        Func I              ///< n-order integral image
+        );
 
 // -----------------------------------------------------------------------------
 
-int main(int argc, char **argv) {
-    const int box_filter_radius = 10;
+RecFilter integral_image(int order, int width, int height, int tile_width, ImageParam I) {
 
-    Arguments args(argc, argv);
-    bool nocheck   = args.nocheck;
-    int iter       = args.iterations;
-    int tile_width = args.block;
-    int min_w      = args.min_width;
-    int max_w      = args.max_width;
-    int inc_w      = tile_width;
-    int filter_reps= args.filter_reps;
-
-    stringstream s;
-    s << "box_filter_" << filter_reps << ".perflog";
-
-    Log log(s.str());
-    log << "Width\tOurs" << endl;
-
-    // Profile the filter for all image widths
-    for (int in_w=min_w; in_w<=max_w; in_w+=inc_w) {
-        Image<float> image = generate_random_image<float>(in_w,in_w);
-        ImageParam I;
-        I.set(image);
-
-        RecFilter S = integral_image  (filter_reps, in_w, in_w, tile_width, I);
-        RecFilter D = derivative_image(filter_reps, box_filter_radius, in_w, in_w, tile_width, S.as_func());
-
-        float time = D.profile(iter);
-
-        cerr << in_w << "\t" << time << " ms" << endl;
-        log  << in_w << "\t" << throughput(time,in_w*in_w) << endl;
-
-        if (!nocheck) {
-            check_result(D, image);
-        }
+    int n = I.dimensions();
+    vector<Var> a;
+    for (int i=0; i<n; i++) {
+        Var x;
+        a.push_back(x);
     }
-
-    return EXIT_SUCCESS;
+    Func R;
+    R(a) = I(a);
+    return integral_image(order, width, height, tile_width, R);
 }
 
-RecFilter integral_image(int order, int width, int height, int tile_width, ImageParam I) {
+RecFilter integral_image(int order, int width, int height, int tile_width, Func I) {
     vector<float> coeff = integral_image_coeff(order);
 
     RecFilterDim x("x", width);
@@ -173,34 +166,4 @@ RecFilter derivative_image(int order, int filter_radius, int width, int height, 
 
         return F;
     }
-}
-
-template<typename T>
-void check_result(RecFilter F, Image<T> I) {
-    int width  = I.width();
-    int height = I.height();
-
-    Realization out = F.realize();
-
-    Image<T> hl_out(out);
-    Image<T> ref(width, height);
-
-    for (int y=0; y<height; y++) {
-        for (int x=0; x<width; x++) {
-            ref(x,y) = I(x,y);
-        }
-    }
-    for (int y=0; y<height; y++) {
-        for (int x=1; x<width; x++) {
-            ref(x,y) += ref(x-1,y);
-        }
-    }
-    for (int y=1; y<height; y++) {
-        for (int x=0; x<width; x++) {
-            ref(x,y) += ref(x,y-1);
-        }
-    }
-
-    cerr << CheckResultVerbose<T>(ref,hl_out) << endl;
-
 }
