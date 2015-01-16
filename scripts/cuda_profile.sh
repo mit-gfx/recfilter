@@ -13,12 +13,12 @@
 
 TFILE1=$( mktemp )
 
-if [ -z "$TFILE1" -o -z "$TFILE2" ]
+if [ -z "$TFILE1" ]
 then
     TFILE1="$(basename $0).$RANDOM.tmp"
 fi
 
-if [ $# -ge 2 ]
+if [ $# -eq 2 ]
 then
     app=$1
     width=$2
