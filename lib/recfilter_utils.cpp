@@ -43,7 +43,7 @@ Arguments::Arguments(int argc, char** argv) :
         "\twidth    image width, set 0 to run all image widths and force --nocheck [default = 4096]\n"
         "\ttile     tile width for splitting each dimension image [default = 32]\n"
         "\tfilter   number of repeated filter applications on same input [default = 1]\n"
-        "\tnocheck  do not check against reference solution, forced to true if width is 0 [default = false]\n"
+        "\tnocheck  do not check against reference solution, forced to true if width=0 or iterations>1 [default = false]\n"
         "\titer     number of profiling iterations [default = 1]\n"
         "\thelp     show help message\n"
         ));
@@ -106,6 +106,10 @@ Arguments::Arguments(int argc, char** argv) :
             min_width = 2*block;
             max_width = (4096/block)*block;
             nocheck   = true;
+        }
+
+        if (iterations>1) {
+            nocheck = true;
         }
 
     } catch (runtime_error & e) {
