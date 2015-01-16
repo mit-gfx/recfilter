@@ -11,24 +11,24 @@ all: scripts
 	$(MKDIR) $(BIN_DIR)
 	$(MAKE) ../lib
 	$(MAKE) tests
-	$(MAKE) box_filter
-	$(MAKE) bspline_interp
-	$(MAKE) gaussian_vyv
-	$(MAKE) benchmarks
+	$(MAKE) box
+	$(MAKE) bspline
+	$(MAKE) gaussian
+	$(MAKE) summed_table
 	$(MAKE) ls_hist
-	$(MAKE) audio_filter
+	$(MAKE) audio
 	$(MAKE) cpu
 	$(MAKE) gpu
 
 clean: clean_scripts
 	$(MAKE) ../lib 		 clean
 	$(MAKE) tests 		 clean
-	$(MAKE) box_filter 	 clean
-	$(MAKE) bspline_interp clean
+	$(MAKE) box 	 	 clean
+	$(MAKE) bspline 	 clean
 	$(MAKE) ls_hist 	 clean
-	$(MAKE) gaussian_vyv clean
-	$(MAKE) benchmarks 	 clean
-	$(MAKE) audio_filter clean
+	$(MAKE) gaussian 	 clean
+	$(MAKE) summed_table clean
+	$(MAKE) audio  		 clean
 	$(MAKE) cpu 		 clean
 	$(MAKE) gpu 		 clean
 
