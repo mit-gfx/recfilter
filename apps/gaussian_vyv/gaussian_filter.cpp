@@ -43,7 +43,6 @@ int main(int argc, char **argv) {
         "Gaussian_3",
         "Gaussian_12",
         "Gaussian_3cascaded",
-        "Gaussian_12cascaded",
     };
 
     Log log("gaussian_filter.perflog");
@@ -65,7 +64,8 @@ int main(int argc, char **argv) {
 
         vector<float> runtime(filter_names.size(), 0.0f);
 
-        for (int j=0; j<filter_names.size(); j++) {
+        // for (int j=0; j<filter_names.size(); j++) {
+        for (int j=1; j<filter_names.size(); j++) {
             float sigma = 5.0;
             vector<float> W1 = gaussian_weights(sigma, 1);
             vector<float> W2 = gaussian_weights(sigma, 2);
@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
                     int n_scans  = 4;
                     int ws       = 32;
                     int unroll_w = ws/4;
-                    int intra_tiles_per_warp = ws / (2*n_scans);
+                    int intra_tiles_per_warp = ws / (4*n_scans);
                     int inter_tiles_per_warp = 4;
 
                     F.intra_schedule(1).compute_locally()
@@ -179,6 +179,10 @@ int main(int argc, char **argv) {
                 }
 
                 runtime[j] = fc[fc.size()-1].profile(iter);
+            }
+
+            if (j==2)
+            {
             }
         }
 

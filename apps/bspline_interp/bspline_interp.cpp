@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
 
     // possibly inaccurate coeff, only for measuring performance
     const float a = 2.0f-std::sqrt(3.0f);
-    vector<vector<float> > bspline_coeff = {{1+a, -a}, {1+a, -a}, {1+a, -a, 0.1f}};
+    vector<vector<float> > bspline_coeff = {{1+a, -a}, {1+a, -a, 0.1f}, {1+a, -a, 0.1f}};
 
     Log log("bspline_interp.perflog");
     log << "Width";
@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
 
         // run all three filters separately and record the runtimes
         // for (int j=2; j<filters.size(); j++) {
-        for (int j=2; j<3; j++) {
+        for (int j=1; j<2; j++) {
             RecFilter F(filter_names[j]);
 
             vector<float> filter_coeff = bspline_coeff[j];
