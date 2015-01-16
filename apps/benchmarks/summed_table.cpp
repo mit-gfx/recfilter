@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
         RecFilterDim x("x", width);
         RecFilterDim y("y", height);
 
-        RecFilter F;
+        RecFilter F("Summed_table");;
 
         F(x,y) = image(x,y);
 
@@ -72,13 +72,11 @@ int main(int argc, char **argv) {
                 .gpu_blocks     (F.outer(0), F.outer(1));
 
             F.intra_schedule(2).compute_locally()
-                //.reorder_storage(F.tail(), F.inner(), F.outer())
                 .unroll         (F.inner_scan())
                 .split          (F.outer(0), intra_tiles_per_warp)
-                .reorder        (F.inner_scan(), F.inner(), F.tail(), F.outer(0).split_var(), F.outer())
-                .fuse           (F.inner(0), F.outer(0).split_var())
-                .fuse           (F.inner(0), F.tail())
-                .gpu_threads    (F.inner(0))
+                .reorder        (F.inner(),  F.inner_scan(), F.tail(), F.outer(0).split_var(), F.outer())
+                .fuse           (F.tail(), F.inner(0))
+                .gpu_threads    (F.tail(), F.outer(0).split_var())
                 .gpu_blocks     (F.outer(0), F.outer(1));
 
             F.inter_schedule().compute_globally()
@@ -88,12 +86,12 @@ int main(int argc, char **argv) {
                 .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
                 .gpu_threads    (F.inner(0), F.outer(0).split_var())
                 .gpu_blocks     (F.outer(0));
-
-            float time = F.profile(iter);
-
-            cerr << width << "\t" << time << " ms" << endl;
-            log  << width << "\t" << throughput(time,width*width) << endl;
         }
+
+        float time = F.profile(iter);
+
+        cerr << width << "\t" << time << " ms" << endl;
+        log  << width << "\t" << throughput(time,width*width) << endl;
 
         // ---------------------------------------------------------------------
 

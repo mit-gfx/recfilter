@@ -49,15 +49,13 @@ int main(int argc, char **argv) {
     int max_w      = args.max_width;
     int inc_w      = tile_width;
 
-    // vector<string> filters = {"Bicubic", "Biquintic", "Biquintic_cascaded"};
-    // vector<string> filters = {"Bicubic", "Biquintic"};
-    vector<string> filters = {"Bicubic"};
+    vector<string> filters = {"Bicubic", "Biquintic", "Biquintic_cascaded"};
 
     // possibly inaccurate coeff, only for measuring performance
     const float a = 2.0f-std::sqrt(3.0f);
     vector<vector<float> > bspline_coeff = {{1+a, -a}, {1+a, -a}, {1+a, -a, 0.1f}};
 
-    Log log("bspline_filter.perflog");
+    Log log("bspline_interp.perflog");
     log << "Width";
     for (int j=0; j<filters.size(); j++) {
         log << "\t" << filters[j];
@@ -77,7 +75,8 @@ int main(int argc, char **argv) {
         vector<float> runtime(3, 0.0f);
 
         // run all three filters separately and record the runtimes
-        for (int j=0; j<filters.size(); j++) {
+        // for (int j=2; j<filters.size(); j++) {
+        for (int j=1; j<2; j++) {
             RecFilter F(filters[j]);
 
             vector<float> filter_coeff = bspline_coeff[j];
@@ -94,7 +93,7 @@ int main(int argc, char **argv) {
             // cascaded biquintic
             if (j==0 || j==1) {
 
-                F.split(x, tile_width, y, tile_width);
+                F.split_all_dimensions(tile_width);
 
                 if (F.target().has_gpu_feature()) {
                     int order    = filter_coeff.size()-1;
@@ -129,12 +128,43 @@ int main(int argc, char **argv) {
                         .gpu_threads    (F.inner(0), F.outer(0).split_var())
                         .gpu_blocks     (F.outer(0));
                 }
-
-                cerr << F << endl;
-                F.compile_jit("stmt.html");
             }
             else {
-                //vector<RecFilter> fc = F.cascade_by_dimension();
+
+                vector<RecFilter> fc = F.cascade_by_dimension();
+
+                for (int i=0; i<fc.size(); i++) {
+                    RecFilter f = fc[i];
+
+                    cerr << f << endl;
+
+                    f.split_all_dimensions(tile_width);
+
+                    if (f.target().has_gpu_feature()) {
+                        int order    = filter_coeff.size()-1;
+                        int ws       = 32;
+                        int unroll_w = ws/4;
+                        int nthreads = 128;
+
+                        f.intra_schedule(1).compute_locally()
+                            .reorder_storage(f.inner(), f.outer(), f.full())
+                            .unroll         (f.inner_scan())
+                            .split          (f.inner(0), unroll_w)
+                            .split          (f.full(),   ws)
+                            .unroll         (f.inner(1).split_var())
+                            .reorder        (f.inner_scan(), f.inner(1).split_var(), f.inner(), f.full().split_var(), f.outer(), f.full())
+                            .gpu_threads    (f.inner(0), f.full().split_var())
+                            .gpu_blocks     (f.outer(0), f.full());
+
+                        f.inter_schedule().compute_globally()
+                            .reorder_storage(f.tail(), F.outer(), f.full())
+                            .unroll         (f.outer_scan())
+                            .split          (f.full(), nthreads/order)
+                            .reorder        (f.outer_scan(), f.tail(), f.full())
+                            .gpu_threads    (f.tail(), f.full(0).split_var())
+                            .gpu_blocks     (f.full(0));
+                    }
+                }
             }
 
             runtime[j] = F.profile(iter);
