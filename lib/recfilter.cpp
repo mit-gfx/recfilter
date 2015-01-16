@@ -536,7 +536,7 @@ Realization RecFilter::create_realization(void) {
 Realization RecFilter::realize(void) {
     Func F(internal_function(contents.ptr->name).func);
     Realization R = create_realization();
-    F.realize(R);
+    F.realize(R, contents.ptr->target);
     return R;
 }
 
@@ -544,28 +544,27 @@ float RecFilter::profile(int iterations) {
     Func F(internal_function(contents.ptr->name).func);
     Realization R = create_realization();
 
+    double total_time = 0;
     unsigned long time_start, time_end;
 
     if (contents.ptr->target.has_gpu_feature()) {
-        int pre_runs = (iterations>1 ? 1 : 0);      // warm up runs
-        for (int i=0; i<pre_runs; i++) {
-            F.realize(R);
-        }
+        F.realize(R, contents.ptr->target); // warmup run
 
         time_start = millisecond_timer();
         for (int i=0; i<iterations; i++) {
-            F.realize(R);
+            F.realize(R, contents.ptr->target);
         }
         time_end = millisecond_timer();
     } else {
         time_start = millisecond_timer();
         for (int i=0; i<iterations; i++) {
-            F.realize(R);
+            F.realize(R, contents.ptr->target);
         }
         time_end = millisecond_timer();
     }
+    total_time = (time_end-time_start);
 
-    return float(time_end-time_start)/float(iterations);
+    return total_time/iterations;
 }
 
 Target RecFilter::target(void) {

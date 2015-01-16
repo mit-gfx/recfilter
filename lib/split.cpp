@@ -1412,13 +1412,19 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
                     else if (arg == yi.name()) {
                         call_args.push_back(o);
                     } else if (arg == xi.name()) {
-                        // if current scan is causal then accumulate the last
-                        // elements of prev dimension tail
-                        if (split_info.scan_causal[j]) {
-                            call_args.push_back(simplify(tile-1-xi));
-                        } else {
-                            call_args.push_back(xi);
-                        }
+                        // the different terms computing cross dimensional dependencies
+                        // will be merged into a single function, choosing the causal/anticausal
+                        // indices here will mean that indices at the top and botttom of
+                        // the column are needed which will cause the full tile to be written
+                        // instead, choose the causal/anticausal indices once the all these
+                        // functions have been merged
+                        //
+                        // if (split_info.scan_causal[j]) {
+                        //     call_args.push_back(simplify(tile-1-xi));
+                        // } else {
+                        //     call_args.push_back(xi);
+                        // }
+                        call_args.push_back(xi);
                     } else {
                         call_args.push_back(Var(arg));
                     }
@@ -1542,25 +1548,51 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
             F.define_update(updates[k].args, updates[k].values);
         }
 
-        // create the reindexing function
+        // create the reindexing function that extract the corner pixels if the scan
+        // in current dimension is causal then tile_width-xi is needed, else xi
         {
             vector<string> args;
-            vector<Expr> call_args;
+            vector<Expr> causal_call_args;
+            vector<Expr> anticausal_call_args;
             vector<Expr> values;
+
+            // use c_val to get the tail of the c_val'th filter
+            // choose which indices are needed for causal or anticausal filter
+            Expr c_val = yi / filter_order_prev;
             for (int j=0; j<F.args().size(); j++) {
                 if (F.args()[j] == c.name()) {
-                    call_args.push_back(yi / filter_order_prev);
+                    causal_call_args.push_back(c_val);
+                    anticausal_call_args.push_back(c_val);
+                } else if (F.args()[j] == yi.name()) {
+                    args.push_back(F.args()[j]);
+                    causal_call_args.push_back(yi % filter_order_prev);
+                    anticausal_call_args.push_back(yi % filter_order_prev);
+                } else if (F.args()[j] == xi.name()) {
+                    args.push_back(F.args()[j]);
+                    causal_call_args.push_back(tile-1-xi);
+                    anticausal_call_args.push_back(xi);
                 } else {
                     args.push_back(F.args()[j]);
-                    if (F.args()[j] == yi.name()) {
-                       call_args.push_back(yi % filter_order_prev);
-                    } else {
-                        call_args.push_back(Var(F.args()[j]));
-                    }
+                    causal_call_args.push_back(Var(F.args()[j]));
+                    anticausal_call_args.push_back(Var(F.args()[j]));
                 }
             }
             for (int j=0; j<F.values().size(); j++) {
-                values.push_back(Call::make(F,call_args,j));
+                Expr val;
+                Expr causal_val     = Call::make(F, causal_call_args, j);
+                Expr anticausal_val = Call::make(F, anticausal_call_args, j);
+                for (int i=0; i<F_tail.size(); i++) {
+                    bool causal = split_info.scan_causal[i];
+                    for (int k=0; k<F_tail_prev.size(); k++) {
+                        if (val.defined()) {
+                            val = select(c_val==int(F_tail.size())*i+k,
+                                    (causal ? causal_val : anticausal_val), val);
+                        } else {
+                            val = (causal ? causal_val : anticausal_val);
+                        }
+                    }
+                }
+                values.push_back(simplify(val));
             }
             F_reidx.define(args, values);
         }
