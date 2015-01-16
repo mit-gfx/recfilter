@@ -1271,6 +1271,7 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
     RDom ryt  = split_info_prev.tail_rdom;
     int  num_tiles_prev = split_info_prev.num_tiles;
     int  filter_dim_prev = split_info_prev.filter_dim;
+    int  filter_order_prev = split_info_prev.filter_order;
 
     Function F_intra = rF_intra.func;
     vector<Function> F_tail;
@@ -1476,17 +1477,17 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
         rF.pure_var_category   = intra_tile_funcs[0].pure_var_category;
         rF.update_var_category = intra_tile_funcs[0].update_var_category;
 
-        // add the extra dimension in the scheduling args
-        rF.pure_var_category.insert(make_pair(c.name(), VarTag(INNER,0)));
-        for (int i=0; i<rF.update_var_category.size(); i++) {
-            rF.update_var_category[i].insert(make_pair(c.name(), VarTag(INNER,0)));
-        }
-
         // scheduling tags for the reindexing function
         rF_reidx.func          = F_reidx;
         rF_reidx.func_category = REINDEX;
         rF_reidx.pure_var_category = rF.pure_var_category;
         rF_reidx.callee_func   = F.name();
+
+        // add the extra dimension in the scheduling args
+        rF.pure_var_category.insert(make_pair(c.name(), VarTag(INNER,0)));
+        for (int i=0; i<rF.update_var_category.size(); i++) {
+            rF.update_var_category[i].insert(make_pair(c.name(), VarTag(INNER,0)));
+        }
 
         vector<string> args = intra_tile_funcs[0].func.args();
         vector<Expr> values = intra_tile_funcs[0].func.values();
@@ -1543,15 +1544,25 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
 
         // create the reindexing function
         {
+            vector<string> args;
             vector<Expr> call_args;
             vector<Expr> values;
             for (int j=0; j<F.args().size(); j++) {
-                call_args.push_back(Var(F.args()[j]));
+                if (F.args()[j] == c.name()) {
+                    call_args.push_back(yi / filter_order_prev);
+                } else {
+                    args.push_back(F.args()[j]);
+                    if (F.args()[j] == yi.name()) {
+                       call_args.push_back(yi % filter_order_prev);
+                    } else {
+                        call_args.push_back(Var(F.args()[j]));
+                    }
+                }
             }
             for (int j=0; j<F.values().size(); j++) {
                 values.push_back(Call::make(F,call_args,j));
             }
-            F_reidx.define(F.args(), values);
+            F_reidx.define(args, values);
         }
 
         // change all functions to index into the interleaved function
@@ -1566,12 +1577,11 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
 
             for (int j=0; j<args.size(); j++) {
                 if (args[j] == yi.name()) {
-                    call_args.push_back(Var(yi));
+                    call_args.push_back(yi + i*filter_order_prev);
                 } else {
                     call_args.push_back(Var(args[j]));
                 }
             }
-            call_args.insert(call_args.begin()+dimension, i);
             for (int j=0; j<f.values().size(); j++) {
                 values.push_back(Call::make(F_reidx, call_args, j));
             }
@@ -1620,11 +1630,6 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
                 }
             }
         }
-
-        // never expose the extra dimension to the user, fuse it with the
-        // interleaving dimension
-        // Func(F).fuse(yi,c,yi);
-        // Func(F_reidx).fuse(yi,c,yi);
     }
 
     return {rF, rF_reidx};
