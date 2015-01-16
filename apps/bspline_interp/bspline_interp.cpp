@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
     int max_w      = args.max_width;
     int inc_w      = tile_width;
 
-    vector<string> filters = {"Bicubic", "Biquintic", "Biquintic_cascaded"};
+    vector<string> filter_names = {"Bicubic", "Biquintic", "Biquintic_cascaded"};
 
     // possibly inaccurate coeff, only for measuring performance
     const float a = 2.0f-std::sqrt(3.0f);
@@ -57,8 +57,8 @@ int main(int argc, char **argv) {
 
     Log log("bspline_interp.perflog");
     log << "Width";
-    for (int j=0; j<filters.size(); j++) {
-        log << "\t" << filters[j];
+    for (int j=0; j<filter_names.size(); j++) {
+        log << "\t" << filter_names[j];
     }
     log << "\n";
 
@@ -72,12 +72,12 @@ int main(int argc, char **argv) {
         RecFilterDim x("x", width);
         RecFilterDim y("y", height);
 
-        vector<float> runtime(3, 0.0f);
+        vector<float> runtime(filter_names.size(), 0.0f);
 
         // run all three filters separately and record the runtimes
         // for (int j=2; j<filters.size(); j++) {
-        for (int j=1; j<2; j++) {
-            RecFilter F(filters[j]);
+        for (int j=2; j<3; j++) {
+            RecFilter F(filter_names[j]);
 
             vector<float> filter_coeff = bspline_coeff[j];
 
@@ -128,6 +128,8 @@ int main(int argc, char **argv) {
                         .gpu_threads    (F.inner(0), F.outer(0).split_var())
                         .gpu_blocks     (F.outer(0));
                 }
+
+                runtime[j] = F.profile(iter);
             }
             else {
 
@@ -135,8 +137,6 @@ int main(int argc, char **argv) {
 
                 for (int i=0; i<fc.size(); i++) {
                     RecFilter f = fc[i];
-
-                    cerr << f << endl;
 
                     f.split_all_dimensions(tile_width);
 
@@ -150,36 +150,41 @@ int main(int argc, char **argv) {
                             .reorder_storage(f.inner(), f.outer(), f.full())
                             .unroll         (f.inner_scan())
                             .split          (f.inner(0), unroll_w)
-                            .split          (f.full(),   ws)
-                            .unroll         (f.inner(1).split_var())
-                            .reorder        (f.inner_scan(), f.inner(1).split_var(), f.inner(), f.full().split_var(), f.outer(), f.full())
-                            .gpu_threads    (f.inner(0), f.full().split_var())
-                            .gpu_blocks     (f.outer(0), f.full());
+                            .split          (f.full(0),  ws)
+                            .unroll         (f.inner(0).split_var())
+                            .reorder        (f.inner_scan(), f.inner(0).split_var(), f.inner(0), f.full(0).split_var(), f.outer(0), f.full(0))
+                            .gpu_threads    (f.inner(0), f.full(0).split_var())
+                            .gpu_blocks     (f.outer(0), f.full(0));
 
                         f.inter_schedule().compute_globally()
-                            .reorder_storage(f.tail(), F.outer(), f.full())
+                            .reorder_storage(f.tail(), F.outer(0), f.full(0))
                             .unroll         (f.outer_scan())
-                            .split          (f.full(), nthreads/order)
-                            .reorder        (f.outer_scan(), f.tail(), f.full())
+                            .split          (f.full(0), nthreads/order)
+                            .reorder        (f.outer_scan(), f.tail(), f.full(0))
                             .gpu_threads    (f.tail(), f.full(0).split_var())
                             .gpu_blocks     (f.full(0));
+
+                        cerr << f << endl;
                     }
+
+                    runtime[j] = fc[fc.size()-1].profile(iter);
                 }
             }
-
-            runtime[j] = F.profile(iter);
 
             if (!nocheck) {
                 check<float>(F, filter_coeff, image);
             }
         }
 
-        cerr << width << "\t" << runtime[0] << "\t" << runtime[1] << "\t" << runtime[2] << endl;
-        log  << width
-            << "\t" << throughput(runtime[0], width*width)
-            << "\t" << throughput(runtime[1], width*width)
-            << "\t" << throughput(runtime[2], width*width) << endl;
-    }
+        cerr << width;
+        log  << width;
+        for (int j=0; j<filter_names.size(); j++) {
+            cerr << "\t" << runtime[j];
+            log << "\t" << throughput(runtime[j], width*width);
+        }
+        cerr << endl;
+        log << " " << endl;
+   }
 
     return 0;
 }
