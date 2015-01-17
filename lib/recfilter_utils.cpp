@@ -329,10 +329,15 @@ int VarTag::check(const VariableTag &t) const {
     return (as_integer() & VarTag(t).as_integer());
 }
 
+bool VarTag::has_count(void) const {
+    VariableTag t_count = static_cast<VariableTag>(static_cast<int>(tag) & 0x0000000f);
+    return (t_count!=INVALID);
+}
+
 int VarTag::count(void) const {
     VariableTag t_count = static_cast<VariableTag>(static_cast<int>(tag) & 0x0000000f);
     int t_int;
-    switch(t_count) {
+    switch (t_count) {
         case __1: t_int = 0; break;
         case __2: t_int = 1; break;
         case __3: t_int = 2; break;

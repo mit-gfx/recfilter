@@ -35,56 +35,36 @@ int main(int argc, char **argv) {
     RecFilterDim y("y", height);
 
     float sigma = 5.0;
-    vector<float> W1 = gaussian_weights(sigma, 1);
-    vector<float> W2 = gaussian_weights(sigma, 2);
-    vector<float> W3 = gaussian_weights(sigma, 3);
+    vector<float> W3 = gaussian_weights(sigma,3);
 
-    RecFilter F("Gaussian_33");
+    RecFilter G("Gaussian_33");
 
-    F.set_clamped_image_border();
+    G.set_clamped_image_border();
 
-    F(x,y) = image(x,y);
-    F.add_filter(+x, W3);
-    F.add_filter(-x, W3);
-    F.add_filter(+y, W3);
-    F.add_filter(-y, W3);
+    G(x,y) = image(x,y);
+    G.add_filter(+x, W3);
+    G.add_filter(-x, W3);
+    G.add_filter(+y, W3);
+    G.add_filter(-y, W3);
 
-    F.split_all_dimensions(tile_width);
+    vector<RecFilter> fc = G.cascade_by_dimension();
 
-    if (F.target().has_gpu_feature()) {
-        int n_scans  = 4;
-        int ws       = 32;
-        int unroll_w = ws/4;
-        int intra_tiles_per_warp = ws / (4*n_scans);
-        int inter_tiles_per_warp = 4;
+    for (size_t i=0; i<fc.size(); i++) {
+        RecFilter& F = fc[i];
 
-        F.intra_schedule(1).compute_locally()
-            .reorder_storage(F.inner(), F.outer())
-            .unroll         (F.inner_scan())
-            .split          (F.inner(1), unroll_w)
-            .unroll         (F.inner(1).split_var())
-            .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
-            .gpu_threads    (F.inner(0), F.inner(1))
-            .gpu_blocks     (F.outer(0), F.outer(1));
+        F.split_all_dimensions(tile_width);
 
-        F.intra_schedule(2).compute_locally()
-            .unroll         (F.inner_scan())
-            .split          (F.outer(0), intra_tiles_per_warp)
-            .reorder        (F.inner(),  F.inner_scan(), F.tail(), F.outer(0).split_var(), F.outer())
-            .fuse           (F.tail(), F.inner(0))
-            .gpu_threads    (F.tail(), F.outer(0).split_var())
-            .gpu_blocks     (F.outer(0), F.outer(1));
+        if (F.target().has_gpu_feature()) {
+            int n_scans  = 4;
+            int ws       = 32;
+            int unroll_w = ws/4;
+            int intra_tiles_per_warp = ws / (4*n_scans);
+            int inter_tiles_per_warp = 4;
 
-        F.inter_schedule().compute_globally()
-            .reorder_storage(F.inner(), F.tail(), F.outer())
-            .unroll         (F.outer_scan())
-            .split          (F.outer(0), inter_tiles_per_warp)
-            .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
-            .gpu_threads    (F.inner(0), F.outer(0).split_var())
-            .gpu_blocks     (F.outer(0));
+        }
     }
 
-    F.profile(iter);
+    fc[fc.size()-1].profile(iter);
 
     return 0;
 }

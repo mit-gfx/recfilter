@@ -33,11 +33,9 @@ static const VarOrRVar GPU_BLOCK[] = {
 static string remove_dollar(string s) {
     string r = s;
     int pos = std::min(r.find("$"), r.find("."));
-    cerr << r << " " << s << " -> ";
     if (pos != r.npos) {
         r.erase(pos);
     }
-    cerr << r << " " << s << endl;
     return (r.empty() ? "tmp" : r);
 }
 
@@ -93,20 +91,34 @@ RecFilterSchedule::RecFilterSchedule(RecFilter& r, vector<string> fl) :
 
 
 map< int,vector<VarOrRVar> > RecFilterSchedule::var_list_by_tag(RecFilterFunc f, VarTag vtag) {
+    bool ignore_count = !vtag.has_count();
     map< int,vector<VarOrRVar> > var_list;
     map<string,VarTag>::iterator vit;
     for (vit = f.pure_var_category.begin(); vit!=f.pure_var_category.end(); vit++) {
-        if (vit->second.same_except_count(vtag)) {
-            var_list[PURE_DEF].push_back(Var(vit->first));
+        if (ignore_count) {
+            if (vit->second.same_except_count(vtag)) {
+                var_list[PURE_DEF].push_back(Var(vit->first));
+            }
+        } else {
+            if (vit->second == vtag) {
+                var_list[PURE_DEF].push_back(Var(vit->first));
+            }
         }
     }
     for (int i=0; i<f.update_var_category.size(); i++) {
         for (vit=f.update_var_category[i].begin(); vit!=f.update_var_category[i].end(); vit++) {
-            if (vit->second.same_except_count(vtag)) {
-                var_list[i].push_back(Var(vit->first));
+            if (ignore_count) {
+                if (vit->second.same_except_count(vtag)) {
+                    var_list[i].push_back(Var(vit->first));
+                }
+            } else {
+                if (vit->second == vtag) {
+                    var_list[i].push_back(Var(vit->first));
+                }
             }
         }
     }
+
     return var_list;
 }
 

@@ -514,8 +514,9 @@ public:
 
     int    as_integer(void) const;
     VarTag split_var (void) const;
-    int    check     (const VariableTag &t) const;
     int    count     (void) const;
+    bool   has_count (void) const;
+    int    check     (const VariableTag &t) const;
     bool   same_except_count(const VarTag &t) const;
 
 private:

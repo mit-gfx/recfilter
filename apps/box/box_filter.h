@@ -24,12 +24,13 @@ using std::cerr;
 using std::endl;
 
 /** Compute an order n integral image */
+template<typename T>
 RecFilter integral_image(
         int order,          ///< order of integral image
         int width,          ///< width of image
         int height,         ///< height of image
         int tile_width,     ///< tile width for tiling the intergal image
-        ImageParam I        ///< input image expressed as a Func
+        Image<T> I          ///< input image expressed as a Func
         );
 
 /** Compute an order n integral image */
@@ -53,8 +54,8 @@ RecFilter derivative_image(
 
 // -----------------------------------------------------------------------------
 
-RecFilter integral_image(int order, int width, int height, int tile_width, ImageParam I) {
-
+template<typename T>
+RecFilter integral_image(int order, int width, int height, int tile_width, Image<T> I) {
     int n = I.dimensions();
     vector<Var> a;
     for (int i=0; i<n; i++) {
@@ -123,47 +124,42 @@ RecFilter integral_image(int order, int width, int height, int tile_width, Func 
 }
 
 RecFilter derivative_image(int order, int filter_radius, int width, int height, int tile_width, Func I) {
-    if (order>4) {
-        RecFilter F = derivative_image(3, 1, width, height, tile_width, I);
-        return derivative_image(order-3, 1, width, height, tile_width, F.as_func());
+    int B = filter_radius;
+    int z = 2*B+1;
+
+    Var xo("xo"), xi("xi"), xii("xii");
+    Var yo("yo"), yi("yi"), yii("yii");
+
+    RecFilterDim x("x", width);
+    RecFilterDim y("y", height);
+
+    Var u = x.var();
+    Var v = y.var();
+
+    RecFilter F("Box");
+
+    if (order==1) {
+        // s = [-1 (2B-1 zeros) 1] * (1/z)
+        // s2 = conv2(s, s')
+        F(x,y) = (
+                 1.0f * I(clamp(x+B+0, 0, width-1), clamp(y+B+0, 0, height-1)) +
+                -1.0f * I(clamp(x+B+0, 0, width-1), clamp(y-B-1, 0, height-1)) +
+                 1.0f * I(clamp(x-B-1, 0, width-1), clamp(y-B-1, 0, height-1)) +
+                -1.0f * I(clamp(x-B-1, 0, width-1), clamp(y+B+0, 0, height-1))) / std::pow(z,2);
+
+    } else {
+        cerr << "Cannot compute the higher than second order derivative. Instead, "
+             << "compute lower order derivative and cascade them to the same effect." << endl;
+        assert(false);
     }
-    else {
 
-        int B = filter_radius;
-        int z = (2*B+1)*(2*B+1);
+    F.compute_globally()
+        .split  (u, xo, xi, tile_width)
+        .split  (v, yo, yi, tile_width)
+        .split  (yi,yi, yii,8)
+        .unroll (yii)
+        .reorder(yii,xi,yi,xo,yo)
+        .gpu    (xo,yo,xi,yi);
 
-        Var xo("xo"), xi("xi"), xii("xii");
-        Var yo("yo"), yi("yi"), yii("yii");
-
-        RecFilterDim x("x", width);
-        RecFilterDim y("y", height);
-
-        Var u = x.var();
-        Var v = y.var();
-
-        RecFilter F("Box");
-
-        if (order==1) {
-            F(x,y) = (I(min(x+B,width-1), min(y+B,height-1))
-                    + I(max(x-B-1,0),     max(y-B-1,0))
-                    - I(min(x+B,width-1), max(y-B-1,0))
-                    - I(max(x-B-1,0),     min(y+B,height-1))) / z;
-        } else if (order==2) {
-
-        } else if (order==3) {
-
-        } else {
-            cerr << "Invalid order" << endl;
-            assert(false);
-        }
-
-        F.compute_globally()
-            .split(u, xo, xi, tile_width)
-            .split(v, yo, yi, tile_width)
-            .split(yi,yi, yii,4).unroll(yii)
-            .reorder(yii,xi,yi,xo,yo)
-            .gpu(xo,yo,xi,yi);
-
-        return F;
-    }
+    return F;
 }

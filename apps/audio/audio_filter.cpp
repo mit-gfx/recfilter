@@ -24,10 +24,10 @@ int main(int argc, char **argv) {
     vector<float> time_naive;
     vector<float> time_tiled;
 
-    Log log("audio_filter.perflog");
-    log << "Order\tNaive\tTiled" << endl;
+    Log log_naive("audio_filter.nontiled.perflog");
+    Log log_tiled("audio_filter.tiled.perflog");
 
-    for (int order=1; order<MAX_ORDER; order++) {
+    for (int order=1; order<MAX_ORDER; order+=2) {
         std::vector<float> coeffs(order+1, 0.01);
         coeffs[0] = 1.0;
 
@@ -41,7 +41,6 @@ int main(int argc, char **argv) {
             F(x) = image(clamp(x,0,width-1));
             F.add_filter(+x, coeffs);
             F.compute_globally();
-            F.compile_jit("nontiled.html");
             time_naive.push_back(F.profile(iterations));
         }
 
@@ -57,17 +56,16 @@ int main(int argc, char **argv) {
             F.intra_schedule().compute_locally() .vectorize(F.inner(0),vw).parallel(F.outer(0));
             F.inter_schedule().compute_globally().vectorize(F.inner(0),vw);
 
-            F.compile_jit("tiled.html");
             time_tiled.push_back(F.profile(iterations));
         }
 
-        cerr << "Order=" << order << " "
-             << "naive " << time_naive[time_naive.size()-1] << " "
-             << "tiled " << time_tiled[time_tiled.size()-1] << " ms" << endl;
+        log_naive << order << "\t"
+                  << time_naive[time_naive.size()-1] << "\t"
+                  << throughput(time_naive[time_naive.size()-1], width) << endl;
 
-        log << order << "\t"
-            << throughput(time_naive[time_naive.size()-1], width) << "\t"
-            << throughput(time_tiled[time_tiled.size()-1], width) << endl;
+        log_tiled << order << "\t"
+                  << time_tiled[time_tiled.size()-1] << "\t"
+                  << throughput(time_tiled[time_tiled.size()-1], width) << endl;
     }
 
     return 0;

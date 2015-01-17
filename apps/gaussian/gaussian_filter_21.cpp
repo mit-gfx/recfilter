@@ -19,9 +19,6 @@ using std::cerr;
 using std::cout;
 using std::endl;
 
-template<typename T>
-void check(RecFilter F, vector<float> filter_coeff, Image<T> image);
-
 int main(int argc, char **argv) {
     Arguments args(argc, argv);
 

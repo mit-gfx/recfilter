@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
     int tile_width = args.block;
     int in_w       = args.width;
 
-    // possibly inaccurate coeff, only for measuring performance
+    // inaccurate coefficients, only for measuring performance
     const float a = 2.0f-std::sqrt(3.0f);
     vector<float> coeff = {1+a, -a, 0.1f};
 
@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
     F.add_filter(+y, coeff);
     F.add_filter(-y, coeff);
 
-#define OVERLAPPED 0
+#define OVERLAPPED 1
 #if OVERLAPPED
     F.split_all_dimensions(tile_width);
 
@@ -104,41 +104,78 @@ int main(int argc, char **argv) {
         F.profile(iter);
     }
 #else
+
     vector<RecFilter> fc = F.cascade_by_dimension();
-    for (size_t i=0; i<fc.size(); i++) {
-        RecFilter f = fc[i];
+
+    {
+        RecFilter f = fc[1];
 
         f.split_all_dimensions(tile_width);
 
-        if (f.target().has_gpu_feature()) {
-            int order    = coeff.size()-1;
-            int ws       = 32;
-            int unroll_w = ws/4;
-            int nthreads = 128;
+        int ws       = 32;
+        int unroll_w = 8;
 
-            f.intra_schedule(1).compute_locally()
-                .reorder_storage(f.inner(), f.outer(), f.full())
-                .unroll         (f.inner_scan())
-                .split          (f.inner(0), unroll_w)
-                .split          (f.full(0),  ws)
-                .unroll         (f.inner(0).split_var())
-                .reorder        (f.inner_scan(), f.inner(0).split_var(), f.inner(0), f.full(0).split_var(), f.outer(0), f.full(0))
-                .gpu_threads    (f.inner(0), f.full(0).split_var())
-                .gpu_blocks     (f.outer(0), f.full(0));
+        //f.intra_schedule().compute_locally()
+        //.split          (f.full(0), ws)
+        //.split          (f.inner(0), unroll_w)
+        //.unroll         (f.inner(0).split_var())
+        //.unroll         (f.inner_scan())
+        //.reorder        (f.inner_scan(), f.inner(0).split_var(), f.full(0).split_var(), f.inner(0), f.full(0), f.outer(0))
+        ////.gpu_threads    (f.full(0).split_var(), f.inner(0))
+        //.gpu_blocks     (f.full(0), f.outer(0));
 
-            f.inter_schedule().compute_globally()
-                .reorder_storage(f.tail(), F.outer(0), f.full(0))
-                .unroll         (f.outer_scan())
-                .split          (f.full(0), nthreads/order)
-                .reorder        (f.outer_scan(), f.tail(), f.full(0))
-                .gpu_threads    (f.tail(), f.full(0).split_var())
-                .gpu_blocks     (f.full(0));
+        {
+        ///    SI.compute_at(S, Var::gpu_blocks());
+        ///    SI.update(def++).split(x,xo,xi,TILE).split(ry,ry,t,UNROLL).reorder(t,ry,xi,xo,yo).gpu_threads(xi,ry).unroll(t);
+        ///    SI.update(def++).split(x,xo,xi,TILE).reorder(ry,xi,xo,yo).gpu_threads(xi).unroll(ry);
+        ///    SI.update(def++).split(x,xo,xi,TILE).reorder(rt,xi,xo,yo).gpu_threads(xi,rt);
+        ///    SI.update(def++).split(x,xo,xi,TILE).reorder(ry,xi,xo,yo).gpu_threads(xi).unroll(ry);
+        ///    SI.update(def++).split(x,xo,xi,TILE).reorder(rt,xi,xo,yo).gpu_threads(xi,rt);
 
-            cerr << f << endl;
+        ///    S.compute_root().split(x,xo,xi,TILE);
+        ///    S.reorder(xi,yi,xo,yo).gpu_blocks(xo,yo).gpu_threads(xi,yi);
         }
 
-        fc[fc.size()-1].profile(iter);
+        f.inter_schedule().compute_globally()
+            .reorder_storage(f.full(0), f.tail(), F.outer(0))
+            .split          (f.full(0), ws, f.inner())
+            .unroll         (f.outer_scan())
+            .split          (f.full(0), 4)
+            .reorder        (f.outer_scan(), f.tail(), f.full(0).split_var(), f.inner(), f.full(0))
+            .gpu_threads    (f.inner(0), f.full(0).split_var())
+            .gpu_blocks     (f.full(0));
     }
+
+    {
+        RecFilter f = fc[0];
+
+        f.split_all_dimensions(tile_width);
+
+        int ws       = 32;
+        int unroll_w = 8;
+
+        f.intra_schedule().compute_locally()
+            .split          (f.full(0), ws, f.inner())
+            .split          (f.inner(1), unroll_w)
+            .unroll         (f.inner(1).split_var())
+            .unroll         (f.inner_scan())
+            .reorder        (f.inner_scan(), f.inner(1).split_var(), f.tail(), f.inner(), f.outer(), f.full())
+            .gpu_threads    (f.inner(0), f.inner(1))
+            .gpu_blocks     (f.outer(0), f.full(0));
+
+        f.inter_schedule().compute_globally()
+            .reorder_storage(f.full(0), f.tail(), F.outer(0))
+            .split          (f.full(0), ws, f.inner())
+            .unroll         (f.outer_scan())
+            .split          (f.full(0), 4)
+            .reorder        (f.outer_scan(), f.tail(), f.full(0).split_var(), f.inner(), f.full(0))
+            .gpu_threads    (f.inner(0), f.full(0).split_var())
+            .gpu_blocks     (f.full(0));
+    }
+
+    fc[0].compile_jit("stmt.html");
+    fc[0].profile(iter);
+
 #endif
 
     if (!nocheck) {

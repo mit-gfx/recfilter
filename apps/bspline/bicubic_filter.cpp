@@ -89,6 +89,8 @@ int main(int argc, char **argv) {
             .gpu_blocks     (F.outer(0));
     }
 
+    F.profile(iter);
+
     if (!nocheck) {
         check<float>(F, coeff, image);
     }
