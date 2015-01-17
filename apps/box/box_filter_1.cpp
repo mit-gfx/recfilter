@@ -36,13 +36,13 @@ int main(int argc, char **argv) {
     F.add_filter(y, {1.0f, 1.0f});
     F.split(x, tile_width, y, tile_width);
 
-    // derivative_image
+    // derivative_image, set border as input image
     Func f = F.as_func();
-    D(x,y) = (
-            1.0f * f(clamp(x+B+0, 0, width-1), clamp(y+B+0, 0, height-1)) +
-           -1.0f * f(clamp(x+B+0, 0, width-1), clamp(y-B-1, 0, height-1)) +
-            1.0f * f(clamp(x-B-1, 0, width-1), clamp(y-B-1, 0, height-1)) +
-           -1.0f * f(clamp(x-B-1, 0, width-1), clamp(y+B+0, 0, height-1))) / std::pow(2*B+1,2);
+    D(x,y) = select(x<B+1 || y<B+1 || x>width-1-B || y>height-1-B, 0,
+            (1.0f * f(clamp(x+B+0, 0, width-1), clamp(y+B+0, 0, height-1)) +
+            -1.0f * f(clamp(x+B+0, 0, width-1), clamp(y-B-1, 0, height-1)) +
+             1.0f * f(clamp(x-B-1, 0, width-1), clamp(y-B-1, 0, height-1)) +
+            -1.0f * f(clamp(x-B-1, 0, width-1), clamp(y+B+0, 0, height-1))) / std::pow(2*B+1,2));
 
     if (D.target().has_gpu_feature() && F.target().has_gpu_feature()) {
         int order    = 1;
