@@ -1,5 +1,5 @@
 /**
- * \file gaussian_filter_33.cpp
+ * \file gaussian_overlapped_filter.cpp
  *
  * Gaussian blur using IIR filters: cascade of 3rd order x and 3rd order y
  */

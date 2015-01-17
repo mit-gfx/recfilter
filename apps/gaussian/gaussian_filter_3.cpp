@@ -1,5 +1,5 @@
 /**
- * \file gaussian_filter_3.cpp
+ * \file gaussian_overlapped_filter.cpp
  *
  * Gaussian blur using IIR filters: 3rd order x-y overlapped
  */
