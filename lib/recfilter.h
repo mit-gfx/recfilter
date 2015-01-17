@@ -20,7 +20,7 @@ class RecFilter;
 class RecFilterDim;
 class RecFilterDimAndCausality;
 class RecFilterRefVar;
-/// class RecFilterRefExpr;
+class RecFilterRefExpr;
 
 class FuncTag;
 class VarTag;
@@ -146,10 +146,10 @@ public:
     RecFilterRefVar  operator()(RecFilterDim x, RecFilterDim y);
     RecFilterRefVar  operator()(RecFilterDim x, RecFilterDim y, RecFilterDim z);
     RecFilterRefVar  operator()(std::vector<RecFilterDim> x);
-    /// RecFilterRefExpr operator()(Halide::Expr x);
-    /// RecFilterRefExpr operator()(Halide::Expr x, Halide::Expr y);
-    /// RecFilterRefExpr operator()(Halide::Expr x, Halide::Expr y, Halide::Expr z);
-    /// RecFilterRefExpr operator()(std::vector<Halide::Expr> x);
+    RecFilterRefExpr operator()(Halide::Expr x);
+    RecFilterRefExpr operator()(Halide::Expr x, Halide::Expr y);
+    RecFilterRefExpr operator()(Halide::Expr x, Halide::Expr y, Halide::Expr z);
+    RecFilterRefExpr operator()(std::vector<Halide::Expr> x);
     // @}
 
     /** Add a pure definition to the recursive filter
@@ -473,29 +473,29 @@ public:
     /** Use this as the left-hand-side of a definition for a Func with multiple outputs */
     void operator=(std::vector<Halide::Expr> pure_def);
 
-///    /** Use this RecFilterRefVar as a call to the internal recfilter output */
-///    operator Halide::Expr(void);
-///
-///     /** Use this RecFilterRefVar as a call to the one of the output buffers of
-///      * the internal recfilter */
-///     Halide::Expr operator[](int);
+   /** Use this RecFilterRefVar as a call to the internal recfilter output */
+   operator Halide::Expr(void);
+
+    /** Use this RecFilterRefVar as a call to the one of the output buffers of
+     * the internal recfilter */
+    Halide::Expr operator[](int);
 };
 
-/// class RecFilterRefExpr {
-/// private:
-///     RecFilter rf;
-///     std::vector<Halide::Expr> args;
-///
-/// public:
-///     RecFilterRefExpr(RecFilter r, std::vector<Halide::Expr> a);
-///
-///     /** Use this RecFilterRefVar as a call to the internal recfilter output */
-///     operator Halide::Expr(void);
-///
-///     /** Use this RecFilterRefVar as a call to the one of the output buffers of
-///      * the internal recfilter */
-///     Halide::Expr operator[](int);
-/// };
+class RecFilterRefExpr {
+private:
+    RecFilter rf;
+    std::vector<Halide::Expr> args;
+
+public:
+    RecFilterRefExpr(RecFilter r, std::vector<Halide::Expr> a);
+
+    /** Use this RecFilterRefVar as a call to the internal recfilter output */
+    operator Halide::Expr(void);
+
+    /** Use this RecFilterRefVar as a call to the one of the output buffers of
+     * the internal recfilter */
+    Halide::Expr operator[](int);
+};
 
 // -----------------------------------------------------------------------------
 

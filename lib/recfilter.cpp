@@ -54,23 +54,40 @@ void RecFilterRefVar::operator=(FuncRefExpr pure_def) {
     rf.define(args, {Expr(pure_def)});
 }
 
-/// RecFilterRefVar ::operator Expr(void) {
-///     return this->operator[](0);
-/// }
-///
-/// Expr RecFilterRefVar::operator[](int i) {
-///     Function main_func = rf.as_func().function();
-///     vector<Expr> expr_args;
-///     for (int j=0; j<args.size(); j++) {
-///         expr_args[j] = args[j];
-///     }
-///     if (i>=main_func.outputs()) {
-///         cerr << "Could not find output buffer " << i
-///              << " in recursive filter " << rf.name();
-///         assert(false);
-///     }
-///     return Call::make(main_func, expr_args, i);
-/// }
+RecFilterRefVar::operator Expr(void) {
+    return this->operator[](0);
+}
+
+Expr RecFilterRefVar::operator[](int i) {
+    Function main_func = rf.as_func().function();
+    vector<Expr> expr_args;
+    for (int j=0; j<args.size(); j++) {
+        expr_args.push_back(args[j]);
+    }
+    if (i>=main_func.outputs()) {
+        cerr << "Could not find output buffer " << i
+             << " in recursive filter " << rf.name();
+        assert(false);
+    }
+    return Call::make(main_func, expr_args, i);
+}
+
+RecFilterRefExpr::RecFilterRefExpr(RecFilter r, std::vector<Expr> a) :
+    rf(r), args(a) {}
+
+RecFilterRefExpr::operator Expr(void) {
+    return this->operator[](0);
+}
+
+Expr RecFilterRefExpr::operator[](int i) {
+    Function main_func = rf.as_func().function();
+    if (i>=main_func.outputs()) {
+        cerr << "Could not find output buffer " << i
+             << " in recursive filter " << rf.name();
+        assert(false);
+    }
+    return Call::make(main_func, args, i);
+}
 
 // -----------------------------------------------------------------------------
 
@@ -116,18 +133,18 @@ RecFilterRefVar RecFilter::operator()(vector<RecFilterDim> x) {
     return RecFilterRefVar(*this, x);
 }
 
-/// RecFilterRefExpr RecFilter::operator()(Expr x) {
-///     return RecFilterRefExpr(*this,vec(x));
-/// }
-/// RecFilterRefExpr RecFilter::operator()(Expr x, Expr y) {
-///     return RecFilterRefExpr(*this,vec(x,y));
-/// }
-/// RecFilterRefExpr RecFilter::operator()(Expr x, Expr y, Expr z) {
-///     return RecFilterRefExpr(*this,vec(x,y,z));
-/// }
-/// RecFilterRefExpr RecFilter::operator()(vector<Expr> x) {
-///     return RecFilterRefExpr(*this, x);
-/// }
+RecFilterRefExpr RecFilter::operator()(Expr x) {
+    return RecFilterRefExpr(*this,vec(x));
+}
+RecFilterRefExpr RecFilter::operator()(Expr x, Expr y) {
+    return RecFilterRefExpr(*this,vec(x,y));
+}
+RecFilterRefExpr RecFilter::operator()(Expr x, Expr y, Expr z) {
+    return RecFilterRefExpr(*this,vec(x,y,z));
+}
+RecFilterRefExpr RecFilter::operator()(vector<Expr> x) {
+    return RecFilterRefExpr(*this, x);
+}
 
 void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
     assert(contents.ptr);
