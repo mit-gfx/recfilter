@@ -608,7 +608,40 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor) {
         assert(false);
     }
 
-    return split(vtag, factor, VarTag(vtag|SPLIT));
+    for (int j=0; j<func_list.size(); j++) {
+        RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
+        Func            F = Func(rF.func);
+
+        map<int,VarOrRVar> vars = var_by_tag(rF, vtag);
+        map<int,VarOrRVar>::iterator vit;
+
+        for (vit=vars.begin(); vit!=vars.end(); vit++) {
+            int def = vit->first;
+            VarOrRVar v = vit->second.var;
+            stringstream s;
+
+            Var t(unique_name(remove_dollar(v.name())+".1"));
+
+            s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name()
+                << "\"), Var(\"" << t.name() << "\"), " << factor << ")";
+
+            // only add scheduling to defs that are not undef
+            if (def==PURE_DEF) {
+                if (!is_undef(F.values())) {
+                    F.split(v,v,t,factor);
+                    rF.pure_var_category.insert(make_pair(t.name(), VarTag(vtag|SPLIT)));
+                    rF.pure_schedule.push_back(s.str());
+                }
+            } else {
+                if (!is_undef(F.update_values(def))) {
+                    F.update(def).split(v,v,t,factor);
+                    rF.update_var_category[def].insert(make_pair(t.name(), VarTag(vtag|SPLIT)));
+                    rF.update_schedule[def].push_back(s.str());
+                }
+            }
+        }
+    }
+    return *this;
 }
 
 RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vtag_new) {
@@ -617,9 +650,21 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vtag
         assert(false);
     }
 
+    if (vtag_new.check(SCAN) || vtag_new.check(SPLIT) || vtag_new.check(FULL)) {
+        cerr << "VarTag for the new dimension created by split must be one of "
+             << "inner(), outer(), inner(i) and outer(k)" << endl;
+        assert(false);
+    }
+
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
+
+        // check if the new tag has a count, if not then the use the max possible count
+        // afterwards we can use reassign_vartag_counts() to get continuous counts
+        if (vtag_new==INNER || vtag_new==OUTER) {
+            vtag_new = vtag_new|__4;
+        }
 
         // check that vtag_new is not already used
         map<string,VarTag>::iterator z;
@@ -663,12 +708,14 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vtag
                     F.split(v,v,t,factor);
                     rF.pure_var_category.insert(make_pair(t.name(), vtag_new));
                     rF.pure_schedule.push_back(s.str());
+                    reassign_vartag_counts(rF.pure_var_category);
                 }
             } else {
                 if (!is_undef(F.update_values(def))) {
                     F.update(def).split(v,v,t,factor);
                     rF.update_var_category[def].insert(make_pair(t.name(), vtag_new));
                     rF.update_schedule[def].push_back(s.str());
+                    reassign_vartag_counts(rF.update_var_category[def]);
                 }
             }
         }
