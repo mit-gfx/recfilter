@@ -35,8 +35,6 @@ int main(int argc, char **argv) {
     RecFilterDim y("y", height);
 
     float sigma = 5.0;
-    vector<float> W1 = gaussian_weights(sigma, 1);
-    vector<float> W2 = gaussian_weights(sigma, 2);
     vector<float> W3 = gaussian_weights(sigma, 3);
 
     RecFilter F("Gaussian_3");
@@ -52,10 +50,11 @@ int main(int argc, char **argv) {
     F.split_all_dimensions(tile_width);
 
     if (F.target().has_gpu_feature()) {
+        int order    = W3.size()-1;
         int n_scans  = 4;
         int ws       = 32;
         int unroll_w = ws/4;
-        int intra_tiles_per_warp = ws / (4*n_scans);
+        int intra_tiles_per_warp = ws / (3*n_scans);
         int inter_tiles_per_warp = 4;
 
         F.intra_schedule(1).compute_locally()
