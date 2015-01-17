@@ -1,7 +1,7 @@
 /**
  * \file gaussian_filter_33.cpp
  *
- * Gaussian blur using IIR filters: 3rd order x and 3rd order y
+ * Gaussian blur using IIR filters: cascade of 3rd order x and 3rd order y
  */
 
 #include <iostream>
@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
     float sigma = 5.0;
     vector<float> W3 = gaussian_weights(sigma,3);
 
-    RecFilter G("Gaussian_33");
+    RecFilter G("Gaussian_3_cascaded");
 
     G.set_clamped_image_border();
 
@@ -49,22 +49,58 @@ int main(int argc, char **argv) {
 
     vector<RecFilter> fc = G.cascade_by_dimension();
 
-    for (size_t i=0; i<fc.size(); i++) {
-        RecFilter& F = fc[i];
+    fc[0].split_all_dimensions(tile_width);
+    fc[1].split_all_dimensions(tile_width);
 
-        F.split_all_dimensions(tile_width);
+    int ws       = 32;
+    int unroll_w = 8;
+    int tiles_per_warp = 4;
 
-        if (F.target().has_gpu_feature()) {
-            int n_scans  = 4;
-            int ws       = 32;
-            int unroll_w = ws/4;
-            int intra_tiles_per_warp = ws / (4*n_scans);
-            int inter_tiles_per_warp = 4;
+    // x filter schedule
+    {
+        RecFilter f = fc[0];
+        f.intra_schedule().compute_locally()
+            .split          (f.full(0), ws, f.inner())
+            .split          (f.inner(1), unroll_w)
+            .unroll         (f.inner(1).split_var())
+            .unroll         (f.inner_scan())
+            .reorder        (f.inner_scan(), f.inner(1).split_var(), f.tail(), f.inner(), f.outer(), f.full())
+            .gpu_threads    (f.inner(0), f.inner(1))
+            .gpu_blocks     (f.outer(0), f.full(0));
 
-        }
+        f.inter_schedule().compute_globally()
+            .reorder_storage(f.full(0), f.tail(), f.outer(0))
+            .split          (f.full(0), ws, f.inner())
+            .unroll         (f.outer_scan())
+            .split          (f.full(0), tiles_per_warp)
+            .reorder        (f.outer_scan(), f.tail(), f.full(0).split_var(), f.inner(), f.full(0))
+            .gpu_threads    (f.inner(0), f.full(0).split_var())
+            .gpu_blocks     (f.full(0));
     }
 
-    fc[fc.size()-1].profile(iter);
+    // y filter schedule: same schedule as x but very small subtle changes in intra_schedule
+    {
+        RecFilter f = fc[1];
+        f.intra_schedule().compute_locally()
+            .split      (f.full(0), ws)
+            .split      (f.inner(0), unroll_w)
+            .unroll     (f.inner(0).split_var())
+            .unroll     (f.inner_scan())
+            .reorder    (f.inner_scan(), f.inner(0).split_var(), f.inner(0), f.full(0).split_var(), f.full(0), f.outer(0))
+            .gpu_threads(f.full(0).split_var(), f.inner(0))
+            .gpu_blocks (f.full(0), f.outer(0));
+
+        f.inter_schedule().compute_globally()
+            .reorder_storage(f.full(0), f.tail(), f.outer(0))
+            .split          (f.full(0), ws, f.inner())
+            .unroll         (f.outer_scan())
+            .split          (f.full(0), tiles_per_warp)
+            .reorder        (f.outer_scan(), f.tail(), f.full(0).split_var(), f.inner(), f.full(0))
+            .gpu_threads    (f.inner(0), f.full(0).split_var())
+            .gpu_blocks     (f.full(0));
+    }
+
+    fc[1].profile(iter);
 
     return 0;
 }

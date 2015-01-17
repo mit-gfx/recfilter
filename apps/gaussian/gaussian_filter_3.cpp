@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
     float sigma = 5.0;
     vector<float> W3 = gaussian_weights(sigma, 3);
 
-    RecFilter F("Gaussian_3");
+    RecFilter F("Gaussian_3_overlapped");
 
     F.set_clamped_image_border();
 
