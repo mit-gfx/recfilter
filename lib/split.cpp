@@ -397,7 +397,7 @@ static RecFilterFunc extract_tails_from_each_scan(
                 string arg = F_intra.args()[i];
                 for (int j=0; innermost_tiled_dim_id<0 && j<split_info.size(); j++) {
                     if (arg==split_info[j].inner_var.name()) {
-                        innermost_tiled_dim_id = j;
+                        innermost_tiled_dim_id = i;
                         innermost_tiled_dim_buffer_width = split_info[j].tile_width;
                     }
                 }
