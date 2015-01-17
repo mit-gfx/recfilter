@@ -253,7 +253,7 @@ static void reassign_vartag_counts(map<string,VarTag>& var_tags) {
     vector<VariableTag> ref_vartag = {INNER, OUTER, FULL};
 
     for (int u=0; u<ref_vartag.size(); u++) {
-        VarTag ref(ref_vartag[u]);
+        VariableTag ref = ref_vartag[u];
 
         map<int,string> var_count;
 
@@ -264,7 +264,7 @@ static void reassign_vartag_counts(map<string,VarTag>& var_tags) {
         for (vartag_it=var_tags.begin(); vartag_it!=var_tags.end(); vartag_it++) {
             string var = vartag_it->first;
             VarTag tag = vartag_it->second;
-            if (tag.check(ref) && !tag.check(SCAN)) {
+            if (tag.check(ref) && !tag.check(SPLIT) && !tag.check(SCAN)) {
                 int count = tag.count();
                 var_count.insert(make_pair(count,var));
             }
@@ -498,7 +498,7 @@ static RecFilterFunc extract_tails_from_each_scan(
         rF_intra_tail.func_category = REINDEX;
         rF_intra_tail.callee_func   = F_intra.name();
         rF_intra_tail.pure_var_category = rF_intra.pure_var_category;
-        rF_intra_tail.pure_var_category[tail_dimension_var] = TAIL;
+        //rF_intra_tail.pure_var_category[tail_dimension_var] = TAIL;
     }
 
     // redefine the tail functions for each scans to index into the

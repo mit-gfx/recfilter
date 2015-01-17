@@ -83,13 +83,13 @@ map< int,vector<VarOrRVar> > RecFilterSchedule::var_list_by_tag(RecFilterFunc f,
     map< int,vector<VarOrRVar> > var_list;
     map<string,VarTag>::iterator vit;
     for (vit = f.pure_var_category.begin(); vit!=f.pure_var_category.end(); vit++) {
-        if (vit->second.check(vtag)) {
+        if (vit->second.same_except_count(vtag)) {
             var_list[PURE_DEF].push_back(Var(vit->first));
         }
     }
     for (int i=0; i<f.update_var_category.size(); i++) {
         for (vit=f.update_var_category[i].begin(); vit!=f.update_var_category[i].end(); vit++) {
-            if (vit->second.check(vtag)) {
+            if (vit->second.same_except_count(vtag)) {
                 var_list[i].push_back(Var(vit->first));
             }
         }
@@ -528,11 +528,11 @@ RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y, VarTag z, VarT
 }
 
 RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s, VarTag t) {
-    return reorder({x,y,z,s,t});
+    return reorder({x,y,z,w,s,t});
 }
 
 RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s, VarTag t, VarTag u) {
-    return reorder({x,y,z,s,t,u});
+    return reorder({x,y,z,w,s,t,u});
 }
 
 RecFilterSchedule& RecFilterSchedule::reorder_storage(VarTag x, VarTag y) {

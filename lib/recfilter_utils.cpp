@@ -319,20 +319,14 @@ VarTag VarTag::split_var(void) const {
     return VarTag(tag|SPLIT);
 }
 
-int VarTag::check(const VarTag &t) const {
-    return (VarTag(as_integer() & t.as_integer())==t);
+bool VarTag::same_except_count(const VarTag &t) const {
+    int a = as_integer()  & (~(__1 | __2 | __3 | __4));
+    int b = t.as_integer()& (~(__1 | __2 | __3 | __4));
+    return (a==b);
 }
 
 int VarTag::check(const VariableTag &t) const {
-    return check(VarTag(t));
-}
-
-int VarTag::check_granularity(const VarTag &t) const {
-    int a = check(INNER) && t.check(INNER);
-    int b = check(TAIL ) && t.check(TAIL );
-    int c = check(FULL ) && t.check(FULL );
-    int d = check(OUTER) && t.check(OUTER);
-    return (a || b || c || d);
+    return (as_integer() & VarTag(t).as_integer());
 }
 
 int VarTag::count(void) const {

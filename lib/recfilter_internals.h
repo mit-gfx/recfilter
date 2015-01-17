@@ -33,7 +33,7 @@ enum VariableTag: int {
     FULL    = 0x0010, ///< full dimension before tiling
     INNER   = 0x0020, ///< inner dimension after tiling
     OUTER   = 0x0040, ///< outer dimension after tiling
-    TAIL    = 0x0080, ///< if dimension is at lower granularity (only for inner dimensions)
+    TAIL    = 0x0080, ///< if dimension is at lower granularity
     SCAN    = 0x0100, ///< if dimension is a scan
     __1     = 0x0001, ///< first variable with one of the above tags
     __2     = 0x0002, ///< second variable with one of the above tags
