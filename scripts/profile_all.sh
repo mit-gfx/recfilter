@@ -5,13 +5,13 @@
 apps="\
 ./summed_table
 ./bicubic_filter
-./biquintic_filter
 ./box_filter_1
 ./box_filter_3
 ./box_filter_6
-./gaussian_filter_21
-./gaussian_filter_3
-./gaussian_filter_33
+./biquintic_overlapped_filter
+./biquintic_cascaded_filter
+./gaussian_overlapped_filter
+./gaussian_cascaded_filter
 "
 
 # profile each app for all image widths from min_w to max_w
@@ -31,3 +31,6 @@ do
         eval $cmd
     done
 done
+
+# profile audio filter
+# HL_JIT_TARGET=x86-64 ./audio_filter -w 10000000 -t 1000 -iter 200#!/bin/bash
