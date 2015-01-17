@@ -30,6 +30,19 @@ static const VarOrRVar GPU_BLOCK[] = {
 
 // -----------------------------------------------------------------------------
 
+static string remove_dollar(string s) {
+    string r = s;
+    int pos = std::min(r.find("$"), r.find("."));
+    cerr << r << " " << s << " -> ";
+    if (pos != r.npos) {
+        r.erase(pos);
+    }
+    cerr << r << " " << s << endl;
+    return (r.empty() ? "tmp" : r);
+}
+
+// -----------------------------------------------------------------------------
+
 /** Remove the pure def of a Function and arithmetically add it to
  * the expression of the first update def; leaving the pure def undefined */
 static void add_pure_def_to_first_update_def(Function f) {
@@ -591,13 +604,45 @@ RecFilterSchedule& RecFilterSchedule::fuse(VarTag vtag1, VarTag vtag2) {
 
 RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor) {
     if (vtag.check(SPLIT)) {
-        cerr << "Cannot split a variable which was created by split scheduling ops" << endl;
+        cerr << "Cannot split the variable which was created by split scheduling ops" << endl;
+        assert(false);
+    }
+
+    return split(vtag, factor, VarTag(vtag|SPLIT));
+}
+
+RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vtag_new) {
+    if (vtag.check(SPLIT)) {
+        cerr << "Cannot split the variable which was created by split scheduling ops" << endl;
         assert(false);
     }
 
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
+
+        // check that vtag_new is not already used
+        map<string,VarTag>::iterator z;
+        for (z=rF.pure_var_category.begin(); z!=rF.pure_var_category.end(); z++) {
+            if (z->second == vtag_new) {
+                cerr << "Cannot use " << vtag_new << " as the tag for "
+                    << "the new dimesnsion created by split() because "
+                    << F.name() << " already has a dimension tagged as "
+                    << vtag_new << " in pure definition" << endl;
+                assert(false);
+            }
+        }
+        for (int i=0; i<rF.update_var_category.size(); i++) {
+            for (z=rF.update_var_category[i].begin(); z!=rF.update_var_category[i].end(); z++) {
+                if (z->second == vtag_new) {
+                    cerr << "Cannot use " << vtag_new << " as the tag for "
+                        << "the new dimesnsion created by split() because "
+                        << F.name() << " already has a dimension tagged as "
+                        << vtag_new << " in update definition" << i << endl;
+                    assert(false);
+                }
+            }
+        }
 
         map<int,VarOrRVar> vars = var_by_tag(rF, vtag);
         map<int,VarOrRVar>::iterator vit;
@@ -607,7 +652,7 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor) {
             VarOrRVar v = vit->second.var;
             stringstream s;
 
-            Var t(unique_name(v.name()+".1"));
+            Var t(unique_name(remove_dollar(v.name())+".1"));
 
             s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name()
                 << "\"), Var(\"" << t.name() << "\"), " << factor << ")";
@@ -616,13 +661,13 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor) {
             if (def==PURE_DEF) {
                 if (!is_undef(F.values())) {
                     F.split(v,v,t,factor);
-                    rF.pure_var_category.insert(make_pair(t.name(), vtag|SPLIT));
+                    rF.pure_var_category.insert(make_pair(t.name(), vtag_new));
                     rF.pure_schedule.push_back(s.str());
                 }
             } else {
                 if (!is_undef(F.update_values(def))) {
                     F.update(def).split(v,v,t,factor);
-                    rF.update_var_category[def].insert(make_pair(t.name(), vtag|SPLIT));
+                    rF.update_var_category[def].insert(make_pair(t.name(), vtag_new));
                     rF.update_schedule[def].push_back(s.str());
                 }
             }

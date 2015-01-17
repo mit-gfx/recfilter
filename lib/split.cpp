@@ -2102,31 +2102,32 @@ void RecFilter::split(map<string,int> dim_tile) {
     contents.ptr->func.insert(recfilter_func_list.begin(), recfilter_func_list.end());
 
     // apply bounds on all dimensions of all functions
-    for (int i=0; i<recfilter_split_info.size(); i++) {
-        string x = recfilter_split_info[i].var.name();
-        string xi= recfilter_split_info[i].inner_var.name();
-        string xo= recfilter_split_info[i].outer_var.name();
-        int    w = recfilter_split_info[i].image_width;
-        int    tw= recfilter_split_info[i].tile_width;
-        int    nt= w/tw;
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        string x = contents.ptr->filter_info[i].var.name();
+        int    w = contents.ptr->filter_info[i].image_width;
 
-        map<string,RecFilterFunc>::iterator fit;
-        for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-            if (fit->second.func_category == INLINE) {
-                continue;
-            }
-            Func F(fit->second.func);
-            for (int j=0; j<F.args().size(); j++) {
-                string v = F.args()[j].name();
-                VarTag vt= fit->second.pure_var_category[v];
-                if (v==x) { //if (vt.check(FULL)) {
-                    F.bound(v,0,w);
-                }
-                //else if (v==xo) { //else if (vt.check(OUTER)) {
-                //    F.bound(v,0,nt);
-                //}
+        Func F = as_func();
+        for (int j=0; j<F.args().size(); j++) {
+            string v = F.args()[j].name();
+            if (v==x) {
+                F.bound(v,0,w);
             }
         }
+
+        //map<string,RecFilterFunc>::iterator fit;
+        //for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+        //    if (fit->second.func_category == INLINE) {
+        //        continue;
+        //    }
+        //    Func F(fit->second.func);
+        //    for (int j=0; j<F.args().size(); j++) {
+        //        string v = F.args()[j].name();
+        //        VarTag vt= fit->second.pure_var_category[v];
+        //        if (v==x) {
+        //            F.bound(v,0,w);
+        //        }
+        //    }
+        //}
     }
 
     contents.ptr->tiled = true;

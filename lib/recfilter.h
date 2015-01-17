@@ -416,8 +416,9 @@ public:
     RecFilterSchedule& compute_globally();
     RecFilterSchedule& compute_locally();
 
-    RecFilterSchedule& split(VarTag v, int factor);
     RecFilterSchedule& fuse (VarTag v1, VarTag v2);
+    RecFilterSchedule& split(VarTag v, int factor);
+    RecFilterSchedule& split(VarTag v, int factor, VarTag vnew);
 
     RecFilterSchedule& reorder(VarTag x, VarTag y);
     RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z);
