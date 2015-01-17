@@ -118,7 +118,7 @@ void benchmark(int image_width)
 
     // fprintf(stderr, "%d\t%f ms\n", width, dProcessingTime);
     float throughput = (width*width*1000.0f)/(dProcessingTime*1024*1024);
-    fprintf(stderr, "%d\t%f\n", width, throughput);
+    fprintf(stderr, "%d\t%f\t%f\n", width, dProcessingTime, throughput);
 
     checkCudaErrors(cudaFree(d_result));
 }
@@ -138,11 +138,9 @@ main(int argc, char **argv)
     // Benchmark or AutoTest mode detected, no OpenGL
     findCudaDevice(argc, (const char **)argv);
 
-    fprintf(stderr, "Width\tGaussian_NVIDIA\n");
-
-    int min_w = 64;
+    int inc_w = 64;
+    int min_w = inc_w;
     int max_w = 4096;
-    int inc_w = 32;
     for (int w=min_w; w<=max_w; w+=inc_w) {
         benchmark(w);
     }

@@ -143,9 +143,11 @@ int main(int argc, char** argv)
 {
   size_t num_runs = 100;
 
-  std::cerr << "Width\tSummed_table_Thrust" << std::endl;
+  int inc_w = 64;
+  int max_w = 4096;
+  int min_w = inc_w;
 
-  for (int width=64; width<=4096; width+=32)
+  for (int width=min_w; width<=max_w; width+=inc_w)
   {
     size_t m = width;
     size_t n = width;
@@ -183,9 +185,7 @@ int main(int argc, char** argv)
     double millisec = double(time_end-time_start)/double(num_runs);
 
     float throughput = (width*width*1000.0f)/(millisec*1024*1024);
-    std::cerr << width << "\t" << throughput << std::endl;
-
-    // std::cerr << width << "\t" << time << std::endl;
+    std::cerr << width << "\t" << millisec << "\t" << throughput << std::endl;
   }
   return 0;
 }
