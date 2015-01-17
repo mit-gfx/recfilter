@@ -1,8 +1,8 @@
 /**
- * \file biquintic_overlapped_filter.cpp
+ * \file biquintic_cascaded_filter.cpp
  *
- * Bspline biquintic interpolation using IIR filters: overlapped x-y causal-anticausal
- * second order filters
+ * Bspline biquintic interpolation using IIR filters: causal-anticausal second
+ * order filters in x followed by second order causal-anticausal filters in y
  *
  * FIR Biquintic Kernel Matrix
  *     [ 1/120  13/60  11/20 13/60  1/120 0;
@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
     RecFilterDim x("x", width);
     RecFilterDim y("y", height);
 
-    RecFilter F("Biquintic_overlapped");
+    RecFilter F("Biquintic");
 
     F.set_clamped_image_border();
 
@@ -63,44 +63,63 @@ int main(int argc, char **argv) {
     F.add_filter(+y, coeff);
     F.add_filter(-y, coeff);
 
-    F.split_all_dimensions(tile_width);
+    vector<RecFilter> fc = F.cascade_by_dimension();
 
-    int order    = coeff.size()-1;
-    int n_scans  = 4;
+    fc[0].split_all_dimensions(tile_width);
+    fc[1].split_all_dimensions(tile_width);
+
     int ws       = 32;
-    int unroll_w = ws/4;
-    int intra_tiles_per_warp = ws / (order*n_scans);
-    int inter_tiles_per_warp = 4;
+    int unroll_w = 8;
+    int tiles_per_warp = 4;
 
-    F.intra_schedule(1).compute_locally()
-        .reorder_storage(F.inner(), F.outer())
-        .unroll         (F.inner_scan())
-        .split          (F.inner(1), unroll_w)
-        .unroll         (F.inner(1).split_var())
-        .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
-        .gpu_threads    (F.inner(0), F.inner(1))
-        .gpu_blocks     (F.outer(0), F.outer(1));
+    // x filter schedule
+    {
+        RecFilter f = fc[0];
+        f.intra_schedule().compute_locally()
+            .split          (f.full(0), ws, f.inner())
+            .split          (f.inner(1), unroll_w)
+            .unroll         (f.inner(1).split_var())
+            .unroll         (f.inner_scan())
+            .reorder        (f.inner_scan(), f.inner(1).split_var(), f.tail(), f.inner(), f.outer(), f.full())
+            .gpu_threads    (f.inner(0), f.inner(1))
+            .gpu_blocks     (f.outer(0), f.full(0));
 
-    F.intra_schedule(2).compute_locally()
-        .unroll         (F.inner_scan())
-        .split          (F.outer(0), intra_tiles_per_warp)
-        .reorder        (F.inner(),  F.inner_scan(), F.tail(), F.outer(0).split_var(), F.outer())
-        .fuse           (F.tail(), F.inner(0))
-        .gpu_threads    (F.tail(), F.outer(0).split_var())
-        .gpu_blocks     (F.outer(0), F.outer(1));
+        f.inter_schedule().compute_globally()
+            .reorder_storage(f.full(0), f.tail(), f.outer(0))
+            .split          (f.full(0), ws, f.inner())
+            .unroll         (f.outer_scan())
+            .split          (f.full(0), tiles_per_warp)
+            .reorder        (f.outer_scan(), f.tail(), f.full(0).split_var(), f.inner(), f.full(0))
+            .gpu_threads    (f.inner(0), f.full(0).split_var())
+            .gpu_blocks     (f.full(0));
+    }
 
-    F.inter_schedule().compute_globally()
-        .reorder_storage(F.inner(), F.tail(), F.outer())
-        .unroll         (F.outer_scan())
-        .split          (F.outer(0), inter_tiles_per_warp)
-        .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
-        .gpu_threads    (F.inner(0), F.outer(0).split_var())
-        .gpu_blocks     (F.outer(0));
+    // y filter schedule: same schedule as x but very small subtle changes in intra_schedule
+    {
+        RecFilter f = fc[1];
+        f.intra_schedule().compute_locally()
+            .split      (f.full(0), ws)
+            .split      (f.inner(0), unroll_w)
+            .unroll     (f.inner(0).split_var())
+            .unroll     (f.inner_scan())
+            .reorder    (f.inner_scan(), f.inner(0).split_var(), f.inner(0), f.full(0).split_var(), f.full(0), f.outer(0))
+            .gpu_threads(f.full(0).split_var(), f.inner(0))
+            .gpu_blocks (f.full(0), f.outer(0));
 
-    F.profile(iter);
+        f.inter_schedule().compute_globally()
+            .reorder_storage(f.full(0), f.tail(), f.outer(0))
+            .split          (f.full(0), ws, f.inner())
+            .unroll         (f.outer_scan())
+            .split          (f.full(0), tiles_per_warp)
+            .reorder        (f.outer_scan(), f.tail(), f.full(0).split_var(), f.inner(), f.full(0))
+            .gpu_threads    (f.inner(0), f.full(0).split_var())
+            .gpu_blocks     (f.full(0));
+    }
+
+    fc[1].profile(iter);
 
     if (!nocheck) {
-        check<float>(F, coeff, image);
+        check<float>(fc[1], coeff, image);
     }
 
     return 0;
