@@ -1,8 +1,8 @@
 /**
- * \file audio_higher_order.cpp
+ * \file audio_biquads.cpp
  *
  * Performance comparison between tiled and non-tiled 1D filters on CPU
- * for filter orders 1 to 40
+ * for multiple overlapped biquads (second order filters)
  */
 
 #include <iostream>
@@ -11,7 +11,7 @@
 #include "recfilter.h"
 #include "timing.h"
 
-#define MAX_ORDER 40
+#define MAX_NUM_SCANS 15
 
 using namespace Halide;
 
@@ -31,24 +31,22 @@ int main(int argc, char **argv) {
     vector<float> time_naive;
     vector<float> time_tiled;
 
-    Log log_naive("audio_high_order.nontiled.perflog");
-    Log log_tiled("audio_high_order.tiled.perflog");
+    // dummy coeff, for performance comparison only
+    std::vector<float> coeffs = {1.0f, 0.1f, 0.1f};
 
-    for (int order=1; order<MAX_ORDER; order+=2) {
+    Log log_naive("audio_biquads.nontiled.perflog");
+    Log log_tiled("audio_biquads.tiled.perflog");
 
-        // dummy coeff, for performance comparison only
-        std::vector<float> coeffs(order+1, 0.01);
-        coeffs[0] = 1.0;
-
-        Buffer out;
-
+    for (int num_scans=1; num_scans<=MAX_NUM_SCANS; num_scans++) {
         RecFilterDim x("x", width);
 
         // non-tiled implementation
         {
             RecFilter F("R_nontiled");
             F(x) = image(clamp(x,0,width-1));
-            F.add_filter(+x, coeffs);
+            for (int i=0; i<=num_scans; i++) {
+                F.add_filter(+x, coeffs);
+            }
             F.compute_globally();
             time_naive.push_back(F.profile(iterations));
         }
@@ -59,7 +57,9 @@ int main(int argc, char **argv) {
 
             RecFilter F("R_tiled");
             F(x) = image(clamp(x,0,width-1));
-            F.add_filter(+x, coeffs);
+            for (int i=0; i<=num_scans; i++) {
+                F.add_filter(+x, coeffs);
+            }
             F.split(x, tile_width);
 
             F.intra_schedule().compute_locally() .vectorize(F.inner(0),vw).parallel(F.outer(0));
@@ -68,11 +68,11 @@ int main(int argc, char **argv) {
             time_tiled.push_back(F.profile(iterations));
         }
 
-        log_naive << order << "\t"
+        log_naive << num_scans << "\t"
                   << time_naive[time_naive.size()-1] << "\t"
                   << throughput(time_naive[time_naive.size()-1], width) << endl;
 
-        log_tiled << order << "\t"
+        log_tiled << num_scans << "\t"
                   << time_tiled[time_tiled.size()-1] << "\t"
                   << throughput(time_tiled[time_tiled.size()-1], width) << endl;
     }
