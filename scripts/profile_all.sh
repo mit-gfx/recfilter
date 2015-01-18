@@ -12,6 +12,7 @@ apps="\
 ./biquintic_cascaded_filter
 ./gaussian_overlapped_filter
 ./gaussian_cascaded_filter
+./diff_gauss
 "
 
 # profile each app for all image widths from min_w to max_w
