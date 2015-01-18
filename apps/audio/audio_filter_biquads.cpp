@@ -11,7 +11,7 @@
 #include "recfilter.h"
 #include "timing.h"
 
-#define MAX_NUM_SCANS 15
+#define MAX_NUM_SCANS 10
 
 using namespace Halide;
 
