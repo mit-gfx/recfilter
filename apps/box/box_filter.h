@@ -168,7 +168,7 @@ RecFilter box_filter_order_2(Func I, int width, int height, int B, int tile_widt
         .unroll     (sat_y.inner(0).split_var())
         .unroll     (sat_y.inner_scan())
         .reorder    (sat_y.inner_scan(), sat_y.inner(0).split_var(), sat_y.inner(0), sat_y.full(0).split_var(), sat_y.full(0), sat_y.outer(0))
-        .gpu_threads(sat_y.full(0).split_var(), sat_x.inner(0))
+        .gpu_threads(sat_y.full(0).split_var(), sat_y.inner(0))
         .gpu_blocks (sat_y.full(0), sat_y.outer(0));
 
     sat_y.inter_schedule().compute_globally()
