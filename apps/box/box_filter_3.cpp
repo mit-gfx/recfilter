@@ -1,35 +1,40 @@
 /**
- * \file box_filter_3.cpp
+ * \file sat_filter_3.cpp
  *
- * Three box filters computed using 3rd order IIR filter
+ * Three box filters computed using 1st order integral images (overlapped in x and y)
+ * and a second order integral image cascaded along x and y
+ *
+ * \todo the assumption is that the image is padded by k pixels where
+ * k = box_filter_radius * num_applications_of_filter + 1
  */
 
 #include "box_filter.h"
 
-using namespace Halide;
-
 int main(int argc, char **argv) {
-    const int box_filter_radius = 1;
+    const int B = 5;    // box filter radius
 
     Arguments args(argc, argv);
     int iter       = args.iterations;
     int tile_width = args.block;
-    int in_w       = args.width;
+    int width      = args.width;
+    int height     = args.width;
 
-    Image<float> I = generate_random_image<float>(in_w,in_w);
+    Image<float> in_image = generate_random_image<float>(width,height);
 
-    RecFilter S = integral_image   (1, in_w, in_w, tile_width, I);
-    RecFilter D1 = derivative_image(1, box_filter_radius, in_w, in_w, tile_width, S.as_func());
-    RecFilter D2 = derivative_image(1, box_filter_radius, in_w, in_w, tile_width, D1.as_func());
-    RecFilter D3 = derivative_image(1, box_filter_radius, in_w, in_w, tile_width, D2.as_func());
+    // pad the image with zeros
+    int pad = 3*(B+1)+1;
+    for (int i=0; i<in_image.width(); i++) {
+        for (int j=0; j<in_image.height(); j++) {
+            if (i<pad || i>width-pad || j<pad || j>height-pad) {
+                in_image(i,j) = 0.0f;
+            }
+        }
+    }
 
-    RecFilter D = D3;
+    RecFilter b1 = box_filter_order_1(in_image,     width, height, B, tile_width);
+    RecFilter b2 = box_filter_order_2(b1.as_func(), width, height, B, tile_width);
 
-    D.profile(iter);
-
-    Realization R = D.realize();
-    Image<float> res(R);
-    cerr << res << endl;
+    b2.profile(iter);
 
     return 0;
 }

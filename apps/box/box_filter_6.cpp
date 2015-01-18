@@ -1,32 +1,45 @@
 /**
- * \file box_filter_6.cpp
+ * \file sat_filter_3.cpp
  *
- * Six box filters computed using two cascaded 3rd order IIR filters
+ * Three box filters computed using 1st order integral images (overlapped in x and y)
+ * and a second order integral image cascaded along x and y
+ *
+ * \todo the assumption is that the image is padded by k pixels where
+ * k = box_filter_radius * num_applications_of_filter + 1
  */
 
 #include "box_filter.h"
 
-using namespace Halide;
-
 int main(int argc, char **argv) {
-    const int box_filter_radius = 5;
+    const int B = 5;    // box filter radius
 
     Arguments args(argc, argv);
     int iter       = args.iterations;
     int tile_width = args.block;
-    int in_w       = args.width;
+    int width      = args.width;
+    int height     = args.width;
 
-    Image<float> I = generate_random_image<float>(in_w,in_w);
+    Image<float> in_image = generate_random_image<float>(width,height);
 
-    RecFilter S1 = integral_image  (3, in_w, in_w, tile_width, I);
-    RecFilter D1 = derivative_image(2, box_filter_radius, in_w, in_w, tile_width, S1.as_func());
-    RecFilter D2 = derivative_image(1, box_filter_radius, in_w, in_w, tile_width, D1.as_func());
+    // pad the image with zeros
+    int pad = 6*(B+1)+1;
+    for (int i=0; i<in_image.width(); i++) {
+        for (int j=0; j<in_image.height(); j++) {
+            if (i<pad || i>width-pad || j<pad || j>height-pad) {
+                in_image(i,j) = 0.0f;
+            }
+        }
+    }
 
-    RecFilter S2 = integral_image  (3, in_w, in_w, tile_width, D2.as_func());
-    RecFilter D3 = derivative_image(2, box_filter_radius, in_w, in_w, tile_width, S2.as_func());
-    RecFilter D4 = derivative_image(1, box_filter_radius, in_w, in_w, tile_width, D3.as_func());
+    Var x,y;
+    Func b0;
+    b0(x,y) = in_image(x,y);
 
-    D4.profile(iter);
+    RecFilter b1 = box_filter_order_2(b0,           width, height, B, tile_width);
+    RecFilter b2 = box_filter_order_2(b1.as_func(), width, height, B, tile_width);
+    RecFilter b3 = box_filter_order_2(b2.as_func(), width, height, B, tile_width);
+
+    b3.profile(iter);
 
     return 0;
 }
