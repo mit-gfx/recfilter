@@ -69,7 +69,7 @@ extern "C"
 void transpose(unsigned int *d_src, unsigned int *d_dest, unsigned int width, int height);
 
 extern "C"
-double gaussianFilterRGBA(uint *d_src, uint *d_dest, uint *d_temp, int width, int height, float sigma, int order, int nthreads, StopWatchInterface *timer);
+double gaussianFilterRGBA(uint *d_src, uint *d_dest, uint *d_temp, int width, int height, float sigma, int order, int nthreads, StopWatchInterface *timer, bool use_simple_filter=false);
 
 void cleanup();
 

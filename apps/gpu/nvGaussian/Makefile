@@ -179,7 +179,7 @@ endif
 BIN_DIR := ../../../bin/gpu
 BUILD_DIR := _build
 
-all: $(BIN_DIR)/nvRecursiveGaussian
+all: $(BIN_DIR)/nvBiquintic $(BIN_DIR)/nvBicubic $(BIN_DIR)/nvRecursiveGaussian
 
 $(BUILD_DIR)/recursiveGaussian.o: recursiveGaussian.cpp
 	mkdir -p $(BUILD_DIR)
@@ -189,6 +189,31 @@ $(BUILD_DIR)/recursiveGaussian_kernel.o: recursiveGaussian_cuda.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
 $(BIN_DIR)/nvRecursiveGaussian: $(BUILD_DIR)/recursiveGaussian.o $(BUILD_DIR)/recursiveGaussian_kernel.o
+	mkdir -p $(BIN_DIR)
+	$(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
+
+# ----
+$(BUILD_DIR)/biquinticFilter.o: biquinticFilter.cpp
+	mkdir -p $(BUILD_DIR)
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+$(BUILD_DIR)/biquintic_kernel.o: recursiveGaussian_cuda.cu
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+$(BIN_DIR)/nvBiquintic: $(BUILD_DIR)/biquinticFilter.o $(BUILD_DIR)/biquintic_kernel.o
+	mkdir -p $(BIN_DIR)
+	$(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
+
+# ----
+
+$(BUILD_DIR)/bicubicFilter.o: bicubicFilter.cpp
+	mkdir -p $(BUILD_DIR)
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+$(BUILD_DIR)/bicubic_kernel.o: recursiveGaussian_cuda.cu
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+$(BIN_DIR)/nvBicubic: $(BUILD_DIR)/bicubicFilter.o $(BUILD_DIR)/bicubic_kernel.o
 	mkdir -p $(BIN_DIR)
 	$(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 

@@ -90,7 +90,7 @@ void transpose(uint *d_src, uint *d_dest, uint width, int height)
 
 // 8-bit RGBA version
 extern "C"
-double gaussianFilterRGBA(uint *d_src, uint *d_dest, uint *d_temp, int width, int height, float sigma, int order, int nthreads, StopWatchInterface *timer)
+double gaussianFilterRGBA(uint *d_src, uint *d_dest, uint *d_temp, int width, int height, float sigma, int order, int nthreads, StopWatchInterface *timer, bool use_simple_filter=false)
 {
     // var for kernel timing
     double dKernelTime = 0.0;
@@ -152,11 +152,11 @@ double gaussianFilterRGBA(uint *d_src, uint *d_dest, uint *d_temp, int width, in
     sdkResetTimer(&timer);
 
     // process columns
-#if USE_SIMPLE_FILTER
-    d_simpleRecursive_rgba<<< iDivUp(width, nthreads), nthreads >>>(d_src, d_temp, width, height, ema);
-#else
-    d_recursiveGaussian_rgba<<< iDivUp(width, nthreads), nthreads >>>(d_src, d_temp, width, height, a0, a1, a2, a3, b1, b2, coefp, coefn);
-#endif
+    if (use_simple_filter) {
+        d_simpleRecursive_rgba<<< iDivUp(width, nthreads), nthreads >>>(d_src, d_temp, width, height, ema);
+    } else {
+        d_recursiveGaussian_rgba<<< iDivUp(width, nthreads), nthreads >>>(d_src, d_temp, width, height, a0, a1, a2, a3, b1, b2, coefp, coefn);
+    }
     getLastCudaError("Kernel execution failed");
 
     transpose(d_temp, d_dest, width, height);
