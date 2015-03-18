@@ -357,7 +357,7 @@ void RecFilter::add_filter(RecFilterDimAndCausality x, vector<float> coeff) {
 
 // -----------------------------------------------------------------------------
 
-Stage RecFilter::schedule(int id) {
+Stage RecFilter::full_schedule(int id) {
     if (contents.ptr->tiled) {
         cerr << "Filter is tiled, use RecFilter::intra_schedule() "
              << "and RecFilter::inter_schedule()\n" << endl;
@@ -443,6 +443,80 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
     return RecFilterSchedule(*this, func_list);
 }
 
+// -----------------------------------------------------------------------------
+
+Stage RecFilter::auto_full_schedule(int id) {
+    if (contents.ptr->tiled) {
+        cerr << "Filter is tiled, use RecFilter::intra_schedule() "
+             << "and RecFilter::inter_schedule()\n" << endl;
+        assert(false);
+    }
+    return (id<0 ? Stage(as_func()) : as_func().update(id));
+}
+
+RecFilterSchedule RecFilter::auto_inter_schedule(void) {
+    RecFilterSchedule R = inter_schedule();
+
+    VarTag sc = outer_scan();
+    VarTag tx, ty, tz;
+    VarTag bx, by, bz;
+
+    tx = inner(0);
+    ty = outer(0).split_var();
+    bx = outer(0);
+
+    R.compute_globally();
+    R.reorder_storage(inner(), tail(), outer());
+
+    R.unroll(sc);
+
+    R.split  (bx, inter_tiles_per_warp);
+    R.reorder(sc, tail(), tx, ty, tz, bx, by, bz);
+
+    R.gpu_threads(tx,ty,tz);
+    R.gpu_blocks (bx,by,bz);
+
+    return R;
+}
+
+RecFilterSchedule RecFilter::auto_intra_schedule(int id) {
+    RecFilterSchedule R = intra_schedule(id);
+
+    VarTag sc = inner_scan();
+    VarTag tx, ty, tz;
+    VarTag bx, by, bz;
+
+    bx = F.outer(0);
+    by = F.outer(1);
+
+    R.compute_locally();
+
+    R.unroll(sc);
+
+    R.split  (bx, inter_tiles_per_warp);
+    R.reorder(sc, tail(), tx, ty, tz, bx, by, bz);
+
+    R.gpu_threads(tx,ty,tz);
+    R.gpu_blocks (bx,by,bz);
+
+
+    .split          (F.inner(1), unroll_w)
+        .unroll         (F.inner(1).split_var())
+        .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
+        .gpu_threads    (F.inner(0), F.inner(1))
+        .gpu_blocks     (F.outer(0), F.outer(1));
+
+    .split          (F.outer(0), intra_tiles_per_warp)
+        .reorder        (F.inner(),  F.inner_scan(), F.tail(), F.outer(0).split_var(), F.outer())
+        .fuse           (F.tail(), F.inner(0))
+        .gpu_threads(F.tail(), F.outer(0).split_var())
+        .gpu_blocks (bx, by, bz);
+
+    return R;
+}
+
+// -----------------------------------------------------------------------------
+
 VarTag RecFilter::full      (int i) { return VarTag(FULL,  i);     }
 VarTag RecFilter::inner     (int i) { return VarTag(INNER, i);     }
 VarTag RecFilter::outer     (int i) { return VarTag(OUTER, i);     }
@@ -519,7 +593,7 @@ Realization RecFilter::create_realization(void) {
             compute_globally();
         }
         cerr << "Warning: Applied default schedule to filter "
-             << contents.ptr->name << endl;
+            << contents.ptr->name << endl;
     }
 
     // recompile the filter
@@ -531,7 +605,7 @@ Realization RecFilter::create_realization(void) {
     if (contents.ptr->target.has_gpu_feature()) {
         map<string,Buffer> buff = extract_buffer_calls(F);
         for (map<string,Buffer>::iterator b=buff.begin(); b!=buff.end(); b++) {
-            b->second.copy_to_dev();
+            b->second.copy_to_device();
         }
     }
 

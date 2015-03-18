@@ -160,6 +160,10 @@ public:
 
     /**@name Compile and run */
     // {@
+
+    /** Get the compilation target, inferred from HL_JIT_TARGET */
+    Halide::Target target(void);
+
     /** Trigger JIT compilation for specified hardware-platform target; dumps the generated
      * codegen in human readable HTML format if filename is specified */
     void compile_jit(std::string filename="");
@@ -357,7 +361,7 @@ public:
      * \param[in] id pure/update def id, negative for pure def, else id-th update def
      * \return scheduling handle of the pure/update def to directly use Halide API
      */
-    Halide::Stage schedule(int id=-1);
+    Halide::Stage full_schedule(int id=-1);
 
     /** Specify the filter (if not tiled) to be computed in global memory
      *
@@ -378,8 +382,20 @@ public:
     RecFilterSchedule inter_schedule(void);
     // @}
 
-    /** Get the compilation target, inferred from HL_JIT_TARGET */
-    Halide::Target target(void);
+    /**@name Automatic scheduling: generic handles for creating automatic schedules for tiled filter */
+    // {@
+
+    /** Automatic schedule for non-tiled filter and return a handle for additional scheduling */
+    Halide::Stage auto_full_schedule(int id=-1);
+
+    /** Automatic schedule for inter-tile functions if the filter is tiled and return a handle for additional scheduling */
+    RecFilterSchedule auto_inter_schedule(void);
+
+    /** Automatic schedule for intra-tile functions if the filter is tiled and return a handle for additional scheduling
+     * \param id 0 for all intra tile functions, 1 for nD intra-tile functions, otherwise 1D intra-tile functions
+     */
+    RecFilterSchedule auto_intra_schedule(int id);
+    // @}
 
     /** @name Generic handles to write scheduled for dimensions of internal functions */
     // {@
