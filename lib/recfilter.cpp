@@ -445,72 +445,125 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
 
 // -----------------------------------------------------------------------------
 
-Stage RecFilter::auto_full_schedule(int id) {
+Func RecFilter::auto_full_schedule(void) {
     if (contents.ptr->tiled) {
         cerr << "Filter is tiled, use RecFilter::intra_schedule() "
              << "and RecFilter::inter_schedule()\n" << endl;
         assert(false);
     }
-    return (id<0 ? Stage(as_func()) : as_func().update(id));
+
+    Func F = as_func();
+
+    F.compute_globally();
+
+    vector<Var> vars;
+    for (int i=0; i<contents.filter_info.size(); i++) {
+        vars.push_back(contents.filter_info[i].var);
+    }
+
+    {
+        vector<Var> parallel_vars;
+        vector<Var> non_parallel_vars;
+        for (int i=0; i<contents.filter_info.size(); i++) {
+            if (j<3) {
+                parallel_vars.push_back(contents.filter_info[i].var);
+            } else {
+                non_parallel_vars.push_back(contents.filter_info[i].var);
+            }
+        }
+
+        for () {
+        }
+    }
+
+    // update schedule
+    for (int i=0; i<contents.filter_info.size(); i++) {
+        RDom rx = contents.filter_info[i].rdom;
+        for (int j=0; j<contents.filter_info[i].scan_id.size(); j++) {
+            int id = contents.filter_info[i].scan_id[j];
+            vector<Var> other_dims;
+            for (int k=0; k<vars.size(); k++) {
+                if () {
+                    other_dim.push_back(vars[k]);
+                }
+            }
+            F.update(id).
+                unroll (rx).
+                split  ().
+                reorder(rx, tx, ty, tz, bx, by, bz).
+                gpu_threads().
+                gpu_blocks();
+        }
+    }
+
+    return F;
 }
 
-RecFilterSchedule RecFilter::auto_inter_schedule(void) {
+RecFilterSchedule RecFilter::gpu_auto_inter_schedule(int thread_size) {
     RecFilterSchedule R = inter_schedule();
 
     VarTag sc = outer_scan();
-    VarTag tx, ty, tz;
-    VarTag bx, by, bz;
 
-    tx = inner(0);
-    ty = outer(0).split_var();
-    bx = outer(0);
+    VarTag tx = inner(0);
+    VarTag ty = inner(1);
+    VarTag tz = inner(2);
 
-    R.compute_globally();
-    R.reorder_storage(inner(), tail(), outer());
+    VarTag bx = outer(0);
+    VarTag by = outer(1);
+    VarTag bz = outer(2);
 
-    R.unroll(sc);
+    int factor;
 
-    R.split  (bx, inter_tiles_per_warp);
-    R.reorder(sc, tail(), tx, ty, tz, bx, by, bz);
+    // too few threads if ty is empty, too many if ty is full
+    if (!R.contains_vars_with_tag(ty)) {
+        R.split(bx, factor);
+        ty = bx.split_var();
+    } else {
+        R.split(ty, factor).unroll(ty.split_var());
+    }
 
-    R.gpu_threads(tx,ty,tz);
-    R.gpu_blocks (bx,by,bz);
+    // store inner dimensions innermost because threads are operating
+    // on these dimensions - memory coalescing
+    R.compute_globally()
+     .reorder_storage(inner(), tail(), outer())
+     .unroll (sc)
+     .reorder(tail(), sc, tz, tx, ty, bx, by, bz)
+     .gpu_threads(tx, ty)
+     .gpu_blocks (bx, by, bz);
 
     return R;
 }
 
-RecFilterSchedule RecFilter::auto_intra_schedule(int id) {
+RecFilterSchedule RecFilter::gpu_auto_intra_schedule(int id, int thread_size) {
     RecFilterSchedule R = intra_schedule(id);
 
     VarTag sc = inner_scan();
-    VarTag tx, ty, tz;
-    VarTag bx, by, bz;
 
-    bx = F.outer(0);
-    by = F.outer(1);
+    VarTag tx = inner(0);
+    VarTag ty = inner(1);
+    VarTag tz = inner(2);
 
-    R.compute_locally();
+    VarTag bx = outer(0);
+    VarTag by = outer(1);
+    VarTag bz = outer(2);
 
-    R.unroll(sc);
+    int factor = thread_size/ ;
 
-    R.split  (bx, inter_tiles_per_warp);
-    R.reorder(sc, tail(), tx, ty, tz, bx, by, bz);
+    // too few threads if ty is empty, too many if ty is full
+    if (!R.contains_vars_with_tag(ty)) {
+        R.split(bx, factor);
+        ty = bx.split_var();
+        // maybe merge tail and ty
+    } else {
+        R.split(ty, factor).unroll(ty.split_var());
+    }
 
-    R.gpu_threads(tx,ty,tz);
-    R.gpu_blocks (bx,by,bz);
-
-
-    .split          (F.inner(1), unroll_w)
-        .unroll         (F.inner(1).split_var())
-        .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
-        .gpu_threads    (F.inner(0), F.inner(1))
-        .gpu_blocks     (F.outer(0), F.outer(1));
-
-    .split          (F.outer(0), intra_tiles_per_warp)
-        .reorder        (F.inner(),  F.inner_scan(), F.tail(), F.outer(0).split_var(), F.outer())
-        .fuse           (F.tail(), F.inner(0))
-        .gpu_threads(F.tail(), F.outer(0).split_var())
-        .gpu_blocks (bx, by, bz);
+    R.compute_locally()
+     .unroll(sc)
+     .vectorize(tail())
+     .reorder(tail(), sc, tz, tx, ty, bx, by, bz)
+     .gpu_threads(tx, ty)
+     .gpu_blocks (bx, by, bz);
 
     return R;
 }

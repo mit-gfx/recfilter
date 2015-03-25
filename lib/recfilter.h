@@ -427,10 +427,12 @@ private:
     std::map<int,Halide::VarOrRVar> var_by_tag(RecFilterFunc f, VarTag vtag);
 
 public:
+    bool contains_vars_with_tag(VarTag vtag);
+
     RecFilterSchedule(RecFilter& r, std::vector<std::string> fl);
 
-    RecFilterSchedule& compute_globally();
-    RecFilterSchedule& compute_locally();
+    RecFilterSchedule& compute_globally(void);
+    RecFilterSchedule& compute_locally (void);
 
     RecFilterSchedule& fuse (VarTag v1, VarTag v2);
     RecFilterSchedule& split(VarTag v, int factor);

@@ -90,6 +90,16 @@ RecFilterSchedule::RecFilterSchedule(RecFilter& r, vector<string> fl) :
     recfilter(r), func_list(fl) {}
 
 
+bool RecFilterSchedule::contains_vars_with_tag(VarTag vtag) {
+    bool empty = true;
+    for (int j=0; j<func_list.size(); j++) {
+        RecFilterFunc f = recfilter.internal_function(func_list[j]);
+        map< int,vector<VarOrRVar> > var_list = var_list_by_tag(f, vtag);
+        empty &= var_list.empty();
+    }
+    return empty;
+}
+
 map< int,vector<VarOrRVar> > RecFilterSchedule::var_list_by_tag(RecFilterFunc f, VarTag vtag) {
     bool ignore_count = !vtag.has_count();
     map< int,vector<VarOrRVar> > var_list;
@@ -558,6 +568,10 @@ RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y, VarTag z, VarT
 
 RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s, VarTag t, VarTag u) {
     return reorder({x,y,z,w,s,t,u});
+}
+
+RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s, VarTag t, VarTag u, VartTag v) {
+    return reorder({x,y,z,w,s,t,u,v});
 }
 
 RecFilterSchedule& RecFilterSchedule::reorder_storage(VarTag x, VarTag y) {
