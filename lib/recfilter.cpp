@@ -445,7 +445,7 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
 
 // -----------------------------------------------------------------------------
 
-Func RecFilter::auto_full_schedule(void) {
+Func RecFilter::gpu_auto_full_schedule(int tx, int ty, int tz) {
     if (contents.ptr->tiled) {
         cerr << "Filter is tiled, use RecFilter::intra_schedule() "
              << "and RecFilter::inter_schedule()\n" << endl;
@@ -454,87 +454,125 @@ Func RecFilter::auto_full_schedule(void) {
 
     Func F = as_func();
 
-    F.compute_globally();
+    F.compute_root();
 
     vector<Var> vars;
-    for (int i=0; i<contents.filter_info.size(); i++) {
-        vars.push_back(contents.filter_info[i].var);
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        vars.push_back(contents.ptr->filter_info[i].var);
     }
 
+    // schedule for pure def
     {
-        vector<Var> parallel_vars;
-        vector<Var> non_parallel_vars;
-        for (int i=0; i<contents.filter_info.size(); i++) {
+        vector<VarOrRVar> parallel_vars;
+        vector<VarOrRVar> non_parallel_vars;
+        for (int j=0; j<contents.ptr->filter_info.size(); j++) {
             if (j<3) {
-                parallel_vars.push_back(contents.filter_info[i].var);
+                parallel_vars.push_back(contents.ptr->filter_info[j].var);
             } else {
-                non_parallel_vars.push_back(contents.filter_info[i].var);
+                non_parallel_vars.push_back(contents.ptr->filter_info[j].var);
             }
         }
 
-        for () {
+        // reorder the vars so that all parallel vars are at the end and
+        // non parallel vars are inside - necessary for valid CUDA schedule
+        vector<VarOrRVar> reordered_vars;
+        reordered_vars.insert(reordered_vars.end(), parallel_vars.begin(), parallel_vars.end());
+        reordered_vars.insert(reordered_vars.end(), non_parallel_vars.begin(), non_parallel_vars.end());
+        F.reorder(reordered_vars);
+
+        // specify CUDA threads and blocks
+        switch (parallel_vars.size()) {
+            case 1: F.gpu_tile(parallel_vars[0], tx); break;
+            case 2: F.gpu_tile(parallel_vars[0], parallel_vars[1], tx, ty); break;
+            case 3: F.gpu_tile(parallel_vars[0], parallel_vars[1], parallel_vars[2], tx, ty, tz); break;
+            default: break;
         }
     }
 
-    // update schedule
-    for (int i=0; i<contents.filter_info.size(); i++) {
-        RDom rx = contents.filter_info[i].rdom;
-        for (int j=0; j<contents.filter_info[i].scan_id.size(); j++) {
-            int id = contents.filter_info[i].scan_id[j];
-            vector<Var> other_dims;
-            for (int k=0; k<vars.size(); k++) {
-                if () {
-                    other_dim.push_back(vars[k]);
+    // schedule for update def
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        RDom rx = contents.ptr->filter_info[i].rdom;
+
+        vector<VarOrRVar> parallel_vars;
+        vector<VarOrRVar> non_parallel_vars;
+        for (int j=0; j<contents.ptr->filter_info.size(); j++) {
+            if (i != j) {
+                if (j<3) {
+                    parallel_vars.push_back(contents.ptr->filter_info[j].var);
+                } else {
+                    non_parallel_vars.push_back(contents.ptr->filter_info[j].var);
                 }
             }
-            F.update(id).
-                unroll (rx).
-                split  ().
-                reorder(rx, tx, ty, tz, bx, by, bz).
-                gpu_threads().
-                gpu_blocks();
+        }
+
+        for (int j=0; j<contents.ptr->filter_info[i].scan_id.size(); j++) {
+            int def = contents.ptr->filter_info[i].scan_id[j];
+
+            // unroll the scan variable
+            F.update(def).unroll(rx);
+
+            // reorder the vars so that all parallel vars are at the end and
+            // non parallel vars are inside and scan var is inner most - necessary
+            // for valid CUDA schedule
+            vector<VarOrRVar> reordered_vars;
+            reordered_vars.push_back(rx);
+            reordered_vars.insert(reordered_vars.end(), parallel_vars.begin(), parallel_vars.end());
+            reordered_vars.insert(reordered_vars.end(), non_parallel_vars.begin(), non_parallel_vars.end());
+            F.update(def).reorder(reordered_vars);
+
+            // specify CUDA threads and blocks
+            switch (parallel_vars.size()) {
+                case 1: F.gpu_tile(parallel_vars[0], tx); break;
+                case 2: F.gpu_tile(parallel_vars[0], parallel_vars[1], tx, ty); break;
+                case 3: F.gpu_tile(parallel_vars[0], parallel_vars[1], parallel_vars[2], tx, ty, tz); break;
+                default: break;
+            }
         }
     }
 
     return F;
 }
 
-RecFilterSchedule RecFilter::gpu_auto_inter_schedule(int thread_size) {
+RecFilterSchedule RecFilter::gpu_auto_inter_schedule(int max_threads) {
     RecFilterSchedule R = inter_schedule();
 
     VarTag sc = outer_scan();
 
     VarTag tx = inner(0);
     VarTag ty = inner(1);
-    VarTag tz = inner(2);
 
     VarTag bx = outer(0);
     VarTag by = outer(1);
     VarTag bz = outer(2);
 
-    int factor;
+    // max tile is the maximum number of threads that will be launched
+    // by specifying either of tx, ty, or tz as parallel
+    int max_tile = 0;
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        max_tile = std::max(max_tile, contents.ptr->filter_info[i].tile_width);
+    }
 
     // too few threads if ty is empty, too many if ty is full
     if (!R.contains_vars_with_tag(ty)) {
-        R.split(bx, factor);
+        R.split(bx, max_threads/max_tile);
         ty = bx.split_var();
     } else {
-        R.split(ty, factor).unroll(ty.split_var());
+        R.split(ty, max_tile*max_tile/max_threads).unroll(ty.split_var());
     }
 
     // store inner dimensions innermost because threads are operating
     // on these dimensions - memory coalescing
     R.compute_globally()
-     .reorder_storage(inner(), tail(), outer())
-     .unroll (sc)
-     .reorder(tail(), sc, tz, tx, ty, bx, by, bz)
-     .gpu_threads(tx, ty)
-     .gpu_blocks (bx, by, bz);
+        .reorder_storage(inner(), tail(), outer())
+        .unroll (sc)
+        .reorder({tail(), sc, tx, ty, bx, by, bz})
+        .gpu_threads(tx, ty)
+        .gpu_blocks (bx, by, bz);
 
     return R;
 }
 
-RecFilterSchedule RecFilter::gpu_auto_intra_schedule(int id, int thread_size) {
+RecFilterSchedule RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
     RecFilterSchedule R = intra_schedule(id);
 
     VarTag sc = inner_scan();
@@ -547,23 +585,28 @@ RecFilterSchedule RecFilter::gpu_auto_intra_schedule(int id, int thread_size) {
     VarTag by = outer(1);
     VarTag bz = outer(2);
 
-    int factor = thread_size/ ;
+    // max tile is the maximum number of threads that will be launched
+    // by specifying either of tx, ty, or tz as parallel
+    int max_tile = 0;
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        max_tile = std::max(max_tile, contents.ptr->filter_info[i].tile_width);
+    }
 
     // too few threads if ty is empty, too many if ty is full
+    // TODO: maybe merge tail and ty
     if (!R.contains_vars_with_tag(ty)) {
-        R.split(bx, factor);
+        R.split(bx, max_threads/max_tile);
         ty = bx.split_var();
-        // maybe merge tail and ty
     } else {
-        R.split(ty, factor).unroll(ty.split_var());
+        R.split(ty, max_tile*max_tile/max_threads).unroll(ty.split_var());
     }
 
     R.compute_locally()
-     .unroll(sc)
-     .vectorize(tail())
-     .reorder(tail(), sc, tz, tx, ty, bx, by, bz)
-     .gpu_threads(tx, ty)
-     .gpu_blocks (bx, by, bz);
+        .unroll(sc)
+        .vectorize(tail())
+        .reorder({tail(), sc, tz, tx, ty, bx, by, bz})
+        .gpu_threads(tx, ty)
+        .gpu_blocks (bx, by, bz);
 
     return R;
 }

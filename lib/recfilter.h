@@ -385,16 +385,20 @@ public:
     /**@name Automatic scheduling: generic handles for creating automatic schedules for tiled filter */
     // {@
 
-    /** Automatic schedule for non-tiled filter and return a handle for additional scheduling */
-    Halide::Stage auto_full_schedule(int id=-1);
+    /** Automatic schedule for non-tiled filter and return a handle for additional scheduling
+     * \param tx tiling factor to split first dimension into CUDA blocks and threads
+     * \param ty tiling factor to split second dimension into CUDA blocks and threads
+     * \param tz tiling factor to split third dimension into CUDA blocks and threads
+     */
+    Halide::Func gpu_auto_full_schedule(int tx, int ty=1, int tz=1);
 
     /** Automatic schedule for inter-tile functions if the filter is tiled and return a handle for additional scheduling */
-    RecFilterSchedule auto_inter_schedule(void);
+    RecFilterSchedule gpu_auto_inter_schedule(int max_threads);
 
     /** Automatic schedule for intra-tile functions if the filter is tiled and return a handle for additional scheduling
      * \param id 0 for all intra tile functions, 1 for nD intra-tile functions, otherwise 1D intra-tile functions
      */
-    RecFilterSchedule auto_intra_schedule(int id);
+    RecFilterSchedule gpu_auto_intra_schedule(int id, int max_threads);
     // @}
 
     /** @name Generic handles to write scheduled for dimensions of internal functions */

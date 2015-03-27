@@ -570,10 +570,6 @@ RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y, VarTag z, VarT
     return reorder({x,y,z,w,s,t,u});
 }
 
-RecFilterSchedule& RecFilterSchedule::reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s, VarTag t, VarTag u, VartTag v) {
-    return reorder({x,y,z,w,s,t,u,v});
-}
-
 RecFilterSchedule& RecFilterSchedule::reorder_storage(VarTag x, VarTag y) {
     return reorder_storage({x,y});
 }
