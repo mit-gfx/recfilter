@@ -9,6 +9,8 @@
 
 #include "recfilter.h"
 
+#define AUTO_SCHEDULE 1
+
 using namespace Halide;
 
 using std::map;
@@ -47,6 +49,12 @@ int main(int argc, char **argv) {
     // ---------------------------------------------------------------------
 
     if (F.target().has_gpu_feature()) {
+#if AUTO_SCHEDULE
+        int max_threads = 128;
+        F.gpu_auto_inter_schedule(max_threads)
+         .gpu_auto_intra_schedule(1, max_threads)
+         .gpu_auto_intra_schedule(2, max_threads);
+#else
         int order    = 1;
         int n_scans  = 2;
         int ws       = 32;
@@ -78,8 +86,10 @@ int main(int argc, char **argv) {
             .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
             .gpu_threads    (F.inner(0), F.outer(0).split_var())
             .gpu_blocks     (F.outer(0));
+#endif
     }
 
+    F.compile_jit("stmt.html");
     F.profile(iter);
 
     // ---------------------------------------------------------------------

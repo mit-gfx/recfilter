@@ -624,55 +624,64 @@ RecFilterSchedule& RecFilterSchedule::fuse(VarTag vtag1, VarTag vtag2) {
     return *this;
 }
 
-RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor) {
-    if (vtag.check(SPLIT)) {
-        cerr << "Cannot split the variable which was created by split scheduling ops" << endl;
-        assert(false);
-    }
+// RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor) {
+//     if (vtag.check(SPLIT)) {
+//         cerr << "Cannot split the variable which was created by split scheduling ops" << endl;
+//         assert(false);
+//     }
+//
+//     for (int j=0; j<func_list.size(); j++) {
+//         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
+//         Func            F = Func(rF.func);
+//
+//         map<int,VarOrRVar> vars = var_by_tag(rF, vtag);
+//         map<int,VarOrRVar>::iterator vit;
+//
+//         for (vit=vars.begin(); vit!=vars.end(); vit++) {
+//             int def = vit->first;
+//             VarOrRVar v = vit->second.var;
+//             stringstream s;
+//
+//             Var t(unique_name(remove_dollar(v.name())+".1"));
+//
+//             s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name()
+//                 << "\"), Var(\"" << t.name() << "\"), " << factor << ")";
+//
+//             // only add scheduling to defs that are not undef
+//             if (def==PURE_DEF) {
+//                 if (!is_undef(F.values())) {
+//                     F.split(v,v,t,factor);
+//                     rF.pure_var_category.insert(make_pair(t.name(), VarTag(vtag|SPLIT)));
+//                     rF.pure_schedule.push_back(s.str());
+//                 }
+//             } else {
+//                 if (!is_undef(F.update_values(def))) {
+//                     F.update(def).split(v,v,t,factor);
+//                     rF.update_var_category[def].insert(make_pair(t.name(), VarTag(vtag|SPLIT)));
+//                     rF.update_schedule[def].push_back(s.str());
+//                 }
+//             }
+//         }
+//     }
+//     return *this;
+// }
 
-    for (int j=0; j<func_list.size(); j++) {
-        RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
-        Func            F = Func(rF.func);
-
-        map<int,VarOrRVar> vars = var_by_tag(rF, vtag);
-        map<int,VarOrRVar>::iterator vit;
-
-        for (vit=vars.begin(); vit!=vars.end(); vit++) {
-            int def = vit->first;
-            VarOrRVar v = vit->second.var;
-            stringstream s;
-
-            Var t(unique_name(remove_dollar(v.name())+".1"));
-
-            s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name()
-                << "\"), Var(\"" << t.name() << "\"), " << factor << ")";
-
-            // only add scheduling to defs that are not undef
-            if (def==PURE_DEF) {
-                if (!is_undef(F.values())) {
-                    F.split(v,v,t,factor);
-                    rF.pure_var_category.insert(make_pair(t.name(), VarTag(vtag|SPLIT)));
-                    rF.pure_schedule.push_back(s.str());
-                }
-            } else {
-                if (!is_undef(F.update_values(def))) {
-                    F.update(def).split(v,v,t,factor);
-                    rF.update_var_category[def].insert(make_pair(t.name(), VarTag(vtag|SPLIT)));
-                    rF.update_schedule[def].push_back(s.str());
-                }
-            }
-        }
-    }
-    return *this;
+RecFilterSchedule& RecFilterSchedule::split(VarTag v, int factor) {
+    return split(v, factor, INVALID, INVALID);
 }
 
-RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vtag_new) {
+RecFilterSchedule& RecFilterSchedule::split(VarTag v, int factor, VarTag vin) {
+    return split(v, factor, vin, INVALID);
+}
+
+RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vin, VarTag vout) {
     if (vtag.check(SPLIT)) {
         cerr << "Cannot split the variable which was created by split scheduling ops" << endl;
         assert(false);
     }
 
-    if (vtag_new.check(SCAN) || vtag_new.check(SPLIT) || vtag_new.check(FULL)) {
+    if (vin .check(SCAN) || vin .check(SPLIT) || vin .check(FULL) ||
+        vout.check(SCAN) || vout.check(SPLIT) || vout.check(FULL)) {
         cerr << "VarTag for the new dimension created by split must be one of "
              << "inner(), outer(), inner(i) and outer(k)" << endl;
         assert(false);
@@ -684,28 +693,31 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vtag
 
         // check if the new tag has a count, if not then the use the max possible count
         // afterwards we can use reassign_vartag_counts() to get continuous counts
-        if (vtag_new==INNER || vtag_new==OUTER) {
-            vtag_new = vtag_new|__4;
+        if (vin!=INVALID && (vin==INNER || vin==OUTER)) {
+            vin = vin|__4;
+        }
+        if (vout!=INVALID && (vout==INNER || vout==OUTER)) {
+            vout = vout|__4;
         }
 
         // check that vtag_new is not already used
         map<string,VarTag>::iterator z;
         for (z=rF.pure_var_category.begin(); z!=rF.pure_var_category.end(); z++) {
-            if (z->second == vtag_new) {
-                cerr << "Cannot use " << vtag_new << " as the tag for "
-                    << "the new dimesnsion created by split() because "
-                    << F.name() << " already has a dimension tagged as "
-                    << vtag_new << " in pure definition" << endl;
+            if (z->second==vin || z->second==vout) {
+                cerr << "Cannot use " << vin << " or " << vout << " as the tag "
+                    << "for the new dimesnsion created by split() because "
+                    << F.name() << " already has a dimension with the same tag "
+                    << "in pure definition" << endl;
                 assert(false);
             }
         }
         for (int i=0; i<rF.update_var_category.size(); i++) {
             for (z=rF.update_var_category[i].begin(); z!=rF.update_var_category[i].end(); z++) {
-                if (z->second == vtag_new) {
-                    cerr << "Cannot use " << vtag_new << " as the tag for "
-                        << "the new dimesnsion created by split() because "
-                        << F.name() << " already has a dimension tagged as "
-                        << vtag_new << " in update definition" << i << endl;
+                if (z->second==vin || z->second==vout) {
+                    cerr << "Cannot use " << vin << " or " << vout << " as the tag "
+                        << "for the new dimesnsion created by split() because "
+                        << F.name() << " already has a dimension with the same tag "
+                        << "in update definition" << i << endl;
                     assert(false);
                 }
             }
@@ -719,6 +731,13 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vtag
             VarOrRVar v = vit->second.var;
             stringstream s;
 
+            if (vin==INVALID) {
+                vin = vtag|SPLIT;
+            }
+            if (vout==INVALID) {
+                vout = vtag;
+            }
+
             Var t(unique_name(remove_dollar(v.name())+".1"));
 
             s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name()
@@ -728,14 +747,16 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vtag
             if (def==PURE_DEF) {
                 if (!is_undef(F.values())) {
                     F.split(v,v,t,factor);
-                    rF.pure_var_category.insert(make_pair(t.name(), vtag_new));
+                    rF.pure_var_category.insert(make_pair(v.name(), vout));
+                    rF.pure_var_category.insert(make_pair(t.name(), vin));
                     rF.pure_schedule.push_back(s.str());
                     reassign_vartag_counts(rF.pure_var_category);
                 }
             } else {
                 if (!is_undef(F.update_values(def))) {
                     F.update(def).split(v,v,t,factor);
-                    rF.update_var_category[def].insert(make_pair(t.name(), vtag_new));
+                    rF.update_var_category[def].insert(make_pair(v.name(), vout));
+                    rF.update_var_category[def].insert(make_pair(t.name(), vin));
                     rF.update_schedule[def].push_back(s.str());
                     reassign_vartag_counts(rF.update_var_category[def]);
                 }
