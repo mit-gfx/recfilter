@@ -344,6 +344,79 @@ public:
     RecFilter overlap_to_higher_order_filter(RecFilter fA, std::string name="O");
     // @}
 
+    /**@name Collective scheduling: generic handles for scheduling */
+    // {@
+
+    /** Extract a handle to schedule intra-tile functions of the tiled filter
+     * \param id 0 for all intra tile functions, 1 for nD intra-tile functions, otherwise 1D intra-tile functions
+     */
+    RecFilterSchedule intra_schedule(int id=0);
+
+    /** Extract a handle to schedule intra-tile functions of the tiled filter */
+    RecFilterSchedule inter_schedule(void);
+
+    /** Extract a handle to schedule non-tiled filter */
+    RecFilterSchedule full_schedule(void);
+    // @}
+
+
+    /**@name Automatic scheduling for GPU targets */
+    // {@
+    /** Automatic schedule for non-tiled filter and return a handle for additional scheduling
+     * \param tx tiling factor to split first dimension into CUDA blocks and threads
+     * \param ty tiling factor to split second dimension into CUDA blocks and threads
+     * \param tz tiling factor to split third dimension into CUDA blocks and threads
+     * \returns handle for additional scheduling
+     */
+    RecFilter& gpu_auto_full_schedule(int tx, int ty=1, int tz=1);
+
+    /** Automatic schedule for inter-tile functions of tiled filter
+     * \param max_threads maximum threads in a CUDA warp
+     * \returns handle for additional scheduling
+     */
+    RecFilter& gpu_auto_inter_schedule(int max_threads);
+
+    /** Automatic schedule for intra-tile functions if tiled filter
+     * \param id 0 for all intra tile functions, 1 for nD intra-tile functions, otherwise 1D intra-tile functions
+     * \param max_threads maximum threads in a CUDA warp
+     * \returns handle for additional scheduling
+     */
+    RecFilter& gpu_auto_intra_schedule(int id, int max_threads);
+    // @}
+
+    /**@name Automatic scheduling for CPU targets */
+    // {@
+    /** Automatic schedule for non-tiled filter
+     * \param vector_width vectorization width of the target platform
+     * \returns handle for additional scheduling
+     */
+    RecFilter& cpu_auto_full_schedule(int vector_width=8);
+
+    /** Automatic schedule for inter-tile functions of tiled filter
+     * \param vector_width vectorization width of the target platform
+     * \returns handle for additional scheduling
+     */
+    RecFilter& cpu_auto_inter_schedule(int vector_width=8);
+
+    /** Automatic schedule for intra-tile functions if tiled filter
+     * \param vector_width vectorization width of the target platform
+     * \returns handle for additional scheduling
+     */
+    RecFilter& cpu_auto_intra_schedule(int vector_width=8);
+    // @}
+
+    /** @name Generic handles to write scheduled for dimensions of internal functions */
+    // {@
+    VarTag full         (int i=-1);
+    VarTag inner        (int i=-1);
+    VarTag outer        (int i=-1);
+    VarTag tail         (void);
+    VarTag full_scan    (void);
+    VarTag inner_scan   (void);
+    VarTag outer_scan   (void);
+    VarTag inner_channels(void);
+    VarTag outer_channels(void);
+    // @}
 
     /**@name Print Halide code for the recursive filter */
     // {@
@@ -353,68 +426,9 @@ public:
     std::string print_hl_code  (void) const;
     // @}
 
-    /**@name Scheduling handles for non-tiled filters */
-    // {@
-
-    /** Extract a handle to schedule the filter (if not tiled)
-     *
-     * \param[in] id pure/update def id, negative for pure def, else id-th update def
-     * \return scheduling handle of the pure/update def to directly use Halide API
-     */
-    Halide::Stage full_schedule(int id=-1);
-
-    /** Specify the filter (if not tiled) to be computed in global memory
-     *
-     *  \return scheduling handle to directly use Halide API
-     */
-    Halide::Stage compute_globally(void);
-    // @}
-
-    /**@name Collective scheduling: generic handles for scheduling for tiled filter */
-    // {@
-
-    /** Extract a handle to schedule intra-tile functions if the filter is tiled
-     * \param id 0 for all intra tile functions, 1 for nD intra-tile functions, otherwise 1D intra-tile functions
-     */
-    RecFilterSchedule intra_schedule(int id=0);
-
-    /** Extract a handle to schedule intra-tile functions if the filter is tiled */
-    RecFilterSchedule inter_schedule(void);
-    // @}
-
-    /**@name Automatic scheduling: generic handles for creating automatic schedules for tiled filter */
-    // {@
-
-    /** Automatic schedule for non-tiled filter and return a handle for additional scheduling
-     * \param tx tiling factor to split first dimension into CUDA blocks and threads
-     * \param ty tiling factor to split second dimension into CUDA blocks and threads
-     * \param tz tiling factor to split third dimension into CUDA blocks and threads
-     */
-    RecFilter& gpu_auto_full_schedule(int tx, int ty=1, int tz=1);
-
-    /** Automatic schedule for inter-tile functions if the filter is tiled and return a handle for additional scheduling */
-    RecFilter& gpu_auto_inter_schedule(int max_threads);
-
-    /** Automatic schedule for intra-tile functions if the filter is tiled and return a handle for additional scheduling
-     * \param id 0 for all intra tile functions, 1 for nD intra-tile functions, otherwise 1D intra-tile functions
-     */
-    RecFilter& gpu_auto_intra_schedule(int id, int max_threads);
-    // @}
-
-    /** @name Generic handles to write scheduled for dimensions of internal functions */
-    // {@
-    VarTag full      (int i=-1);
-    VarTag inner     (int i=-1);
-    VarTag outer     (int i=-1);
-    VarTag tail      (void);
-    VarTag full_scan (void);
-    VarTag inner_scan(void);
-    VarTag outer_scan(void);
-    // @}
-
 protected:
     /** Allow scheduler access to internal functions; only needed to append the
-     * scheduling commands to each RecFilterFunc::schedule */
+     * scheduling commands to each RecFilterFunc::schedule for debugging purposes */
     friend class RecFilterSchedule;
 };
 
@@ -443,6 +457,7 @@ public:
     RecFilterSchedule& split(VarTag v, int factor, VarTag vin);
     RecFilterSchedule& split(VarTag v, int factor, VarTag vin, VarTag vout);
 
+    RecFilterSchedule& reorder(std::vector<VarTag> x);
     RecFilterSchedule& reorder(VarTag x, VarTag y);
     RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z);
     RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z, VarTag w);
@@ -450,6 +465,7 @@ public:
     RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s, VarTag t);
     RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s, VarTag t, VarTag u);
 
+    RecFilterSchedule& reorder_storage(std::vector<VarTag> x);
     RecFilterSchedule& reorder_storage(VarTag x, VarTag y);
     RecFilterSchedule& reorder_storage(VarTag x, VarTag y, VarTag z);
     RecFilterSchedule& reorder_storage(VarTag x, VarTag y, VarTag z, VarTag w);
@@ -465,9 +481,6 @@ public:
     RecFilterSchedule& gpu_blocks(VarTag v1);
     RecFilterSchedule& gpu_blocks(VarTag v1, VarTag v2);
     RecFilterSchedule& gpu_blocks(VarTag v1, VarTag v2, VarTag v3);
-
-    RecFilterSchedule& reorder (std::vector<VarTag> x);
-    RecFilterSchedule& reorder_storage(std::vector<VarTag> x);
 };
 
 

@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
             for (int i=0; i<=num_scans; i++) {
                 F.add_filter(+x, coeffs);
             }
-            F.compute_globally();
+            F.as_func().compute_root();
             time_naive.push_back(F.profile(iterations));
         }
 

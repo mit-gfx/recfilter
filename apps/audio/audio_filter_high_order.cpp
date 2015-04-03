@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
             RecFilter F("R_nontiled");
             F(x) = image(clamp(x,0,width-1));
             F.add_filter(+x, coeffs);
-            F.compute_globally();
+            F.as_func().compute_root();
             time_naive.push_back(F.profile(iterations));
         }
 

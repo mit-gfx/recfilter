@@ -359,24 +359,14 @@ void RecFilter::add_filter(RecFilterDimAndCausality x, vector<float> coeff) {
 
 // -----------------------------------------------------------------------------
 
-Stage RecFilter::full_schedule(int id) {
+RecFilterSchedule RecFilter::full_schedule(void) {
     if (contents.ptr->tiled) {
         cerr << "Filter is tiled, use RecFilter::intra_schedule() "
              << "and RecFilter::inter_schedule()\n" << endl;
         assert(false);
     }
-    return (id<0 ? Stage(as_func()) : as_func().update(id));
+    return RecFilterSchedule(*this, { name() });
 }
-
-Stage RecFilter::compute_globally(void) {
-    if (contents.ptr->tiled) {
-        cerr << "Filter is tiled, use RecFilter::intra_schedule() "
-             << "and RecFilter::inter_schedule()\n" << endl;
-        assert(false);
-    }
-    return as_func().compute_root();
-}
-
 
 RecFilterSchedule RecFilter::intra_schedule(int id) {
     if (!contents.ptr->tiled) {
@@ -447,10 +437,55 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
 
 // -----------------------------------------------------------------------------
 
+RecFilter& RecFilter::cpu_auto_full_schedule(int vector_width) {
+    if (contents.ptr->tiled) {
+        cerr << "Filter is tiled, use RecFilter::cpu_auto_intra_schedule() "
+             << "and RecFilter::cpu_auto_inter_schedule()\n" << endl;
+        assert(false);
+    }
+
+    // scan dimension can be unrolled
+    // inner most dimension must be vectorized
+    // all full dimensions must be parallelized
+
+    full_schedule().compute_globally()
+     .split(full(0), vector_width)
+     .reorder(full(0).split_var(), full_scan(), full())
+     .unroll(full_scan())
+     .vectorize(full(0).split_var())
+     .parallel(full());
+
+    return *this;
+}
+
+RecFilter& RecFilter::cpu_auto_intra_schedule(int vector_width) {
+    if (!contents.ptr->tiled) {
+        cerr << "Filter is not tiled, use RecFilter::cpu_auto_full_schedule()\n" << endl;
+        assert(false);
+    }
+
+    assert("cpu_auto_intra_schedule not supported currently" && false);
+
+    return *this;
+}
+
+RecFilter& RecFilter::cpu_auto_inter_schedule(int vector_width) {
+    if (!contents.ptr->tiled) {
+        cerr << "Filter is not tiled, use RecFilter::cpu_auto_full_schedule()\n" << endl;
+        assert(false);
+    }
+
+    assert("cpu_auto_inter_schedule not supported currently" && false);
+
+    return *this;
+}
+
+// -----------------------------------------------------------------------------
+
 RecFilter& RecFilter::gpu_auto_full_schedule(int tx, int ty, int tz) {
 //    if (contents.ptr->tiled) {
-//        cerr << "Filter is tiled, use RecFilter::intra_schedule() "
-//             << "and RecFilter::inter_schedule()\n" << endl;
+//        cerr << "Filter is tiled, use RecFilter::gpu_auto_intra_schedule() "
+//             << "and RecFilter::gpu_auto_inter_schedule()\n" << endl;
 //        assert(false);
 //    }
 //
@@ -536,6 +571,11 @@ RecFilter& RecFilter::gpu_auto_full_schedule(int tx, int ty, int tz) {
 }
 
 RecFilter& RecFilter::gpu_auto_inter_schedule(int max_threads) {
+    if (!contents.ptr->tiled) {
+        cerr << "Filter is not tiled, use RecFilter::gpu_auto_full_schedule()\n" << endl;
+        assert(false);
+    }
+
     if (contents.ptr->filter_info.size()>AUTO_SCHEDULE_MAX_DIMENSIONS) {
         cerr << "Auto schedules are not supported for more than " << AUTO_SCHEDULE_MAX_DIMENSIONS << " filter dimensions" << endl;
         assert(false);
@@ -557,11 +597,14 @@ RecFilter& RecFilter::gpu_auto_inter_schedule(int max_threads) {
 
     stringstream str;
 
+    // store inner dimensions innermost because threads are operating
+    // on these dimensions - memory coalescing
     R.compute_globally()
-     .reorder_storage(full(), inner(), tail(), outer());
+     .reorder_storage({inner_channels(), full(), inner(), tail(), outer(), outer_channels()});
+
     str << name()
         << ".inter_schedule().compute_globally()"
-        << ".reorder_storage(full(), inner(), tail(), outer())";
+        << ".reorder_storage({inner_channels(), full(), inner(), tail(), outer(), outer_channels()})";
 
     // max tile is the maximum number of threads that will be launched
     // by specifying either of tx, ty, or tz as parallel
@@ -595,17 +638,15 @@ RecFilter& RecFilter::gpu_auto_inter_schedule(int max_threads) {
             << ".unroll(" << ty.split_var() << ")";
     }
 
-    // store inner dimensions innermost because threads are operating
-    // on these dimensions - memory coalescing
     R.unroll(sc)
-     .vectorize(tail())
-     .reorder({tail(), sc, tx, ty, bx, by})
+     .vectorize(inner_channels())
+     .reorder({inner_channels(), sc, tail(), tx, ty, bx, by})
      .gpu_threads(tx, ty)
      .gpu_blocks (bx, by);
 
     str << ".unroll(" << sc << ")"
-        << ".vectorize(" << tail() << ")"
-        << ".reorder({" << tail() << ", " << sc << ", " << ", " << tx << ", " << ty << ", " << bx << ", " << by << "})"
+        << ".vectorize(" << inner_channels() << ")"
+        << ".reorder({" << inner_channels() << ", " << sc << ", " << tail() << ", " << ", " << tx << ", " << ty << ", " << bx << ", " << by << "})"
         << ".gpu_threads(" << tx << ", " << ty << ")"
         << ".gpu_blocks (" << bx << ", " << by << ");" << endl;
 
@@ -615,6 +656,11 @@ RecFilter& RecFilter::gpu_auto_inter_schedule(int max_threads) {
 }
 
 RecFilter& RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
+    if (!contents.ptr->tiled) {
+        cerr << "Filter is not tiled, use RecFilter::gpu_auto_full_schedule()\n" << endl;
+        assert(false);
+    }
+
     if (contents.ptr->filter_info.size()>AUTO_SCHEDULE_MAX_DIMENSIONS) {
         cerr << "Auto schedules are not supported for more than " << AUTO_SCHEDULE_MAX_DIMENSIONS << " filter dimensions" << endl;
         assert(false);
@@ -638,7 +684,7 @@ RecFilter& RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
     stringstream str;
 
     R.compute_locally();
-    str << name() << "." << "intra_schedule(" << id << ").compute_locally()";
+    str << name() << ".intra_schedule(" << id << ").compute_locally()";
 
     // max tile is the maximum number of threads that will be launched
     // by specifying either of tx, ty, or tz as parallel
@@ -653,29 +699,21 @@ RecFilter& RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
 
     // there is at least one non-tiled dimension
     if (!R.contains_vars_with_tag(fx)) {
-        R.split(fx, max_tile);
-        bz = by;
-        by = bx;
-        bx = fx;
-        tz = ty;
-        ty = tx;
-        tx = bx.split_var();
+        R.split(fx, max_tile, inner(), outer());
+        str << ".split(" << fx << ", " << max_tile << ", " << inner() << ", " << outer() << ")";
     }
 
     // there are two non-tiled dimensions
     if (!R.contains_vars_with_tag(fy)) {
-        R.split(fy, max_tile);
-        bz = by;
-        by = fy;
-        tz = ty;
-        ty = by.split_var();
+        R.split(fy, max_tile, inner(), outer());
+        str << ".split(" << fy << ", " << max_tile << ", " << inner() << ", " << outer() << ")";
     }
 
     // too few threads if ty is empty, too many if ty is full
     // TODO: maybe merge tail and ty
     if (!R.contains_vars_with_tag(ty)) {
-        int intra_tiles_per_warp = max_tile/(max_order*num_scans);
-        R.split(bx, intra_tiles_per_warp);
+        int intra_tiles_per_warp = max_threads/(max_tile*max_order);
+        R.fuse(tx, tail()).split(bx, intra_tiles_per_warp);
         ty = bx.split_var();
         str << ".split(" << bx << ", " << intra_tiles_per_warp << ")";
     } else {
@@ -685,14 +723,14 @@ RecFilter& RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
     }
 
     R.unroll(sc)
-     .vectorize(tail())
-     .reorder({tail(), sc, tz, tx, ty, bx, by, bz})
+     .vectorize(inner_channels())
+     .reorder({inner_channels(), tail(), sc, tz, tx, ty, outer()})
      .gpu_threads(tx, ty)
      .gpu_blocks (bx, by, bz);
 
     str << ".unroll(" << sc << ")"
-        << ".vectorize(" << tail() << ")"
-        << ".reorder({" << tail() << ", " << sc << ", " << tz << ", " << tx << ", " << ty << ", " << bx << ", " << by << ", " << bz << "})"
+        << ".vectorize(" << inner_channels() << ")"
+        << ".reorder({" << inner_channels() << ", " << tail() << ", " << sc << ", " << tz << ", " << tx << ", " << ty << ", " << outer() << "})"
         << ".gpu_threads(" << tx << ", " << ty << ")"
         << ".gpu_blocks (" << bx << ", " << by << ", " << bz << ");" << endl;
 
@@ -703,13 +741,15 @@ RecFilter& RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
 
 // -----------------------------------------------------------------------------
 
-VarTag RecFilter::full      (int i) { return VarTag(FULL,  i);     }
-VarTag RecFilter::inner     (int i) { return VarTag(INNER, i);     }
-VarTag RecFilter::outer     (int i) { return VarTag(OUTER, i);     }
-VarTag RecFilter::tail      (void)  { return VarTag(TAIL);         }
-VarTag RecFilter::full_scan (void)  { return VarTag(FULL|SCAN);    }
-VarTag RecFilter::inner_scan(void)  { return VarTag(INNER|SCAN);   }
-VarTag RecFilter::outer_scan(void)  { return VarTag(OUTER|SCAN);   }
+VarTag RecFilter::full          (int i) { return VarTag(FULL,  i);     }
+VarTag RecFilter::inner         (int i) { return VarTag(INNER, i);     }
+VarTag RecFilter::outer         (int i) { return VarTag(OUTER, i);     }
+VarTag RecFilter::tail          (void)  { return VarTag(TAIL);         }
+VarTag RecFilter::full_scan     (void)  { return VarTag(FULL|SCAN);    }
+VarTag RecFilter::inner_scan    (void)  { return VarTag(INNER|SCAN);   }
+VarTag RecFilter::outer_scan    (void)  { return VarTag(OUTER|SCAN);   }
+VarTag RecFilter::inner_channels(void)  { return VarTag(INNER|CHANNEL);}
+VarTag RecFilter::outer_channels(void)  { return VarTag(OUTER|CHANNEL);}
 
 // -----------------------------------------------------------------------------
 
@@ -776,7 +816,7 @@ Realization RecFilter::create_realization(void) {
             inter_schedule().compute_globally();
             intra_schedule().compute_globally();
         } else {
-            compute_globally();
+            full_schedule().compute_globally();
         }
         cerr << "Warning: Applied default schedule to filter "
             << contents.ptr->name << endl;

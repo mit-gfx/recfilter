@@ -35,6 +35,7 @@ enum VariableTag: int {
     OUTER   = 0x0040, ///< outer dimension after tiling
     TAIL    = 0x0080, ///< if dimension is at lower granularity
     SCAN    = 0x0100, ///< if dimension is a scan
+    CHANNEL = 0x0200, ///< if dimension represents RGB channels
     __1     = 0x0001, ///< first variable with one of the above tags
     __2     = 0x0002, ///< second variable with one of the above tags
     __3     = 0x0004, ///< third variable with one of the above tags

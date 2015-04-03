@@ -54,7 +54,8 @@ RecFilter box_filter_order_1(Image<float> I, int width, int height, int B, int t
     Var u = x.var();
     Var v = y.var();
 
-    D.compute_globally()
+    D.as_func()
+        .compute_root()
         .split  (u, xo, xi, tile_width)
         .split  (v, yo, yi, tile_width)
         .split  (yi,yi, yii,8)
@@ -183,7 +184,7 @@ RecFilter box_filter_order_2(Func I, int width, int height, int B, int tile_widt
     // -------------------------------------------------------------------------
     // same schedule for the differencing operators in both dimensions
 
-    diff_x.compute_globally()
+    diff_x.as_func()
         .split  (u, xo, xi, tile_width)
         .split  (v, yo, yi, tile_width)
         .split  (yi,yi, yii, unroll_w)
@@ -191,7 +192,8 @@ RecFilter box_filter_order_2(Func I, int width, int height, int B, int tile_widt
         .reorder(yii,xi,yi,xo,yo)
         .gpu    (xo,yo,xi,yi);
 
-    diff_y.compute_globally()
+    diff_y.as_func()
+        .compute_root()
         .split  (u, xo, xi, tile_width)
         .split  (v, yo, yi, tile_width)
         .split  (yi,yi, yii,unroll_w)
