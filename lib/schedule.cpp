@@ -750,7 +750,7 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vin,
                     rF.pure_var_category.insert(make_pair(v.name(), vout));
                     rF.pure_var_category.insert(make_pair(t.name(), vin));
                     rF.pure_schedule.push_back(s.str());
-                    reassign_vartag_counts(rF.pure_var_category);
+                    recfilter.reassign_vartag_counts(rF.pure_var_category);
                 }
             } else {
                 if (!is_undef(F.update_values(def))) {
@@ -758,7 +758,7 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vin,
                     rF.update_var_category[def].insert(make_pair(v.name(), vout));
                     rF.update_var_category[def].insert(make_pair(t.name(), vin));
                     rF.update_schedule[def].push_back(s.str());
-                    reassign_vartag_counts(rF.update_var_category[def]);
+                    recfilter.reassign_vartag_counts(rF.update_var_category[def]);
                 }
             }
         }

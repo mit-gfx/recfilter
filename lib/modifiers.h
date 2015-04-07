@@ -160,13 +160,4 @@ Halide::Expr remove_lets(Halide::Expr);
 /** Extract the list of buffers called in the definition a function */
 std::map<std::string, Halide::Buffer> extract_buffer_calls(Halide::Func func);
 
-
-/** Make sure that all vars with tags INNER, OUTER or FULL have VarTag count in
- * continuous increasing order - this continuity was broken during tiling or due
- * to split() scheduling directive where vars were replaced by inner/outer/tail vars
- *
- * \param[in,out] var_tags list of variable tags to be modified
- */
-void reassign_vartag_counts(std::map<std::string,VarTag>& var_tags);
-
 #endif // _MODIFIERS_H_

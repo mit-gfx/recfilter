@@ -964,3 +964,56 @@ string RecFilter::print_hl_code(void) const {
     string c = print_schedule();
     return a+b+c;
 }
+
+// -----------------------------------------------------------------------------
+
+
+void RecFilter::reassign_vartag_counts(map<string,VarTag>& var_tags) {
+    vector<VariableTag> ref_vartag = {INNER, OUTER, FULL};
+
+    for (int u=0; u<ref_vartag.size(); u++) {
+        VariableTag ref = ref_vartag[u];
+
+        map<int,string> var_count;
+
+        map<string,VarTag>::iterator vartag_it;
+        map<int,string>::iterator    count_it;
+
+        // assign counts to the vars in the order that they appeared in the
+        // filter definition. each var came from some original RecFilterDim
+        // assign the index of that RecFilterDim to each var
+        for (vartag_it=var_tags.begin(); vartag_it!=var_tags.end(); vartag_it++) {
+            string var = vartag_it->first;
+            VarTag tag = vartag_it->second;
+            if (tag.check(ref) && !tag.check(SPLIT) && !tag.check(SCAN)) {
+                // find the original dimension that this var came from
+                // this var's name will start with the name of the original var
+                for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+                    int    original_count = contents.ptr->filter_info[i].filter_dim;
+                    string original_var   = contents.ptr->filter_info[i].var.name();
+                    if (var.find(original_var)==0) {
+                        vartag_it->second = VarTag(ref, original_count);
+                    }
+                }
+            }
+        }
+
+        // extract the vars and put them in sorted order according to their count
+        for (vartag_it=var_tags.begin(); vartag_it!=var_tags.end(); vartag_it++) {
+            string var = vartag_it->first;
+            VarTag tag = vartag_it->second;
+            if (tag.check(ref) && !tag.check(SPLIT) && !tag.check(SCAN)) {
+                int count = tag.count();
+                var_count.insert(make_pair(count,var));
+            }
+        }
+
+        // access the vars in sorted order
+        int count = 0;
+        for (count_it=var_count.begin(); count_it!=var_count.end(); count_it++) {
+            string var = count_it->second;
+            var_tags[ var ] = VarTag(ref,count);
+            count++;
+        }
+    }
+}

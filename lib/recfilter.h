@@ -119,6 +119,15 @@ private:
      */
     void inline_func(std::string func_name);
 
+    /** Make sure that all vars with tags INNER, OUTER or FULL have VarTag count
+     * in the same order as the corresponding non-tiled dimensions in the original
+     * filter in continuous increasing order; this continuity was broken during
+     * splitting where vars were replaced by inner/outer/tail vars
+     *
+     * \param[in,out] var_tags list of variable tags to be modified
+     */
+    void reassign_vartag_counts(std::map<std::string,VarTag>& var_tags);
+
     /** Finalize the filter; triggers automatic function transformations and cleanup */
     void finalize(void);
 
