@@ -438,7 +438,7 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
 
 // -----------------------------------------------------------------------------
 
-RecFilter& RecFilter::cpu_auto_full_schedule(int vector_width) {
+void RecFilter::cpu_auto_full_schedule(int vector_width) {
     if (contents.ptr->tiled) {
         cerr << "Filter is tiled, use RecFilter::cpu_auto_intra_schedule() "
              << "and RecFilter::cpu_auto_inter_schedule()\n" << endl;
@@ -455,35 +455,35 @@ RecFilter& RecFilter::cpu_auto_full_schedule(int vector_width) {
      .unroll(full_scan())
      .vectorize(full(0).split_var())
      .parallel(full());
-
-    return *this;
 }
 
-RecFilter& RecFilter::cpu_auto_intra_schedule(int vector_width) {
+void RecFilter::cpu_auto_intra_schedule(int vector_width) {
     if (!contents.ptr->tiled) {
         cerr << "Filter is not tiled, use RecFilter::cpu_auto_full_schedule()\n" << endl;
         assert(false);
     }
 
     assert("cpu_auto_intra_schedule not supported currently" && false);
-
-    return *this;
 }
 
-RecFilter& RecFilter::cpu_auto_inter_schedule(int vector_width) {
+void RecFilter::cpu_auto_inter_schedule(int vector_width) {
     if (!contents.ptr->tiled) {
         cerr << "Filter is not tiled, use RecFilter::cpu_auto_full_schedule()\n" << endl;
         assert(false);
     }
 
     assert("cpu_auto_inter_schedule not supported currently" && false);
-
-    return *this;
 }
 
 // -----------------------------------------------------------------------------
 
-RecFilter& RecFilter::gpu_auto_full_schedule(int tx, int ty, int tz) {
+void RecFilter::gpu_auto_schedule(int max_threads) {
+    gpu_auto_intra_schedule(1,max_threads);
+    gpu_auto_intra_schedule(2,max_threads);
+    gpu_auto_inter_schedule(max_threads);
+}
+
+void RecFilter::gpu_auto_full_schedule(int tx, int ty, int tz) {
 //    if (contents.ptr->tiled) {
 //        cerr << "Filter is tiled, use RecFilter::gpu_auto_intra_schedule() "
 //             << "and RecFilter::gpu_auto_inter_schedule()\n" << endl;
@@ -568,10 +568,9 @@ RecFilter& RecFilter::gpu_auto_full_schedule(int tx, int ty, int tz) {
 //        }
 //    }
 //
-    return *this;
 }
 
-RecFilter& RecFilter::gpu_auto_inter_schedule(int max_threads) {
+void RecFilter::gpu_auto_inter_schedule(int max_threads) {
     if (!contents.ptr->tiled) {
         cerr << "Filter is not tiled, use RecFilter::gpu_auto_full_schedule()\n" << endl;
         assert(false);
@@ -641,11 +640,9 @@ RecFilter& RecFilter::gpu_auto_inter_schedule(int max_threads) {
         << "\t.gpu_blocks (" << bx << ", " << by << ");\n" << endl;
 
     // cerr << str.str() << endl;
-
-    return *this;
 }
 
-RecFilter& RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
+void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
     if (!contents.ptr->tiled) {
         cerr << "Filter is not tiled, use RecFilter::gpu_auto_full_schedule()\n" << endl;
         assert(false);
@@ -712,13 +709,15 @@ RecFilter& RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
                 str << "\t.split(" << ty << ", "<< factor << ")\n"
                     << "\t.unroll(" << ty.split_var() << ")\n";
             }
+            R.reorder_storage(inner(), outer());
             R.unroll(sc)
-             .reorder({tail(), sc, ty.split_var(), tz, tx, ty, outer()})
+             .reorder({sc, ty.split_var(), tz, tx, ty, outer()})
              .gpu_threads(tx, ty)
              .gpu_blocks (bx, by, bz);
 
-            str << "\t.unroll(" << sc << ")\n"
-                << "\t.reorder({" << tail() << ", " << sc << ", " << ty.split_var() << ", " << tz << ", " << tx << ", " << ty << ", " << outer() << "})\n"
+            str << "\rreorder_storage(inner(), outer())\n"
+                << "\t.unroll(" << sc << ")\n"
+                << "\t.reorder({" << sc << ", " << ty.split_var() << ", " << tz << ", " << tx << ", " << ty << ", " << outer() << "})\n"
                 << "\t.gpu_threads(" << tx << ", " << ty << ")\n"
                 << "\t.gpu_blocks (" << bx << ", " << by << ", " << bz << ");\n" << endl;
             break;
@@ -747,8 +746,6 @@ RecFilter& RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
     }
 
     // cerr << str.str() << endl;
-
-    return *this;
 }
 
 // -----------------------------------------------------------------------------

@@ -17,7 +17,6 @@ using namespace Halide;
 using std::map;
 using std::vector;
 using std::string;
-using std::cerr;
 using std::cout;
 using std::endl;
 
@@ -27,6 +26,7 @@ void check(RecFilter F, vector<float> filter_coeff, Image<T> image);
 int main(int argc, char **argv) {
     Arguments args(argc, argv);
 
+    bool nosched   = args.noschedule;
     bool nocheck   = args.nocheck;
     int iter       = args.iterations;
     int tile_width = args.block;
@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
 
     F.split_all_dimensions(tile_width);
 
-    if (F.target().has_gpu_feature()) {
+    if (nosched) {
         int order    = coeff.size()-1;
         int n_scans  = 4;
         int ws       = 32;
@@ -87,10 +87,15 @@ int main(int argc, char **argv) {
             .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
             .gpu_threads    (F.inner(0), F.outer(0).split_var())
             .gpu_blocks     (F.outer(0));
+    } else {
+        cout << "Using automatic scheduling" << endl;
+        int max_threads = 128;
+        F.gpu_auto_schedule(max_threads);
     }
 
     F.profile(iter);
 
+    cout << F.print_schedule() << endl;
     if (!nocheck) {
         check<float>(F, coeff, image);
     }
@@ -100,7 +105,7 @@ int main(int argc, char **argv) {
 
 template<typename T>
 void check(RecFilter F, vector<float> filter_coeff, Image<T> image) {
-    cerr << "\nChecking difference ... " << endl;
+    cout << "\nChecking difference ... " << endl;
 
     int width = image.width();
     int height = image.height();

@@ -14,7 +14,6 @@ using namespace Halide;
 using std::map;
 using std::vector;
 using std::string;
-using std::cerr;
 using std::cout;
 using std::endl;
 
@@ -22,6 +21,7 @@ using std::endl;
 int main(int argc, char **argv) {
     Arguments args(argc, argv);
 
+    bool nosched   = args.noschedule;
     bool nocheck   = args.nocheck;
     int iter       = args.iterations;
     int tile_width = args.block;
@@ -46,14 +46,7 @@ int main(int argc, char **argv) {
 
     // ---------------------------------------------------------------------
 
-    if (F.target().has_gpu_feature()) {
-#define AUTO_SCHEDULE 1
-#if AUTO_SCHEDULE
-        int max_threads = 128;
-        F.gpu_auto_inter_schedule(max_threads)
-         .gpu_auto_intra_schedule(1, max_threads)
-         .gpu_auto_intra_schedule(2, max_threads);
-#else
+    if (nosched) {
         int order    = 1;
         int n_scans  = 2;
         int ws       = 32;
@@ -85,17 +78,20 @@ int main(int argc, char **argv) {
             .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
             .gpu_threads    (F.inner(0), F.outer(0).split_var())
             .gpu_blocks     (F.outer(0));
-#endif
+    } else {
+        cout << "Using automatic scheduling" << endl;
+        int max_threads = 128;
+        F.gpu_auto_schedule(max_threads);
     }
 
-    cerr << F.print_schedule() << endl;
+    cout << F.print_schedule() << endl;
     F.compile_jit("stmt.html");
     F.profile(iter);
 
     // ---------------------------------------------------------------------
 
     if (!nocheck) {
-        cerr << "\nChecking difference ... " << endl;
+        cout << "\nChecking difference ... " << endl;
         Realization out = F.realize();
 
         Image<float> hl_out(out);

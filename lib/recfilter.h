@@ -377,20 +377,29 @@ public:
      * \param tz tiling factor to split third dimension into CUDA blocks and threads
      * \returns handle for additional scheduling
      */
-    RecFilter& gpu_auto_full_schedule(int tx, int ty=1, int tz=1);
+    void gpu_auto_full_schedule(int tx, int ty=1, int tz=1);
+
+    /** Automatic schedule for tiled or non-tiled recursive filter;
+     * calls RecFilter::gpu_auto_full_schedule(),
+     * RecFilter::gpu_auto_intra_schedule() and
+     * RecFilter::gpu_auto_inter_schedule().
+     * \param max_threads maximum threads in a CUDA warp
+     * \returns handle for additional scheduling
+     */
+    void gpu_auto_schedule(int max_threads);
 
     /** Automatic schedule for inter-tile functions of tiled filter
      * \param max_threads maximum threads in a CUDA warp
      * \returns handle for additional scheduling
      */
-    RecFilter& gpu_auto_inter_schedule(int max_threads);
+    void gpu_auto_inter_schedule(int max_threads);
 
     /** Automatic schedule for intra-tile functions if tiled filter
      * \param id 0 for all intra tile functions, 1 for nD intra-tile functions, otherwise 1D intra-tile functions
      * \param max_threads maximum threads in a CUDA warp
      * \returns handle for additional scheduling
      */
-    RecFilter& gpu_auto_intra_schedule(int id, int max_threads);
+    void gpu_auto_intra_schedule(int id, int max_threads);
     // @}
 
     /**@name Automatic scheduling for CPU targets */
@@ -399,19 +408,19 @@ public:
      * \param vector_width vectorization width of the target platform
      * \returns handle for additional scheduling
      */
-    RecFilter& cpu_auto_full_schedule(int vector_width=8);
+    void cpu_auto_full_schedule(int vector_width=8);
 
     /** Automatic schedule for inter-tile functions of tiled filter
      * \param vector_width vectorization width of the target platform
      * \returns handle for additional scheduling
      */
-    RecFilter& cpu_auto_inter_schedule(int vector_width=8);
+    void cpu_auto_inter_schedule(int vector_width=8);
 
     /** Automatic schedule for intra-tile functions if tiled filter
      * \param vector_width vectorization width of the target platform
      * \returns handle for additional scheduling
      */
-    RecFilter& cpu_auto_intra_schedule(int vector_width=8);
+    void cpu_auto_intra_schedule(int vector_width=8);
     // @}
 
     /** @name Generic handles to write scheduled for dimensions of internal functions */
@@ -584,17 +593,17 @@ std::ostream &operator<<(std::ostream &s, const Halide::Internal::Function &f);
 
 /** Command line arg parser */
 class Arguments {
-    public:
-        int width;       ///< image width
-        int max_width;   ///< max image width
-        int min_width;   ///< min image width
-        int block;       ///< block size
-        int iterations;  ///< profiling iterations
-        int filter_reps; ///< filter iterations (multiple applications of the filter)
-        bool nocheck;    ///< skip check Halide result against reference solution
+public:
+    int width;       ///< image width
+    int max_width;   ///< max image width
+    int min_width;   ///< min image width
+    int block;       ///< block size
+    int iterations;  ///< profiling iterations
+    bool nocheck;    ///< skip check Halide result against reference solution
+    bool noschedule; ///< do not use automatic scheduling
 
-        /** Parse command line args from number of args and list of args */
-        Arguments(int argc, char** argv);
+    /** Parse command line args from number of args and list of args */
+    Arguments(int argc, char** argv);
 };
 
 // ----------------------------------------------------------------------------
