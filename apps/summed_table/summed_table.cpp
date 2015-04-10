@@ -49,7 +49,6 @@ int main(int argc, char **argv) {
     if (F.target().has_gpu_feature()) {
 #define AUTO_SCHEDULE 1
 #if AUTO_SCHEDULE
-        cerr <<       F.print_synopsis() ;
         int max_threads = 128;
         F.gpu_auto_inter_schedule(max_threads)
          .gpu_auto_intra_schedule(1, max_threads)
