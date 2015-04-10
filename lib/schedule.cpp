@@ -95,15 +95,29 @@ bool RecFilterSchedule::contains_vars_with_tag(VarTag vtag) {
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc f = recfilter.internal_function(func_list[j]);
         map< int,vector<VarOrRVar> > var_list = var_list_by_tag(f, vtag);
-        empty &= var_list.empty();
+
+        Func F(f.func);
+
+        // check if valid pure definition has any vars with this tag
+        if (!is_undef(F.values()) && var_list.find(PURE_DEF)!=var_list.end()) {
+            empty &= var_list[PURE_DEF].empty();
+        }
+
+        // check if any valid update definition has any vars with this tag
+        for (int i=0; i<F.num_update_definitions(); i++) {
+            if (!is_undef(F.update_values(i)) && var_list.find(i)!=var_list.end()) {
+                empty &= var_list[i].empty();
+            }
+        }
     }
-    return empty;
+    return !empty;
 }
 
 map< int,vector<VarOrRVar> > RecFilterSchedule::var_list_by_tag(RecFilterFunc f, VarTag vtag) {
     bool ignore_count = !vtag.has_count();
     map< int,vector<VarOrRVar> > var_list;
     map<string,VarTag>::iterator vit;
+
     for (vit = f.pure_var_category.begin(); vit!=f.pure_var_category.end(); vit++) {
         if (ignore_count) {
             if (vit->second.same_except_count(vtag)) {
@@ -249,8 +263,8 @@ RecFilterSchedule& RecFilterSchedule::compute_locally(void) {
 RecFilterSchedule& RecFilterSchedule::parallel(VarTag vtag, int factor) {
     if (recfilter.target().has_gpu_feature()) {
         cerr << "Cannot use RecFilterSchedule::parallel() if compilation "
-             << "target is GPU; use RecFilterSchedule::gpu_blocks() or "
-             << "RecFilterSchedule::gpu_threads()" << endl;
+            << "target is GPU; use RecFilterSchedule::gpu_blocks() or "
+            << "RecFilterSchedule::gpu_threads()" << endl;
         assert(false);
     }
 
@@ -388,7 +402,7 @@ RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag v1, VarTag v2) {
 RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag v1, VarTag v2, VarTag v3) {
     if (!recfilter.target().has_gpu_feature()) {
         cerr << "Cannot use RecFilterSchedule::gpu_blocks() if compilation "
-             << "target is not GPU; use RecFilterSchedule::parallel()" << endl;
+            << "target is not GPU; use RecFilterSchedule::parallel()" << endl;
         assert(false);
     }
 
@@ -451,8 +465,8 @@ RecFilterSchedule& RecFilterSchedule::gpu_blocks(VarTag v1, VarTag v2, VarTag v3
                         F.parallel(v).rename(v, GPU_BLOCK[block_id_x]);
                         rF.pure_schedule.push_back(s.str());
                     } //else {
-                        //F.gpu_single_thread();
-                        //rF.pure_schedule.push_back("gpu_single_thread()");
+                    //F.gpu_single_thread();
+                    //rF.pure_schedule.push_back("gpu_single_thread()");
                     //}
                 } else {
                     if (!is_undef(F.update_values(def))) {
@@ -477,7 +491,7 @@ RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag v1, VarTag v2) {
 RecFilterSchedule& RecFilterSchedule::gpu_threads(VarTag v1, VarTag v2, VarTag v3) {
     if (!recfilter.target().has_gpu_feature()) {
         cerr << "Cannot use RecFilterSchedule::gpu_threads() if compilation "
-             << "target is not GPU; use RecFilterSchedule::parallel()" << endl;
+            << "target is not GPU; use RecFilterSchedule::parallel()" << endl;
         assert(false);
     }
 
@@ -624,48 +638,6 @@ RecFilterSchedule& RecFilterSchedule::fuse(VarTag vtag1, VarTag vtag2) {
     return *this;
 }
 
-// RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor) {
-//     if (vtag.check(SPLIT)) {
-//         cerr << "Cannot split the variable which was created by split scheduling ops" << endl;
-//         assert(false);
-//     }
-//
-//     for (int j=0; j<func_list.size(); j++) {
-//         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
-//         Func            F = Func(rF.func);
-//
-//         map<int,VarOrRVar> vars = var_by_tag(rF, vtag);
-//         map<int,VarOrRVar>::iterator vit;
-//
-//         for (vit=vars.begin(); vit!=vars.end(); vit++) {
-//             int def = vit->first;
-//             VarOrRVar v = vit->second.var;
-//             stringstream s;
-//
-//             Var t(unique_name(remove_dollar(v.name())+".1"));
-//
-//             s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name()
-//                 << "\"), Var(\"" << t.name() << "\"), " << factor << ")";
-//
-//             // only add scheduling to defs that are not undef
-//             if (def==PURE_DEF) {
-//                 if (!is_undef(F.values())) {
-//                     F.split(v,v,t,factor);
-//                     rF.pure_var_category.insert(make_pair(t.name(), VarTag(vtag|SPLIT)));
-//                     rF.pure_schedule.push_back(s.str());
-//                 }
-//             } else {
-//                 if (!is_undef(F.update_values(def))) {
-//                     F.update(def).split(v,v,t,factor);
-//                     rF.update_var_category[def].insert(make_pair(t.name(), VarTag(vtag|SPLIT)));
-//                     rF.update_schedule[def].push_back(s.str());
-//                 }
-//             }
-//         }
-//     }
-//     return *this;
-// }
-
 RecFilterSchedule& RecFilterSchedule::split(VarTag v, int factor) {
     return split(v, factor, INVALID, INVALID);
 }
@@ -683,9 +655,18 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vin,
     if (vin .check(SCAN) || vin .check(SPLIT) || vin .check(FULL) ||
         vout.check(SCAN) || vout.check(SPLIT) || vout.check(FULL)) {
         cerr << "VarTag for the new dimension created by split must be one of "
-             << "inner(), outer(), inner(i) and outer(k)" << endl;
+            << "inner(), outer(), inner(i) and outer(k)" << endl;
         assert(false);
     }
+
+    // use default tags if they are empty
+    vin = (vin==INVALID ? vtag|SPLIT : vin);
+    vout= (vin==INVALID ? vtag       : vout);
+
+    // add a count if they dont have a count
+    vin = (vin==INNER  || vin==OUTER  ? vin = vin|__4 : vin);
+    vout= (vout==INNER || vout==OUTER ? vout= vout|__4 : vout);
+
 
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
@@ -693,13 +674,6 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vin,
 
         // check if the new tag has a count, if not then the use the max possible count
         // afterwards we can use reassign_vartag_counts() to get continuous counts
-        if (vin!=INVALID && (vin==INNER || vin==OUTER)) {
-            vin = vin|__4;
-        }
-        if (vout!=INVALID && (vout==INNER || vout==OUTER)) {
-            vout = vout|__4;
-        }
-
         // check that vtag_new is not already used
         map<string,VarTag>::iterator z;
         for (z=rF.pure_var_category.begin(); z!=rF.pure_var_category.end(); z++) {
@@ -731,17 +705,10 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vin,
             VarOrRVar v = vit->second.var;
             stringstream s;
 
-            if (vin==INVALID) {
-                vin = vtag|SPLIT;
-            }
-            if (vout==INVALID) {
-                vout = vtag;
-            }
-
             Var t(unique_name(remove_dollar(v.name())+".1"));
 
             s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name()
-                << "\"), Var(\"" << t.name() << "\"), " << factor << ")";
+              << "\"), Var(\"" << t.name() << "\"), " << factor << ")";
 
             // only add scheduling to defs that are not undef
             if (def==PURE_DEF) {

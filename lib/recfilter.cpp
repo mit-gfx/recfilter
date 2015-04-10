@@ -432,6 +432,7 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
     if (func_list.empty()) {
         cerr << "Warning: No inter tile functions to schedule" << endl;
     }
+
     return RecFilterSchedule(*this, func_list);
 }
 
@@ -600,11 +601,10 @@ RecFilter& RecFilter::gpu_auto_inter_schedule(int max_threads) {
     // store inner dimensions innermost because threads are operating
     // on these dimensions - memory coalescing
     R.compute_globally()
-     .reorder_storage({inner_channels(), full(), inner(), tail(), outer(), outer_channels()});
+     .reorder_storage({full(), inner(), tail(), outer()});
 
-    str << name()
-        << ".inter_schedule().compute_globally()"
-        << ".reorder_storage({inner_channels(), full(), inner(), tail(), outer(), outer_channels()})";
+    str << name() << ".inter_schedule().compute_globally()\n"
+        << "\t.reorder_storage({full(), inner(), tail(), outer()})\n";
 
     // max tile is the maximum number of threads that will be launched
     // by specifying either of tx, ty, or tz as parallel
@@ -614,15 +614,15 @@ RecFilter& RecFilter::gpu_auto_inter_schedule(int max_threads) {
     }
 
     // there is at least one non-tiled dimension
-    if (!R.contains_vars_with_tag(fx)) {
+    if (R.contains_vars_with_tag(fx)) {
         R.split(fx, max_tile, inner(), outer());
-        str << ".split(" << fx << ", " << max_tile << ", " << inner() << ", " << outer() << ")";
+        str << "\t.split(" << fx << ", " << max_tile << ", " << inner() << ", " << outer() << ")\n";
     }
 
     // there are two non-tiled dimensions
-    if (!R.contains_vars_with_tag(fy)) {
+    if (R.contains_vars_with_tag(fy)) {
         R.split(fy, max_tile, inner(), outer());
-        str << ".split(" << fy << ", " << max_tile << ", " << inner() << ", " << outer() << ")";
+        str << "\t.split(" << fy << ", " << max_tile << ", " << inner() << ", " << outer() << ")\n";
     }
 
     // too few threads if ty is empty, too many if ty is full
@@ -630,25 +630,23 @@ RecFilter& RecFilter::gpu_auto_inter_schedule(int max_threads) {
         int factor = max_threads/max_tile;
         R.split(bx, factor);
         ty = bx.split_var();
-        str << ".split(" << bx << ", " << factor << ")";
+        str << "\t.split(" << bx << ", " << factor << ")\n";
     } else {
         int factor = max_tile*max_tile/max_threads;
         R.split(ty, factor).unroll(ty.split_var());
-        str << ".split(" << bx << ", " << factor << ")"
-            << ".unroll(" << ty.split_var() << ")";
+        str << "\t.split(" << bx << ", " << factor << ")\n"
+            << "\t.unroll(" << ty.split_var() << ")\n";
     }
 
     R.unroll(sc)
-     .vectorize(inner_channels())
-     .reorder({inner_channels(), sc, tail(), tx, ty, bx, by})
+     .reorder({sc, tail(), ty.split_var(), tx, ty, bx, by})
      .gpu_threads(tx, ty)
      .gpu_blocks (bx, by);
 
-    str << ".unroll(" << sc << ")"
-        << ".vectorize(" << inner_channels() << ")"
-        << ".reorder({" << inner_channels() << ", " << sc << ", " << tail() << ", " << ", " << tx << ", " << ty << ", " << bx << ", " << by << "})"
-        << ".gpu_threads(" << tx << ", " << ty << ")"
-        << ".gpu_blocks (" << bx << ", " << by << ");" << endl;
+    str << "\t.unroll(" << sc << ")\n"
+        << "\t.reorder({" << sc << ", " << tail() << ", " << ty.split_var() << ", " << ", " << tx << ", " << ty << ", " << bx << ", " << by << "})\n"
+        << "\t.gpu_threads(" << tx << ", " << ty << ")\n"
+        << "\t.gpu_blocks (" << bx << ", " << by << ");\n" << endl;
 
     cerr << str.str() << endl;
 
@@ -684,7 +682,7 @@ RecFilter& RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
     stringstream str;
 
     R.compute_locally();
-    str << name() << ".intra_schedule(" << id << ").compute_locally()";
+    str << name() << ".intra_schedule(" << id << ").compute_locally()\n";
 
     // max tile is the maximum number of threads that will be launched
     // by specifying either of tx, ty, or tz as parallel
@@ -698,15 +696,15 @@ RecFilter& RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
     }
 
     // there is at least one non-tiled dimension
-    if (!R.contains_vars_with_tag(fx)) {
+    if (R.contains_vars_with_tag(fx)) {
         R.split(fx, max_tile, inner(), outer());
-        str << ".split(" << fx << ", " << max_tile << ", " << inner() << ", " << outer() << ")";
+        str << "\t.split(" << fx << ", " << max_tile << ", " << inner() << ", " << outer() << ")\n";
     }
 
     // there are two non-tiled dimensions
-    if (!R.contains_vars_with_tag(fy)) {
+    if (R.contains_vars_with_tag(fy)) {
         R.split(fy, max_tile, inner(), outer());
-        str << ".split(" << fy << ", " << max_tile << ", " << inner() << ", " << outer() << ")";
+        str << "\t.split(" << fy << ", " << max_tile << ", " << inner() << ", " << outer() << ")\n";
     }
 
     // too few threads if ty is empty, too many if ty is full
@@ -715,24 +713,24 @@ RecFilter& RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
         int intra_tiles_per_warp = max_threads/(max_tile*max_order);
         R.fuse(tx, tail()).split(bx, intra_tiles_per_warp);
         ty = bx.split_var();
-        str << ".split(" << bx << ", " << intra_tiles_per_warp << ")";
+        str << "\t.fuse(" << tx << ", " << tail() << ")\n"
+            << "\t.split(" << bx << ", " << intra_tiles_per_warp << ")\n";
     } else {
         int factor = max_tile*max_tile/max_threads;
         R.split(ty, factor).unroll(ty.split_var());
-        str << ".split(" << ty << ", "<< factor << ").unroll(" << ty.split_var() << ")";
+        str << "\t.split(" << ty << ", "<< factor << ")\n"
+            << "\t.unroll(" << ty.split_var() << ")\n";
     }
 
     R.unroll(sc)
-     .vectorize(inner_channels())
-     .reorder({inner_channels(), tail(), sc, tz, tx, ty, outer()})
+     .reorder({tail(), sc, ty.split_var(), tz, tx, ty, outer()})
      .gpu_threads(tx, ty)
      .gpu_blocks (bx, by, bz);
 
-    str << ".unroll(" << sc << ")"
-        << ".vectorize(" << inner_channels() << ")"
-        << ".reorder({" << inner_channels() << ", " << tail() << ", " << sc << ", " << tz << ", " << tx << ", " << ty << ", " << outer() << "})"
-        << ".gpu_threads(" << tx << ", " << ty << ")"
-        << ".gpu_blocks (" << bx << ", " << by << ", " << bz << ");" << endl;
+    str << "\t.unroll(" << sc << ")\n"
+        << "\t.reorder({" << tail() << ", " << sc << ", " << ty.split_var() << ", " << tz << ", " << tx << ", " << ty << ", " << outer() << "})\n"
+        << "\t.gpu_threads(" << tx << ", " << ty << ")\n"
+        << "\t.gpu_blocks (" << bx << ", " << by << ", " << bz << ");\n" << endl;
 
     cerr << str.str() << endl;
 
