@@ -101,13 +101,6 @@ private:
     /** Get all recursive filter funcs that have the given tag */
     std::vector<std::string> internal_functions(FuncTag ftag);
 
-    /** Get all the vars of a given recursive filter function with the given tag */
-    std::map< int,std::vector<Halide::VarOrRVar> > internal_func_vars(RecFilterFunc f, VarTag vtag);
-
-    /** Get one of the vars of a given recursive filter function with the given tag
-     * indicated by the */
-    std::map<int,Halide::VarOrRVar> internal_func_vars(RecFilterFunc f, VarTag vtag, uint vidx);
-
     /** Inline all calls to a given function
      *
      * Preconditions:
@@ -118,15 +111,6 @@ private:
      * \param[in] func_name name of function to inline
      */
     void inline_func(std::string func_name);
-
-    /** Make sure that all vars with tags INNER, OUTER or FULL have VarTag count
-     * in the same order as the corresponding non-tiled dimensions in the original
-     * filter in continuous increasing order; this continuity was broken during
-     * splitting where vars were replaced by inner/outer/tail vars
-     *
-     * \param[in,out] var_tags list of variable tags to be modified
-     */
-    void reassign_vartag_counts(std::map<std::string,VarTag>& var_tags);
 
     /** Finalize the filter; triggers automatic function transformations and cleanup */
     void finalize(void);
@@ -463,6 +447,7 @@ private:
     std::map<int,Halide::VarOrRVar> var_by_tag(RecFilterFunc f, VarTag vtag);
 
 public:
+    bool empty(void);
     bool contains_vars_with_tag(VarTag vtag);
 
     RecFilterSchedule(RecFilter& r, std::vector<std::string> fl);
@@ -483,6 +468,7 @@ public:
     RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s, VarTag t);
     RecFilterSchedule& reorder(VarTag x, VarTag y, VarTag z, VarTag w, VarTag s, VarTag t, VarTag u);
 
+    RecFilterSchedule& storage_layout (VarTag innermost, VarTag outermost);
     RecFilterSchedule& reorder_storage(std::vector<VarTag> x);
     RecFilterSchedule& reorder_storage(VarTag x, VarTag y);
     RecFilterSchedule& reorder_storage(VarTag x, VarTag y, VarTag z);

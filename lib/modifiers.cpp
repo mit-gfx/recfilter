@@ -9,6 +9,8 @@ using std::string;
 using std::vector;
 using std::set;
 using std::map;
+using std::cerr;
+using std::endl;
 using std::make_pair;
 
 template<typename T>
@@ -798,4 +800,82 @@ map<string, Buffer> extract_buffer_calls(Func func) {
     }
 
     return extract.buff_list;
+}
+
+// -----------------------------------------------------------------------------
+
+void reassign_vartag_counts(
+        map<string,VarTag>& var_tags,
+        vector<string> args,
+        map<string,string> var_splits)
+{
+    vector<Expr> args_expr;
+    for (int i=0; i<args.size(); i++) {
+        args_expr.push_back(Var(args[i]));
+    }
+    reassign_vartag_counts(var_tags, args_expr, var_splits);
+}
+
+void reassign_vartag_counts(
+        map<string,VarTag>& var_tags,
+        vector<Expr> args,
+        map<string,string> var_splits)
+{
+    // repeat the process for INNER, OUTER and FULL variables
+    // these are the only ones which have counts
+    vector<VariableTag> ref_vartag = {INNER, OUTER, FULL};
+
+    for (int u=0; u<ref_vartag.size(); u++) {
+        VariableTag ref = ref_vartag[u];
+
+        // list of vars is ordered by their dimension in the Func
+        map<int, vector<string> > vartag_count;
+
+        map<string,VarTag>::iterator vartag_it = var_tags.begin();
+        for (; vartag_it!=var_tags.end(); vartag_it++) {
+            string var = vartag_it->first;
+            VarTag tag = vartag_it->second;
+
+            // no need to touch the count if this is a SCAN or SPLIT var
+            if (tag.check(ref) && !tag.check(SPLIT) && !tag.check(SCAN)) {
+                bool processed = false;
+                string original_var = var;
+
+                // if this variable was created by RecFilterSchedule::split() then
+                // use the original var; do recursively because the original var
+                // might itself be created by RecFilterSchedule::split()
+                while (var_splits.find(original_var) != var_splits.end()) {
+                    original_var = var_splits[original_var];
+                }
+
+                // find the arg which depends upon this variable, use its index
+                // to assign a count to this variable
+                for (int i=0; !processed && i<args.size(); i++) {
+                    if (expr_depends_on_var(args[i], original_var)) {
+                        vartag_count[i].push_back(var);
+                        processed = true;
+                    }
+                }
+
+                if (!processed) {
+                    cerr << "Variable " << var << " could not be reassigned a new VarTag count "
+                        << "because it was not found in list of args as well as list of variables "
+                        << "created by RecFilterSchedule::split()" << endl;
+                    assert(false);
+                }
+            }
+        }
+
+        // extract the vars and put them in sorted order according to their count
+        int next_count = 0;
+        map<int, vector<string> >::iterator vartag_count_it = vartag_count.begin();
+        for (; vartag_count_it!=vartag_count.end(); vartag_count_it++) {
+            vector<string> var_list = vartag_count_it->second;
+            for (int i=0; i<var_list.size(); i++) {
+                string v = var_list[i];
+                var_tags[v] = VarTag(ref,next_count);
+                next_count++;
+            }
+        }
+    }
 }

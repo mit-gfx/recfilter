@@ -450,11 +450,12 @@ void RecFilter::cpu_auto_full_schedule(int vector_width) {
     // all full dimensions must be parallelized
 
     full_schedule().compute_globally()
-     .split(full(0), vector_width)
-     .reorder(full(0).split_var(), full_scan(), full())
-     .unroll(full_scan())
-     .vectorize(full(0).split_var())
-     .parallel(full());
+        .reorder_storage(full(0), full())
+        .split(full(0), vector_width)
+        .reorder(full(0).split_var(), full_scan(), full())
+        .unroll(full_scan())
+        .vectorize(full(0).split_var())
+        .parallel(full());
 }
 
 void RecFilter::cpu_auto_intra_schedule(int vector_width) {
@@ -462,7 +463,6 @@ void RecFilter::cpu_auto_intra_schedule(int vector_width) {
         cerr << "Filter is not tiled, use RecFilter::cpu_auto_full_schedule()\n" << endl;
         assert(false);
     }
-
     assert("cpu_auto_intra_schedule not supported currently" && false);
 }
 
@@ -471,25 +471,28 @@ void RecFilter::cpu_auto_inter_schedule(int vector_width) {
         cerr << "Filter is not tiled, use RecFilter::cpu_auto_full_schedule()\n" << endl;
         assert(false);
     }
-
     assert("cpu_auto_inter_schedule not supported currently" && false);
 }
 
 // -----------------------------------------------------------------------------
 
 void RecFilter::gpu_auto_schedule(int max_threads) {
-    gpu_auto_intra_schedule(1,max_threads);
-    gpu_auto_intra_schedule(2,max_threads);
-    gpu_auto_inter_schedule(max_threads);
+    if (contents.ptr->tiled) {
+        gpu_auto_intra_schedule(1,max_threads);
+        gpu_auto_intra_schedule(2,max_threads);
+        gpu_auto_inter_schedule(max_threads);
+    } else {
+        gpu_auto_full_schedule(0,0,0);
+    }
 }
 
 void RecFilter::gpu_auto_full_schedule(int tx, int ty, int tz) {
-//    if (contents.ptr->tiled) {
-//        cerr << "Filter is tiled, use RecFilter::gpu_auto_intra_schedule() "
-//             << "and RecFilter::gpu_auto_inter_schedule()\n" << endl;
-//        assert(false);
-//    }
-//
+    if (contents.ptr->tiled) {
+        cerr << "Filter is tiled, use RecFilter::gpu_auto_intra_schedule() "
+             << "and RecFilter::gpu_auto_inter_schedule()\n" << endl;
+        assert(false);
+    }
+
 //    Func F = as_func();
 //
 //    F.compute_root();
@@ -583,6 +586,10 @@ void RecFilter::gpu_auto_inter_schedule(int max_threads) {
 
     RecFilterSchedule R = inter_schedule();
 
+    if (R.empty()) {
+        return;
+    }
+
     VarTag sc = outer_scan();       // exactly one scan dimension
 
     VarTag fx = full(0);            // at most 2 full dimensions
@@ -608,7 +615,9 @@ void RecFilter::gpu_auto_inter_schedule(int max_threads) {
     // by specifying either of tx, ty, or tz as parallel
     int max_tile = 0;
     for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-        max_tile = std::max(max_tile, contents.ptr->filter_info[i].tile_width);
+        if (contents.ptr->filter_info[i].tile_width<contents.ptr->filter_info[i].image_width) {
+            max_tile = std::max(max_tile, contents.ptr->filter_info[i].tile_width);
+        }
     }
 
     // there is at least one non-tiled dimension
@@ -655,6 +664,10 @@ void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
 
     RecFilterSchedule R = intra_schedule(id);
 
+    if (R.empty()) {
+        return;
+    }
+
     VarTag sc = inner_scan();       // exactly one scan dimension
 
     VarTag fx = full(0);            // at most 2 full dimensions
@@ -670,8 +683,9 @@ void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
 
     stringstream str;
 
-    R.compute_locally();
-    str << name() << ".intra_schedule(" << id << ").compute_locally()\n";
+    R.compute_locally().storage_layout(INVALID, outer());
+    str << name() << ".intra_schedule(" << id << ").compute_locally()\n"
+        << "\treorder_storage(inner(), outer())\n";
 
     // max tile is the maximum number of threads that will be launched
     // by specifying either of tx, ty, or tz as parallel
@@ -679,9 +693,11 @@ void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
     int max_order = 0;
     int num_scans = 0;
     for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-        max_tile  = std::max(max_tile,  contents.ptr->filter_info[i].tile_width);
-        max_order = std::max(max_order, contents.ptr->filter_info[i].filter_order);
-        num_scans+= contents.ptr->filter_info[i].num_scans;
+        if (contents.ptr->filter_info[i].tile_width<contents.ptr->filter_info[i].image_width) {
+            max_tile = std::max(max_tile, contents.ptr->filter_info[i].tile_width);
+        }
+        max_order  = std::max(max_order, contents.ptr->filter_info[i].filter_order);
+        num_scans += contents.ptr->filter_info[i].num_scans;
     }
 
     // there is at least one non-tiled dimension
@@ -696,7 +712,6 @@ void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
         str << "\t.split(" << fy << ", " << max_tile << ", " << inner() << ", " << outer() << ")\n";
     }
 
-
     switch (id)
     {
         // for nD intra tile terms: each inner var is of size max_tile if ty is not
@@ -709,14 +724,13 @@ void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
                 str << "\t.split(" << ty << ", "<< factor << ")\n"
                     << "\t.unroll(" << ty.split_var() << ")\n";
             }
-            R.reorder_storage(inner(), outer());
+
             R.unroll(sc)
              .reorder({sc, ty.split_var(), tz, tx, ty, outer()})
              .gpu_threads(tx, ty)
              .gpu_blocks (bx, by, bz);
 
-            str << "\rreorder_storage(inner(), outer())\n"
-                << "\t.unroll(" << sc << ")\n"
+            str << "\t.unroll(" << sc << ")\n"
                 << "\t.reorder({" << sc << ", " << ty.split_var() << ", " << tz << ", " << tx << ", " << ty << ", " << outer() << "})\n"
                 << "\t.gpu_threads(" << tx << ", " << ty << ")\n"
                 << "\t.gpu_blocks (" << bx << ", " << by << ", " << bz << ");\n" << endl;
@@ -972,57 +986,4 @@ string RecFilter::print_hl_code(void) const {
     string b = print_functions();
     string c = print_schedule();
     return a+b+c;
-}
-
-// -----------------------------------------------------------------------------
-
-
-void RecFilter::reassign_vartag_counts(map<string,VarTag>& var_tags) {
-    vector<VariableTag> ref_vartag = {INNER, OUTER, FULL};
-
-    for (int u=0; u<ref_vartag.size(); u++) {
-        VariableTag ref = ref_vartag[u];
-
-        map<int,string> var_count;
-
-        map<string,VarTag>::iterator vartag_it;
-        map<int,string>::iterator    count_it;
-
-        // assign counts to the vars in the order that they appeared in the
-        // filter definition. each var came from some original RecFilterDim
-        // assign the index of that RecFilterDim to each var
-        for (vartag_it=var_tags.begin(); vartag_it!=var_tags.end(); vartag_it++) {
-            string var = vartag_it->first;
-            VarTag tag = vartag_it->second;
-            if (tag.check(ref) && !tag.check(SPLIT) && !tag.check(SCAN)) {
-                // find the original dimension that this var came from
-                // this var's name will start with the name of the original var
-                for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-                    int    original_count = contents.ptr->filter_info[i].filter_dim;
-                    string original_var   = contents.ptr->filter_info[i].var.name();
-                    if (var.find(original_var)==0) {
-                        vartag_it->second = VarTag(ref, original_count);
-                    }
-                }
-            }
-        }
-
-        // extract the vars and put them in sorted order according to their count
-        for (vartag_it=var_tags.begin(); vartag_it!=var_tags.end(); vartag_it++) {
-            string var = vartag_it->first;
-            VarTag tag = vartag_it->second;
-            if (tag.check(ref) && !tag.check(SPLIT) && !tag.check(SCAN)) {
-                int count = tag.count();
-                var_count.insert(make_pair(count,var));
-            }
-        }
-
-        // access the vars in sorted order
-        int count = 0;
-        for (count_it=var_count.begin(); count_it!=var_count.end(); count_it++) {
-            string var = count_it->second;
-            var_tags[ var ] = VarTag(ref,count);
-            count++;
-        }
-    }
 }

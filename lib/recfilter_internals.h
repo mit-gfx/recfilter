@@ -100,6 +100,12 @@ public:
     /** Category tags for all the vars in all the update defs */
     std::vector<std::map<std::string,VarTag> >  update_var_category;
 
+    /** List of new vars created by RecFilterSchedule::split() on pure definition */
+    std::map<std::string, std::string> pure_var_splits;
+
+    /** List of new vars created by RecFilterSchedule::split() on update definitions */
+    std::map<int, std::map<std::string, std::string> >  update_var_splits;
+
     /** Name of a function that calls this function; set if this function
      * has the REINDEX_FOR_READ tag set */
     std::string caller_func;

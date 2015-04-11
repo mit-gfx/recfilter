@@ -32,6 +32,7 @@ using std::endl;
 
 template<typename T>
 void check(RecFilter F, vector<float> filter_coeff, Image<T> image);
+void manual_schedule(RecFilter& fx, RecFilter& fy);
 
 int main(int argc, char **argv) {
     Arguments args(argc, argv);
@@ -70,69 +71,72 @@ int main(int argc, char **argv) {
     fc[1].split_all_dimensions(tile_width);
 
     if (nosched) {
-        int ws       = 32;
-        int unroll_w = 8;
-        int tiles_per_warp = 4;
-
-        // x filter schedule
-        {
-            RecFilter f = fc[0];
-            f.intra_schedule().compute_locally()
-                .split          (f.full(0), ws, f.inner())
-                .split          (f.inner(1), unroll_w)
-                .unroll         (f.inner(1).split_var())
-                .unroll         (f.inner_scan())
-                .reorder        (f.inner_scan(), f.inner(1).split_var(), f.tail(), f.inner(), f.outer(), f.full())
-                .gpu_threads    (f.inner(0), f.inner(1))
-                .gpu_blocks     (f.outer(0), f.full(0));
-
-            f.inter_schedule().compute_globally()
-                .reorder_storage(f.full(0), f.tail(), f.outer(0))
-                .split          (f.full(0), ws, f.inner())
-                .unroll         (f.outer_scan())
-                .split          (f.full(0), tiles_per_warp)
-                .reorder        (f.outer_scan(), f.tail(), f.full(0).split_var(), f.inner(), f.full(0))
-                .gpu_threads    (f.inner(0), f.full(0).split_var())
-                .gpu_blocks     (f.full(0));
-        }
-
-        // y filter schedule: same schedule as x but very small subtle changes in intra_schedule
-        {
-            RecFilter f = fc[1];
-            f.intra_schedule().compute_locally()
-                .split      (f.full(0), ws)
-                .split      (f.inner(0), unroll_w)
-                .unroll     (f.inner(0).split_var())
-                .unroll     (f.inner_scan())
-                .reorder    (f.inner_scan(), f.inner(0).split_var(), f.inner(0), f.full(0).split_var(), f.full(0), f.outer(0))
-                .gpu_threads(f.full(0).split_var(), f.inner(0))
-                .gpu_blocks (f.full(0), f.outer(0));
-
-            f.inter_schedule().compute_globally()
-                .reorder_storage(f.full(0), f.tail(), f.outer(0))
-                .split          (f.full(0), ws, f.inner())
-                .unroll         (f.outer_scan())
-                .split          (f.full(0), tiles_per_warp)
-                .reorder        (f.outer_scan(), f.tail(), f.full(0).split_var(), f.inner(), f.full(0))
-                .gpu_threads    (f.inner(0), f.full(0).split_var())
-                .gpu_blocks     (f.full(0));
-        }
+        manual_schedule(fc[0], fc[1]);
     } else {
-        cout << "Using automatic scheduling" << endl;
         int max_threads = 128;
         fc[0].gpu_auto_schedule(max_threads);
         fc[1].gpu_auto_schedule(max_threads);
     }
 
-    cout << fc[0].print_schedule() << endl;
-    cout << fc[1].print_schedule() << endl;
     fc[1].profile(iter);
 
     if (!nocheck) {
         check<float>(fc[1], coeff, image);
     }
 
-    return 0;
+    return EXIT_SUCCESS;
+}
+
+void manual_schedule(RecFilter& fx, RecFilter& fy) {
+    int ws       = 32;
+    int unroll_w = 8;
+    int tiles_per_warp = 4;
+
+    // x filter schedule
+    {
+        RecFilter f = fx;
+        f.intra_schedule().compute_locally()
+            .reorder_storage(f.inner(), f.full(0), f.outer())
+            .split          (f.full(0), ws, f.inner())
+            .split          (f.inner(1), unroll_w)
+            .unroll         (f.inner(1).split_var())
+            .unroll         (f.inner_scan())
+            .reorder        (f.inner_scan(), f.inner(1).split_var(), f.tail(), f.inner(), f.outer(), f.full())
+            .gpu_threads    (f.inner(0), f.inner(1))
+            .gpu_blocks     (f.outer(0), f.full(0));
+
+        f.inter_schedule().compute_globally()
+            .reorder_storage(f.full(0), f.tail(), f.outer(0))
+            .split          (f.full(0), ws, f.inner())
+            .unroll         (f.outer_scan())
+            .split          (f.full(0), tiles_per_warp)
+            .reorder        (f.outer_scan(), f.tail(), f.full(0).split_var(), f.inner(), f.full(0))
+            .gpu_threads    (f.inner(0), f.full(0).split_var())
+            .gpu_blocks     (f.full(0));
+    }
+
+    // y filter schedule: same schedule as x but very small subtle changes in intra_schedule
+    {
+        RecFilter f = fy;
+        f.intra_schedule().compute_locally()
+            .reorder_storage(f.full(0), f.inner(), f.outer())
+            .split          (f.full(0), ws)
+            .split          (f.inner(0), unroll_w)
+            .unroll         (f.inner(0).split_var())
+            .unroll         (f.inner_scan())
+            .reorder        (f.inner_scan(), f.inner(0).split_var(), f.inner(0), f.full(0).split_var(), f.full(0), f.outer(0))
+            .gpu_threads    (f.full(0).split_var(), f.inner(0))
+            .gpu_blocks     (f.full(0), f.outer(0));
+
+        f.inter_schedule().compute_globally()
+            .reorder_storage(f.full(0), f.tail(), f.outer(0))
+            .split          (f.full(0), ws, f.inner())
+            .unroll         (f.outer_scan())
+            .split          (f.full(0), tiles_per_warp)
+            .reorder        (f.outer_scan(), f.tail(), f.full(0).split_var(), f.inner(), f.full(0))
+            .gpu_threads    (f.inner(0), f.full(0).split_var())
+            .gpu_blocks     (f.full(0));
+    }
 }
 
 template<typename T>

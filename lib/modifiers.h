@@ -160,4 +160,30 @@ Halide::Expr remove_lets(Halide::Expr);
 /** Extract the list of buffers called in the definition a function */
 std::map<std::string, Halide::Buffer> extract_buffer_calls(Halide::Func func);
 
+/** Make sure that all vars with tags INNER, OUTER or FULL have VarTag count
+ * in the same order as they appear in the function definition; this continuity
+ * was broken during tiling or by RecFilterSchedule::split()
+ *
+ * \param[in,out] var_tags list of variable tags to be modified
+ * \param[in] args pure definition args
+ * \param[in] var_splits list of variables created by RecFilterSchedule::split() and the corresponding old variables for the pure definition
+ */
+void reassign_vartag_counts(
+        std::map<std::string,VarTag>& var_tags,
+        std::vector<std::string> args,
+        std::map<std::string,std::string> var_splits);
+
+/** Make sure that all vars with tags INNER, OUTER or FULL have VarTag count
+ * in the same order as they appear in the function definition; this continuity
+ * was broken during tiling or by RecFilterSchedule::split()
+ *
+ * \param[in,out] var_tags list of variable tags to be modified
+ * \param[in] args update definition args
+ * \param[in] var_splits list of variables created by RecFilterSchedule::split() and the corresponding old variables for this update definition
+ */
+void reassign_vartag_counts(
+        std::map<std::string,VarTag>& var_tags,
+        std::vector<Halide::Expr> args,
+        std::map<std::string,std::string> var_splits);
+
 #endif // _MODIFIERS_H_

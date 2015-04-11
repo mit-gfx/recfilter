@@ -90,6 +90,10 @@ RecFilterSchedule::RecFilterSchedule(RecFilter& r, vector<string> fl) :
     recfilter(r), func_list(fl) {}
 
 
+bool RecFilterSchedule::empty(void) {
+    return func_list.empty();
+}
+
 bool RecFilterSchedule::contains_vars_with_tag(VarTag vtag) {
     bool empty = true;
     for (int j=0; j<func_list.size(); j++) {
@@ -154,7 +158,9 @@ map<int,VarOrRVar> RecFilterSchedule::var_by_tag(RecFilterFunc f, VarTag vtag) {
             if (var_list.find(PURE_DEF)==var_list.end()) {
                 var_list.insert(make_pair(PURE_DEF, Var(vit->first)));
             } else {
-                cerr << "Found multiple vars with the scheduling tag " << vtag << endl;
+                cerr << "Found multiple vars with the scheduling tag " << vtag
+                     << " in pure def of " << f.func.name() << endl;
+                cerr << f << endl;
                 assert(false);
             }
         }
@@ -165,7 +171,9 @@ map<int,VarOrRVar> RecFilterSchedule::var_by_tag(RecFilterFunc f, VarTag vtag) {
                 if (var_list.find(i)==var_list.end()) {
                     var_list.insert(make_pair(i, Var(vit->first)));
                 } else {
-                    cerr << "Found multiple vars with the scheduling tag " << vtag << endl;
+                    cerr << "Found multiple vars with the scheduling tag " << vtag
+                         << " in update def " << i << " of " << f.func.name() << endl;
+                    cerr << f << endl;
                     assert(false);
                 }
             }
@@ -638,35 +646,25 @@ RecFilterSchedule& RecFilterSchedule::fuse(VarTag vtag1, VarTag vtag2) {
     return *this;
 }
 
-RecFilterSchedule& RecFilterSchedule::split(VarTag v, int factor) {
-    return split(v, factor, INVALID, INVALID);
+RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor) {
+    return split(vtag, factor, INVALID, INVALID);
 }
 
-RecFilterSchedule& RecFilterSchedule::split(VarTag v, int factor, VarTag vin) {
-    return split(v, factor, vin, INVALID);
+RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag var_in) {
+    return split(vtag, factor, var_in, INVALID);
 }
 
-RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vin, VarTag vout) {
+RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag var_in, VarTag var_out) {
     if (vtag.check(SPLIT)) {
         cerr << "Cannot split the variable which was created by split scheduling ops" << endl;
         assert(false);
     }
-
-    if (vin .check(SCAN) || vin .check(SPLIT) || vin .check(FULL) ||
-        vout.check(SCAN) || vout.check(SPLIT) || vout.check(FULL)) {
+    if (var_in .check(SCAN) || var_in .check(SPLIT) || var_in .check(FULL) ||
+        var_out.check(SCAN) || var_out.check(SPLIT) || var_out.check(FULL)) {
         cerr << "VarTag for the new dimension created by split must be one of "
             << "inner(), outer(), inner(i) and outer(k)" << endl;
         assert(false);
     }
-
-    // use default tags if they are empty
-    vin = (vin==INVALID ? vtag|SPLIT : vin);
-    vout= (vin==INVALID ? vtag       : vout);
-
-    // add a count if they dont have a count
-    vin = (vin==INNER  || vin==OUTER  ? vin = vin|__4 : vin);
-    vout= (vout==INNER || vout==OUTER ? vout= vout|__4 : vout);
-
 
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
@@ -677,8 +675,8 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vin,
         // check that vtag_new is not already used
         map<string,VarTag>::iterator z;
         for (z=rF.pure_var_category.begin(); z!=rF.pure_var_category.end(); z++) {
-            if (z->second==vin || z->second==vout) {
-                cerr << "Cannot use " << vin << " or " << vout << " as the tag "
+            if (z->second==var_in || z->second==var_out) {
+                cerr << "Cannot use " << var_in << " or " << var_out << " as the tag "
                     << "for the new dimesnsion created by split() because "
                     << F.name() << " already has a dimension with the same tag "
                     << "in pure definition" << endl;
@@ -687,8 +685,8 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vin,
         }
         for (int i=0; i<rF.update_var_category.size(); i++) {
             for (z=rF.update_var_category[i].begin(); z!=rF.update_var_category[i].end(); z++) {
-                if (z->second==vin || z->second==vout) {
-                    cerr << "Cannot use " << vin << " or " << vout << " as the tag "
+                if (z->second==var_in || z->second==var_out) {
+                    cerr << "Cannot use " << var_in << " or " << var_out << " as the tag "
                         << "for the new dimesnsion created by split() because "
                         << F.name() << " already has a dimension with the same tag "
                         << "in update definition" << i << endl;
@@ -696,6 +694,14 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vin,
                 }
             }
         }
+
+        // use default tags if they are empty
+        VarTag vin = (var_in ==INVALID ? vtag|SPLIT : var_in);
+        VarTag vout= (var_out==INVALID ? vtag       : var_out);
+
+        // add a count if they dont have a count
+        vin = (vin ==INNER || vin ==OUTER ? vin = vin |__4 : vin);
+        vout= (vout==INNER || vout==OUTER ? vout= vout|__4 : vout);
 
         map<int,VarOrRVar> vars = var_by_tag(rF, vtag);
         map<int,VarOrRVar>::iterator vit;
@@ -712,21 +718,25 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag vin,
 
             // only add scheduling to defs that are not undef
             if (def==PURE_DEF) {
-                if (!is_undef(F.values())) {
-                    F.split(v,v,t,factor);
-                    rF.pure_var_category.insert(make_pair(v.name(), vout));
-                    rF.pure_var_category.insert(make_pair(t.name(), vin));
-                    rF.pure_schedule.push_back(s.str());
-                    recfilter.reassign_vartag_counts(rF.pure_var_category);
-                }
+                F.split(v,v,t,factor);
+                rF.pure_var_category.erase(v.name());
+                rF.pure_var_category.erase(t.name());
+                rF.pure_var_category.insert(make_pair(v.name(), vout));
+                rF.pure_var_category.insert(make_pair(t.name(), vin));
+                rF.pure_var_splits  .insert(make_pair(t.name(), v.name()));
+                rF.pure_schedule.push_back(s.str());
+                reassign_vartag_counts(rF.pure_var_category, rF.func.args(),
+                        rF.pure_var_splits);
             } else {
-                if (!is_undef(F.update_values(def))) {
-                    F.update(def).split(v,v,t,factor);
-                    rF.update_var_category[def].insert(make_pair(v.name(), vout));
-                    rF.update_var_category[def].insert(make_pair(t.name(), vin));
-                    rF.update_schedule[def].push_back(s.str());
-                    recfilter.reassign_vartag_counts(rF.update_var_category[def]);
-                }
+                F.update(def).split(v,v,t,factor);
+                rF.update_var_category[def].erase(v.name());
+                rF.update_var_category[def].erase(t.name());
+                rF.update_var_category[def].insert(make_pair(v.name(), vout));
+                rF.update_var_category[def].insert(make_pair(t.name(), vin));
+                rF.update_var_splits  [def].insert(make_pair(t.name(), v.name()));
+                rF.update_schedule[def].push_back(s.str());
+                reassign_vartag_counts(rF.update_var_category[def],
+                        rF.func.updates()[def].args, rF.update_var_splits[def]);
             }
         }
     }
@@ -795,6 +805,86 @@ RecFilterSchedule& RecFilterSchedule::reorder(vector<VarTag> vtag) {
     return *this;
 }
 
+RecFilterSchedule& RecFilterSchedule::storage_layout(VarTag innermost, VarTag outermost) {
+    for (int j=0; j<func_list.size(); j++) {
+        RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
+        Func            F = Func(rF.func);
+
+        // get the list of vars from the pure def
+        vector<Var> var_list = F.args();
+
+        // no need to reorder storage
+        // - if function is same as final result
+        // - if the function is not compute at root level
+        // - if less than 2 variables to reorder
+        if (!rF.func.schedule().compute_level().is_root() ||
+                rF.func.name()==recfilter.name() || var_list.size()<2) {
+            continue;
+        }
+
+        // access the variables in the order in which they were defined
+        // extract innermost and outermost variables in separate lists
+        vector<Var> innermost_var_list;
+        vector<Var> middle_var_list;
+        vector<Var> outermost_var_list;
+        for (int i=0; i<var_list.size(); i++) {
+            Var v = var_list[i];
+            if (rF.pure_var_category.find(v.name()) != rF.pure_var_category.end()) {
+                VarTag vt = rF.pure_var_category[v.name()];
+                if (innermost!=INVALID && vt.same_except_count(innermost)) {
+                    innermost_var_list.push_back(v);
+                } else if (outermost!=INVALID && vt.same_except_count(outermost)) {
+                    outermost_var_list.push_back(v);
+                } else {
+                    middle_var_list.push_back(v);
+                }
+            }
+        }
+
+        // add the vars in the order of innermost, middle and outermost
+        var_list.clear();
+        var_list.insert(var_list.end(), innermost_var_list.begin(), innermost_var_list.end());
+        var_list.insert(var_list.end(), middle_var_list   .begin(), middle_var_list   .end());
+        var_list.insert(var_list.end(), outermost_var_list.begin(), outermost_var_list.end());
+
+        stringstream s;
+
+        s << "reorder_storage(";
+        for (int i=0; i<var_list.size(); i++) {
+            if (i>0) {
+                s  << ",";
+            }
+            s << "Var(\"" << var_list[i].name() << "\")";
+        }
+        s << ")";
+
+        switch (var_list.size())
+        {
+            case 2: F.reorder_storage(
+                            var_list[0],
+                            var_list[1]); break;
+            case 3: F.reorder_storage(
+                            var_list[0],
+                            var_list[1],
+                            var_list[2]); break;
+            case 4: F.reorder_storage(
+                            var_list[0],
+                            var_list[1],
+                            var_list[2],
+                            var_list[3]); break;
+            case 5: F.reorder_storage(
+                            var_list[0],
+                            var_list[1],
+                            var_list[2],
+                            var_list[3],
+                            var_list[4]); break;
+            default:cerr << "Too many variables in reorder_storage()" << endl; assert(false); break;
+        }
+        rF.pure_schedule.push_back(s.str());
+    }
+    return *this;
+}
+
 RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
     for (int j=0; j<func_list.size(); j++) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
@@ -842,17 +932,22 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
             }
             s << ")";
 
-            switch (var_list.size()) {
-                case 2: F.reorder_storage(var_list[0].var,
+            switch (var_list.size())
+            {
+                case 2: F.reorder_storage(
+                                var_list[0].var,
                                 var_list[1].var); break;
-                case 3: F.reorder_storage(var_list[0].var,
+                case 3: F.reorder_storage(
+                                var_list[0].var,
                                 var_list[1].var,
                                 var_list[2].var); break;
-                case 4: F.reorder_storage(var_list[0].var,
+                case 4: F.reorder_storage(
+                                var_list[0].var,
                                 var_list[1].var,
                                 var_list[2].var,
                                 var_list[3].var); break;
-                case 5: F.reorder_storage(var_list[0].var,
+                case 5: F.reorder_storage(
+                                var_list[0].var,
                                 var_list[1].var,
                                 var_list[2].var,
                                 var_list[3].var,

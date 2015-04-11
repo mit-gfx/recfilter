@@ -378,15 +378,15 @@ ostream &operator<<(ostream &s, const FuncTag &f) {
 }
 
 ostream &operator<<(ostream &s, const VarTag &v) {
-    if (v.check(FULL )) { s << "FULL ";  }
-    if (v.check(INNER)) { s << "INNER "; }
-    if (v.check(OUTER)) { s << "OUTER "; }
-    if (v.check(SCAN )) { s << "SCAN ";  }
-    if (v.check(TAIL )) { s << "TAIL ";  }
-    if (v.check(__1))   { s << "1 ";     }
-    if (v.check(__2))   { s << "2 ";     }
-    if (v.check(__3))   { s << "3 ";     }
-    if (v.check(__4))   { s << "4 ";     }
-    if (v.check(SPLIT)) { s << "SPLIT ";}
+    if (v.check(FULL )) { s << "FULL";   }
+    if (v.check(INNER)) { s << "INNER";  }
+    if (v.check(OUTER)) { s << "OUTER";  }
+    if (v.check(TAIL )) { s << "TAIL";   }
+    if (v.check(__1))   { s << "_1";     }
+    if (v.check(__2))   { s << "_2";     }
+    if (v.check(__3))   { s << "_3";     }
+    if (v.check(__4))   { s << "_4";     }
+    if (v.check(SCAN )) { s << "_SCAN";  }
+    if (v.check(SPLIT)) { s << "_SPLIT"; }
     return s;
 }

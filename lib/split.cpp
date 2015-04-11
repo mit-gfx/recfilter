@@ -2053,6 +2053,8 @@ void RecFilter::split(map<string,int> dim_tile) {
             rF.pure_var_category.erase(var.name());
             rF.pure_var_category.insert(make_pair(inner_var.name(), VarTag(INNER,i)));
             rF.pure_var_category.insert(make_pair(outer_var.name(), VarTag(OUTER,i)));
+            rF.pure_var_splits.insert  (make_pair(outer_var.name(), var.name()));
+            rF.pure_var_splits.insert  (make_pair(inner_var.name(), var.name()));
             rF.pure_schedule.push_back(s);
         }
 
@@ -2074,21 +2076,6 @@ void RecFilter::split(map<string,int> dim_tile) {
                 F.bound(v,0,w);
             }
         }
-
-        //map<string,RecFilterFunc>::iterator fit;
-        //for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-        //    if (fit->second.func_category == INLINE) {
-        //        continue;
-        //    }
-        //    Func F(fit->second.func);
-        //    for (int j=0; j<F.args().size(); j++) {
-        //        string v = F.args()[j].name();
-        //        VarTag vt= fit->second.pure_var_category[v];
-        //        if (v==x) {
-        //            F.bound(v,0,w);
-        //        }
-        //    }
-        //}
     }
 
     contents.ptr->tiled = true;
@@ -2139,9 +2126,11 @@ void RecFilter::finalize(void) {
     if (contents.ptr->tiled) {
         // reassign var tag counts for all functions
         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-            reassign_vartag_counts(fit->second.pure_var_category);
+            reassign_vartag_counts(fit->second.pure_var_category,
+                    fit->second.func.args(), fit->second.pure_var_splits);
             for (int i=0; i<fit->second.update_var_category.size(); i++) {
-                reassign_vartag_counts(fit->second.update_var_category[i]);
+                reassign_vartag_counts(fit->second.update_var_category[i],
+                    fit->second.func.updates()[i].args, fit->second.update_var_splits[i]);
             }
         }
 
