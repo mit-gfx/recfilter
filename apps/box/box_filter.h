@@ -18,7 +18,7 @@
 
 using namespace Halide;
 
-RecFilter box_filter_order_1(Image<float> I, int width, int height, int B, int tile_width) {
+RecFilter box_filter_order_1(Image<float> I, int width, int height, int B, int tile_width, bool autoschedule) {
     RecFilterDim x("x", width);
     RecFilterDim y("y", height);
 
@@ -42,18 +42,15 @@ RecFilter box_filter_order_1(Image<float> I, int width, int height, int B, int t
     // -------------------------------------------------------------------------
     // x-y overlapped schedule copied from summed area table
 
-    int n_scans  = 2;
-    int ws       = 32;
-    int unroll_w = ws/4;
-    int intra_tiles_per_warp = ws / n_scans;
-    int inter_tiles_per_warp = 4;
-
     Var xo("xo"), xi("xi"), xii("xii");
     Var yo("yo"), yi("yi"), yii("yii");
 
     Var u = x.var();
     Var v = y.var();
 
+    // -------------------------------------------------------------------------
+    // schedule for the differencing operator, this is a pointwise operation
+    // easiest to just use Halide scheduling API for these
     D.as_func()
         .compute_root()
         .split  (u, xo, xi, tile_width)
@@ -63,35 +60,49 @@ RecFilter box_filter_order_1(Image<float> I, int width, int height, int B, int t
         .reorder(yii,xi,yi,xo,yo)
         .gpu    (xo,yo,xi,yi);
 
-    F.intra_schedule(1).compute_locally()
-        .reorder_storage(F.inner(), F.outer())
-        .unroll         (F.inner_scan())
-        .split          (F.inner(1), unroll_w)
-        .unroll         (F.inner(1).split_var())
-        .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
-        .gpu_threads    (F.inner(0), F.inner(1))
-        .gpu_blocks     (F.outer(0), F.outer(1));
+    // -------------------------------------------------------------------------
+    // schedule for the recursive filters
 
-    F.intra_schedule(2).compute_locally()
-        .unroll         (F.inner_scan())
-        .split          (F.outer(0), intra_tiles_per_warp)
-        .reorder        (F.inner(),  F.inner_scan(), F.tail(), F.outer(0).split_var(), F.outer())
-        .fuse           (F.tail(), F.inner(0))
-        .gpu_threads    (F.tail(), F.outer(0).split_var())
-        .gpu_blocks     (F.outer(0), F.outer(1));
+    if (autoschedule) {
+        F.gpu_auto_schedule(128);
+    }
+    else {
+        int n_scans  = 2;
+        int ws       = 32;
+        int unroll_w = ws/4;
+        int intra_tiles_per_warp = ws / n_scans;
+        int inter_tiles_per_warp = 4;
 
-    F.inter_schedule().compute_globally()
-        .reorder_storage(F.inner(), F.tail(), F.outer())
-        .unroll         (F.outer_scan())
-        .split          (F.outer(0), inter_tiles_per_warp)
-        .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
-        .gpu_threads    (F.inner(0), F.outer(0).split_var())
-        .gpu_blocks     (F.outer(0));
+        F.intra_schedule(1).compute_locally()
+            .reorder_storage(F.inner(), F.outer())
+            .unroll         (F.inner_scan())
+            .split          (F.inner(1), unroll_w)
+            .unroll         (F.inner(1).split_var())
+            .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
+            .gpu_threads    (F.inner(0), F.inner(1))
+            .gpu_blocks     (F.outer(0), F.outer(1));
+
+        F.intra_schedule(2).compute_locally()
+            .unroll         (F.inner_scan())
+            .split          (F.outer(0), intra_tiles_per_warp)
+            .reorder        (F.inner(),  F.inner_scan(), F.tail(), F.outer(0).split_var(), F.outer())
+            .fuse           (F.tail(), F.inner(0))
+            .gpu_threads    (F.tail(), F.outer(0).split_var())
+            .gpu_blocks     (F.outer(0), F.outer(1));
+
+        F.inter_schedule().compute_globally()
+            .reorder_storage(F.inner(), F.tail(), F.outer())
+            .unroll         (F.outer_scan())
+            .split          (F.outer(0), inter_tiles_per_warp)
+            .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
+            .gpu_threads    (F.inner(0), F.outer(0).split_var())
+            .gpu_blocks     (F.outer(0));
+    }
 
     return D;
 }
 
-RecFilter box_filter_order_2(Func I, int width, int height, int B, int tile_width) {
+RecFilter box_filter_order_2(Func I, int width, int height, int B, int tile_width, bool autoschedule) {
     RecFilter sat_x ("Box2_Satx");     // 2nd order prefix sum along x
     RecFilter diff_x("Box2_Diffx");    // 2nd order finite differencing along x
     RecFilter sat_y ("Box2_Saty");     // 2nd order prefix sum along y
@@ -108,7 +119,7 @@ RecFilter box_filter_order_2(Func I, int width, int height, int B, int tile_widt
 
     // -------------------------------------------------------------------------
 
-    // x filter: 3rd order intergal image along x followed by finite differencing
+    // x filter: 2nd order intergal image along x followed by finite differencing
 
     sat_x(x,y) = I(x,y);
     sat_x.add_filter(+x, coeff);
@@ -118,7 +129,7 @@ RecFilter box_filter_order_2(Func I, int width, int height, int B, int tile_widt
     diff_x(x,y) = (fA(min(x+B,width-1), v)-fA(max(x-B-1,0), v)) / float(2*B+1);
 
 
-    // y filter: 3rd order intergal image along y followed by finite differencing
+    // y filter: 2nd order intergal image along y followed by finite differencing
 
     sat_y(x,y) = diff_x.as_func()(x,y);
     sat_y.add_filter(+y, coeff);
@@ -134,60 +145,14 @@ RecFilter box_filter_order_2(Func I, int width, int height, int B, int tile_widt
     sat_y.split_all_dimensions(tile_width);
 
     // -------------------------------------------------------------------------
-
-    int ws       = 32;
-    int unroll_w = 8;
-    int tiles_per_warp = 4;
-
-    // schedule for x IIR filter
-
-    sat_x.intra_schedule().compute_locally()
-        .split          (sat_x.full(0), ws, sat_x.inner())
-        .split          (sat_x.inner(1), unroll_w)
-        .unroll         (sat_x.inner(1).split_var())
-        .unroll         (sat_x.inner_scan())
-        .reorder        (sat_x.inner_scan(), sat_x.inner(1).split_var(), sat_x.tail(), sat_x.inner(), sat_x.outer(), sat_x.full())
-        .gpu_threads    (sat_x.inner(0), sat_x.inner(1))
-        .gpu_blocks     (sat_x.outer(0), sat_x.full(0));
-
-    sat_x.inter_schedule().compute_globally()
-        .reorder_storage(sat_x.full(0), sat_x.tail(), sat_x.outer(0))
-        .split          (sat_x.full(0), ws, sat_x.inner())
-        .unroll         (sat_x.outer_scan())
-        .split          (sat_x.full(0), tiles_per_warp)
-        .reorder        (sat_x.outer_scan(), sat_x.tail(), sat_x.full(0).split_var(), sat_x.inner(), sat_x.full(0))
-        .gpu_threads    (sat_x.inner(0), sat_x.full(0).split_var())
-        .gpu_blocks     (sat_x.full(0));
-
-    // -------------------------------------------------------------------------
-    // slightly different schedule for y IIR filter
-
-    sat_y.intra_schedule().compute_locally()
-        .reorder_storage(sat_y.full(0), sat_y.inner(), sat_y.outer(0))
-        .split      (sat_y.full(0), ws)
-        .split      (sat_y.inner(0), unroll_w)
-        .unroll     (sat_y.inner(0).split_var())
-        .unroll     (sat_y.inner_scan())
-        .reorder    (sat_y.inner_scan(), sat_y.inner(0).split_var(), sat_y.inner(0), sat_y.full(0).split_var(), sat_y.full(0), sat_y.outer(0))
-        .gpu_threads(sat_y.full(0).split_var(), sat_y.inner(0))
-        .gpu_blocks (sat_y.full(0), sat_y.outer(0));
-
-    sat_y.inter_schedule().compute_globally()
-        .reorder_storage(sat_y.full(0), sat_y.tail(), sat_y.outer(0))
-        .split          (sat_y.full(0), ws, sat_y.inner())
-        .unroll         (sat_y.outer_scan())
-        .split          (sat_y.full(0), tiles_per_warp)
-        .reorder        (sat_y.outer_scan(), sat_y.tail(), sat_y.full(0).split_var(), sat_y.inner(), sat_y.full(0))
-        .gpu_threads    (sat_y.inner(0), sat_y.full(0).split_var())
-        .gpu_blocks     (sat_y.full(0));
-
-    // -------------------------------------------------------------------------
-    // same schedule for the differencing operators in both dimensions
+    // schedule for the differencing operators in both dimensions
+    // these are pointwise operations and not recursive filters, easiest to just
+    // use Halide scheduling API for these
 
     diff_x.as_func()
         .split  (u, xo, xi, tile_width)
         .split  (v, yo, yi, tile_width)
-        .split  (yi,yi, yii, unroll_w)
+        .split  (yi,yi, yii, 8)
         .unroll (yii)
         .reorder(yii,xi,yi,xo,yo)
         .gpu    (xo,yo,xi,yi);
@@ -196,10 +161,64 @@ RecFilter box_filter_order_2(Func I, int width, int height, int B, int tile_widt
         .compute_root()
         .split  (u, xo, xi, tile_width)
         .split  (v, yo, yi, tile_width)
-        .split  (yi,yi, yii,unroll_w)
+        .split  (yi,yi, yii, 8)
         .unroll (yii)
         .reorder(yii,xi,yi,xo,yo)
         .gpu    (xo,yo,xi,yi);
+
+    // -------------------------------------------------------------------------
+    // schedule for the recursive filters
+
+    if (autoschedule) {
+        sat_x.gpu_auto_schedule(128);
+        sat_y.gpu_auto_schedule(128);
+    }
+    else {
+        int ws       = 32;
+        int unroll_w = 8;
+        int tiles_per_warp = 4;
+
+        // schedule for x IIR filter
+
+        sat_x.intra_schedule().compute_locally()
+            .split          (sat_x.full(0), ws, sat_x.inner())
+            .split          (sat_x.inner(1), unroll_w)
+            .unroll         (sat_x.inner(1).split_var())
+            .unroll         (sat_x.inner_scan())
+            .reorder        (sat_x.inner_scan(), sat_x.inner(1).split_var(), sat_x.tail(), sat_x.inner(), sat_x.outer(), sat_x.full())
+            .gpu_threads    (sat_x.inner(0), sat_x.inner(1))
+            .gpu_blocks     (sat_x.outer(0), sat_x.full(0));
+
+        sat_x.inter_schedule().compute_globally()
+            .reorder_storage(sat_x.full(0), sat_x.tail(), sat_x.outer(0))
+            .split          (sat_x.full(0), ws, sat_x.inner())
+            .unroll         (sat_x.outer_scan())
+            .split          (sat_x.full(0), tiles_per_warp)
+            .reorder        (sat_x.outer_scan(), sat_x.tail(), sat_x.full(0).split_var(), sat_x.inner(), sat_x.full(0))
+            .gpu_threads    (sat_x.inner(0), sat_x.full(0).split_var())
+            .gpu_blocks     (sat_x.full(0));
+
+        // slightly different schedule for y IIR filter
+
+        sat_y.intra_schedule().compute_locally()
+            .reorder_storage(sat_y.full(0), sat_y.inner(), sat_y.outer(0))
+            .split      (sat_y.full(0), ws)
+            .split      (sat_y.inner(0), unroll_w)
+            .unroll     (sat_y.inner(0).split_var())
+            .unroll     (sat_y.inner_scan())
+            .reorder    (sat_y.inner_scan(), sat_y.inner(0).split_var(), sat_y.inner(0), sat_y.full(0).split_var(), sat_y.full(0), sat_y.outer(0))
+            .gpu_threads(sat_y.full(0).split_var(), sat_y.inner(0))
+            .gpu_blocks (sat_y.full(0), sat_y.outer(0));
+
+        sat_y.inter_schedule().compute_globally()
+            .reorder_storage(sat_y.full(0), sat_y.tail(), sat_y.outer(0))
+            .split          (sat_y.full(0), ws, sat_y.inner())
+            .unroll         (sat_y.outer_scan())
+            .split          (sat_y.full(0), tiles_per_warp)
+            .reorder        (sat_y.outer_scan(), sat_y.tail(), sat_y.full(0).split_var(), sat_y.inner(), sat_y.full(0))
+            .gpu_threads    (sat_y.inner(0), sat_y.full(0).split_var())
+            .gpu_blocks     (sat_y.full(0));
+    }
 
     return diff_y;
 }

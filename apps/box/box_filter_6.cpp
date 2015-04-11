@@ -14,6 +14,8 @@ int main(int argc, char **argv) {
     const int B = 5;    // box filter radius
 
     Arguments args(argc, argv);
+
+    bool nosched   = args.noschedule;
     int iter       = args.iterations;
     int tile_width = args.block;
     int width      = args.width;
@@ -35,9 +37,9 @@ int main(int argc, char **argv) {
     Func b0;
     b0(x,y) = in_image(x,y);
 
-    RecFilter b1 = box_filter_order_2(b0,           width, height, B, tile_width);
-    RecFilter b2 = box_filter_order_2(b1.as_func(), width, height, B, tile_width);
-    RecFilter b3 = box_filter_order_2(b2.as_func(), width, height, B, tile_width);
+    RecFilter b1 = box_filter_order_2(b0,           width, height, B, tile_width, !nosched);
+    RecFilter b2 = box_filter_order_2(b1.as_func(), width, height, B, tile_width, !nosched);
+    RecFilter b3 = box_filter_order_2(b2.as_func(), width, height, B, tile_width, !nosched);
 
     b3.profile(iter);
 
