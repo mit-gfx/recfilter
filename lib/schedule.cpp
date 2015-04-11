@@ -285,32 +285,36 @@ RecFilterSchedule& RecFilterSchedule::parallel(VarTag vtag, int factor) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
-        map<int,VarOrRVar> vars = var_by_tag(rF, vtag);
-        map<int,VarOrRVar>::iterator vit;
+        map<int,vector<VarOrRVar> > vars = var_list_by_tag(rF, vtag);
+        map<int,vector<VarOrRVar> >::iterator vit;
 
         for (vit=vars.begin(); vit!=vars.end(); vit++) {
             int def = vit->first;
-            VarOrRVar v = vit->second;
+            vector<VarOrRVar> vlist= vit->second;
 
-            // only add scheduling to defs that are not undef
-            if (def==PURE_DEF) {
-                if (!is_undef(F.values())) {
-                    if (factor) {
-                        F.parallel(v, factor);
-                        rF.pure_schedule.push_back("parallel(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
-                    } else {
-                        F.parallel(v);
-                        rF.pure_schedule.push_back("parallel(Var(\"" + v.name() + "\"))");
+            for (int i=0; i<vlist.size(); i++) {
+                VarOrRVar v = vlist[i];
+
+                // only add scheduling to defs that are not undef
+                if (def==PURE_DEF) {
+                    if (!is_undef(F.values())) {
+                        if (factor) {
+                            F.parallel(v, factor);
+                            rF.pure_schedule.push_back("parallel(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
+                        } else {
+                            F.parallel(v);
+                            rF.pure_schedule.push_back("parallel(Var(\"" + v.name() + "\"))");
+                        }
                     }
-                }
-            } else {
-                if (!is_undef(F.update_values(def))) {
-                    if (factor) {
-                        F.update(def).parallel(v, factor);
-                        rF.update_schedule[def].push_back("parallel(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
-                    } else {
-                        F.update(def).parallel(v);
-                        rF.update_schedule[def].push_back("parallel(Var(\"" + v.name() + "\"))");
+                } else {
+                    if (!is_undef(F.update_values(def))) {
+                        if (factor) {
+                            F.update(def).parallel(v, factor);
+                            rF.update_schedule[def].push_back("parallel(Var(\"" + v.name() + "\")," + int_to_string(factor) + ")");
+                        } else {
+                            F.update(def).parallel(v);
+                            rF.update_schedule[def].push_back("parallel(Var(\"" + v.name() + "\"))");
+                        }
                     }
                 }
             }
@@ -660,7 +664,7 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag var_
         assert(false);
     }
     if (var_in .check(SCAN) || var_in .check(SPLIT) || var_in .check(FULL) ||
-        var_out.check(SCAN) || var_out.check(SPLIT) || var_out.check(FULL)) {
+            var_out.check(SCAN) || var_out.check(SPLIT) || var_out.check(FULL)) {
         cerr << "VarTag for the new dimension created by split must be one of "
             << "inner(), outer(), inner(i) and outer(k)" << endl;
         assert(false);
@@ -714,7 +718,7 @@ RecFilterSchedule& RecFilterSchedule::split(VarTag vtag, int factor, VarTag var_
             Var t(unique_name(remove_dollar(v.name())+".1"));
 
             s << "split(Var(\"" << v.name() << "\"), Var(\"" << v.name()
-              << "\"), Var(\"" << t.name() << "\"), " << factor << ")";
+                << "\"), Var(\"" << t.name() << "\"), " << factor << ")";
 
             // only add scheduling to defs that are not undef
             if (def==PURE_DEF) {
@@ -797,8 +801,7 @@ RecFilterSchedule& RecFilterSchedule::reorder(vector<VarTag> vtag) {
                     }
                 }
             } else {
-                cerr << "VarTags provided to reorder() resulted in less than 2 variables" << endl;
-                assert(false);
+                cerr << "Warning: VarTags provided to reorder() resulted in less than 2 variables" << endl;
             }
         }
     }
@@ -956,8 +959,7 @@ RecFilterSchedule& RecFilterSchedule::reorder_storage(vector<VarTag> vtag) {
             }
             rF.pure_schedule.push_back(s.str());
         } else {
-            cerr << "VarTags provided to reorder_storage() resulted in less than 2 variables" << endl;
-            assert(false);
+            cerr << "Warning: VarTags provided to reorder_storage() resulted in less than 2 variables" << endl;
         }
     }
     return *this;

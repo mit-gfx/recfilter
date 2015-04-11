@@ -355,56 +355,58 @@ public:
 
     /**@name Automatic scheduling for GPU targets */
     // {@
-    /** Automatic schedule for non-tiled filter and return a handle for additional scheduling
+    /** Automatic GPU schedule for non-tiled filter and return a handle for additional scheduling
      * \param tx tiling factor to split first dimension into CUDA blocks and threads
      * \param ty tiling factor to split second dimension into CUDA blocks and threads
      * \param tz tiling factor to split third dimension into CUDA blocks and threads
-     * \returns handle for additional scheduling
      */
     void gpu_auto_full_schedule(int tx, int ty=1, int tz=1);
 
-    /** Automatic schedule for tiled or non-tiled recursive filter;
+    /** Automatic GPU schedule for tiled or non-tiled recursive filter;
      * calls RecFilter::gpu_auto_full_schedule(),
      * RecFilter::gpu_auto_intra_schedule() and
      * RecFilter::gpu_auto_inter_schedule().
      * \param max_threads maximum threads in a CUDA warp
-     * \returns handle for additional scheduling
      */
     void gpu_auto_schedule(int max_threads);
 
-    /** Automatic schedule for inter-tile functions of tiled filter
+    /** Automatic GPU schedule for inter-tile functions of tiled filter
      * \param max_threads maximum threads in a CUDA warp
-     * \returns handle for additional scheduling
      */
     void gpu_auto_inter_schedule(int max_threads);
 
-    /** Automatic schedule for intra-tile functions if tiled filter
+    /** Automatic GPU schedule for intra-tile functions if tiled filter
      * \param id 0 for all intra tile functions, 1 for nD intra-tile functions, otherwise 1D intra-tile functions
      * \param max_threads maximum threads in a CUDA warp
-     * \returns handle for additional scheduling
      */
     void gpu_auto_intra_schedule(int id, int max_threads);
     // @}
 
     /**@name Automatic scheduling for CPU targets */
     // {@
-    /** Automatic schedule for non-tiled filter
-     * \param vector_width vectorization width of the target platform
-     * \returns handle for additional scheduling
-     */
-    void cpu_auto_full_schedule(int vector_width=8);
 
-    /** Automatic schedule for inter-tile functions of tiled filter
+    /** Automatic CPU schedule for tiled or non-tiled recursive filter;
+     * calls RecFilter::cpu_auto_full_schedule(),
+     * RecFilter::cpu_auto_intra_schedule() and
+     * RecFilter::cpu_auto_inter_schedule().
      * \param vector_width vectorization width of the target platform
-     * \returns handle for additional scheduling
      */
-    void cpu_auto_inter_schedule(int vector_width=8);
+    void cpu_auto_schedule(int vector_width);
 
-    /** Automatic schedule for intra-tile functions if tiled filter
+    /** Automatic CPU schedule for non-tiled filter
      * \param vector_width vectorization width of the target platform
-     * \returns handle for additional scheduling
      */
-    void cpu_auto_intra_schedule(int vector_width=8);
+    void cpu_auto_full_schedule(int vector_width);
+
+    /** Automatic CPU schedule for inter-tile functions of tiled filter
+     * \param vector_width vectorization width of the target platform
+     */
+    void cpu_auto_inter_schedule(int vector_width);
+
+    /** Automatic CPU schedule for intra-tile functions if tiled filter
+     * \param vector_width vectorization width of the target platform
+     */
+    void cpu_auto_intra_schedule(int vector_width);
     // @}
 
     /** @name Generic handles to write scheduled for dimensions of internal functions */

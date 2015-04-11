@@ -438,6 +438,15 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
 
 // -----------------------------------------------------------------------------
 
+void RecFilter::cpu_auto_schedule(int vector_width) {
+    if (contents.ptr->tiled) {
+        cpu_auto_intra_schedule(vector_width);
+        cpu_auto_inter_schedule(vector_width);
+    } else {
+        cpu_auto_full_schedule(vector_width);
+    }
+}
+
 void RecFilter::cpu_auto_full_schedule(int vector_width) {
     if (contents.ptr->tiled) {
         cerr << "Filter is tiled, use RecFilter::cpu_auto_intra_schedule() "
@@ -450,12 +459,10 @@ void RecFilter::cpu_auto_full_schedule(int vector_width) {
     // all full dimensions must be parallelized
 
     full_schedule().compute_globally()
-        .reorder_storage(full(0), full())
-        .split(full(0), vector_width)
-        .reorder(full(0).split_var(), full_scan(), full())
-        .unroll(full_scan())
-        .vectorize(full(0).split_var())
-        .parallel(full());
+        .reorder(full_scan(), full())
+        .vectorize(full(0), vector_width)
+        //.parallel(full())
+        ;
 }
 
 void RecFilter::cpu_auto_intra_schedule(int vector_width) {
@@ -463,7 +470,29 @@ void RecFilter::cpu_auto_intra_schedule(int vector_width) {
         cerr << "Filter is not tiled, use RecFilter::cpu_auto_full_schedule()\n" << endl;
         assert(false);
     }
-    assert("cpu_auto_intra_schedule not supported currently" && false);
+
+    RecFilterSchedule R = intra_schedule(0);
+
+    if (R.empty()) {
+        return;
+    }
+
+    int max_tile = 0;
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        if (contents.ptr->filter_info[i].tile_width<contents.ptr->filter_info[i].image_width) {
+            max_tile = std::max(max_tile, contents.ptr->filter_info[i].tile_width);
+        }
+    }
+
+    R.compute_locally()
+        //.storage_layout(INVALID, outer())
+        .split(full(0), max_tile, inner(), outer())  // convert full dimensions
+        .split(full(1), max_tile, inner(), outer())  // into tiles
+        .split(full(2), max_tile, inner(), outer())
+        .reorder({inner_scan(), inner(), outer()})   // scan dimension is innermost
+        .vectorize(inner(0), vector_width)           // vectorize innermost non-scan dimension
+        //.parallel(inner())                           // parallelize everything else
+        .parallel(outer());
 }
 
 void RecFilter::cpu_auto_inter_schedule(int vector_width) {
@@ -471,7 +500,29 @@ void RecFilter::cpu_auto_inter_schedule(int vector_width) {
         cerr << "Filter is not tiled, use RecFilter::cpu_auto_full_schedule()\n" << endl;
         assert(false);
     }
-    assert("cpu_auto_inter_schedule not supported currently" && false);
+
+    RecFilterSchedule R = inter_schedule();
+
+    if (R.empty()) {
+        return;
+    }
+
+    int max_tile = 0;
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        if (contents.ptr->filter_info[i].tile_width<contents.ptr->filter_info[i].image_width) {
+            max_tile = std::max(max_tile, contents.ptr->filter_info[i].tile_width);
+        }
+    }
+
+    R.compute_globally()
+        //.reorder_storage({full(), inner(), tail(), outer()})
+        .split(full(0), max_tile, inner(), outer())         // convert full dimensions
+        .split(full(1), max_tile, inner(), outer())         // into tiles
+        .split(full(2), max_tile, inner(), outer())
+        .reorder({outer_scan(), tail(), inner(), outer()})  // scan dimension is innermost
+        .vectorize(inner(0), vector_width)                  // vectorize innermost non-scan dimension
+        //.parallel(inner())                                  // parallelize everything else
+        .parallel(outer());
 }
 
 // -----------------------------------------------------------------------------
@@ -601,15 +652,10 @@ void RecFilter::gpu_auto_inter_schedule(int max_threads) {
     VarTag bx = outer(0);           // at most 2 outer dimensions
     VarTag by = outer(1);           // as 1 outer dim is being scanned
 
-    stringstream str;
-
     // store inner dimensions innermost because threads are operating
     // on these dimensions - memory coalescing
     R.compute_globally()
      .reorder_storage({full(), inner(), tail(), outer()});
-
-    str << name() << ".inter_schedule().compute_globally()\n"
-        << "\t.reorder_storage({full(), inner(), tail(), outer()})\n";
 
     // max tile is the maximum number of threads that will be launched
     // by specifying either of tx, ty, or tz as parallel
@@ -623,13 +669,11 @@ void RecFilter::gpu_auto_inter_schedule(int max_threads) {
     // there is at least one non-tiled dimension
     if (R.contains_vars_with_tag(fx)) {
         R.split(fx, max_tile, inner(), outer());
-        str << "\t.split(" << fx << ", " << max_tile << ", " << inner() << ", " << outer() << ")\n";
     }
 
     // there are two non-tiled dimensions
     if (R.contains_vars_with_tag(fy)) {
         R.split(fy, max_tile, inner(), outer());
-        str << "\t.split(" << fy << ", " << max_tile << ", " << inner() << ", " << outer() << ")\n";
     }
 
     // split an outer dimensions to generate extra threads to fill CUDA warps;
@@ -637,18 +681,10 @@ void RecFilter::gpu_auto_inter_schedule(int max_threads) {
     int factor = max_threads/max_tile;
 
     R.unroll(sc)
-     .split(bx, factor)
-     .reorder({sc, tail(), ty, bx.split_var(), tx, bx, by})
-     .gpu_threads(tx, bx.split_var())
-     .gpu_blocks (bx, by);
-
-    str << "\t.unroll(" << sc << ")\n"
-        << "\t.split(" << bx << ", " << factor << ")\n"
-        << "\t.reorder({" << sc << ", " << tail() << ", " << ty << ", " << bx.split_var() << ", " << tx << ", " << bx << ", " << by << "})\n"
-        << "\t.gpu_threads(" << tx << ", " << bx.split_var() << ")\n"
-        << "\t.gpu_blocks (" << bx << ", " << by << ");\n" << endl;
-
-    // cerr << str.str() << endl;
+        .split(bx, factor)
+        .reorder({sc, tail(), ty, bx.split_var(), tx, bx, by})
+        .gpu_threads(tx, bx.split_var())
+        .gpu_blocks (bx, by);
 }
 
 void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
@@ -681,11 +717,7 @@ void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
     VarTag by = outer(1);
     VarTag bz = outer(2);
 
-    stringstream str;
-
     R.compute_locally().storage_layout(INVALID, outer());
-    str << name() << ".intra_schedule(" << id << ").compute_locally()\n"
-        << "\treorder_storage(inner(), outer())\n";
 
     // max tile is the maximum number of threads that will be launched
     // by specifying either of tx, ty, or tz as parallel
@@ -703,63 +735,43 @@ void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
     // there is at least one non-tiled dimension
     if (R.contains_vars_with_tag(fx)) {
         R.split(fx, max_tile, inner(), outer());
-        str << "\t.split(" << fx << ", " << max_tile << ", " << inner() << ", " << outer() << ")\n";
     }
 
     // there are two non-tiled dimensions
     if (R.contains_vars_with_tag(fy)) {
         R.split(fy, max_tile, inner(), outer());
-        str << "\t.split(" << fy << ", " << max_tile << ", " << inner() << ", " << outer() << ")\n";
     }
 
-    switch (id)
-    {
-        // for nD intra tile terms: each inner var is of size max_tile if ty is not
-        // empty then this will give too many threads, reduce by splitting ty; any
-        // parallelism in tz in case of 3D filters is not exploited
+    switch (id) {
         case 1:
+            // for nD intra tile terms: each inner var is of size max_tile if ty is not
+            // empty then this will give too many threads, reduce by splitting ty; any
+            // parallelism in tz in case of 3D filters is not exploited
             if (R.contains_vars_with_tag(ty) && max_tile*max_tile>max_threads) {
                 int factor = max_tile*max_tile/max_threads;
                 R.split(ty, factor).unroll(ty.split_var());
-                str << "\t.split(" << ty << ", "<< factor << ")\n"
-                    << "\t.unroll(" << ty.split_var() << ")\n";
             }
-
             R.unroll(sc)
-             .reorder({sc, ty.split_var(), tz, tx, ty, outer()})
-             .gpu_threads(tx, ty)
-             .gpu_blocks (bx, by, bz);
-
-            str << "\t.unroll(" << sc << ")\n"
-                << "\t.reorder({" << sc << ", " << ty.split_var() << ", " << tz << ", " << tx << ", " << ty << ", " << outer() << "})\n"
-                << "\t.gpu_threads(" << tx << ", " << ty << ")\n"
-                << "\t.gpu_blocks (" << bx << ", " << by << ", " << bz << ");\n" << endl;
+                .reorder({sc, ty.split_var(), tz, tx, ty, outer()})
+                .gpu_threads(tx, ty)
+                .gpu_blocks (bx, by, bz);
             break;
 
 
-        // for intra tile terms that compute cross dimensional residuals, generate more
-        // threads by splitting an outer dimension and using it as threads; any parallelism
-        // in tz in case of 3D filters is not exploited
         case 2:
+            // for intra tile terms that compute cross dimensional residuals, generate more
+            // threads by splitting an outer dimension and using it as threads; any parallelism
+            // in tz in case of 3D filters is not exploited
             R.unroll(sc)
-             .split(bx, max_tile/(num_scans*max_order))
-             .reorder({tx, ty, tz, sc, tail(), bx.split_var(), outer()})
-             .fuse(tail(), tx)
-             .gpu_threads(tail(), bx.split_var())
-             .gpu_blocks (bx, by, bz);
-
-            str << "\t.unroll(" << sc << ")\n"
-                << "\t.split(" << bx << ", " << max_tile/(num_scans*max_order) << ")\n"
-                << "\t.reorder({" << tx << ", " << ty << ", " << tz << ", " << sc << ", " << tail() << ", " << bx.split_var() << ", " << outer() << "})\n"
-                << "\t.fuse(" << tx << ", " << tail() << ")\n"
-                << "\t.gpu_threads(" << tail() << ", " << bx.split_var() << ")\n"
-                << "\t.gpu_blocks (" << bx << ", " << by << ", " << bz << ");\n" << endl;
+                .split(bx, max_tile/(num_scans*max_order))
+                .reorder({tx, ty, tz, sc, tail(), bx.split_var(), outer()})
+                .fuse(tail(), tx)
+                .gpu_threads(tail(), bx.split_var())
+                .gpu_blocks (bx, by, bz);
             break;
 
         default: break;
     }
-
-    // cerr << str.str() << endl;
 }
 
 // -----------------------------------------------------------------------------

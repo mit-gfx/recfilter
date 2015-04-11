@@ -16,13 +16,14 @@
 using namespace Halide;
 
 using std::vector;
-using std::cerr;
+using std::cout;
 using std::endl;
 
 int main(int argc, char **argv) {
     Arguments args(argc, argv);
 
-    int width     = args.width;
+    bool nosched   = args.noschedule;
+    int width      = args.width;
     int tile_width = args.block;
     int iterations = args.iterations;
 
@@ -37,6 +38,8 @@ int main(int argc, char **argv) {
     Log log_naive("audio_biquads.nontiled.perflog");
     Log log_tiled("audio_biquads.tiled.perflog");
 
+    int vector_width = 8;
+
     for (int num_scans=1; num_scans<=MAX_NUM_SCANS; num_scans++) {
         RecFilterDim x("x", width);
 
@@ -47,14 +50,16 @@ int main(int argc, char **argv) {
             for (int i=0; i<=num_scans; i++) {
                 F.add_filter(+x, coeffs);
             }
-            F.as_func().compute_root();
+            if (nosched) {
+                F.full_schedule().compute_globally();
+            } else {
+                F.cpu_auto_schedule(vector_width);
+            }
             time_naive.push_back(F.profile(iterations));
         }
 
         // tiled implementation
         {
-            int vw = 8;
-
             RecFilter F("R_tiled");
             F(x) = image(clamp(x,0,width-1));
             for (int i=0; i<=num_scans; i++) {
@@ -62,9 +67,12 @@ int main(int argc, char **argv) {
             }
             F.split(x, tile_width);
 
-            F.intra_schedule().compute_locally() .vectorize(F.inner(0),vw).parallel(F.outer(0));
-            F.inter_schedule().compute_globally().vectorize(F.inner(0),vw);
-
+            if (nosched) {
+                F.intra_schedule().compute_locally() .vectorize(F.inner(0),vector_width).parallel(F.outer(0));
+                F.inter_schedule().compute_globally().vectorize(F.inner(0),vector_width);
+            } else {
+                F.cpu_auto_schedule(vector_width);
+            }
             time_tiled.push_back(F.profile(iterations));
         }
 
@@ -75,7 +83,11 @@ int main(int argc, char **argv) {
         log_tiled << num_scans << "\t"
                   << time_tiled[time_tiled.size()-1] << "\t"
                   << throughput(time_tiled[time_tiled.size()-1], width) << endl;
+
+        cout << num_scans << "\t"
+             << time_naive[time_naive.size()-1] << "\t"
+             << time_tiled[time_tiled.size()-1] << endl;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
