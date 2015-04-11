@@ -31,6 +31,8 @@ Expr diff_op_xy(Func F, Expr x, Expr y, int w, int h, int B);
 
 int main(int argc, char** argv) {
     Arguments args(argc, argv);
+
+    bool nosched   = args.noschedule;
     int iter       = args.iterations;
     int tile_width = args.block;
     int width      = args.width;
@@ -105,121 +107,130 @@ int main(int argc, char** argv) {
     // -------------------------------------------------------------------------
     // schedules
 
-    int ws       = 32;
-    int unroll_w = ws/4;
-    int intra_tiles_per_warp = ws/2;
-    int inter_tiles_per_warp = 4;
+    // Identical schedules for the three pointwise operations
+    // these are not recursive filters, so it is just easier to
+    // write schedule for them using Halide API
 
-    Var xo("xo"), xi("xi"), xii("xii");
-    Var yo("yo"), yi("yi"), yii("yii");
+    Var xo("xo"), xi("xi"), xii("xii"), u(x.var());
+    Var yo("yo"), yi("yi"), yii("yii"), v(y.var());
 
-    Var u = x.var();
-    Var v = y.var();
+    Box1.as_func().compute_root()
+        .split  (u, xo, xi, tile_width)
+        .split  (v, yo, yi, tile_width)
+        .split  (yi,yi, yii,8)
+        .unroll (yii)
+        .reorder(yii,xi,yi,xo,yo)
+        .gpu    (xo,yo,xi,yi);
 
+    Box2x.as_func().compute_root()
+        .split  (u, xo, xi, tile_width)
+        .split  (v, yo, yi, tile_width)
+        .split  (yi,yi, yii, 8)
+        .unroll (yii)
+        .reorder(yii,xi,yi,xo,yo)
+        .gpu    (xo,yo,xi,yi);
 
-    // first box filter
-    {
-        RecFilter F = SAT;
-        RecFilter D = Box1;
+    DoG.as_func().compute_root()
+        .split  (u, xo, xi, tile_width)
+        .split  (v, yo, yi, tile_width)
+        .split  (yi,yi, yii,8)
+        .unroll (yii)
+        .reorder(yii,xi,yi,xo,yo)
+        .gpu    (xo,yo,xi,yi);
 
-        F.intra_schedule(1).compute_locally()
-            .reorder_storage(F.inner(), F.outer())
-            .unroll         (F.inner_scan())
-            .split          (F.inner(1), unroll_w)
-            .unroll         (F.inner(1).split_var())
-            .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
-            .gpu_threads    (F.inner(0), F.inner(1))
-            .gpu_blocks     (F.outer(0), F.outer(1));
-
-        F.intra_schedule(2).compute_locally()
-            .unroll     (F.inner_scan())
-            .split      (F.outer(0), intra_tiles_per_warp)
-            .reorder    (F.inner(),  F.inner_scan(), F.tail(), F.outer(0).split_var(), F.outer())
-            .fuse       (F.tail(), F.inner(0))
-            .gpu_threads(F.tail(), F.outer(0).split_var())
-            .gpu_blocks (F.outer(0), F.outer(1));
-
-        F.inter_schedule().compute_globally()
-            .reorder_storage(F.inner(), F.tail(), F.outer())
-            .unroll         (F.outer_scan())
-            .split          (F.outer(0), inter_tiles_per_warp)
-            .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
-            .gpu_threads    (F.inner(0), F.outer(0).split_var())
-            .gpu_blocks     (F.outer(0));
-
-        D.compute_globally()
-            .split  (u, xo, xi, tile_width)
-            .split  (v, yo, yi, tile_width)
-            .split  (yi,yi, yii,8)
-            .unroll (yii)
-            .reorder(yii,xi,yi,xo,yo)
-            .gpu    (xo,yo,xi,yi);
+    // automatic schedules for recursive filter pipelines
+    if (!nosched) {
+        SAT  .gpu_auto_schedule(128);
+        SAT2x.gpu_auto_schedule(128);
+        SAT2y.gpu_auto_schedule(128);
     }
+    else {
+
+        // euivalnet manual schedules
+
+        int ws       = 32;
+        int unroll_w = ws/4;
+        int intra_tiles_per_warp = ws/2;
+        int inter_tiles_per_warp = 4;
+
+        // first box filter
+        {
+            RecFilter F = SAT;
+
+            F.intra_schedule(1).compute_locally()
+                .reorder_storage(F.inner(), F.outer())
+                .unroll         (F.inner_scan())
+                .split          (F.inner(1), unroll_w)
+                .unroll         (F.inner(1).split_var())
+                .reorder        (F.inner_scan(), F.inner(1).split_var(), F.inner(), F.outer())
+                .gpu_threads    (F.inner(0), F.inner(1))
+                .gpu_blocks     (F.outer(0), F.outer(1));
+
+            F.intra_schedule(2).compute_locally()
+                .unroll     (F.inner_scan())
+                .split      (F.outer(0), intra_tiles_per_warp)
+                .reorder    (F.inner(),  F.inner_scan(), F.tail(), F.outer(0).split_var(), F.outer())
+                .fuse       (F.tail(), F.inner(0))
+                .gpu_threads(F.tail(), F.outer(0).split_var())
+                .gpu_blocks (F.outer(0), F.outer(1));
+
+            F.inter_schedule().compute_globally()
+                .reorder_storage(F.inner(), F.tail(), F.outer())
+                .unroll         (F.outer_scan())
+                .split          (F.outer(0), inter_tiles_per_warp)
+                .reorder        (F.outer_scan(), F.tail(), F.outer(0).split_var(), F.inner(), F.outer())
+                .gpu_threads    (F.inner(0), F.outer(0).split_var())
+                .gpu_blocks     (F.outer(0));
+
+        }
 
 
-    // second order 2 box filter along x
-    {
-        RecFilter sat_x  = SAT2x;
-        RecFilter diff_x = Box2x;
+        // second order 2 box filter along x
+        {
+            RecFilter sat_x  = SAT2x;
 
-        sat_x.intra_schedule().compute_locally()
-            .split      (sat_x.full(0), ws, sat_x.inner())
-            .split      (sat_x.inner(1), unroll_w)
-            .unroll     (sat_x.inner(1).split_var())
-            .unroll     (sat_x.inner_scan())
-            .reorder    (sat_x.inner_scan(), sat_x.inner(1).split_var(), sat_x.tail(), sat_x.inner(), sat_x.outer(), sat_x.full())
-            .gpu_threads(sat_x.inner(0), sat_x.inner(1))
-            .gpu_blocks (sat_x.outer(0), sat_x.full(0));
+            sat_x.intra_schedule().compute_locally()
+                .split      (sat_x.full(0), ws, sat_x.inner())
+                .split      (sat_x.inner(1), unroll_w)
+                .unroll     (sat_x.inner(1).split_var())
+                .unroll     (sat_x.inner_scan())
+                .reorder    (sat_x.inner_scan(), sat_x.inner(1).split_var(), sat_x.tail(), sat_x.inner(), sat_x.outer(), sat_x.full())
+                .gpu_threads(sat_x.inner(0), sat_x.inner(1))
+                .gpu_blocks (sat_x.outer(0), sat_x.full(0));
 
-        sat_x.inter_schedule().compute_globally()
-            .reorder_storage(sat_x.full(0), sat_x.tail(), sat_x.outer(0))
-            .split          (sat_x.full(0), ws, sat_x.inner())
-            .unroll         (sat_x.outer_scan())
-            .split          (sat_x.full(0), inter_tiles_per_warp)
-            .reorder        (sat_x.outer_scan(), sat_x.tail(), sat_x.full(0).split_var(), sat_x.inner(), sat_x.full(0))
-            .gpu_threads    (sat_x.inner(0), sat_x.full(0).split_var())
-            .gpu_blocks     (sat_x.full(0));
+            sat_x.inter_schedule().compute_globally()
+                .reorder_storage(sat_x.full(0), sat_x.tail(), sat_x.outer(0))
+                .split          (sat_x.full(0), ws, sat_x.inner())
+                .unroll         (sat_x.outer_scan())
+                .split          (sat_x.full(0), inter_tiles_per_warp)
+                .reorder        (sat_x.outer_scan(), sat_x.tail(), sat_x.full(0).split_var(), sat_x.inner(), sat_x.full(0))
+                .gpu_threads    (sat_x.inner(0), sat_x.full(0).split_var())
+                .gpu_blocks     (sat_x.full(0));
+        }
 
-        diff_x.compute_globally()
-            .split  (u, xo, xi, tile_width)
-            .split  (v, yo, yi, tile_width)
-            .split  (yi,yi, yii, unroll_w)
-            .unroll (yii)
-            .reorder(yii,xi,yi,xo,yo)
-            .gpu    (xo,yo,xi,yi);
-    }
+        // slightly different schedule for y IIR filter
+        {
+            RecFilter sat_y  = SAT2y;
 
-    // slightly different schedule for y IIR filter
-    {
-        RecFilter sat_y  = SAT2y;
-        RecFilter diff_y = DoG;
+            sat_y.intra_schedule().compute_locally()
+                .reorder_storage(sat_y.full(0), sat_y.inner(), sat_y.outer(0))
+                .split      (sat_y.full(0), ws)
+                .split      (sat_y.inner(0), unroll_w)
+                .unroll     (sat_y.inner(0).split_var())
+                .unroll     (sat_y.inner_scan())
+                .reorder    (sat_y.inner_scan(), sat_y.inner(0).split_var(), sat_y.inner(0), sat_y.full(0).split_var(), sat_y.full(0), sat_y.outer(0))
+                .gpu_threads(sat_y.full(0).split_var(), sat_y.inner(0))
+                .gpu_blocks (sat_y.full(0), sat_y.outer(0));
 
-        sat_y.intra_schedule().compute_locally()
-            .reorder_storage(sat_y.full(0), sat_y.inner(), sat_y.outer(0))
-            .split      (sat_y.full(0), ws)
-            .split      (sat_y.inner(0), unroll_w)
-            .unroll     (sat_y.inner(0).split_var())
-            .unroll     (sat_y.inner_scan())
-            .reorder    (sat_y.inner_scan(), sat_y.inner(0).split_var(), sat_y.inner(0), sat_y.full(0).split_var(), sat_y.full(0), sat_y.outer(0))
-            .gpu_threads(sat_y.full(0).split_var(), sat_y.inner(0))
-            .gpu_blocks (sat_y.full(0), sat_y.outer(0));
-
-        sat_y.inter_schedule().compute_globally()
-            .reorder_storage(sat_y.full(0), sat_y.tail(), sat_y.outer(0))
-            .split          (sat_y.full(0), ws, sat_y.inner())
-            .unroll         (sat_y.outer_scan())
-            .split          (sat_y.full(0), inter_tiles_per_warp)
-            .reorder        (sat_y.outer_scan(), sat_y.tail(), sat_y.full(0).split_var(), sat_y.inner(), sat_y.full(0))
-            .gpu_threads    (sat_y.inner(0), sat_y.full(0).split_var())
-            .gpu_blocks     (sat_y.full(0));
-
-        diff_y.compute_globally()
-            .split  (u, xo, xi, tile_width)
-            .split  (v, yo, yi, tile_width)
-            .split  (yi,yi, yii,unroll_w)
-            .unroll (yii)
-            .reorder(yii,xi,yi,xo,yo)
-            .gpu    (xo,yo,xi,yi);
+            sat_y.inter_schedule().compute_globally()
+                .reorder_storage(sat_y.full(0), sat_y.tail(), sat_y.outer(0))
+                .split          (sat_y.full(0), ws, sat_y.inner())
+                .unroll         (sat_y.outer_scan())
+                .split          (sat_y.full(0), inter_tiles_per_warp)
+                .reorder        (sat_y.outer_scan(), sat_y.tail(), sat_y.full(0).split_var(), sat_y.inner(), sat_y.full(0))
+                .gpu_threads    (sat_y.inner(0), sat_y.full(0).split_var())
+                .gpu_blocks     (sat_y.full(0));
+        }
     }
 
     DoG.profile(iter);
@@ -243,7 +254,7 @@ Expr diff_op_y(Func F, Expr x, Expr y, int w, int h, int B, int c) {
 Expr diff_op_xy(Func F, Expr x, Expr y, int w, int h, int B) {
     Expr e =(1.0f * F(clamp(x+B+0, 0, w-1), clamp(y+B+0, 0, h-1)) +
             -1.0f * F(clamp(x+B+0, 0, w-1), clamp(y-B-1, 0, h-1)) +
-             1.0f * F(clamp(x-B-1, 0, w-1), clamp(y-B-1, 0, h-1)) +
+            1.0f * F(clamp(x-B-1, 0, w-1), clamp(y-B-1, 0, h-1)) +
             -1.0f * F(clamp(x-B-1, 0, w-1), clamp(y+B+0, 0, h-1))) / std::pow(2*B+1,2);
     return e;
 }

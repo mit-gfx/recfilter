@@ -7,19 +7,21 @@ all:
 	$(MAKE) bspline
 	$(MAKE) gaussian
 	$(MAKE) summed_table
-	$(MAKE) ls_hist
+	$(MAKE) DoG
 	$(MAKE) audio
 	$(MAKE) cpu
 	$(MAKE) gpu
+	$(MAKE) ls_hist
 
 clean:
 	$(MAKE) ../lib 		 clean
 	$(MAKE) tests 		 clean
 	$(MAKE) box 	 	 clean
 	$(MAKE) bspline 	 clean
-	$(MAKE) ls_hist 	 clean
 	$(MAKE) gaussian 	 clean
+	$(MAKE) DoG			 clean
 	$(MAKE) summed_table clean
 	$(MAKE) audio  		 clean
 	$(MAKE) cpu 		 clean
 	$(MAKE) gpu 		 clean
+	$(MAKE) ls_hist 	 clean
