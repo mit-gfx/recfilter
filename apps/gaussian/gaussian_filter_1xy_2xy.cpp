@@ -1,5 +1,5 @@
 /**
- * \file gaussian_filter_21.cpp
+ * \file gaussian_filter_1xy_2xy.cpp
  *
  * Gaussian blur using IIR filters: 1st and 2nd order x-y overlapped
  */
@@ -13,8 +13,6 @@
 using namespace Halide;
 
 using std::vector;
-using std::cout;
-using std::endl;
 
 void manual_schedule(RecFilter& f);
 
@@ -39,7 +37,7 @@ int main(int argc, char **argv) {
     vector<float> W2 = gaussian_weights(sigma, 2);
     vector<float> W3 = gaussian_weights(sigma, 3);
 
-    RecFilter F("Gaussian_21");
+    RecFilter F("Gaussian_1xy_2xy");
 
     F.set_clamped_image_border();
 

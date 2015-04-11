@@ -150,6 +150,7 @@ RecFilter box_filter_order_2(Func I, int width, int height, int B, int tile_widt
     // use Halide scheduling API for these
 
     diff_x.as_func()
+        .compute_root()
         .split  (u, xo, xi, tile_width)
         .split  (v, yo, yi, tile_width)
         .split  (yi,yi, yii, 8)

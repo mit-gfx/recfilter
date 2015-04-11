@@ -1,5 +1,5 @@
 /**
- * \file gaussian_overlapped_filter.cpp
+ * \file gaussian_filter_3x_3y.cpp
  *
  * Gaussian blur using IIR filters: cascade of 3rd order x and 3rd order y
  */
@@ -12,12 +12,7 @@
 
 using namespace Halide;
 
-using std::map;
 using std::vector;
-using std::string;
-using std::cerr;
-using std::cout;
-using std::endl;
 
 void manual_schedule(RecFilter& fx, RecFilter& fy);
 
@@ -40,7 +35,7 @@ int main(int argc, char **argv) {
     float sigma = 5.0;
     vector<float> W3 = gaussian_weights(sigma,3);
 
-    RecFilter G("Gaussian_3_cascaded");
+    RecFilter G("Gaussian_3x_3y");
 
     G.set_clamped_image_border();
 
