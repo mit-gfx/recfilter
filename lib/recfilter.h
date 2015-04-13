@@ -350,25 +350,34 @@ public:
 
     /** Extract a handle to schedule non-tiled filter */
     RecFilterSchedule full_schedule(void);
-    // @}
 
+    /** Set final result of filter to be computed at an external Func,
+     * useful for merging the filter with external stages; the filter
+     * must not depend upon the external function - overrides any
+     * previous compute_at scheduling
+     *
+     * \param external function inside which the filter must be computed
+     * \param granularity variable where this filter's result should be computed
+     */
+    void compute_at(Halide::Func external, Halide::Var granularity);
+    // @}
 
     /**@name Automatic scheduling for GPU targets */
     // {@
     /** Automatic GPU schedule for non-tiled filter and return a handle for additional scheduling
-     * \param tx tiling factor to split first dimension into CUDA blocks and threads
-     * \param ty tiling factor to split second dimension into CUDA blocks and threads
-     * \param tz tiling factor to split third dimension into CUDA blocks and threads
+     * \param max_threads maximum threads in a CUDA warp
+     * \param tile_width  tiling factor to split full dimensions into CUDA blocks and CUDA tiles
      */
-    void gpu_auto_full_schedule(int tx, int ty=1, int tz=1);
+    void gpu_auto_full_schedule(int max_threads, int tile_width=32);
 
     /** Automatic GPU schedule for tiled or non-tiled recursive filter;
      * calls RecFilter::gpu_auto_full_schedule(),
      * RecFilter::gpu_auto_intra_schedule() and
      * RecFilter::gpu_auto_inter_schedule().
      * \param max_threads maximum threads in a CUDA warp
+     * \param tile_width  tiling factor to split full dimensions into CUDA blocks and CUDA tiles (only used if filter is not tiled)
      */
-    void gpu_auto_schedule(int max_threads);
+    void gpu_auto_schedule(int max_threads, int tile_width=32);
 
     /** Automatic GPU schedule for inter-tile functions of tiled filter
      * \param max_threads maximum threads in a CUDA warp

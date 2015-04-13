@@ -436,6 +436,19 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
     return RecFilterSchedule(*this, func_list);
 }
 
+void RecFilter::compute_at(Func external, Var granularity) {
+    // check that the filter does not depend upon F
+    if (contents.ptr->func.find(external.name()) != contents.ptr->func.end()) {
+        cerr << "Cannot compute the filter " << name() << " at " << external.name()
+             << " because it is a consumer of " << external.name() << endl;
+        assert(false);
+    }
+
+    // update the compute level scheduling
+    Function f = as_func().function();
+    f.schedule().compute_level() = LoopLevel(external.name(), granularity.name());
+}
+
 // -----------------------------------------------------------------------------
 
 void RecFilter::cpu_auto_schedule(int vector_width) {
@@ -527,101 +540,43 @@ void RecFilter::cpu_auto_inter_schedule(int vector_width) {
 
 // -----------------------------------------------------------------------------
 
-void RecFilter::gpu_auto_schedule(int max_threads) {
+void RecFilter::gpu_auto_schedule(int max_threads, int tile_width) {
     if (contents.ptr->tiled) {
         gpu_auto_intra_schedule(1,max_threads);
         gpu_auto_intra_schedule(2,max_threads);
         gpu_auto_inter_schedule(max_threads);
     } else {
-        gpu_auto_full_schedule(0,0,0);
+        gpu_auto_full_schedule(max_threads, tile_width);
     }
 }
 
-void RecFilter::gpu_auto_full_schedule(int tx, int ty, int tz) {
+void RecFilter::gpu_auto_full_schedule(int max_threads, int tile_width) {
     if (contents.ptr->tiled) {
         cerr << "Filter is tiled, use RecFilter::gpu_auto_intra_schedule() "
              << "and RecFilter::gpu_auto_inter_schedule()\n" << endl;
         assert(false);
     }
 
-//    Func F = as_func();
-//
-//    F.compute_root();
-//
-//    vector<Var> vars;
-//    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-//        vars.push_back(contents.ptr->filter_info[i].var);
-//    }
-//
-//    // schedule for pure def
-//    {
-//        vector<VarOrRVar> parallel_vars;
-//        vector<VarOrRVar> non_parallel_vars;
-//        for (int j=0; j<contents.ptr->filter_info.size(); j++) {
-//            if (j<3) {
-//                parallel_vars.push_back(contents.ptr->filter_info[j].var);
-//            } else {
-//                non_parallel_vars.push_back(contents.ptr->filter_info[j].var);
-//            }
-//        }
-//
-//        // reorder the vars so that all parallel vars are at the end and
-//        // non parallel vars are inside - necessary for valid CUDA schedule
-//        vector<VarOrRVar> reordered_vars;
-//        reordered_vars.insert(reordered_vars.end(), parallel_vars.begin(), parallel_vars.end());
-//        reordered_vars.insert(reordered_vars.end(), non_parallel_vars.begin(), non_parallel_vars.end());
-//        F.reorder(reordered_vars);
-//
-//        // specify CUDA threads and blocks
-//        switch (parallel_vars.size()) {
-//            case 1: F.gpu_tile(parallel_vars[0], tx); break;
-//            case 2: F.gpu_tile(parallel_vars[0], parallel_vars[1], tx, ty); break;
-//            case 3: F.gpu_tile(parallel_vars[0], parallel_vars[1], parallel_vars[2], tx, ty, tz); break;
-//            default: break;
-//        }
-//    }
-//
-//    // schedule for update def
-//    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-//        RDom rx = contents.ptr->filter_info[i].rdom;
-//
-//        vector<VarOrRVar> parallel_vars;
-//        vector<VarOrRVar> non_parallel_vars;
-//        for (int j=0; j<contents.ptr->filter_info.size(); j++) {
-//            if (i != j) {
-//                if (j<3) {
-//                    parallel_vars.push_back(contents.ptr->filter_info[j].var);
-//                } else {
-//                    non_parallel_vars.push_back(contents.ptr->filter_info[j].var);
-//                }
-//            }
-//        }
-//
-//        for (int j=0; j<contents.ptr->filter_info[i].scan_id.size(); j++) {
-//            int def = contents.ptr->filter_info[i].scan_id[j];
-//
-//            // unroll the scan variable
-//            F.update(def).unroll(rx);
-//
-//            // reorder the vars so that all parallel vars are at the end and
-//            // non parallel vars are inside and scan var is inner most - necessary
-//            // for valid CUDA schedule
-//            vector<VarOrRVar> reordered_vars;
-//            reordered_vars.push_back(rx);
-//            reordered_vars.insert(reordered_vars.end(), parallel_vars.begin(), parallel_vars.end());
-//            reordered_vars.insert(reordered_vars.end(), non_parallel_vars.begin(), non_parallel_vars.end());
-//            F.update(def).reorder(reordered_vars);
-//
-//            // specify CUDA threads and blocks
-//            switch (parallel_vars.size()) {
-//                case 1: F.gpu_tile(parallel_vars[0], tx); break;
-//                case 2: F.gpu_tile(parallel_vars[0], parallel_vars[1], tx, ty); break;
-//                case 3: F.gpu_tile(parallel_vars[0], parallel_vars[1], parallel_vars[2], tx, ty, tz); break;
-//                default: break;
-//            }
-//        }
-//    }
-//
+    RecFilterSchedule R = full_schedule();
+
+    R.compute_globally()
+        .unroll(full_scan())
+        .split(full(0), tile_width, inner(), outer())  // convert full dimensions
+        .split(full(1), tile_width, inner(), outer())  // into tiles
+        .split(full(2), tile_width, inner(), outer());
+
+    VarTag tx = inner(0);
+    VarTag ty = inner(1);
+    VarTag tz = inner(2);
+
+    if (R.contains_vars_with_tag(ty) && tile_width*tile_width>max_threads) {
+        int factor = tile_width*tile_width/max_threads;
+        R.split(ty, factor).unroll(ty.split_var());
+    }
+
+    R.reorder({full_scan(), ty.split_var(), tz, tx, ty, outer()})
+        .gpu_threads(tx, ty)
+        .gpu_threads(outer(0), outer(1), outer(2));
 }
 
 void RecFilter::gpu_auto_inter_schedule(int max_threads) {
