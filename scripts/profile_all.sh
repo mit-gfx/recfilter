@@ -10,8 +10,11 @@ apps="\
 ./box_filter_6
 ./biquintic_overlapped_filter
 ./biquintic_cascaded_filter
-./gaussian_overlapped_filter
-./gaussian_cascaded_filter
+./gaussian_filter_1xy_1xy_1xy
+./gaussian_filter_1xy_2x_2y
+./gaussian_filter_1xy_2xy
+./gaussian_filter_3x_3y
+./gaussian_filter_3xy
 ./diff_gauss
 "
 
@@ -22,17 +25,9 @@ inc_w=64
 
 for app in $apps
 do
-    logfile="$app".ours.perflog
-    rm -f $logfile
-
-    for (( w=$min_w; w <= $max_w; w+=$inc_w ))
-    do
-        cmd="./cuda_profile.sh $app $w >> $logfile"
-        echo $cmd
-        eval $cmd
-    done
+    ./profile_app.sh $app
 done
 
 # profile CPU 1D filters
-# HL_JIT_TARGET=x86-64 ./audio_higher_order -w 10000000 -t 1000 -iter 200
-# HL_JIT_TARGET=x86-64 ./audio_biquads -w 10000000 -t 1000 -iter 200
+HL_JIT_TARGET=x86-64 ./audio_filter_higher_order -w 10000000 -t 1000 -iter 200
+HL_JIT_TARGET=x86-64 ./audio_filter_biquads -w 10000000 -t 1000 -iter 200
