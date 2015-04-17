@@ -444,9 +444,50 @@ void RecFilter::compute_at(Func external, Var granularity) {
         assert(false);
     }
 
-    // update the compute level scheduling
-    Function f = as_func().function();
-    f.schedule().compute_level() = LoopLevel(external.name(), granularity.name());
+    // reference compute at level of all functions that are computed at the final result
+    LoopLevel ref_compute_level(name(), granularity.name());
+
+    // new compute at level
+    string compute_level_str = "compute_at(" + external.name() +
+        ",Var(\"" + granularity.name() + "\"))";
+
+    // find all Func which are compute_at(func_name)
+    // change them to new compute at level
+    // also modify the schedule string for each of these functions
+    map<string, RecFilterFunc>::iterator fit;
+    for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+        Function f = fit->second.func;
+        // if (f.schedule().compute_level().match(ref_compute_level)) {
+        if (f.schedule().compute_level().func == name()) {
+            // reset compute and store levels and then apply the new compute at
+            f.schedule().compute_level()= LoopLevel();
+            f.schedule().store_level() = LoopLevel();
+            Func(f).compute_at(external, granularity);
+
+            // change the compute_at schedule string
+            vector<string> pure_schedule = fit->second.pure_schedule;
+            for (int i=0; i<pure_schedule.size(); i++) {
+                if (pure_schedule[i].find("compute_")==0) {
+                    pure_schedule[i] = compute_level_str;
+                }
+            }
+            fit->second.pure_schedule = pure_schedule;
+        }
+    }
+
+    // update the store and compute level of the final result
+    RecFilterFunc& rF = internal_function(name());
+    Function f        = rF.func;
+    f.schedule().compute_level()= LoopLevel();
+    f.schedule().store_level() = LoopLevel();
+    Func(f).compute_at(external, granularity);
+    vector<string> pure_schedule = rF.pure_schedule;
+    for (int i=0; i<pure_schedule.size(); i++) {
+        if (pure_schedule[i].find("compute_")==0) {
+            pure_schedule[i]= compute_level_str;
+        }
+    }
+    rF.pure_schedule = pure_schedule;
 }
 
 // -----------------------------------------------------------------------------
@@ -499,9 +540,9 @@ void RecFilter::cpu_auto_intra_schedule(int vector_width) {
 
     R.compute_locally()
         //.storage_layout(INVALID, outer())
-        .split(full(0), max_tile, inner(), outer())  // convert full dimensions
-        .split(full(1), max_tile, inner(), outer())  // into tiles
-        .split(full(2), max_tile, inner(), outer())
+        .split(full(0), max_tile, inner(), outer())  // convert upto 3 full dimensions
+        .split(full(0), max_tile, inner(), outer())  // into tiles
+        .split(full(0), max_tile, inner(), outer())
         .reorder({inner_scan(), inner(), outer()})   // scan dimension is innermost
         .vectorize(inner(0), vector_width)           // vectorize innermost non-scan dimension
         //.parallel(inner())                           // parallelize everything else
@@ -529,9 +570,9 @@ void RecFilter::cpu_auto_inter_schedule(int vector_width) {
 
     R.compute_globally()
         //.reorder_storage({full(), inner(), tail(), outer()})
-        .split(full(0), max_tile, inner(), outer())         // convert full dimensions
-        .split(full(1), max_tile, inner(), outer())         // into tiles
-        .split(full(2), max_tile, inner(), outer())
+        .split(full(0), max_tile, inner(), outer())         // convert upto 3 full dimensions
+        .split(full(0), max_tile, inner(), outer())         // into tiles
+        .split(full(0), max_tile, inner(), outer())
         .reorder({outer_scan(), tail(), inner(), outer()})  // scan dimension is innermost
         .vectorize(inner(0), vector_width)                  // vectorize innermost non-scan dimension
         //.parallel(inner())                                  // parallelize everything else
@@ -561,9 +602,9 @@ void RecFilter::gpu_auto_full_schedule(int max_threads, int tile_width) {
 
     R.compute_globally()
         .unroll(full_scan())
-        .split(full(0), tile_width, inner(), outer())  // convert full dimensions
-        .split(full(1), tile_width, inner(), outer())  // into tiles
-        .split(full(2), tile_width, inner(), outer());
+        .split(full(0), tile_width, inner(), outer())  // convert upto three full
+        .split(full(0), tile_width, inner(), outer())  // dimensions into tiles
+        .split(full(0), tile_width, inner(), outer());
 
     VarTag tx = inner(0);
     VarTag ty = inner(1);
@@ -576,7 +617,7 @@ void RecFilter::gpu_auto_full_schedule(int max_threads, int tile_width) {
 
     R.reorder({full_scan(), ty.split_var(), tz, tx, ty, outer()})
         .gpu_threads(tx, ty)
-        .gpu_threads(outer(0), outer(1), outer(2));
+        .gpu_blocks(outer(0), outer(1), outer(2));
 }
 
 void RecFilter::gpu_auto_inter_schedule(int max_threads) {
@@ -596,22 +637,6 @@ void RecFilter::gpu_auto_inter_schedule(int max_threads) {
         return;
     }
 
-    VarTag sc = outer_scan();       // exactly one scan dimension
-
-    VarTag fx = full(0);            // at most 2 full dimensions
-    VarTag fy = full(1);
-
-    VarTag tx = inner(0);           // at most 3 inner dimensions
-    VarTag ty = inner(1);           // because 1 inner dimension is a tail
-
-    VarTag bx = outer(0);           // at most 2 outer dimensions
-    VarTag by = outer(1);           // as 1 outer dim is being scanned
-
-    // store inner dimensions innermost because threads are operating
-    // on these dimensions - memory coalescing
-    R.compute_globally()
-     .reorder_storage({full(), inner(), tail(), outer()});
-
     // max tile is the maximum number of threads that will be launched
     // by specifying either of tx, ty, or tz as parallel
     int max_tile = 0;
@@ -621,15 +646,21 @@ void RecFilter::gpu_auto_inter_schedule(int max_threads) {
         }
     }
 
-    // there is at least one non-tiled dimension
-    if (R.contains_vars_with_tag(fx)) {
-        R.split(fx, max_tile, inner(), outer());
-    }
+    // store inner dimensions innermost because threads are operating
+    // on these dimensions - memory coalescing
+    R.compute_globally()
+     .reorder_storage({full(), inner(), tail(), outer()});
 
-    // there are two non-tiled dimensions
-    if (R.contains_vars_with_tag(fy)) {
-        R.split(fy, max_tile, inner(), outer());
-    }
+    R.split(full(0), max_tile, inner(), outer())  // upto two full dimensions
+     .split(full(0), max_tile, inner(), outer());
+
+    VarTag sc = outer_scan();       // exactly one scan dimension
+
+    VarTag tx = inner(0);           // at most 3 inner dimensions
+    VarTag ty = inner(1);           // because 1 inner dimension is a tail
+
+    VarTag bx = outer(0);           // at most 2 outer dimensions
+    VarTag by = outer(1);           // as 1 outer dim is being scanned
 
     // split an outer dimensions to generate extra threads to fill CUDA warps;
     // any parallelism ty for 3D filters is not exploited
@@ -659,21 +690,6 @@ void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
         return;
     }
 
-    VarTag sc = inner_scan();       // exactly one scan dimension
-
-    VarTag fx = full(0);            // at most 2 full dimensions
-    VarTag fy = full(1);
-
-    VarTag tx = inner(0);           // at most 3 inner dimensions
-    VarTag ty = inner(1);
-    VarTag tz = inner(2);
-
-    VarTag bx = outer(0);           // at most 3 outer dimensions
-    VarTag by = outer(1);
-    VarTag bz = outer(2);
-
-    R.compute_locally().storage_layout(INVALID, outer());
-
     // max tile is the maximum number of threads that will be launched
     // by specifying either of tx, ty, or tz as parallel
     int max_tile  = 0;
@@ -687,15 +703,20 @@ void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
         num_scans += contents.ptr->filter_info[i].num_scans;
     }
 
-    // there is at least one non-tiled dimension
-    if (R.contains_vars_with_tag(fx)) {
-        R.split(fx, max_tile, inner(), outer());
-    }
+    R.split(full(0), max_tile, inner(), outer())  // upto two full dimensions
+     .split(full(0), max_tile, inner(), outer());
 
-    // there are two non-tiled dimensions
-    if (R.contains_vars_with_tag(fy)) {
-        R.split(fy, max_tile, inner(), outer());
-    }
+    VarTag sc = inner_scan();       // exactly one scan dimension
+
+    VarTag tx = inner(0);           // at most 3 inner dimensions
+    VarTag ty = inner(1);
+    VarTag tz = inner(2);
+
+    VarTag bx = outer(0);           // at most 3 outer dimensions
+    VarTag by = outer(1);
+    VarTag bz = outer(2);
+
+    R.compute_locally().storage_layout(INVALID, outer());
 
     switch (id) {
         case 1:

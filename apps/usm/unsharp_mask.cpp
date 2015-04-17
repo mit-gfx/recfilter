@@ -3,6 +3,10 @@
  *
  * Unsharp mask: uses Gaussian filter for blurring, can be replaced by
  * any low pass IIR filter
+ *
+ * UnsharpMask = Image + w*HighFreq;
+ *             = Image + w*(Image - Blur(Image))
+ *             = (1+w)*Image - w*Blur(Image)
  */
 
 #include <iostream>
@@ -14,8 +18,6 @@
 using namespace Halide;
 
 using std::vector;
-
-void manual_schedule(RecFilter& fx, RecFilter& fy);
 
 int main(int argc, char **argv) {
     Arguments args(argc, argv);
@@ -33,7 +35,7 @@ int main(int argc, char **argv) {
     RecFilterDim y("y", height);
 
     float sigma  = 5.0f;
-    float weight = 0.7f;
+    float weight = 1.0f;
     vector<float> W3 = gaussian_weights(sigma,3);
 
     RecFilter USM ("UnsharpMask");
@@ -63,12 +65,14 @@ int main(int argc, char **argv) {
 
     // subtract the blurred image from original image
     {
-        USM(x,y) = ((weight)*image(x,y) - (1.0f-weight)*Blur(x,y)) / (2.0f*weight-1.0f);
+        USM(x,y) = (1.0f+weight)*image(x,y) - (weight)*Blur(x,y);
 
-        USM.gpu_auto_schedule(tile_width, 128);
+        USM.gpu_auto_schedule(128, tile_width);
 
         // make sure that Blur result and USM happen in the same CUDA kernel
-        Blur.compute_at(USM, Var::gpu_blocks());
+        Blur.compute_at(USM.as_func(), Var::gpu_blocks());
+
+        std::cerr << USM.print_schedule() << Blur.print_schedule() << std::endl;
     }
 
     USM.compile_jit("USM.html");
