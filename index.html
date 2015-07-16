@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>RecFilter by mit-gfx</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">RecFilter</h1>
+      <h2 class="project-tagline">Domain-specific language for IIR filters</h2>
+      <a href="https://github.com/mit-gfx/recfilter" class="btn">View on GitHub</a>
+      <a href="https://github.com/mit-gfx/recfilter/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/mit-gfx/recfilter/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <p><img src="http://www.mit.edu/%7Egchauras/recfilter_image.jpg" alt="Performance"></p>
+
+<p>Infinite impulse response (IIR) or recursive filters, are essential for image processing because they
+turn expensive large-footprint convolutions into operations that have a constant cost per pixel regardless
+of kernel size. However, their recursive nature  constrains the order in which pixels can be computed,
+severely limiting both parallelism within a filter and memory locality across multiple filters.
+Prior research has developed algorithms that can compute IIR filters with image tiles. Using a
+divide-and-recombine strategy inspired by parallel prefix sum, they expose greater parallelism and
+exploit producer-consumer locality in pipelines of IIR filters over multi-dimensional images. While
+the principles are simple, it is hard, given a recursive filter, to derive a corresponding tile-parallel
+algorithm, and even harder to implement and debug it.</p>
+
+<p>We show that parallel and locality-aware implementations of IIR filter pipelines can be obtained through
+<em>program transformations</em>, which we mechanize through a <em>domain-specific compiler</em>. We show that
+the composition of a small set of transformations suffices to cover the space of possible strategies. We
+also demonstrate that the tiled implementations can be automatically scheduled in hardware-specific manners using a
+small set of generic heuristics. The programmer specifies the basic recursive filters, and the choice of
+transformation requires only a few lines of code. Our compiler then generates high-performance implementations
+that are an order of magnitude faster than standard GPU implementations, and outperform hand tuned
+tiled implementations of specialized algorithms which require orders of magnitude more programming
+effort - a few lines of code instead of a few thousand lines per pipeline.</p>
+
+<h2>
+<a id="publication" class="anchor" href="#publication" aria-hidden="true"><span class="octicon octicon-link"></span></a>Publication</h2>
+
+<p><strong>Compiling High Performance Recursive Filters</strong> <br>
+<a href="http://people.csail.mit.edu/gchauras">Gaurav Chaurasia</a>, <a href="http://people.csail.mit.edu/jrk">Jonathan Ragan-Kelley</a>, <a href="http://people.csail.mit.edu/sparis">Sylvain Paris</a>, <a href="http://www-sop.inria.fr/members/George.Drettakis/">George Drettakis</a>, <a href="http://people.csail.mit.edu/fredo">Fredo Durand</a> <br>
+<em>High Performance Graphics 2015</em> <br></p>
+
+<ul>
+<li><a href="http://www-sop.inria.fr/reves/Basilic/2015/CRPDD15a/recfilter.pdf">Paper</a></li>
+<li><a href="http://www-sop.inria.fr/reves/Basilic/2015/CRPDD15a/supplement.pdf">Supplementary</a></li>
+<li><a href="github%20repo%20to%20be%20made%20public%20soon%20after%20code%20cleanup">Code</a></li>
+</ul>
+
+<h2>
+<a id="bibtex" class="anchor" href="#bibtex" aria-hidden="true"><span class="octicon octicon-link"></span></a>Bibtex</h2>
+
+<pre><code>@inproceedings{Chaurasia:2015,
+  author       = {Gaurav Chaurasia and Jonathan Ragan-Kelley and Sylvain Paris and George Drettakis and Fredo Durand},
+  title        = {Compiling High Performance Recursive Filters},
+  booktitle    = {High Performance Graphics},
+  year         = {2015},
+  doi          = {},
+  url          = {http://www-sop.inria.fr/reves/Basilic/2015/CRPDD15a/}
+}
+</code></pre>
+
+<h2>
+<a id="acknowledgement" class="anchor" href="#acknowledgement" aria-hidden="true"><span class="octicon octicon-link"></span></a>Acknowledgement</h2>
+
+<p>We thank <a href="http://www.qcri.org/">Qatar Computing Research Institute (QCRI)</a> for research funding.</p>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/mit-gfx/recfilter">RecFilter</a> is maintained by <a href="https://github.com/mit-gfx">mit-gfx</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
+
