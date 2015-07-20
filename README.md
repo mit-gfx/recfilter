@@ -7,7 +7,7 @@
     - uses NVIDIA's nvvm backend for CUDA ptx generation rather than the open source ptx backend
     - other minor modifications
 - ususal requirements for Halide: [llvm](http://llvm.org/), [clang](http://clang.llvm.org/) (see [Halide building instructions](https://github.com/halide/Halide))
-- [NVIDIA CUDA toolkit 7](https://developer.nvidia.com/cuda-toolkit) (version 6.0 or 6.5 do not suffice)
+- [NVIDIA CUDA toolkit 7](https://developer.nvidia.com/cuda-toolkit) (version 6.0 or 6.5 will not suffice)
 
 ## Compilation
 The makefile in the base directory should build everything and place the executables in `bin`.
