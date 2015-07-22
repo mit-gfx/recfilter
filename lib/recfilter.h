@@ -286,48 +286,15 @@ public:
      */
     std::vector<RecFilter> cascade_by_dimension(void);
 
-    /** Cascade a higher order filter into multiple lower order filters
-     *
-     * Preconditions:
-     * - filter must not be tiled
-     * - all scans in the given filter must have the same order
-     * - list of lower orders must add up the to order of given filter
-     *
-     * Precautions:
-     * - all lower order filters will have coefficients 1.0 and the last
-     *   filter will have coefficients not equal to 1.0; this can lead to
-     *   numerical issues
-     *
-     * \param orders list of low orders to be used for cascading
-     * \returns lower order filters
-     */
-    std::vector<RecFilter> cascade_by_order(std::vector<int> orders);
-
-    /** Cascade a higher order filter into two lower order filters
-     *
-     * Preconditions:
-     * - filter must not be tiled
-     * - all scans in the given filter must have the same order
-     * - lower orders must add up the to order of given filter
-     *
-     * Precautions:
-     * - first lower order filter will have coefficients 1.0 and the second
-     *   filter will have coefficients not equal to 1.0; this can lead to
-     *   numerical issues
-     *
-     * \param order_a order of first filter after cascading
-     * \param order_b order of second filter after cascading
-     *
-     * \returns pair of lower order filters
-     */
-    std::vector<RecFilter> cascade_by_order(int order_a, int order_b);
-
-    /** Overlap a given filter with the current filter
+    /** Overlap a given filter with the current filter creating a higher
+     * order filter
      *
      * Preconditions:
      * - filter must not be tiled
      * - given filter must have same number of dimensions in the same order
      * - each scan of each dimension of given filter must have same causality
+     *
+     * \TODO This function is only partially tested and may be unstable
      *
      * \param fA filter to be overlapped with current filter
      * \param name name of the overlapped filter (optional)
