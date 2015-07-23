@@ -30,9 +30,3 @@ See also:
 - [Tests](https://github.com/mit-gfx/recfilter/tree/master/tests)
 - [Benchmarking applications](https://github.com/mit-gfx/recfilter/tree/master/apps)
 - [Demos](https://github.com/mit-gfx/recfilter/tree/master/demos)
-
-
-## Halide version
-
-The current supported version of Halide will be automatically cloned while runnning
-`make` in the base directory.
