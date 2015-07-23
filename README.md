@@ -26,11 +26,10 @@ $(RECFILTER_DIR)
  |- gpu/        (CUDA benchmarks from NVIDIA toolkit and Thrust)
 ```
 
-## [Tests](https://github.com/mit-gfx/recfilter/tree/master/tests)
-
-## [Benchmarking applications](https://github.com/mit-gfx/recfilter/tree/master/apps)
-
-## [Demos](https://github.com/mit-gfx/recfilter/tree/master/demos)
+See also:
+- [Tests](https://github.com/mit-gfx/recfilter/tree/master/tests)
+- [Benchmarking applications](https://github.com/mit-gfx/recfilter/tree/master/apps)
+- [Demos](https://github.com/mit-gfx/recfilter/tree/master/demos)
 
 
 ## Halide version
