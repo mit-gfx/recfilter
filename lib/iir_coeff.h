@@ -7,23 +7,13 @@
 #include <Halide.h>
 
 /**
- * Compute the feedback coefficients of a filter of given order which
- * can be used to cascade a higher order filter into two lower order
- * order filters such that the coefficients of one of the lower order
- * filter are all 1.0
- *
- * \param[in] order order of lower order filter
- * \param[in] c feedback coefficients of higher order filter
- * \return feedback coefficients of lower filter order
- */
-std::vector<float> cascade_feedback_coeff(std::vector<float> c, int order);
-
-/**
  * Compute the coefficients of a higher order filter that is equivalent
  * to two cascaded lower order filters of given coefficients
  *
+ * \TODO This function is only partially tested and may be unstable
+ *
  * \param[in] a coefficients of first lower order filter
- * \param[in] a coefficients of second lower order filter
+ * \param[in] b coefficients of second lower order filter
  * \returns coefficients of higher order filter
  */
 std::vector<float> overlap_feedback_coeff(std::vector<float> a, std::vector<float> b);
