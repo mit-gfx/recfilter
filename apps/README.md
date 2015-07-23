@@ -1,6 +1,6 @@
 ### Benchmarking tests
 
-These tests run the application multiple times on garbage data to test running times.
+These tests run the application multiple times on random data to test running times. The output is checked for correctness.
 
 | Application                   | Description                                           |
 |:------------------------------|-------------------------------------------------------|
