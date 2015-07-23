@@ -26,14 +26,7 @@ $(RECFILTER_DIR)
  |- gpu/        (CUDA benchmarks from NVIDIA toolkit and Thrust)
 ```
 
-{{tests/README.md}}
-
-{{apps/README.md}}
-
-{{demos/README.md}}
-
-
-## Halide version
-
-The current supported version of Halide will be automatically cloned while runnning
-`make` in the base directory.
+See also:
+- [Tests](https://github.com/mit-gfx/recfilter/tree/master/tests)
+- [Benchmarking applications](https://github.com/mit-gfx/recfilter/tree/master/apps)
+- [Demos](https://github.com/mit-gfx/recfilter/tree/master/demos)
