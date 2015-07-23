@@ -1,3 +1,3 @@
 SRC  := $(wildcard *.cpp)
 
-include ../Makefile.common
+include ../../Makefile.common
