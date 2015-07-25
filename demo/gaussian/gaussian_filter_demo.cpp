@@ -7,9 +7,10 @@
 #include <iostream>
 #include <Halide.h>
 
-#include "recfilter.h"
-#include "iir_coeff.h"
-#include "image_io.h"
+#include <recfilter.h>
+#include <iir_coeff.h>
+
+#include "../image_io.h"
 
 using namespace Halide;
 

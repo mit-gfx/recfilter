@@ -7,7 +7,6 @@ all:
 	$(MAKE) gaussian
 	$(MAKE) summed_table
 	$(MAKE) DoG
-	$(MAKE) usm
 	$(MAKE) audio
 	$(MAKE) cpu
 	$(MAKE) gpu
@@ -18,7 +17,6 @@ clean:
 	$(MAKE) bspline 	 clean
 	$(MAKE) gaussian 	 clean
 	$(MAKE) DoG			 clean
-	$(MAKE) usm 		 clean
 	$(MAKE) summed_table clean
 	$(MAKE) audio  		 clean
 	$(MAKE) cpu 		 clean

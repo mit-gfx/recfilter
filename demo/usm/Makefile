@@ -1,4 +1,6 @@
+RECFILTER_BASE := ../../
+
 SRC  := $(wildcard *.cpp)
-INC  := $(wildcard *.h)
+INC  := ../image_io.h
 
 include ../../Makefile.common

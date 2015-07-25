@@ -1,3 +1,5 @@
+RECFILTER_BASE := ../../
+
 SRC  := $(wildcard *.cpp)
 INC  := $(wildcard *.h)
 
