@@ -37,7 +37,6 @@ int main(int argc, char **argv) {
     float sigma = 10.0;
     vector<float> W3 = gaussian_weights(sigma,3);
 
-    Func Result;
     Func Gaussian;
 
     // perform the Gaussian blur
@@ -74,6 +73,7 @@ int main(int argc, char **argv) {
     {
         Var i("i"), j("j"), c("c");
 
+        Func Result;
         Result(i,j,c) = select(c==0, Gaussian(i,j)[0], c==1, Gaussian(i,j)[1], Gaussian(i,j)[2]);
 
         Buffer buff(type_of<float>(), width, height, channels);

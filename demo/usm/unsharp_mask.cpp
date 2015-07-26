@@ -25,30 +25,44 @@ using std::endl;
 using std::cerr;
 
 int main(int argc, char **argv) {
-    Arguments args(argc, argv);
-
-    int iter       = args.iterations;
-    int tile_width = args.block;
-    int in_w       = args.width;
-
-    int width = in_w;
-    int height= in_w;
-
-    Image<float> image = generate_random_image<float>(width,height);
-
-    RecFilterDim x("x", width);
-    RecFilterDim y("y", height);
+//    string filename;
+//    if (argc==2) {
+//        filename = argv[1];
+//    } else {
+//        cerr << "Usage: unsharp_mask_demo [name of png file]" << endl;
+//        return EXIT_FAILURE;
+//    }
+//
+//    Image<uint8_t> input = load<uint8_t>(filename);
+//
+//    int width   = input.width();
+//    int height  = input.height();
+//    int channels= input.channels();
 
     float sigma  = 5.0f;
     float weight = 1.0f;
     vector<float> W3 = gaussian_weights(sigma,3);
 
-    RecFilter USM ("UnsharpMask");
-    RecFilter Blur("Blur");
+    Arguments args(argc, argv);
+    int iter       = args.iterations;
+    int tile_width = args.block;
+    int in_w       = args.width;
+    int width      = in_w;
+    int height     = in_w;
+    Image<float> image = generate_random_image<float>(width,height);
 
     // some low pass blur
     {
-        RecFilter B("GaussianBlur");
+        RecFilter USM("USM");
+        RecFilter B  ("Blur");
+
+        RecFilterDim x("x", width);
+        RecFilterDim y("y", height);
+
+//    Expr r = cast<float>(input(x,y,0)) / 255.0f;
+//    Expr g = cast<float>(input(x,y,1)) / 255.0f;
+//    Expr b = cast<float>(input(x,y,2)) / 255.0f;
+
         B.set_clamped_image_border();
 
         B(x,y) = image(x,y);
@@ -59,31 +73,42 @@ int main(int argc, char **argv) {
 
         // tile and schedule blur
         vector<RecFilter> fc = B.cascade_by_dimension();
-        for (int i=0; i<fc.size(); i++) {
-            fc[i].split_all_dimensions(tile_width);
-            fc[i].gpu_auto_schedule(128);
-        }
 
-        // extract the result of Blur
-        Blur = fc[fc.size()-1];
+        fc[0].split_all_dimensions(tile_width);
+        fc[1].split_all_dimensions(tile_width);
+
+        // subtract the blurred image from original image
+        USM(x,y) = (1.0f+weight)*image(x,y) - (weight)*fc[1](x,y);
+
+        // tile the dimensions of USM and schedule with 128 threads per tile
+        // make sure that blur result and USM happen in the same CUDA kernel
+        // make blur result to be computed at CUDA block level of USM result
+        // set this before applying default GPU schedules so that the automatic
+        // heuristics do not get confused
+        fc[1].compute_at(USM.as_func(), Var::gpu_blocks());
+        fc[0].gpu_auto_schedule(128);
+        fc[1].gpu_auto_schedule(128);
+        USM  .gpu_auto_schedule(128, tile_width);
+
+        std::cerr << USM.print_schedule() << fc[1].print_schedule() << std::endl;
+
+        USM.compile_jit("USM.html");
+        USM.profile(iter);
     }
 
-    // subtract the blurred image from original image
-    {
-        USM(x,y) = (1.0f+weight)*image(x,y) - (weight)*Blur(x,y);
-
-        // tile the dimensions of USM and schedule the kernel with
-        // 128 threads per tile
-        USM.gpu_auto_schedule(128, tile_width);
-
-        // make sure that Blur result and USM happen in the same CUDA kernel
-        Blur.compute_at(USM.as_func(), Var::gpu_blocks());
-
-        std::cerr << USM.print_schedule() << Blur.print_schedule() << std::endl;
-    }
-
-    USM.compile_jit("USM.html");
-    USM.profile(iter);
+//    // assemble channels again and save result
+//    // should also be done on the GPU
+//    {
+//        Var i("i"), j("j"), c("c");
+//
+//        Result(i,j,c) = select(c==0, USM(i,j)[0], c==1, USM(i,j)[1], USM(i,j)[2]);
+//
+//        Buffer buff(type_of<float>(), width, height, channels);
+//        Result.realize(buff);
+//        Image<float> output(buff);
+//
+//        save(output, "out.png");
+//    }
 
     return EXIT_SUCCESS;
 }
