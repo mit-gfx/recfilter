@@ -236,11 +236,15 @@ ostream &operator<<(std::ostream &os, const RecFilterFunc &f) {
 
     s << "// Func " << f.func.name() << " synopsis\n";
     s << "// Function tag: " << f.func_category;
-    if (!f.callee_func.empty()) {
-        s << " (calls " << f.callee_func <<  ")";
+    if (!f.consumer_func.empty()) {
+        s << " (consumer " << f.consumer_func <<  ")";
     }
-    if (!f.caller_func.empty()) {
-        s << " (called by " << f.caller_func <<  ")";
+    if (!f.producer_func.empty()) {
+        s << " (producer " << f.producer_func <<  ")";
+    }
+    if (!f.external_consumer_func.defined()) {
+        s << " (external consumer " << f.external_consumer_func.name()
+          << " at loop " << f.external_consumer_var.name()  <<  ")";
     }
     s << "\n";
 

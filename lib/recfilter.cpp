@@ -396,7 +396,7 @@ RecFilterSchedule RecFilter::intra_schedule(int id) {
             for (; g_it!=contents.ptr->func.end(); g_it++) {
                 RecFilterFunc rf = g_it->second;
                 if (rf.func_category==REINDEX) {
-                    if (rf.callee_func==func_name || rf.caller_func==func_name) {
+                    if (rf.producer_func==func_name || rf.consumer_func==func_name) {
                         func_list.push_back(g_it->first);
                     }
                 }
@@ -436,58 +436,75 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
     return RecFilterSchedule(*this, func_list);
 }
 
-void RecFilter::compute_at(Func external, Var granularity) {
+void RecFilter::compute_at(Func external, Var looplevel) {
     // check that the filter does not depend upon F
     if (contents.ptr->func.find(external.name()) != contents.ptr->func.end()) {
-        cerr << "Cannot compute the filter " << name() << " at " << external.name()
+        cerr << "Cannot compute " << name() << " at " << external.name()
              << " because it is a consumer of " << external.name() << endl;
         assert(false);
     }
 
-    // reference compute at level of all functions that are computed at the final result
-    LoopLevel ref_compute_level(name(), granularity.name());
+    // Func representing the final result
+    RecFilterFunc& rF = internal_function(name());
+    Function f        = rF.func;
+
+    // check that the compute looplevel of the final result is not already set
+    if (!f.schedule().compute_level().is_inline() ||
+        !f.schedule().store_level().is_inline())
+    {
+        cerr << "Cannot compute " << name() << " inside " << external.name()
+             << " because it is set to be computed at "
+             << f.schedule().compute_level().func << " "
+             << f.schedule().compute_level().var << endl;
+        assert(false);
+    }
 
     // new compute at level
     string compute_level_str = "compute_at(" + external.name() +
-        ",Var(\"" + granularity.name() + "\"))";
-
-    // find all Func which are compute_at(func_name)
-    // change them to new compute at level
-    // also modify the schedule string for each of these functions
-    map<string, RecFilterFunc>::iterator fit;
-    for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-        Function f = fit->second.func;
-        // if (f.schedule().compute_level().match(ref_compute_level)) {
-        if (f.schedule().compute_level().func == name()) {
-            // reset compute and store levels and then apply the new compute at
-            f.schedule().compute_level()= LoopLevel();
-            f.schedule().store_level() = LoopLevel();
-            Func(f).compute_at(external, granularity);
-
-            // change the compute_at schedule string
-            vector<string> pure_schedule = fit->second.pure_schedule;
-            for (int i=0; i<pure_schedule.size(); i++) {
-                if (pure_schedule[i].find("compute_")==0) {
-                    pure_schedule[i] = compute_level_str;
-                }
-            }
-            fit->second.pure_schedule = pure_schedule;
-        }
-    }
+        ", Var(\"" + looplevel.name() + "\"))";
 
     // update the store and compute level of the final result
-    RecFilterFunc& rF = internal_function(name());
-    Function f        = rF.func;
-    f.schedule().compute_level()= LoopLevel();
-    f.schedule().store_level() = LoopLevel();
-    Func(f).compute_at(external, granularity);
-    vector<string> pure_schedule = rF.pure_schedule;
-    for (int i=0; i<pure_schedule.size(); i++) {
-        if (pure_schedule[i].find("compute_")==0) {
-            pure_schedule[i]= compute_level_str;
+    Func(f).compute_at(external, looplevel);
+    rF.pure_schedule.push_back(compute_level_str);
+
+    // find all Functions whose consumer is this final result and set the consumer
+    // function to the external function. This is because the Func computing the final
+    // result is now being computed inside some loop of an external function. So all
+    // functions which were consumed by the final result should be computed in the same
+    // loop level of the external function
+    map<string, RecFilterFunc>::iterator fit;
+    for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+        RecFilterFunc& rG = fit->second;
+        if (rG.consumer_func == name()) {
+            rG.external_consumer_func = external;
+            rG.external_consumer_var  = looplevel;
+            cerr << "HAHA " << rG << endl;
         }
     }
-    rF.pure_schedule = pure_schedule;
+
+///    // find all Func which are compute_at(func_name)
+///    // change them to new compute at level
+///    // also modify the schedule string for each of these functions
+///    map<string, RecFilterFunc>::iterator fit;
+///    for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+///        Function f = fit->second.func;
+///        // if (f.schedule().compute_level().match(ref_compute_level)) {
+///        if (f.schedule().compute_level().func == name()) {
+///            // reset compute and store levels and then apply the new compute at
+///            f.schedule().compute_level()= LoopLevel();
+///            f.schedule().store_level() = LoopLevel();
+///            Func(f).compute_at(external, looplevel);
+///
+///            // change the compute_at schedule string
+///            vector<string> pure_schedule = fit->second.pure_schedule;
+///            for (int i=0; i<pure_schedule.size(); i++) {
+///                if (pure_schedule[i].find("compute_")==0) {
+///                    pure_schedule[i] = compute_level_str;
+///                }
+///            }
+///            fit->second.pure_schedule = pure_schedule;
+///        }
+///    }
 }
 
 // -----------------------------------------------------------------------------

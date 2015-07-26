@@ -457,7 +457,7 @@ static RecFilterFunc extract_tails_from_each_scan(
 
         rF_intra_tail.func = F_intra_tail;
         rF_intra_tail.func_category = REINDEX;
-        rF_intra_tail.callee_func   = F_intra.name();
+        rF_intra_tail.producer_func   = F_intra.name();
         rF_intra_tail.pure_var_category = rF_intra.pure_var_category;
         //rF_intra_tail.pure_var_category[tail_dimension_var] = TAIL;
     }
@@ -898,7 +898,7 @@ static vector<RecFilterFunc> wrap_complete_tail_term(
         RecFilterFunc rf;
         rf.func = function;
         rf.func_category     = REINDEX;
-        rf.callee_func       = rF_ctail[k].func.name();
+        rf.producer_func       = rF_ctail[k].func.name();
         rf.pure_var_category = rF_ctail[k].pure_var_category;
 
         rF_ctailw.push_back(rf);
@@ -1048,7 +1048,7 @@ static vector<RecFilterFunc> create_final_residual_term(
         rf.func = function;
         rf.func_category = REINDEX;
         rf.pure_var_category = rF_ctail[j].pure_var_category;
-        rf.caller_func = final_result_func;
+        rf.consumer_func = final_result_func;
 
         // add the genertaed recfilter function to the global list
         recfilter_func_list.insert(make_pair(rf.func.name(), rf));
@@ -1409,7 +1409,7 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
             }
             rF_tail_prev_scanned.func_category     = REINDEX;
             rF_tail_prev_scanned.pure_var_category = rF_tail_prev_scanned_sub.pure_var_category;
-            rF_tail_prev_scanned.callee_func       = rF_tail_prev_scanned_sub.func.name();
+            rF_tail_prev_scanned.producer_func       = rF_tail_prev_scanned_sub.func.name();
 
             intra_tile_funcs.push_back(rF_tail_prev_scanned_sub);
             reindex_funcs   .push_back(rF_tail_prev_scanned);
@@ -1448,7 +1448,7 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
         rF_reidx.func          = F_reidx;
         rF_reidx.func_category = REINDEX;
         rF_reidx.pure_var_category = rF.pure_var_category;
-        rF_reidx.callee_func   = F.name();
+        rF_reidx.producer_func   = F.name();
 
         // add the extra dimension in the scheduling args
         rF.pure_var_category.insert(make_pair(c.name(), VarTag(INNER,0)));
@@ -1583,8 +1583,10 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
             rf.func_category = INLINE;
             rf.pure_var_category.clear();
             rf.update_var_category.clear();
-            rf.callee_func.clear();
-            rf.caller_func.clear();
+            rf.producer_func.clear();
+            rf.consumer_func.clear();
+            rf.external_consumer_func = Func();
+            rf.external_consumer_var  = Var();
         }
 
         // convert all all reindexing functions to inline
@@ -1592,8 +1594,10 @@ static vector<RecFilterFunc> add_prev_dimension_residual_to_tails(
             reindex_funcs[i].func_category = INLINE;
             reindex_funcs[i].pure_var_category.clear();
             reindex_funcs[i].update_var_category.clear();
-            reindex_funcs[i].callee_func.clear();
-            reindex_funcs[i].caller_func.clear();
+            reindex_funcs[i].producer_func.clear();
+            reindex_funcs[i].consumer_func.clear();
+            reindex_funcs[i].external_consumer_func = Func();
+            reindex_funcs[i].external_consumer_var  = Var();
         }
 
         // remove all redundant update defs where LHS = RHS
@@ -2035,7 +2039,7 @@ void RecFilter::split(map<string,int> dim_tile) {
 
         // remove the scheduling tags of the update defs
         rF.func_category = REINDEX;
-        rF.callee_func = F_final.name();
+        rF.producer_func = F_final.name();
         rF.update_var_category.clear();
 
         // split the tiled vars of the final term
@@ -2149,7 +2153,7 @@ void RecFilter::finalize(void) {
                 int num_reindexing_funcs = 0;
                 map<string,RecFilterFunc>::iterator git;
                 for (git=contents.ptr->func.begin(); git!=contents.ptr->func.end(); git++) {
-                    if (git->second.func_category==REINDEX && git->second.callee_func==rF.func.name()) {
+                    if (git->second.func_category==REINDEX && git->second.producer_func==rF.func.name()) {
                         num_reindexing_funcs++;
                     }
                 }

@@ -213,55 +213,56 @@ RecFilterSchedule& RecFilterSchedule::compute_locally(void) {
             continue;
         }
 
-        Var outer_var;
+        // function and loop level within which this function must be computed
+        Func consumer_func;
+        Var  consumer_var;
 
-        // find the reindexing function associated with this function
-        // function that calls this function must be computed in the global mem
-        Func callee_func;
-        for (int i=0; i<func_list.size(); i++) {
-            RecFilterFunc& rf = recfilter.internal_function(func_list[i]);
-            if (rf.func_category==REINDEX && rf.callee_func==F.name()) {
-                if (callee_func.defined()) {
+        if (rF.external_consumer_func.defined()) {
+            // use an external function as consumer and loop level
+            consumer_func = rF.external_consumer_func;
+            consumer_var  = rF.external_consumer_var;
+        } else {
+
+            // use an internal Func as consumer
+            RecFilterFunc& consumer = recfilter.internal_function(rF.consumer_func);
+
+            // find the innermost tile index to use as loop level
+            // GPU targets - this is CUDA tile index x
+            // CPU targets - this is first OUTER index
+            if (recfilter.target().has_gpu_feature()) {
+                consumer_var = Var::gpu_blocks();
+            } else {
+                map<int,VarOrRVar> outer_vlist = var_by_tag(consumer, VarTag(OUTER,0));
+                if (outer_vlist.find(PURE_DEF) == outer_vlist.end()) {
                     cerr << F.name() << " cannot be computed locally in another function "
-                        << "because it is called by multiple functions" << endl;
+                         << "because the consumer " << consumer.func.name() << " does not "
+                         << "have outer variable where " << F.name() << " can be computed" << endl;
                     assert(false);
                 }
-                callee_func = Func(rf.func);
-                callee_func.compute_root();
-                rf.pure_schedule.push_back("compute_root()");
-
-                // compute the function inside the first outer var for CPU schedule
-                // compute the function inside the first GPU block var for GPU schedule
-                if (recfilter.target().has_gpu_feature()) {
-                    outer_var = Var::gpu_blocks();
-                } else{
-                    map<int,VarOrRVar> outer_vlist = var_by_tag(rf, VarTag(OUTER,0));
-                    if (outer_vlist.find(PURE_DEF) == outer_vlist.end()) {
-                        cerr << F.name() << " cannot be computed locally in another function "
-                            << "because the function calling it does not seem to have outer "
-                            << "variable where " << F.name() << " can be computed" << endl;
-                        assert(false);
-                    }
-                    outer_var = outer_vlist.find(PURE_DEF)->second.var;
-                }
+                consumer_var = outer_vlist.find(PURE_DEF)->second.var;
             }
+            consumer_func = Func(consumer.func);
         }
 
-        if (callee_func.defined()) {
-            // functions called in this function should be computed at same level
+        if (consumer_func.defined()) {
+            string compute_level_str = "compute_at(" + consumer_func.name() + ", Var(\""
+                + consumer_var.name() + "\"))";
+
+            // functions consumed by this function should be computed at same level
             for (int i=0; i<func_list.size(); i++) {
                 RecFilterFunc& rf = recfilter.internal_function(func_list[i]);
-                if (rf.func_category==REINDEX && rf.caller_func==F.name()) {
-                    Func(rf.func).compute_at(callee_func, outer_var);
-                    rf.pure_schedule.push_back("compute_at("+callee_func.name()+", Var(\""+outer_var.name()+"\"))");
+                if (rf.func_category==REINDEX && rf.consumer_func==F.name()) {
+                    Func(rf.func).compute_at(consumer_func, consumer_var);
+                    rf.pure_schedule.push_back(compute_level_str);
                 }
             }
 
-            F.compute_at(callee_func, outer_var);
-            rF.pure_schedule.push_back("compute_at("+callee_func.name()+", Var(\""+outer_var.name()+"\"))");
+            F.compute_at(consumer_func, consumer_var);
+            rF.pure_schedule.push_back(compute_level_str);
+
         } else {
             cerr << "Warning: " << F.name() << " cannot be computed locally in "
-                << "another function because it is not called by any function" << endl;
+                << "another function because it is not consumed by any function" << endl;
             compute_globally();
         }
     }

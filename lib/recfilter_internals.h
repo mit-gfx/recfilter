@@ -106,13 +106,29 @@ public:
     /** List of new vars created by RecFilterSchedule::split() on update definitions */
     std::map<int, std::map<std::string, std::string> >  update_var_splits;
 
-    /** Name of a function that calls this function; set if this function
-     * has the REINDEX_FOR_READ tag set */
-    std::string caller_func;
+    /** Name of consumer function. This can be set if this function has REINDEX tag set
+     * because only REINDEX functions are guaranteed to have a single consumer */
+    std::string consumer_func;
 
-    /** Name of a function that this function calls; set if this function
-     * has the REINDEX_FOR_WRITE tag set */
-    std::string callee_func;
+    /** Name of producer function. This can be set if this function has REINDEX tag set
+     * because only REINDEX functions are guaranteed to have a single producer */
+    std::string producer_func;
+
+    /** External consumer function which consumes RecFilter's output;
+     * external consumer means a Func outside the RecFilter pipeline that consumes the output
+     * of the RecFilter. This is set by RecFilter::compute_at() and is useful for merging the final
+     * stage of the recfilter and initial stage of next filter. This can be set if
+     * this function has REINDEX tag set; only REINDEX functions are guaranteed to have
+     * a single consumer */
+    Halide::Func external_consumer_func;
+
+    /** External consumer function's loop level at which the RecFilter's output is consumed;
+     * external consumer means a Func outside the RecFilter pipeline that consumes the output
+     * of the RecFilter. This is set by RecFilter::compute_at() and is useful for merging the final
+     * stage of the recfilter and initial stage of next filter. This can be set if
+     * this function has REINDEX tag set; only REINDEX functions are guaranteed to have
+     * a single consumer */
+    Halide::Var external_consumer_var;
 
     /** Schedule for pure def of the function as valid Halide code */
     std::vector<std::string> pure_schedule;
