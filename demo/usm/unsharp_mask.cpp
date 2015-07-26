@@ -20,6 +20,9 @@
 using namespace Halide;
 
 using std::vector;
+using std::string;
+using std::endl;
+using std::cerr;
 
 int main(int argc, char **argv) {
     Arguments args(argc, argv);
