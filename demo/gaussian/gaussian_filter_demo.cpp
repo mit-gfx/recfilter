@@ -70,6 +70,7 @@ int main(int argc, char **argv) {
     }
 
     // assemble channels again and save result
+    // should also be done on the GPU
     {
         Var i("i"), j("j"), c("c");
 

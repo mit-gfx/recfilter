@@ -1,12 +1,10 @@
 #include <iostream>
 #include <Halide.h>
 
-#include "recfilter.h"
+#include <recfilter.h>
+#include <iir_coeff.h>
 
-#include "iir_coeff.h"
-
-#define WARP_SIZE   32
-#define MAX_THREADS 192
+#include "../image_io.h"
 
 using namespace Halide;
 
@@ -21,95 +19,117 @@ using std::endl;
 #define HIST_SIGMA    (BIN_WIDTH)
 #define GAUSS_SIGMA   (5.0f)
 
-
-Func gaussian_blur(Func I, float sigma, Expr width, Expr height, int tile_width, string name);
+Func smooth(Func I, RecFilterDim x, RecFilterDim y, float sigma);
 
 int main(int argc, char **argv) {
-    Arguments args(argc, argv);
+    string filename;
+    if (argc==2) {
+        filename = argv[1];
+    } else {
+        cerr << "Usage: gaussian_filter_demo [name of png file]" << endl;
+        return EXIT_FAILURE;
+    }
 
-    bool nocheck = args.nocheck;
-    int  width   = args.width;
-    int  height  = args.width;
-    int  tile_width = args.block;
+    Image<uint8_t> input = load<uint8_t>(filename);
 
-    Image<float> random_image = generate_random_image<float>(width,height);
-    ImageParam image(type_of<float>(), 2);
-    image.set(random_image);
+    int width   = input.width();
+    int height  = input.height();
+    int channels= input.channels();
 
     // ----------------------------------------------------------------------------------------------
 
     RecFilterDim x("x", width);
     RecFilterDim y("y", height);
 
-    // bounds
-    Expr iw = image.width()-1;
-    Expr ih = image.height()-1;
+    Expr r = cast<float>(input(x,y,0)) / 255.0f;
+    Expr g = cast<float>(input(x,y,1)) / 255.0f;
+    Expr b = cast<float>(input(x,y,2)) / 255.0f;
 
     // bins of the locally smoothed histogram
-    vector<Func> Gauss;
+    vector<Func> Hist;
 
     for (int i=0; i<NUM_BINS; i++) {
         string name = Internal::int_to_string(i);
-        Func L("L_" + name);
+        Func L("L" + name);
 
+        // create the histogram
         // pass image through histogram lookup table
-        L(x,y) = gaussIntegral(image(x,y), BIN_CENTER(i), HIST_SIGMA);
+        L(x,y) = Tuple(
+            gaussIntegral(r, BIN_CENTER(i), HIST_SIGMA),
+            gaussIntegral(g, BIN_CENTER(i), HIST_SIGMA),
+            gaussIntegral(b, BIN_CENTER(i), HIST_SIGMA));
 
-        // Gaussian filter using direct cognex blur
-        Func G = gaussian_blur(L, GAUSS_SIGMA,
-                image.width(), image.height(), tile_width, "G_"+name);
+        // smooth the histogram
+        // Gaussian filter using tile width = 32
+        Func G = smooth(L, x, y, GAUSS_SIGMA);
 
         // add to the overall list
-        Gauss.push_back(G);
+        Hist.push_back(G);
     }
 
-    Func Median("Median");
-    vector<Expr> median;
-    for (int i=0; i<NUM_BINS-1; i++) {
-        Expr target = Gauss[0](x,y) + 0.5f*(Gauss[NUM_BINS-1](x,y)-Gauss[0](x,y));
-        Expr frac   = (target-Gauss[i](x,y))/(Gauss[i+1](x,y)-Gauss[i](x,y));
-        Expr cond   = (Gauss[i](x,y)<target && Gauss[i+1](x,y)>=target);
-        Expr value  = BIN_CENTER(i) + frac*BIN_WIDTH;
-        if (i==0) {
-            median.push_back(value);
-        } else {
-            median.push_back(select(cond, value, median[i-1]));
+    // compute the median from the smoothed histograms
+    vector<Expr> median_rgb;
+    for (int j=0; j<channels; j++) {
+        Expr median;
+        Expr g0     = Hist[0]         (x,y)[j];
+        Expr gn     = Hist[NUM_BINS-1](x,y)[j];
+        Expr target = g0 + 0.5f*(gn - g0);
+        for (int i=0; i<NUM_BINS-1; i++) {
+            Expr gi     = Hist[i]  (x,y)[j];
+            Expr gi1    = Hist[i+1](x,y)[j];
+            Expr frac   = (target-gi)/(gi1-gi);
+            Expr cond   = (gi<target && gi1>=target);
+            Expr value  = BIN_CENTER(i) + frac*BIN_WIDTH;
+
+            median = (i==0 ? value : select(cond, value, median));
         }
-    }
-    Median(x,y) = median[median.size()-1];
-
-    Median.compute_root();
-    Median.gpu_tile(x.var(), y.var(), WARP_SIZE,MAX_THREADS);
-
-    // ----------------------------------------------------------------------------------------------
-
-    Realization out = Median.realize();
-
-    // ----------------------------------------------------------------------------------------------
-
-    if (!nocheck) {
-        cerr << "\nChecking difference ... " << endl;
-        Image<float> hl_out(out);
+        median_rgb.push_back(median);
     }
 
-    return 0;
+    RecFilter Median("Median");
+    Median(x,y) = median_rgb;
+    Median.gpu_auto_schedule(128, 32);
+
+    // assemble channels again and save result
+    // should also be done on the GPU
+    {
+        Var i("i"), j("j"), c("c");
+
+        Func M = Median.as_func();
+
+        Func Result;
+        Result(i,j,c) = select(c==0, M(i,j)[0], c==1, M(i,j)[1], M(i,j)[2]);
+
+        Buffer buff(type_of<float>(), width, height, channels);
+        Result.realize(buff);
+        Image<float> output(buff);
+
+        save(output, "out.png");
+    }
+
+    return EXIT_SUCCESS;
 }
 
 
-Func gaussian_blur(Func I, float sigma, Expr width, Expr height, int tile_width, string name) {
-    int   box  = gaussian_box_filter(3, sigma); // approx Gaussian with 3 box filters
-    float norm = std::pow(box, 3*2);            // normalizing factor
+Func smooth(Func I, RecFilterDim x, RecFilterDim y, float sigma) {
+    vector<float> W3 = gaussian_weights(sigma,3);
 
-    int num_scans = 2;
-    int order     = 3;
+    RecFilter S("Smooth_"+I.name());
 
-    Image<float> W(num_scans,order);
-    W(0,0) = 3.0f; W(0,1) = -3.0f; W(0,2) = 1.0f;
-    W(1,0) = 3.0f; W(1,1) = -3.0f; W(1,2) = 1.0f;
+    S.set_clamped_image_border();
 
-    Func S;
+    S(x,y) = I(x,y);
+    S.add_filter(+x, W3);
+    S.add_filter(-x, W3);
+    S.add_filter(+y, W3);
+    S.add_filter(-y, W3);
 
-    // TODO: add the fastest Gaussian blur
+    vector<RecFilter> fc = S.cascade_by_dimension();
 
-    return S;
+    fc[0].split_all_dimensions(32);     // tile width = 32
+    fc[1].split_all_dimensions(32);
+    fc[0].gpu_auto_schedule(128);       // max threads per CUDA tile = 128
+    fc[1].gpu_auto_schedule(128);
+
+    return fc[1].as_func();
 }

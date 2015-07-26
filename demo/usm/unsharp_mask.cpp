@@ -12,8 +12,10 @@
 #include <iostream>
 #include <Halide.h>
 
-#include "iir_coeff.h"
-#include "recfilter.h"
+#include <recfilter.h>
+#include <iir_coeff.h>
+
+#include "../image_io.h"
 
 using namespace Halide;
 
@@ -67,6 +69,8 @@ int main(int argc, char **argv) {
     {
         USM(x,y) = (1.0f+weight)*image(x,y) - (weight)*Blur(x,y);
 
+        // tile the dimensions of USM and schedule the kernel with
+        // 128 threads per tile
         USM.gpu_auto_schedule(128, tile_width);
 
         // make sure that Blur result and USM happen in the same CUDA kernel
