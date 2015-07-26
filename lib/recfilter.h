@@ -333,7 +333,7 @@ public:
     // {@
     /** Automatic GPU schedule for non-tiled filter and return a handle for additional scheduling
      * \param max_threads maximum threads in a CUDA warp
-     * \param tile_width  tiling factor to split full dimensions into CUDA blocks and CUDA tiles
+     * \param tile_width  tiling factor to split non-tiled dimensions into CUDA blocks and CUDA tiles
      */
     void gpu_auto_full_schedule(int max_threads, int tile_width=32);
 
@@ -342,7 +342,7 @@ public:
      * RecFilter::gpu_auto_intra_schedule() and
      * RecFilter::gpu_auto_inter_schedule().
      * \param max_threads maximum threads in a CUDA warp
-     * \param tile_width  tiling factor to split full dimensions into CUDA blocks and CUDA tiles (only used if filter is not tiled)
+     * \param tile_width  tiling factor to non-tiled full dimensions into CUDA blocks and CUDA tiles (only used if filter is not tiled)
      */
     void gpu_auto_schedule(int max_threads, int tile_width=32);
 

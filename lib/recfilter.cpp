@@ -515,8 +515,7 @@ void RecFilter::cpu_auto_full_schedule(int vector_width) {
     full_schedule().compute_globally()
         .reorder(full_scan(), full())
         .vectorize(full(0), vector_width)
-        //.parallel(full())
-        ;
+        .parallel(full());                  // TODO: only parallelize outermost, not all
 }
 
 void RecFilter::cpu_auto_intra_schedule(int vector_width) {
@@ -539,14 +538,12 @@ void RecFilter::cpu_auto_intra_schedule(int vector_width) {
     }
 
     R.compute_locally()
-        //.storage_layout(INVALID, outer())
         .split(full(0), max_tile, inner(), outer())  // convert upto 3 full dimensions
         .split(full(0), max_tile, inner(), outer())  // into tiles
         .split(full(0), max_tile, inner(), outer())
         .reorder({inner_scan(), inner(), outer()})   // scan dimension is innermost
         .vectorize(inner(0), vector_width)           // vectorize innermost non-scan dimension
-        //.parallel(inner())                           // parallelize everything else
-        .parallel(outer());
+        .parallel(outer());                          // TODO: only parallelize outermost
 }
 
 void RecFilter::cpu_auto_inter_schedule(int vector_width) {
@@ -569,14 +566,12 @@ void RecFilter::cpu_auto_inter_schedule(int vector_width) {
     }
 
     R.compute_globally()
-        //.reorder_storage({full(), inner(), tail(), outer()})
         .split(full(0), max_tile, inner(), outer())         // convert upto 3 full dimensions
         .split(full(0), max_tile, inner(), outer())         // into tiles
         .split(full(0), max_tile, inner(), outer())
         .reorder({outer_scan(), tail(), inner(), outer()})  // scan dimension is innermost
         .vectorize(inner(0), vector_width)                  // vectorize innermost non-scan dimension
-        //.parallel(inner())                                  // parallelize everything else
-        .parallel(outer());
+        .parallel(outer());                          // TODO: only parallelize outermost
 }
 
 // -----------------------------------------------------------------------------
