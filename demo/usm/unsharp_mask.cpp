@@ -91,7 +91,6 @@ int main(int argc, char **argv) {
         USM  .gpu_auto_schedule(128, tile_width);
 
         USM  .apply_bounds();
-        USM  .compile_jit("USM.html");
         USM  .profile(iter);
     }
 
