@@ -436,6 +436,40 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
     return RecFilterSchedule(*this, func_list);
 }
 
+void RecFilter::compute_at(RecFilter external) {
+    Var external_var;
+    Func external_func = external.as_func();
+    RecFilterFunc external_rfunc = external.internal_function(external.name());
+
+    // find the innermost tile index to use as loop level
+    // GPU targets - this is CUDA tile index x
+    // CPU targets - this is first OUTER index
+    if (target().has_gpu_feature()) {
+        external_var = Var::gpu_blocks();
+    } else {
+        bool found = false;
+        map<string, VarTag> pure_var_category = external_rfunc.pure_var_category;
+        map<string, VarTag>::iterator vit  = pure_var_category.begin();
+        map<string, VarTag>::iterator vend = pure_var_category.end();
+        for (; !found && vit!=vend; vit++) {
+            if (vit->second == VarTag(OUTER,0)) {
+                found = true;
+                external_var = Var(vit->first);
+            }
+        }
+
+        if (!found) {
+            cerr << name() << " cannot be computed locally in another recursive "
+                << "filter because the external filter does not a tile index where "
+                << name() << " can be computed, possibly because it is not tiled"
+                << endl;
+            assert(false);
+        }
+    }
+
+    compute_at(external_func, external_var);
+}
+
 void RecFilter::compute_at(Func external, Var looplevel) {
     // Func representing the final result
     RecFilterFunc& rF = internal_function(name());
@@ -444,7 +478,7 @@ void RecFilter::compute_at(Func external, Var looplevel) {
     // check that the filter does not depend upon F
     if (contents.ptr->func.find(external.name()) != contents.ptr->func.end()) {
         cerr << "Cannot compute " << name() << " at " << external.name()
-             << " because it is a consumer of " << external.name() << endl;
+            << " because it is a consumer of " << external.name() << endl;
         assert(false);
     }
 
@@ -452,18 +486,18 @@ void RecFilter::compute_at(Func external, Var looplevel) {
     // be computed at something else
     if (!rF.consumer_func.empty() || rF.external_consumer_func.defined()) {
         cerr << "Cannot compute " << name() << " at " << external.name()
-             << " because it already has a consumer " << endl;
+            << " because it already has a consumer " << endl;
         assert(false);
     }
 
     // check that the compute looplevel of the final result is not already set
     if (!f.schedule().compute_level().is_inline() ||
-        !f.schedule().store_level().is_inline())
+            !f.schedule().store_level().is_inline())
     {
         cerr << "Cannot compute " << name() << " inside " << external.name()
-             << " because it is set to be computed at "
-             << f.schedule().compute_level().func << " "
-             << f.schedule().compute_level().var << endl;
+            << " because it is set to be computed at "
+            << f.schedule().compute_level().func << " "
+            << f.schedule().compute_level().var << endl;
         assert(false);
     }
 
@@ -479,7 +513,7 @@ void RecFilter::compute_at(Func external, Var looplevel) {
     if (!rF.producer_func.empty()) {
         RecFilterFunc& producer = internal_function(rF.producer_func);
         if (!producer.func.schedule().compute_level().is_inline() ||
-            !producer.func.schedule().store_level().is_inline())
+                !producer.func.schedule().store_level().is_inline())
         {
             Func(producer.func).compute_at(external, looplevel);
             producer.pure_schedule.push_back(compute_level_str);
@@ -515,7 +549,7 @@ void RecFilter::cpu_auto_schedule(int vector_width) {
 void RecFilter::cpu_auto_full_schedule(int vector_width) {
     if (contents.ptr->tiled) {
         cerr << "Filter is tiled, use RecFilter::cpu_auto_intra_schedule() "
-             << "and RecFilter::cpu_auto_inter_schedule()\n" << endl;
+            << "and RecFilter::cpu_auto_inter_schedule()\n" << endl;
         assert(false);
     }
 

@@ -259,8 +259,8 @@ RecFilterSchedule& RecFilterSchedule::compute_locally(void) {
                         map<int,VarOrRVar> outer_vlist = var_by_tag(rf, VarTag(OUTER,0));
                         if (outer_vlist.find(PURE_DEF) == outer_vlist.end()) {
                             cerr << F.name() << " cannot be computed locally in another function "
-                                << "because the function calling it does not seem to have outer "
-                                << "variable where " << F.name() << " can be computed" << endl;
+                                << "because the external function does not have a tile "
+                                << "index where " << F.name() << " can be computed" << endl;
                             assert(false);
                         }
                         consumer_var = outer_vlist.find(PURE_DEF)->second.var;
