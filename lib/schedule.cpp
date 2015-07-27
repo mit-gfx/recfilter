@@ -238,32 +238,37 @@ RecFilterSchedule& RecFilterSchedule::compute_locally(void) {
 
             // use an internal Func as consumer, go to all internal
             // functions and find one that is the producer of this function
-            for (int i=0; i<func_list.size(); i++) {
+            bool found = false;
+            for (int i=0; i<func_list.size() && !found; i++) {
                 RecFilterFunc& rf = recfilter.internal_function(func_list[i]);
                 if (rf.func_category==REINDEX && rf.producer_func==F.name()) {
-                    if (consumer_func.defined()) {
-                        cerr << F.name() << " cannot be computed locally in another function "
-                            << "because it is has multiple consumers" << endl;
-                        assert(false);
-                    }
-                    consumer_func = Func(rf.func);
-                    consumer_func.compute_root();
-                    rf.pure_schedule.push_back("compute_root()");
+                    found = true;
 
-                    // find the innermost tile index to use as loop level
-                    // GPU targets - this is CUDA tile index x
-                    // CPU targets - this is first OUTER index
-                    if (recfilter.target().has_gpu_feature()) {
-                        consumer_var = Var::gpu_blocks();
-                    } else{
-                        map<int,VarOrRVar> outer_vlist = var_by_tag(rf, VarTag(OUTER,0));
-                        if (outer_vlist.find(PURE_DEF) == outer_vlist.end()) {
-                            cerr << F.name() << " cannot be computed locally in another function "
-                                << "because the function calling it does not seem to have outer "
-                                << "variable where " << F.name() << " can be computed" << endl;
-                            assert(false);
+                    // if the consumer has an external consumer then just
+                    // use the external consumer
+                    if (rf.external_consumer_func.defined()) {
+                        consumer_func = rf.external_consumer_func;
+                        consumer_var  = rf.external_consumer_var;
+                    } else {
+                        consumer_func = Func(rf.func);
+                        consumer_func.compute_root();
+                        rf.pure_schedule.push_back("compute_root()");
+
+                        // find the innermost tile index to use as loop level
+                        // GPU targets - this is CUDA tile index x
+                        // CPU targets - this is first OUTER index
+                        if (recfilter.target().has_gpu_feature()) {
+                            consumer_var = Var::gpu_blocks();
+                        } else{
+                            map<int,VarOrRVar> outer_vlist = var_by_tag(rf, VarTag(OUTER,0));
+                            if (outer_vlist.find(PURE_DEF) == outer_vlist.end()) {
+                                cerr << F.name() << " cannot be computed locally in another function "
+                                    << "because the function calling it does not seem to have outer "
+                                    << "variable where " << F.name() << " can be computed" << endl;
+                                assert(false);
+                            }
+                            consumer_var = outer_vlist.find(PURE_DEF)->second.var;
                         }
-                        consumer_var = outer_vlist.find(PURE_DEF)->second.var;
                     }
                 }
             }

@@ -472,8 +472,11 @@ void RecFilter::compute_at(Func external, Var looplevel) {
         ", Var(\"" + looplevel.name() + "\"))";
 
     // update the store and compute level of the final result
-    Func(f).compute_at(external, looplevel);
-    rF.pure_schedule.push_back(compute_level_str);
+    //Func(f).compute_at(external, looplevel);
+    //rF.pure_schedule.push_back(compute_level_str);
+    inline_function(f, {external});
+    rF.external_consumer_func = external;
+    rF.external_consumer_var  = looplevel;
 
     // set the producer of this function to be computed at the same looplevel
     if (!rF.producer_func.empty()) {
@@ -722,11 +725,7 @@ void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
     VarTag by = outer(1);
     VarTag bz = outer(2);
 
-    cerr << print_schedule() << "HAHAHAHA" << endl;
-
     R.compute_locally().storage_layout(INVALID, outer());
-    cerr << print_schedule() << "HOHOHOHOH" << endl;
-
 
     switch (id) {
         case 1:
@@ -984,4 +983,24 @@ string RecFilter::print_hl_code(void) const {
     string b = print_functions();
     string c = print_schedule();
     return a+b+c;
+}
+
+void RecFilter::inline_func(string func_name) {
+    if (contents.ptr->name == func_name) {
+        return;
+    }
+
+    // all the functions in this recfilter
+    vector<Func> func_list;
+    map<string,RecFilterFunc>::iterator f = contents.ptr->func.begin();
+    map<string,RecFilterFunc>::iterator fe= contents.ptr->func.end();
+    while (f!=fe) {
+        func_list.push_back(Func(f->second.func));
+        f++;
+    }
+
+    // inline this function in all the functions of this filter
+    Function F = internal_function(func_name).func;
+    inline_function(F, func_list);
+    contents.ptr->func.erase(func_name);
 }
