@@ -242,7 +242,7 @@ ostream &operator<<(std::ostream &os, const RecFilterFunc &f) {
     if (!f.producer_func.empty()) {
         s << " (producer " << f.producer_func <<  ")";
     }
-    if (!f.external_consumer_func.defined()) {
+    if (f.external_consumer_func.defined()) {
         s << " (external consumer " << f.external_consumer_func.name()
           << " at loop " << f.external_consumer_var.name()  <<  ")";
     }

@@ -190,6 +190,12 @@ RecFilterSchedule& RecFilterSchedule::compute_globally(void) {
         RecFilterFunc& rF = recfilter.internal_function(func_list[j]);
         Func            F = Func(rF.func);
 
+        // nothing to do if the function is already compute root
+        if (F.function().schedule().compute_level().is_root() &&
+            F.function().schedule().store_level().is_root()) {
+            continue;
+        }
+
         // remove the initializations of all inter tile scans to avoid extra
         // kernel execution for initializing the output buffer for GPU schedule
         // this also ensure that this module is only enabled if the filter is tiled
@@ -197,8 +203,15 @@ RecFilterSchedule& RecFilterSchedule::compute_globally(void) {
             add_pure_def_to_first_update_def(F.function());
         }
 
-        F.compute_root();
-        rF.pure_schedule.push_back("compute_root()");
+        if (F.function().schedule().compute_level().is_inline() &&
+            F.function().schedule().store_level().is_inline()) {
+            F.compute_root();
+            rF.pure_schedule.push_back("compute_root()");
+        } else {
+            cerr << "Cannot set " << F.name() << " to be computed in global memory "
+                 << "because it is already scheduled to be computed locally" << endl;
+            assert(false);
+        }
     }
     return *this;
 }
@@ -223,25 +236,37 @@ RecFilterSchedule& RecFilterSchedule::compute_locally(void) {
             consumer_var  = rF.external_consumer_var;
         } else {
 
-            // use an internal Func as consumer
-            RecFilterFunc& consumer = recfilter.internal_function(rF.consumer_func);
+            // use an internal Func as consumer, go to all internal
+            // functions and find one that is the producer of this function
+            for (int i=0; i<func_list.size(); i++) {
+                RecFilterFunc& rf = recfilter.internal_function(func_list[i]);
+                if (rf.func_category==REINDEX && rf.producer_func==F.name()) {
+                    if (consumer_func.defined()) {
+                        cerr << F.name() << " cannot be computed locally in another function "
+                            << "because it is has multiple consumers" << endl;
+                        assert(false);
+                    }
+                    consumer_func = Func(rf.func);
+                    consumer_func.compute_root();
+                    rf.pure_schedule.push_back("compute_root()");
 
-            // find the innermost tile index to use as loop level
-            // GPU targets - this is CUDA tile index x
-            // CPU targets - this is first OUTER index
-            if (recfilter.target().has_gpu_feature()) {
-                consumer_var = Var::gpu_blocks();
-            } else {
-                map<int,VarOrRVar> outer_vlist = var_by_tag(consumer, VarTag(OUTER,0));
-                if (outer_vlist.find(PURE_DEF) == outer_vlist.end()) {
-                    cerr << F.name() << " cannot be computed locally in another function "
-                         << "because the consumer " << consumer.func.name() << " does not "
-                         << "have outer variable where " << F.name() << " can be computed" << endl;
-                    assert(false);
+                    // find the innermost tile index to use as loop level
+                    // GPU targets - this is CUDA tile index x
+                    // CPU targets - this is first OUTER index
+                    if (recfilter.target().has_gpu_feature()) {
+                        consumer_var = Var::gpu_blocks();
+                    } else{
+                        map<int,VarOrRVar> outer_vlist = var_by_tag(rf, VarTag(OUTER,0));
+                        if (outer_vlist.find(PURE_DEF) == outer_vlist.end()) {
+                            cerr << F.name() << " cannot be computed locally in another function "
+                                << "because the function calling it does not seem to have outer "
+                                << "variable where " << F.name() << " can be computed" << endl;
+                            assert(false);
+                        }
+                        consumer_var = outer_vlist.find(PURE_DEF)->second.var;
+                    }
                 }
-                consumer_var = outer_vlist.find(PURE_DEF)->second.var;
             }
-            consumer_func = Func(consumer.func);
         }
 
         if (consumer_func.defined()) {
