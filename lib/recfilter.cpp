@@ -204,13 +204,6 @@ void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
         args.push_back(contents.ptr->filter_info[i].var.name());
     }
     f.define(args, pure_def);
-
-    // bound the output buffer for each dimension
-    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-        Var  v      = contents.ptr->filter_info[i].var;
-        Expr extent = contents.ptr->filter_info[i].image_width;
-        Func(f).bound(v, 0, extent);
-    }
 }
 
 // -----------------------------------------------------------------------------
