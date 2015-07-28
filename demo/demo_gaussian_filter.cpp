@@ -1,5 +1,5 @@
 /**
- * \file gaussian_filter_demo.cpp
+ * \file demo_gaussian_filter.cpp
  *
  * Gaussian blur demo using IIR filters: cascade of 3rd order x and 3rd order y
  */

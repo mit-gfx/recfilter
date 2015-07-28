@@ -1,12 +1,10 @@
 /**
- * \file unsharp_mask.cpp
+ * \file demo_unsharp_mask.cpp
  *
  * Unsharp mask: uses Gaussian filter for blurring, can be replaced by
  * any low pass IIR filter
  *
- * UnsharpMask = Image + w*HighFreq;
- *             = Image + w*(Image - Blur(Image))
- *             = (1+w)*Image - w*Blur(Image)
+ * UnsharpMask = (1+w)*Image - w*Blur(Image)
  */
 
 #include <iostream>

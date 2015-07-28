@@ -1,3 +1,9 @@
+/**
+ * \file demo_smoothed_hist_median_filter.cpp
+ *
+ * Median filter using smoothed local histograms
+ */
+
 #include <iostream>
 #include <Halide.h>
 
