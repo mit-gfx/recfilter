@@ -157,6 +157,10 @@ public:
     /** Get the compilation target, inferred from HL_JIT_TARGET */
     Halide::Target target(void);
 
+    /** Apply output domains bounds; this is performed implicitly for tiled
+     * filters, but it must be called by the application for non-tiled filters */
+    void apply_bounds(void);
+
     /** Trigger JIT compilation for specified hardware-platform target; dumps the generated
      * codegen in human readable HTML format if filename is specified */
     void compile_jit(std::string filename="");

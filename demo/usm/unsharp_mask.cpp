@@ -90,10 +90,8 @@ int main(int argc, char **argv) {
         fc[1].gpu_auto_schedule(128);
         USM  .gpu_auto_schedule(128, tile_width);
 
-        std::cerr << USM.print_schedule() << fc[1].print_schedule() << std::endl;
-
-        USM.compile_jit("USM.html");
-        USM.profile(iter);
+        USM  .apply_bounds();
+        USM  .profile(iter);
     }
 
 //    // assemble channels again and save result

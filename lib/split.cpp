@@ -1845,9 +1845,11 @@ static vector< vector<RecFilterFunc> > split_scans(
 
 // -----------------------------------------------------------------------------
 
+// TODO: this assumes that the filter has some scans, add a new case for filters
+// with no scans
 void RecFilter::split(map<string,int> dim_tile) {
     if (contents.ptr->tiled) {
-        cerr << "Recursive filter cannot be split twice" << endl;
+        cerr << "Recursive filter cannot be tiled twice" << endl;
         assert(false);
     }
 
@@ -2068,20 +2070,6 @@ void RecFilter::split(map<string,int> dim_tile) {
     // add all the generated RecFilterFuncs
     contents.ptr->func.insert(recfilter_func_list.begin(), recfilter_func_list.end());
 
-    // apply bounds on all dimensions of all functions
-    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-        string x = contents.ptr->filter_info[i].var.name();
-        int    w = contents.ptr->filter_info[i].image_width;
-
-        Func F = as_func();
-        for (int j=0; j<F.args().size(); j++) {
-            string v = F.args()[j].name();
-            if (v==x) {
-                F.bound(v,0,w);
-            }
-        }
-    }
-
     contents.ptr->tiled = true;
 
     // perform generic and target dependent optimizations
@@ -2124,9 +2112,29 @@ void RecFilter::split(RecFilterDim x, int tx, RecFilterDim y, int ty, RecFilterD
 
 // -----------------------------------------------------------------------------
 
-void RecFilter::finalize(void) {
-    map<string,RecFilterFunc>::iterator fit;
+void RecFilter::apply_bounds(void) {
+    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
+        string x = contents.ptr->filter_info[i].var.name();
+        int    w = contents.ptr->filter_info[i].image_width;
 
+        Func F = as_func();
+        for (int j=0; j<F.args().size(); j++) {
+            string v = F.args()[j].name();
+            if (v==x) {
+                F.bound(v,0,w);
+            }
+        }
+    }
+}
+
+void RecFilter::finalize(void) {
+    if (contents.ptr->finalized) {
+        return;
+    }
+
+    apply_bounds();
+
+    map<string,RecFilterFunc>::iterator fit;
     if (contents.ptr->tiled) {
         // reassign var tag counts for all functions
         for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
