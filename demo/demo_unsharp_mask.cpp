@@ -15,7 +15,7 @@
 #include <recfilter.h>
 #include <iir_coeff.h>
 
-#include "../image_io.h"
+#include "image_io.h"
 
 using namespace Halide;
 
