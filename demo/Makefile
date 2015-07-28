@@ -1,9 +1,6 @@
-all:
-	make -C gaussian
-	make -C usm
-	make -C ls_hist
+RECFILTER_BASE := ../
 
-clean:
-	make -C gaussian clean
-	make -C usm		 clean
-	make -C ls_hist  clean
+SRC  := $(wildcard *.cpp)
+INC  := image_io.h
+
+include ../Makefile.common
