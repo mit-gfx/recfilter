@@ -65,6 +65,10 @@ int main(int argc, char **argv) {
     // that appropriate can be generated
     fc[1].compute_at(USM.as_func(), Var::gpu_blocks());
 
+    // set the bounds of USM
+    // TODO: make this automatic
+    USM.apply_bounds();
+
     // auto schedule for GPU
     fc[0].gpu_auto_schedule(128);
     fc[1].gpu_auto_schedule(128);
