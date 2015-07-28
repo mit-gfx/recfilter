@@ -9,8 +9,6 @@ all:
 	$(MAKE) DoG
 	$(MAKE) usm
 	$(MAKE) audio
-	$(MAKE) cpu
-	$(MAKE) gpu
 
 clean:
 	$(MAKE) ../lib 		 clean
@@ -21,5 +19,3 @@ clean:
 	$(MAKE) usm			 clean
 	$(MAKE) summed_table clean
 	$(MAKE) audio  		 clean
-	$(MAKE) cpu 		 clean
-	$(MAKE) gpu 		 clean
