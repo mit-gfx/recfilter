@@ -133,12 +133,38 @@ public:
     /** Name of the filter */
     std::string name(void) const;
 
-    /**@name Recursive filter specification */
+    /** @name Recursive filter initialization
+     * These functions allow functional programming like syntax to initialize
+     * a recursive filter
+     * \code
+     * R(x)       = some_expression_involving_x         // 1D filter
+     * R(x,y)     = some_expression_involving_x_y       // 2D filter
+     * R(x,y,z)   = some_expression_involving_x_y_z     // 3D filter
+     * R({x,y..}) = some_expression_for_involving_x_y.. // nD filter
+     * \endcode
+     */
     // {@
-    RecFilterRefVar  operator()(RecFilterDim x);
-    RecFilterRefVar  operator()(RecFilterDim x, RecFilterDim y);
-    RecFilterRefVar  operator()(RecFilterDim x, RecFilterDim y, RecFilterDim z);
-    RecFilterRefVar  operator()(std::vector<RecFilterDim> x);
+    RecFilterRefVar operator()(RecFilterDim x);
+    RecFilterRefVar operator()(RecFilterDim x, RecFilterDim y);
+    RecFilterRefVar operator()(RecFilterDim x, RecFilterDim y, RecFilterDim z);
+    RecFilterRefVar operator()(std::vector<RecFilterDim> x);
+    // @}
+
+    /** @name Recursive filter result expression
+     * These functions return an expression that represents the final result of
+     * the filter
+     * \code
+     * R(x)       // pixel x for a 1D filter
+     * R(x,y)     // pixel (x,y) for a 1D filter
+     * R(x,y,z)   // pixel (x,y,z) for a 1D filter
+     * R({x,y..}) // pixel (x,y..) for a nD filter
+     * \endcode
+     */
+    // {@
+    RecFilterRefExpr operator()(Halide::Var x);
+    RecFilterRefExpr operator()(Halide::Var x, Halide::Var y);
+    RecFilterRefExpr operator()(Halide::Var x, Halide::Var y, Halide::Var z);
+    RecFilterRefExpr operator()(std::vector<Halide::Var> x);
     RecFilterRefExpr operator()(Halide::Expr x);
     RecFilterRefExpr operator()(Halide::Expr x, Halide::Expr y);
     RecFilterRefExpr operator()(Halide::Expr x, Halide::Expr y, Halide::Expr z);
@@ -308,7 +334,7 @@ public:
     RecFilter overlap_to_higher_order_filter(RecFilter fA, std::string name="O");
     // @}
 
-    /**@name Collective scheduling: generic handles for scheduling */
+    /**@name Collective scheduling handles */
     // {@
 
     /** Extract a handle to schedule intra-tile functions of the tiled filter
@@ -397,7 +423,7 @@ public:
     void cpu_auto_intra_schedule(int vector_width);
     // @}
 
-    /** @name Generic handles to write scheduled for dimensions of internal functions */
+    /** @name Generic handles to write schedules for dimensions of internal functions */
     // {@
     VarTag full         (int i=-1);
     VarTag inner        (int i=-1);
@@ -480,6 +506,15 @@ public:
 
 // ----------------------------------------------------------------------------
 
+/** Create an expression that can be used to initialize a pixel.
+ * This class allows functional programming like syntax to initialize a filter R:
+ * \code
+ * R(x)       = some_expression_involving_x         // 1D filter
+ * R(x,y)     = some_expression_involving_x_y       // 2D filter
+ * R(x,y,z)   = some_expression_involving_x_y_z     // 3D filter
+ * R({x,y..}) = some_expression_for_involving_x_y.. // nD filter
+ * \endcode
+ */
 class RecFilterRefVar {
 private:
     RecFilter rf;
@@ -511,6 +546,8 @@ public:
     Halide::Expr operator[](int);
 };
 
+/** Constructing an Expr from the final result of a recursive filter. This class
+ * allows using \c R(x,y) as pixel \c (x,y) of the final result of the filter */
 class RecFilterRefExpr {
 private:
     RecFilter rf;
@@ -529,7 +566,10 @@ public:
 
 // -----------------------------------------------------------------------------
 
-/** Scheduling tags for Function dimensions */
+/** Scheduling tags for RecFilter function dimensions
+ * \TODO add documentation for members
+ * \TODO simplify this API
+ */
 class VarTag {
 public:
     VarTag(void);
@@ -555,8 +595,7 @@ private:
 
 // -----------------------------------------------------------------------------
 
-/** @name Printing utils for recursive filter, Halide functions, schedules and
- * difference between computed result and reference result */
+/** @name Printing utils for recursive filter, Halide functions and schedules */
 // {@
 std::ostream &operator<<(std::ostream &s, const RecFilter &r);
 std::ostream &operator<<(std::ostream &s, const RecFilterFunc &f);

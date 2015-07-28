@@ -44,7 +44,6 @@ Arguments::Arguments(int argc, char** argv) :
         "\twidth    image width, set 0 to run all image widths and force --nocheck [default = 4096]\n"
         "\ttile     tile width for splitting each dimension image [default = 32]\n"
         "\tnocheck  do not check against reference solution, forced to true if width=0 or iterations>1 [default = false]\n"
-        "\tnosched  do not use automatic scheduling [default = false]\n"
         "\titer     number of profiling iterations [default = 1]\n"
         "\thelp     show help message\n"
         ));
@@ -59,10 +58,6 @@ Arguments::Arguments(int argc, char** argv) :
 
             else if (!option.compare("-nocheck") || !option.compare("--nocheck")) {
                 nocheck = true;
-            }
-
-            else if (!option.compare("-nosched") || !option.compare("--nosched")) {
-                noschedule = true;
             }
 
             else if (!option.compare("-iter") || !option.compare("--iter")) {

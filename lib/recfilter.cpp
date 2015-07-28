@@ -37,7 +37,7 @@ RecFilterRefVar::RecFilterRefVar(RecFilter r, std::vector<RecFilterDim> a) :
     rf(r), args(a) {}
 
 void RecFilterRefVar::operator=(Expr pure_def) {
-    rf.define(args, vec(pure_def));
+    rf.define(args, { pure_def });
 }
 
 void RecFilterRefVar::operator=(const Tuple &pure_def) {
@@ -123,26 +123,42 @@ string RecFilter::name(void) const {
 }
 
 RecFilterRefVar RecFilter::operator()(RecFilterDim x) {
-    return RecFilterRefVar(*this,vec(x));
+    return RecFilterRefVar(*this, { x });
 }
 RecFilterRefVar RecFilter::operator()(RecFilterDim x, RecFilterDim y) {
-    return RecFilterRefVar(*this,vec(x,y));
+    return RecFilterRefVar(*this, { x, y });
 }
 RecFilterRefVar RecFilter::operator()(RecFilterDim x, RecFilterDim y, RecFilterDim z){
-    return RecFilterRefVar(*this,vec(x,y,z));
+    return RecFilterRefVar(*this, { x, y, z });
 }
 RecFilterRefVar RecFilter::operator()(vector<RecFilterDim> x) {
     return RecFilterRefVar(*this, x);
 }
 
+RecFilterRefExpr RecFilter::operator()(Var x) {
+    return RecFilterRefExpr(*this, { Expr(x) });
+}
+RecFilterRefExpr RecFilter::operator()(Var x, Var y) {
+    return RecFilterRefExpr(*this, { Expr(x), Expr(y) });
+}
+RecFilterRefExpr RecFilter::operator()(Var x, Var y, Var z) {
+    return RecFilterRefExpr(*this, { Expr(x), Expr(y), Expr(z) });
+}
+RecFilterRefExpr RecFilter::operator()(vector<Var> x) {
+    vector<Expr> x_expr(x.size());
+    for (int i=0; i<x.size(); i++) {
+        x_expr[i] = Expr(x[i]);
+    }
+    return RecFilterRefExpr(*this, x_expr);
+}
 RecFilterRefExpr RecFilter::operator()(Expr x) {
-    return RecFilterRefExpr(*this,vec(x));
+    return RecFilterRefExpr(*this, { x });
 }
 RecFilterRefExpr RecFilter::operator()(Expr x, Expr y) {
-    return RecFilterRefExpr(*this,vec(x,y));
+    return RecFilterRefExpr(*this, { x, y });
 }
 RecFilterRefExpr RecFilter::operator()(Expr x, Expr y, Expr z) {
-    return RecFilterRefExpr(*this,vec(x,y,z));
+    return RecFilterRefExpr(*this, { x, y, z });
 }
 RecFilterRefExpr RecFilter::operator()(vector<Expr> x) {
     return RecFilterRefExpr(*this, x);
