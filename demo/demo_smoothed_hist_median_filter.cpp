@@ -99,12 +99,12 @@ int main(int argc, char **argv) {
     // assemble channels again and save result
     // should also be done on the GPU
     {
-        Var i("i"), j("j"), c("c");
-
-        Func M = Median.as_func();
+        Var i, j, c;
 
         Func Result;
-        Result(i,j,c) = select(c==0, M(i,j)[0], c==1, M(i,j)[1], M(i,j)[2]);
+        Result(i,j,c) = select(c==0, Median(i,j)[0],
+                               c==1, Median(i,j)[1],
+                                     Median(i,j)[2]);
 
         Buffer buff(type_of<float>(), width, height, channels);
         Result.realize(buff);

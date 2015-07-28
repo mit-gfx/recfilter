@@ -37,11 +37,12 @@ int main(int argc, char **argv) {
     float sigma = 10.0;
     vector<float> W3 = gaussian_weights(sigma,3);
 
-    Func Gaussian;
+    RecFilter GaussianX;
+    RecFilter GaussianY;
 
     // perform the Gaussian blur
     {
-        RecFilter S("GaussianDemo");
+        RecFilter S("Gaussian");
         RecFilterDim x("x", width);
         RecFilterDim y("y", height);
 
@@ -59,22 +60,25 @@ int main(int argc, char **argv) {
 
         vector<RecFilter> fc = S.cascade_by_dimension();
 
-        fc[0].split_all_dimensions(32);
-        fc[1].split_all_dimensions(32);
+        GaussianX = fc[0];
+        GaussianY = fc[1];
 
-        fc[0].gpu_auto_schedule(128);
-        fc[1].gpu_auto_schedule(128);
+        GaussianX.split_all_dimensions(32);
+        GaussianY.split_all_dimensions(32);
 
-        Gaussian = fc[1].as_func();
+        GaussianX.gpu_auto_schedule(128);
+        GaussianY.gpu_auto_schedule(128);
     }
 
     // assemble channels again and save result
-    // should also be done on the GPU
+    // TODO: should also be done on the GPU or avoided
     {
-        Var i("i"), j("j"), c("c");
+        Var i, j, c;
 
         Func Result;
-        Result(i,j,c) = select(c==0, Gaussian(i,j)[0], c==1, Gaussian(i,j)[1], Gaussian(i,j)[2]);
+        Result(i,j,c) = select(c==0, GaussianY(i,j)[0],
+                               c==1, GaussianY(i,j)[1],
+                                     GaussianY(i,j)[2]);
 
         Buffer buff(type_of<float>(), width, height, channels);
         Result.realize(buff);
