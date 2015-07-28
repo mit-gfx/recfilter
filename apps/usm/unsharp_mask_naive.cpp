@@ -1,12 +1,14 @@
 /**
- * \file unsharp_mask.cpp
+ * \file unsharp_mask_naive.cpp
  *
  * Unsharp mask: uses Gaussian filter for blurring, can be replaced by
  * any low pass IIR filter
  *
- * UnsharpMask = Image + w*HighFreq;
- *             = Image + w*(Image - Blur(Image))
- *             = (1+w)*Image - w*Blur(Image)
+ * UnsharpMask = (1+w)*Image - w*Blur(Image)
+ *
+ * This implementation is called naive because it computes the full result
+ * of the blur and then computes unsharp mask in a subsequent pass, hence
+ * it involves one extra write to global memory.
  */
 
 #include <iostream>
@@ -21,9 +23,6 @@ using std::vector;
 using std::string;
 using std::endl;
 using std::cerr;
-
-// merge the last stage of Blur with USM
-#define ENABLE_MERGING 0
 
 int main(int argc, char **argv) {
     Arguments args(argc, argv);
@@ -60,13 +59,6 @@ int main(int argc, char **argv) {
 
     // subtract the blurred image from original image
     USM(x,y) = (1.0f+weight)*image(x,y) - (weight)*fc[1](x,y);
-
-#if ENABLE_MERGING
-    // merge the last stage of Gaussian blur computation with unsharp
-    // mask computation -- perform this merge before GPU scheduling so
-    // that appropriate can be generated
-    fc[1].compute_at(USM.as_func(), Var::gpu_blocks());
-#endif
 
     // auto schedule for GPU
     fc[0].gpu_auto_schedule(128);
