@@ -4,6 +4,7 @@ all:
 	$(MAKE) lib
 	$(MAKE) apps
 	$(MAKE) tests
+	$(MAKE) demos
 	$(MAKE) scripts
 
 doc: lib Doxyfile
@@ -13,4 +14,5 @@ clean:
 	$(MAKE) lib 	clean
 	$(MAKE) apps 	clean
 	$(MAKE) tests	clean
+	$(MAKE) demos   clean
 	$(MAKE) scripts clean
