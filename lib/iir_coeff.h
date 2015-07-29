@@ -10,7 +10,7 @@
  * Compute the coefficients of a higher order filter that is equivalent
  * to two cascaded lower order filters of given coefficients
  *
- * \TODO This function is only partially tested and may be unstable
+ * \todo This function is only partially tested and may be unstable
  *
  * \param[in] a coefficients of first lower order filter
  * \param[in] b coefficients of second lower order filter

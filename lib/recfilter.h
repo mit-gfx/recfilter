@@ -259,7 +259,10 @@ public:
     // @}
 
 
-    /** @name Cascading API
+    /** @name Cascading API */
+    // {@
+
+    /**
      *
      *  Cascade the filter to produce multiple filters using list of list of scans and
      *  producing a list of recursive filters each ccomputes the corresponding list
@@ -276,7 +279,6 @@ public:
      *
      *  \return two cascaded filters
      */
-    // {@
     std::vector<RecFilter> cascade(std::vector<int> a, std::vector<int> b);
 
     /**
@@ -324,7 +326,7 @@ public:
      * - given filter must have same number of dimensions in the same order
      * - each scan of each dimension of given filter must have same causality
      *
-     * \TODO This function is only partially tested and may be unstable
+     * \todo This function is only partially tested and may be unstable
      *
      * \param fA filter to be overlapped with current filter
      * \param name name of the overlapped filter (optional)
@@ -353,7 +355,6 @@ public:
      * must not depend upon the external function
      *
      * \param external function inside which the filter must be computed
-     * \param granularity variable where this filter's result should be computed
      */
     void compute_at(RecFilter external);
 
@@ -567,8 +568,8 @@ public:
 // -----------------------------------------------------------------------------
 
 /** Scheduling tags for RecFilter function dimensions
- * \TODO add documentation for members
- * \TODO simplify this API
+ * \todo add documentation for members
+ * \todo simplify this API
  */
 class VarTag {
 public:
