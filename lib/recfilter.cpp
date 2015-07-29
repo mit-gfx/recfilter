@@ -37,7 +37,7 @@ RecFilterRefVar::RecFilterRefVar(RecFilter r, std::vector<RecFilterDim> a) :
     rf(r), args(a) {}
 
 void RecFilterRefVar::operator=(Expr pure_def) {
-    rf.define(args, vec(pure_def));
+    rf.define(args, { pure_def });
 }
 
 void RecFilterRefVar::operator=(const Tuple &pure_def) {
@@ -123,26 +123,42 @@ string RecFilter::name(void) const {
 }
 
 RecFilterRefVar RecFilter::operator()(RecFilterDim x) {
-    return RecFilterRefVar(*this,vec(x));
+    return RecFilterRefVar(*this, { x });
 }
 RecFilterRefVar RecFilter::operator()(RecFilterDim x, RecFilterDim y) {
-    return RecFilterRefVar(*this,vec(x,y));
+    return RecFilterRefVar(*this, { x, y });
 }
 RecFilterRefVar RecFilter::operator()(RecFilterDim x, RecFilterDim y, RecFilterDim z){
-    return RecFilterRefVar(*this,vec(x,y,z));
+    return RecFilterRefVar(*this, { x, y, z });
 }
 RecFilterRefVar RecFilter::operator()(vector<RecFilterDim> x) {
     return RecFilterRefVar(*this, x);
 }
 
+RecFilterRefExpr RecFilter::operator()(Var x) {
+    return RecFilterRefExpr(*this, { Expr(x) });
+}
+RecFilterRefExpr RecFilter::operator()(Var x, Var y) {
+    return RecFilterRefExpr(*this, { Expr(x), Expr(y) });
+}
+RecFilterRefExpr RecFilter::operator()(Var x, Var y, Var z) {
+    return RecFilterRefExpr(*this, { Expr(x), Expr(y), Expr(z) });
+}
+RecFilterRefExpr RecFilter::operator()(vector<Var> x) {
+    vector<Expr> x_expr(x.size());
+    for (int i=0; i<x.size(); i++) {
+        x_expr[i] = Expr(x[i]);
+    }
+    return RecFilterRefExpr(*this, x_expr);
+}
 RecFilterRefExpr RecFilter::operator()(Expr x) {
-    return RecFilterRefExpr(*this,vec(x));
+    return RecFilterRefExpr(*this, { x });
 }
 RecFilterRefExpr RecFilter::operator()(Expr x, Expr y) {
-    return RecFilterRefExpr(*this,vec(x,y));
+    return RecFilterRefExpr(*this, { x, y });
 }
 RecFilterRefExpr RecFilter::operator()(Expr x, Expr y, Expr z) {
-    return RecFilterRefExpr(*this,vec(x,y,z));
+    return RecFilterRefExpr(*this, { x, y, z });
 }
 RecFilterRefExpr RecFilter::operator()(vector<Expr> x) {
     return RecFilterRefExpr(*this, x);
@@ -204,13 +220,6 @@ void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
         args.push_back(contents.ptr->filter_info[i].var.name());
     }
     f.define(args, pure_def);
-
-    // bound the output buffer for each dimension
-    for (int i=0; i<contents.ptr->filter_info.size(); i++) {
-        Var  v      = contents.ptr->filter_info[i].var;
-        Expr extent = contents.ptr->filter_info[i].image_width;
-        Func(f).bound(v, 0, extent);
-    }
 }
 
 // -----------------------------------------------------------------------------
@@ -396,7 +405,7 @@ RecFilterSchedule RecFilter::intra_schedule(int id) {
             for (; g_it!=contents.ptr->func.end(); g_it++) {
                 RecFilterFunc rf = g_it->second;
                 if (rf.func_category==REINDEX) {
-                    if (rf.callee_func==func_name || rf.caller_func==func_name) {
+                    if (rf.producer_func==func_name || rf.consumer_func==func_name) {
                         func_list.push_back(g_it->first);
                     }
                 }
@@ -436,58 +445,106 @@ RecFilterSchedule RecFilter::inter_schedule(void) {
     return RecFilterSchedule(*this, func_list);
 }
 
-void RecFilter::compute_at(Func external, Var granularity) {
+void RecFilter::compute_at(RecFilter external) {
+    Var external_var;
+    Func external_func = external.as_func();
+    RecFilterFunc external_rfunc = external.internal_function(external.name());
+
+    // find the innermost tile index to use as loop level
+    // GPU targets - this is CUDA tile index x
+    // CPU targets - this is first OUTER index
+    if (target().has_gpu_feature()) {
+        external_var = Var::gpu_blocks();
+    } else {
+        bool found = false;
+        map<string, VarTag> pure_var_category = external_rfunc.pure_var_category;
+        map<string, VarTag>::iterator vit  = pure_var_category.begin();
+        map<string, VarTag>::iterator vend = pure_var_category.end();
+        for (; !found && vit!=vend; vit++) {
+            if (vit->second == VarTag(OUTER,0)) {
+                found = true;
+                external_var = Var(vit->first);
+            }
+        }
+
+        if (!found) {
+            cerr << name() << " cannot be computed locally in another recursive "
+                << "filter because the external filter does not a tile index where "
+                << name() << " can be computed, possibly because it is not tiled"
+                << endl;
+            assert(false);
+        }
+    }
+
+    compute_at(external_func, external_var);
+}
+
+void RecFilter::compute_at(Func external, Var looplevel) {
+    // Func representing the final result
+    RecFilterFunc& rF = internal_function(name());
+    Function f        = rF.func;
+
     // check that the filter does not depend upon F
     if (contents.ptr->func.find(external.name()) != contents.ptr->func.end()) {
-        cerr << "Cannot compute the filter " << name() << " at " << external.name()
-             << " because it is a consumer of " << external.name() << endl;
+        cerr << "Cannot compute " << name() << " at " << external.name()
+            << " because it is a consumer of " << external.name() << endl;
         assert(false);
     }
 
-    // reference compute at level of all functions that are computed at the final result
-    LoopLevel ref_compute_level(name(), granularity.name());
+    // this function must not have a consumer because this is now being set to
+    // be computed at something else
+    if (!rF.consumer_func.empty() || rF.external_consumer_func.defined()) {
+        cerr << "Cannot compute " << name() << " at " << external.name()
+            << " because it already has a consumer " << endl;
+        assert(false);
+    }
+
+    // check that the compute looplevel of the final result is not already set
+    if (!f.schedule().compute_level().is_inline() ||
+            !f.schedule().store_level().is_inline())
+    {
+        cerr << "Cannot compute " << name() << " inside " << external.name()
+            << " because it is set to be computed at "
+            << f.schedule().compute_level().func << " "
+            << f.schedule().compute_level().var << endl;
+        assert(false);
+    }
 
     // new compute at level
     string compute_level_str = "compute_at(" + external.name() +
-        ",Var(\"" + granularity.name() + "\"))";
-
-    // find all Func which are compute_at(func_name)
-    // change them to new compute at level
-    // also modify the schedule string for each of these functions
-    map<string, RecFilterFunc>::iterator fit;
-    for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
-        Function f = fit->second.func;
-        // if (f.schedule().compute_level().match(ref_compute_level)) {
-        if (f.schedule().compute_level().func == name()) {
-            // reset compute and store levels and then apply the new compute at
-            f.schedule().compute_level()= LoopLevel();
-            f.schedule().store_level() = LoopLevel();
-            Func(f).compute_at(external, granularity);
-
-            // change the compute_at schedule string
-            vector<string> pure_schedule = fit->second.pure_schedule;
-            for (int i=0; i<pure_schedule.size(); i++) {
-                if (pure_schedule[i].find("compute_")==0) {
-                    pure_schedule[i] = compute_level_str;
-                }
-            }
-            fit->second.pure_schedule = pure_schedule;
-        }
-    }
+        ", Var(\"" + looplevel.name() + "\"))";
 
     // update the store and compute level of the final result
-    RecFilterFunc& rF = internal_function(name());
-    Function f        = rF.func;
-    f.schedule().compute_level()= LoopLevel();
-    f.schedule().store_level() = LoopLevel();
-    Func(f).compute_at(external, granularity);
-    vector<string> pure_schedule = rF.pure_schedule;
-    for (int i=0; i<pure_schedule.size(); i++) {
-        if (pure_schedule[i].find("compute_")==0) {
-            pure_schedule[i]= compute_level_str;
+    //Func(f).compute_at(external, looplevel);
+    //rF.pure_schedule.push_back(compute_level_str);
+    inline_function(f, {external});
+    rF.external_consumer_func = external;
+    rF.external_consumer_var  = looplevel;
+
+    // set the producer of this function to be computed at the same looplevel
+    if (!rF.producer_func.empty()) {
+        RecFilterFunc& producer = internal_function(rF.producer_func);
+        if (!producer.func.schedule().compute_level().is_inline() ||
+                !producer.func.schedule().store_level().is_inline())
+        {
+            Func(producer.func).compute_at(external, looplevel);
+            producer.pure_schedule.push_back(compute_level_str);
+        }
+
+        // find all Functions whose consumer is this the above producer and set them
+        // to be computed inside the external function. This is because the Func
+        // computing the final result is now being computed inside some loop of an
+        // external function. So all upstream functions should be same, or else they
+        // will trigger a write to global memory
+        map<string, RecFilterFunc>::iterator fit;
+        for (fit=contents.ptr->func.begin(); fit!=contents.ptr->func.end(); fit++) {
+            RecFilterFunc& rG = fit->second;
+            if (rG.consumer_func == producer.func.name()) {
+                rG.external_consumer_func = external;
+                rG.external_consumer_var  = looplevel;
+            }
         }
     }
-    rF.pure_schedule = pure_schedule;
 }
 
 // -----------------------------------------------------------------------------
@@ -504,7 +561,7 @@ void RecFilter::cpu_auto_schedule(int vector_width) {
 void RecFilter::cpu_auto_full_schedule(int vector_width) {
     if (contents.ptr->tiled) {
         cerr << "Filter is tiled, use RecFilter::cpu_auto_intra_schedule() "
-             << "and RecFilter::cpu_auto_inter_schedule()\n" << endl;
+            << "and RecFilter::cpu_auto_inter_schedule()\n" << endl;
         assert(false);
     }
 
@@ -515,8 +572,7 @@ void RecFilter::cpu_auto_full_schedule(int vector_width) {
     full_schedule().compute_globally()
         .reorder(full_scan(), full())
         .vectorize(full(0), vector_width)
-        //.parallel(full())
-        ;
+        .parallel(full());                  // TODO: only parallelize outermost, not all
 }
 
 void RecFilter::cpu_auto_intra_schedule(int vector_width) {
@@ -539,14 +595,12 @@ void RecFilter::cpu_auto_intra_schedule(int vector_width) {
     }
 
     R.compute_locally()
-        //.storage_layout(INVALID, outer())
         .split(full(0), max_tile, inner(), outer())  // convert upto 3 full dimensions
         .split(full(0), max_tile, inner(), outer())  // into tiles
         .split(full(0), max_tile, inner(), outer())
         .reorder({inner_scan(), inner(), outer()})   // scan dimension is innermost
         .vectorize(inner(0), vector_width)           // vectorize innermost non-scan dimension
-        //.parallel(inner())                           // parallelize everything else
-        .parallel(outer());
+        .parallel(outer());                          // TODO: only parallelize outermost
 }
 
 void RecFilter::cpu_auto_inter_schedule(int vector_width) {
@@ -569,14 +623,12 @@ void RecFilter::cpu_auto_inter_schedule(int vector_width) {
     }
 
     R.compute_globally()
-        //.reorder_storage({full(), inner(), tail(), outer()})
         .split(full(0), max_tile, inner(), outer())         // convert upto 3 full dimensions
         .split(full(0), max_tile, inner(), outer())         // into tiles
         .split(full(0), max_tile, inner(), outer())
         .reorder({outer_scan(), tail(), inner(), outer()})  // scan dimension is innermost
         .vectorize(inner(0), vector_width)                  // vectorize innermost non-scan dimension
-        //.parallel(inner())                                  // parallelize everything else
-        .parallel(outer());
+        .parallel(outer());                                 // TODO: only parallelize outermost
 }
 
 // -----------------------------------------------------------------------------
@@ -974,4 +1026,24 @@ string RecFilter::print_hl_code(void) const {
     string b = print_functions();
     string c = print_schedule();
     return a+b+c;
+}
+
+void RecFilter::inline_func(string func_name) {
+    if (contents.ptr->name == func_name) {
+        return;
+    }
+
+    // all the functions in this recfilter
+    vector<Func> func_list;
+    map<string,RecFilterFunc>::iterator f = contents.ptr->func.begin();
+    map<string,RecFilterFunc>::iterator fe= contents.ptr->func.end();
+    while (f!=fe) {
+        func_list.push_back(Func(f->second.func));
+        f++;
+    }
+
+    // inline this function in all the functions of this filter
+    Function F = internal_function(func_name).func;
+    inline_function(F, func_list);
+    contents.ptr->func.erase(func_name);
 }

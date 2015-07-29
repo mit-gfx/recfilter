@@ -8,4 +8,5 @@ These tests run the application multiple times on random data to test running ti
 | ``box/``                      | iterated box filters                                  |
 | ``gaussian/``                 | Vliet-Young-Verbeek approxmiation of Gaussian blur    |
 | ``bspline/``                  | bicubic and biquintic b-spline filters                |
+| ``usm/``                      | unsharp mask using Vliet-Young-Verbeek Gaussian blur  |
 | ``audio_filter/``             | high order 1D IIR filters used for audio processing   |

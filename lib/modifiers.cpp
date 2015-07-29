@@ -879,3 +879,46 @@ void reassign_vartag_counts(
         }
     }
 }
+
+// -----------------------------------------------------------------------------
+
+void inline_function(Function f, vector<Func> func_list) {
+    if (!f.is_pure()) {
+        cerr << "Function " << f.name() << " to be inlined must be pure" << endl;
+        assert(false);
+    }
+
+    // go to all other functions and inline calls to f
+    for (int j=0; j<func_list.size(); j++) {
+        Function g = func_list[j].function();
+
+        // check if g not same as f and g calls f
+        map<string,Function> called_funcs = find_direct_calls(g);
+        if (g.name()==f.name() || called_funcs.find(f.name())==called_funcs.end()) {
+            continue;
+        }
+
+        vector<string> args   = g.args();
+        vector<Expr>   values = g.values();
+        vector<UpdateDefinition> updates = g.updates();
+
+        for (int k=0; k<values.size(); k++) {
+            values[k] = inline_function(values[k], f);
+        }
+        g.clear_all_definitions();
+        g.define(args, values);
+
+        for (int k=0; k<updates.size(); k++) {
+            vector<Expr> update_args   = updates[k].args;
+            vector<Expr> update_values = updates[k].values;
+            for (int u=0; u<update_args.size(); u++) {
+                update_args[u] = inline_function(update_args[u], f);
+            }
+            for (int u=0; u<update_values.size(); u++) {
+                update_values[u] = inline_function(update_values[u], f);
+            }
+            g.define_update(update_args, update_values);
+        }
+    }
+}
+

@@ -186,4 +186,11 @@ void reassign_vartag_counts(
         std::vector<Halide::Expr> args,
         std::map<std::string,std::string> var_splits);
 
+/** Inline a pure function in a list of other functions
+ *
+ * \param[in]    f function to be inlined
+ * \param[inout] func_list list of functions in which calls to first parameter must be inlined
+ */
+void inline_function(Halide::Internal::Function f, std::vector<Halide::Func> func_list);
+
 #endif // _MODIFIERS_H_
