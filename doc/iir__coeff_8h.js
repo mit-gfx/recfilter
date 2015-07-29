@@ -1,6 +1,5 @@
 var iir__coeff_8h =
 [
-    [ "cascade_feedback_coeff", "iir__coeff_8h.html#a1b02037ca5921c8d90a9f8c610eadd51", null ],
     [ "overlap_feedback_coeff", "iir__coeff_8h.html#a75cd9708feca9478351cbd468d5d1b2d", null ],
     [ "integral_image_coeff", "iir__coeff_8h.html#ac5b85c92d40228c1a9e137fd86c4eddc", null ],
     [ "gaussian", "iir__coeff_8h.html#ac54574283c3b9c2c897de2f17b89219d", null ],

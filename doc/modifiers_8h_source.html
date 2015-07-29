@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.6"/>
-<title>RecursiveFilter: modifiers.h Source File</title>
+<title>RecFilter: lib/modifiers.h Source File</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -29,7 +29,7 @@
  <tbody>
  <tr style="height: 56px;">
   <td style="padding-left: 0.5em;">
-   <div id="projectname">RecursiveFilter
+   <div id="projectname">RecFilter
    </div>
   </td>
  </tr>
@@ -44,6 +44,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
       <li class="current"><a href="files.html"><span>Files</span></a></li>
       <li>
@@ -90,7 +91,7 @@ $(document).ready(function(){initNavTree('modifiers_8h_source.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Data Structures</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerator</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Data Structures</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -291,12 +292,20 @@ $(document).ready(function(){initNavTree('modifiers_8h_source.html','');});
 <div class="line"><a name="l00185"></a><span class="lineno">  185</span>&#160;        std::map&lt;std::string,VarTag&gt;&amp; var_tags,</div>
 <div class="line"><a name="l00186"></a><span class="lineno">  186</span>&#160;        std::vector&lt;Halide::Expr&gt; args,</div>
 <div class="line"><a name="l00187"></a><span class="lineno">  187</span>&#160;        std::map&lt;std::string,std::string&gt; var_splits);</div>
-<div class="line"><a name="l00188"></a><span class="lineno">  188</span>&#160;</div>
-<div class="line"><a name="l00189"></a><span class="lineno">  189</span>&#160;<span class="preprocessor">#endif // _MODIFIERS_H_</span></div>
+<div class="line"><a name="l00188"></a><span class="lineno">  188</span>&#160;<span class="comment"></span></div>
+<div class="line"><a name="l00189"></a><span class="lineno">  189</span>&#160;<span class="comment">/** Inline a pure function in a list of other functions</span></div>
+<div class="line"><a name="l00190"></a><span class="lineno">  190</span>&#160;<span class="comment"> *</span></div>
+<div class="line"><a name="l00191"></a><span class="lineno">  191</span>&#160;<span class="comment"> * \param[in]    f function to be inlined</span></div>
+<div class="line"><a name="l00192"></a><span class="lineno">  192</span>&#160;<span class="comment"> * \param[inout] func_list list of functions in which calls to first parameter must be inlined</span></div>
+<div class="line"><a name="l00193"></a><span class="lineno">  193</span>&#160;<span class="comment"> */</span></div>
+<div class="line"><a name="l00194"></a><span class="lineno">  194</span>&#160;<span class="keywordtype">void</span> <a class="code" href="modifiers_8h.html#a67e1644a20d2857ac9de063ce05f7ec0">inline_function</a>(Halide::Internal::Function f, std::vector&lt;Halide::Func&gt; func_list);</div>
+<div class="line"><a name="l00195"></a><span class="lineno">  195</span>&#160;</div>
+<div class="line"><a name="l00196"></a><span class="lineno">  196</span>&#160;<span class="preprocessor">#endif // _MODIFIERS_H_</span></div>
 <div class="ttc" id="modifiers_8h_html_a866410e753cc1683988b2c69d0efa11b"><div class="ttname"><a href="modifiers_8h.html#a866410e753cc1683988b2c69d0efa11b">reassign_vartag_counts</a></div><div class="ttdeci">void reassign_vartag_counts(std::map&lt; std::string, VarTag &gt; &amp;var_tags, std::vector&lt; std::string &gt; args, std::map&lt; std::string, std::string &gt; var_splits)</div><div class="ttdoc">Make sure that all vars with tags INNER, OUTER or FULL have VarTag count in the same order as they ap...</div></div>
 <div class="ttc" id="modifiers_8h_html_a5e7cdf599c07198d5d65085ff46296f6"><div class="ttname"><a href="modifiers_8h.html#a5e7cdf599c07198d5d65085ff46296f6">substitute_arg_in_feedforward_func_call</a></div><div class="ttdeci">Halide::Expr substitute_arg_in_feedforward_func_call(std::string func_name, std::vector&lt; Halide::Expr &gt; def_arg, size_t pos, Halide::Expr new_arg, Halide::Expr original)</div><div class="ttdoc">Substitute a calling arg in feed forward recursive calls to a Func; feedforward calls are those where...</div></div>
 <div class="ttc" id="modifiers_8h_html_adc087ed911c38adafffea0578e8515ff"><div class="ttname"><a href="modifiers_8h.html#adc087ed911c38adafffea0578e8515ff">augment_func_call</a></div><div class="ttdeci">Halide::Expr augment_func_call(std::string func_name, std::vector&lt; std::string &gt; func_args, std::vector&lt; Halide::Expr &gt; extra, Halide::Expr original)</div><div class="ttdoc">Mathematically add an expression to all calls to a particular Function; the expression to be added is...</div></div>
 <div class="ttc" id="modifiers_8h_html_afb2d47e043a46269aebaf907f42bd2ab"><div class="ttname"><a href="modifiers_8h.html#afb2d47e043a46269aebaf907f42bd2ab">substitute_func_call_with_args</a></div><div class="ttdeci">Halide::Expr substitute_func_call_with_args(std::string func_name, std::vector&lt; Halide::Expr &gt; call_args, Halide::Expr replace, Halide::Expr original)</div><div class="ttdoc">Substitute all calls to a particular Function by a given expression the calling args match the given ...</div></div>
+<div class="ttc" id="modifiers_8h_html_a67e1644a20d2857ac9de063ce05f7ec0"><div class="ttname"><a href="modifiers_8h.html#a67e1644a20d2857ac9de063ce05f7ec0">inline_function</a></div><div class="ttdeci">void inline_function(Halide::Internal::Function f, std::vector&lt; Halide::Func &gt; func_list)</div><div class="ttdoc">Inline a pure function in a list of other functions. </div></div>
 <div class="ttc" id="modifiers_8h_html_a7c64c7dd2d659b02a4abb4788b2423d1"><div class="ttname"><a href="modifiers_8h.html#a7c64c7dd2d659b02a4abb4788b2423d1">insert_arg_in_func_call</a></div><div class="ttdeci">Halide::Expr insert_arg_in_func_call(std::string func_name, size_t pos, Halide::Expr arg, Halide::Expr original)</div><div class="ttdoc">Add a calling argument to all calls to a particular Function. </div></div>
 <div class="ttc" id="modifiers_8h_html_a1d41d9e40c26e4fb6da20f5b973a1467"><div class="ttname"><a href="modifiers_8h.html#a1d41d9e40c26e4fb6da20f5b973a1467">extract_buffer_calls</a></div><div class="ttdeci">std::map&lt; std::string, Halide::Buffer &gt; extract_buffer_calls(Halide::Func func)</div><div class="ttdoc">Extract the list of buffers called in the definition a function. </div></div>
 <div class="ttc" id="modifiers_8h_html_ae43d0dbc43669018cc13975713f840a8"><div class="ttname"><a href="modifiers_8h.html#ae43d0dbc43669018cc13975713f840a8">remove_lets</a></div><div class="ttdeci">Halide::Expr remove_lets(Halide::Expr)</div><div class="ttdoc">Remove all lets by inlining; all sub-expressions will exist once in memory, but may have many pointer...</div></div>

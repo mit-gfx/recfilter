@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.6"/>
-<title>RecursiveFilter: iir_coeff.h File Reference</title>
+<title>RecFilter: lib/iir_coeff.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -29,7 +29,7 @@
  <tbody>
  <tr style="height: 56px;">
   <td style="padding-left: 0.5em;">
-   <div id="projectname">RecursiveFilter
+   <div id="projectname">RecFilter
    </div>
   </td>
  </tr>
@@ -44,6 +44,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
       <li class="current"><a href="files.html"><span>Files</span></a></li>
       <li>
@@ -90,7 +91,7 @@ $(document).ready(function(){initNavTree('iir__coeff_8h.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Data Structures</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerator</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Data Structures</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -115,9 +116,6 @@ $(document).ready(function(){initNavTree('iir__coeff_8h.html','');});
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a1b02037ca5921c8d90a9f8c610eadd51"><td class="memItemLeft" align="right" valign="top">std::vector&lt; float &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="iir__coeff_8h.html#a1b02037ca5921c8d90a9f8c610eadd51">cascade_feedback_coeff</a> (std::vector&lt; float &gt; c, int order)</td></tr>
-<tr class="memdesc:a1b02037ca5921c8d90a9f8c610eadd51"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute the feedback coefficients of a filter of given order which can be used to cascade a higher order filter into two lower order order filters such that the coefficients of one of the lower order filter are all 1.0.  <a href="#a1b02037ca5921c8d90a9f8c610eadd51">More...</a><br/></td></tr>
-<tr class="separator:a1b02037ca5921c8d90a9f8c610eadd51"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a75cd9708feca9478351cbd468d5d1b2d"><td class="memItemLeft" align="right" valign="top">std::vector&lt; float &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="iir__coeff_8h.html#a75cd9708feca9478351cbd468d5d1b2d">overlap_feedback_coeff</a> (std::vector&lt; float &gt; a, std::vector&lt; float &gt; b)</td></tr>
 <tr class="memdesc:a75cd9708feca9478351cbd468d5d1b2d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute the coefficients of a higher order filter that is equivalent to two cascaded lower order filters of given coefficients.  <a href="#a75cd9708feca9478351cbd468d5d1b2d">More...</a><br/></td></tr>
 <tr class="separator:a75cd9708feca9478351cbd468d5d1b2d"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -158,42 +156,6 @@ Functions</h2></td></tr>
 <tr class="separator:a74c3f290324a2a4d2f28f29db0c645f9"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Function Documentation</h2>
-<a class="anchor" id="a1b02037ca5921c8d90a9f8c610eadd51"></a>
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">std::vector&lt;float&gt; cascade_feedback_coeff </td>
-          <td>(</td>
-          <td class="paramtype">std::vector&lt; float &gt;&#160;</td>
-          <td class="paramname"><em>c</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>order</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Compute the feedback coefficients of a filter of given order which can be used to cascade a higher order filter into two lower order order filters such that the coefficients of one of the lower order filter are all 1.0. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">order</td><td>order of lower order filter </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">c</td><td>feedback coefficients of higher order filter </td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="section return"><dt>Returns</dt><dd>feedback coefficients of lower filter order </dd></dl>
-
-</div>
-</div>
 <a class="anchor" id="a75cd9708feca9478351cbd468d5d1b2d"></a>
 <div class="memitem">
 <div class="memproto">
@@ -219,10 +181,11 @@ Functions</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Compute the coefficients of a higher order filter that is equivalent to two cascaded lower order filters of given coefficients. </p>
+<dl class="todo"><dt><b><a class="el" href="todo.html#_todo000001">Todo:</a></b></dt><dd>This function is only partially tested and may be unstable</dd></dl>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramdir">[in]</td><td class="paramname">a</td><td>coefficients of first lower order filter </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">a</td><td>coefficients of second lower order filter </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">b</td><td>coefficients of second lower order filter </td></tr>
   </table>
   </dd>
 </dl>
@@ -285,7 +248,7 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Referenced by <a class="el" href="iir__coeff_8h_source.html#l00090">reference_gaussian()</a>.</p>
+<p>Referenced by <a class="el" href="iir__coeff_8h_source.html#l00080">reference_gaussian()</a>.</p>
 
 </div>
 </div>
@@ -559,7 +522,7 @@ template&lt;typename T &gt; </div>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>filtered image </dd></dl>
 
-<p>Definition at line <a class="el" href="iir__coeff_8h_source.html#l00090">90</a> of file <a class="el" href="iir__coeff_8h_source.html">iir_coeff.h</a>.</p>
+<p>Definition at line <a class="el" href="iir__coeff_8h_source.html#l00080">80</a> of file <a class="el" href="iir__coeff_8h_source.html">iir_coeff.h</a>.</p>
 
 <p>References <a class="el" href="iir__coeff_8h.html#ac54574283c3b9c2c897de2f17b89219d">gaussian()</a>.</p>
 

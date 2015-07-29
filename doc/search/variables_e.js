@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['width',['width',['../class_arguments.html#ad5806f773a570e724c3d0c07e652224f',1,'Arguments']]]
+  ['var',['var',['../struct_filter_info.html#a0130e7179e457eb401ef82f11c73bc1d',1,'FilterInfo']]]
 ];

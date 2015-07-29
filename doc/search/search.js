@@ -11,9 +11,10 @@ var indexSectionsWithContent =
   1: "acflrv",
   2: "cimrt",
   3: "acdefghilmnoprstuv",
-  4: "bcdfimnoprstuvw",
+  4: "bcdefimnoprstuvw",
   5: "fv",
-  6: "_cfiorst"
+  6: "_cfiorst",
+  7: "t"
 };
 
 var indexSectionNames =
@@ -24,7 +25,8 @@ var indexSectionNames =
   3: "functions",
   4: "variables",
   5: "enums",
-  6: "enumvalues"
+  6: "enumvalues",
+  7: "pages"
 };
 
 function convertToId(search)

@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.6"/>
-<title>RecursiveFilter: RecFilter Class Reference</title>
+<title>RecFilter: RecFilter Class Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -29,7 +29,7 @@
  <tbody>
  <tr style="height: 56px;">
   <td style="padding-left: 0.5em;">
-   <div id="projectname">RecursiveFilter
+   <div id="projectname">RecFilter
    </div>
   </td>
  </tr>
@@ -44,6 +44,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li class="current"><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
       <li><a href="files.html"><span>Files</span></a></li>
       <li>
@@ -91,7 +92,7 @@ $(document).ready(function(){initNavTree('class_rec_filter.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Data Structures</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerator</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Data Structures</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -133,7 +134,13 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a6bd754d0ab969e2a56cd2d6d27c0b6e4"><td class="memItemLeft" align="right" valign="top">Halide::Func&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a6bd754d0ab969e2a56cd2d6d27c0b6e4">func</a> (std::string func_name)</td></tr>
 <tr class="memdesc:a6bd754d0ab969e2a56cd2d6d27c0b6e4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extract the constituent function by name, useful for debugging:  <a href="#a6bd754d0ab969e2a56cd2d6d27c0b6e4">More...</a><br/></td></tr>
 <tr class="separator:a6bd754d0ab969e2a56cd2d6d27c0b6e4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr><td colspan="2"><div class="groupHeader">Recursive filter specification</div></td></tr>
+<tr><td colspan="2"><div class="groupHeader">Recursive filter initialization</div></td></tr>
+<tr><td colspan="2"><div class="groupText"><p>These functions allow functional programming like syntax to initialize a recursive filter</p>
+<div class="fragment"><div class="line">R(x)       = some_expression_involving_x         <span class="comment">// 1D filter</span></div>
+<div class="line">R(x,y)     = some_expression_involving_x_y       <span class="comment">// 2D filter</span></div>
+<div class="line">R(x,y,z)   = some_expression_involving_x_y_z     <span class="comment">// 3D filter</span></div>
+<div class="line">R({x,y..}) = some_expression_for_involving_x_y.. <span class="comment">// nD filter</span></div>
+</div><!-- fragment --> </div></td></tr>
 <tr class="memitem:a69bb99a78cf5fa4dfb7fb7ee5900dbbc"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_rec_filter_ref_var.html">RecFilterRefVar</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a69bb99a78cf5fa4dfb7fb7ee5900dbbc">operator()</a> (<a class="el" href="class_rec_filter_dim.html">RecFilterDim</a> x)</td></tr>
 <tr class="separator:a69bb99a78cf5fa4dfb7fb7ee5900dbbc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a95eebe7bfb0e8af0b5eef9bd536e2249"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_rec_filter_ref_var.html">RecFilterRefVar</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a95eebe7bfb0e8af0b5eef9bd536e2249">operator()</a> (<a class="el" href="class_rec_filter_dim.html">RecFilterDim</a> x, <a class="el" href="class_rec_filter_dim.html">RecFilterDim</a> y)</td></tr>
@@ -142,6 +149,21 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:a4c20deae5c7f60d664550b70618e9360"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7f0842626edd0ba9035be35e04a0afa6"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_rec_filter_ref_var.html">RecFilterRefVar</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a7f0842626edd0ba9035be35e04a0afa6">operator()</a> (std::vector&lt; <a class="el" href="class_rec_filter_dim.html">RecFilterDim</a> &gt; x)</td></tr>
 <tr class="separator:a7f0842626edd0ba9035be35e04a0afa6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr><td colspan="2"><div class="groupHeader">Recursive filter result expression</div></td></tr>
+<tr><td colspan="2"><div class="groupText"><p>These functions return an expression that represents the final result of the filter</p>
+<div class="fragment"><div class="line">R(x)       <span class="comment">// pixel x for a 1D filter</span></div>
+<div class="line">R(x,y)     <span class="comment">// pixel (x,y) for a 1D filter</span></div>
+<div class="line">R(x,y,z)   <span class="comment">// pixel (x,y,z) for a 1D filter</span></div>
+<div class="line">R({x,y..}) <span class="comment">// pixel (x,y..) for a nD filter</span></div>
+</div><!-- fragment --> </div></td></tr>
+<tr class="memitem:a37b98112eff6cc3c93b2f1004d9d1986"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_rec_filter_ref_expr.html">RecFilterRefExpr</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a37b98112eff6cc3c93b2f1004d9d1986">operator()</a> (Halide::Var x)</td></tr>
+<tr class="separator:a37b98112eff6cc3c93b2f1004d9d1986"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a96f59f79aa1091a29ee9f67baed52212"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_rec_filter_ref_expr.html">RecFilterRefExpr</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a96f59f79aa1091a29ee9f67baed52212">operator()</a> (Halide::Var x, Halide::Var y)</td></tr>
+<tr class="separator:a96f59f79aa1091a29ee9f67baed52212"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8ba6e6d46148edefd02e33568963aa46"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_rec_filter_ref_expr.html">RecFilterRefExpr</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a8ba6e6d46148edefd02e33568963aa46">operator()</a> (Halide::Var x, Halide::Var y, Halide::Var z)</td></tr>
+<tr class="separator:a8ba6e6d46148edefd02e33568963aa46"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5aae2992f981e0553a9f8be1a7e69668"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_rec_filter_ref_expr.html">RecFilterRefExpr</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a5aae2992f981e0553a9f8be1a7e69668">operator()</a> (std::vector&lt; Halide::Var &gt; x)</td></tr>
+<tr class="separator:a5aae2992f981e0553a9f8be1a7e69668"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae00b8eac289bbc5adf5386b7f74590ee"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_rec_filter_ref_expr.html">RecFilterRefExpr</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#ae00b8eac289bbc5adf5386b7f74590ee">operator()</a> (Halide::Expr x)</td></tr>
 <tr class="separator:ae00b8eac289bbc5adf5386b7f74590ee"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a59313113935d135a33c950f2ed08ada0"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_rec_filter_ref_expr.html">RecFilterRefExpr</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a59313113935d135a33c950f2ed08ada0">operator()</a> (Halide::Expr x, Halide::Expr y)</td></tr>
@@ -154,6 +176,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a4d3304a7c3cde75cd9816cc8b6b09775"><td class="memItemLeft" align="right" valign="top">Halide::Target&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a4d3304a7c3cde75cd9816cc8b6b09775">target</a> (void)</td></tr>
 <tr class="memdesc:a4d3304a7c3cde75cd9816cc8b6b09775"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get the compilation target, inferred from HL_JIT_TARGET.  <a href="#a4d3304a7c3cde75cd9816cc8b6b09775">More...</a><br/></td></tr>
 <tr class="separator:a4d3304a7c3cde75cd9816cc8b6b09775"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a02d39bba6665e25f820b0cffdaa33512"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a02d39bba6665e25f820b0cffdaa33512">apply_bounds</a> (void)</td></tr>
+<tr class="memdesc:a02d39bba6665e25f820b0cffdaa33512"><td class="mdescLeft">&#160;</td><td class="mdescRight">Apply output domains bounds; this is performed implicitly for tiled filters, but it must be called by the application for non-tiled filters.  <a href="#a02d39bba6665e25f820b0cffdaa33512">More...</a><br/></td></tr>
+<tr class="separator:a02d39bba6665e25f820b0cffdaa33512"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3890b22a739fffd4bb2c6600e62cf9b0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a3890b22a739fffd4bb2c6600e62cf9b0">compile_jit</a> (std::string filename=&quot;&quot;)</td></tr>
 <tr class="memdesc:a3890b22a739fffd4bb2c6600e62cf9b0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Trigger JIT compilation for specified hardware-platform target; dumps the generated codegen in human readable HTML format if filename is specified.  <a href="#a3890b22a739fffd4bb2c6600e62cf9b0">More...</a><br/></td></tr>
 <tr class="separator:a3890b22a739fffd4bb2c6600e62cf9b0"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -205,23 +230,6 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a7f6a9ed94a44eb190ec8f8fcb989f5c9"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a7f6a9ed94a44eb190ec8f8fcb989f5c9">split</a> (std::map&lt; std::string, int &gt; dims)</td></tr>
 <tr class="separator:a7f6a9ed94a44eb190ec8f8fcb989f5c9"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr><td colspan="2"><div class="groupHeader">Cascading API</div></td></tr>
-<tr><td colspan="2"><div class="groupText"><p>Cascade the filter to produce multiple filters using list of list of scans and producing a list of recursive filters each ccomputes the corresponding list of scans in an overlapped fashion</p>
-<p>Preconditions:</p>
-<ul>
-<li>filter must not be tiled</li>
-<li>list of list of scans spans all the scans of the original filter</li>
-<li>no scan is repeated in the list of list of scans</li>
-<li>the relative order of scans with respect to causality remains preserved</li>
-</ul>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">a</td><td>list of scans for first filter </td></tr>
-    <tr><td class="paramname">b</td><td>list of scans for second filter</td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="section return"><dt>Returns</dt><dd>two cascaded filters </dd></dl>
-</div></td></tr>
 <tr class="memitem:a014f6e2309aee9827237495bd977cc78"><td class="memItemLeft" align="right" valign="top">std::vector&lt; <a class="el" href="class_rec_filter.html">RecFilter</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a014f6e2309aee9827237495bd977cc78">cascade</a> (std::vector&lt; int &gt; a, std::vector&lt; int &gt; b)</td></tr>
 <tr class="memdesc:a014f6e2309aee9827237495bd977cc78"><td class="mdescLeft">&#160;</td><td class="mdescRight">Cascade the filter to produce multiple filters using list of list of scans and producing a list of recursive filters each ccomputes the corresponding list of scans in an overlapped fashion.  <a href="#a014f6e2309aee9827237495bd977cc78">More...</a><br/></td></tr>
 <tr class="separator:a014f6e2309aee9827237495bd977cc78"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -234,16 +242,10 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:ac0ee44f54ea0788f74a1ce839701bc17"><td class="memItemLeft" align="right" valign="top">std::vector&lt; <a class="el" href="class_rec_filter.html">RecFilter</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#ac0ee44f54ea0788f74a1ce839701bc17">cascade_by_dimension</a> (void)</td></tr>
 <tr class="memdesc:ac0ee44f54ea0788f74a1ce839701bc17"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute all scans in the same dimension in an overlapped fashion and cascade different dimensions.  <a href="#ac0ee44f54ea0788f74a1ce839701bc17">More...</a><br/></td></tr>
 <tr class="separator:ac0ee44f54ea0788f74a1ce839701bc17"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adedac68a87b9819334be3293facf96b8"><td class="memItemLeft" align="right" valign="top">std::vector&lt; <a class="el" href="class_rec_filter.html">RecFilter</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#adedac68a87b9819334be3293facf96b8">cascade_by_order</a> (std::vector&lt; int &gt; orders)</td></tr>
-<tr class="memdesc:adedac68a87b9819334be3293facf96b8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Cascade a higher order filter into multiple lower order filters.  <a href="#adedac68a87b9819334be3293facf96b8">More...</a><br/></td></tr>
-<tr class="separator:adedac68a87b9819334be3293facf96b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1458f3cceb5f73946ab3412ba3e89cfa"><td class="memItemLeft" align="right" valign="top">std::vector&lt; <a class="el" href="class_rec_filter.html">RecFilter</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a1458f3cceb5f73946ab3412ba3e89cfa">cascade_by_order</a> (int order_a, int order_b)</td></tr>
-<tr class="memdesc:a1458f3cceb5f73946ab3412ba3e89cfa"><td class="mdescLeft">&#160;</td><td class="mdescRight">Cascade a higher order filter into two lower order filters.  <a href="#a1458f3cceb5f73946ab3412ba3e89cfa">More...</a><br/></td></tr>
-<tr class="separator:a1458f3cceb5f73946ab3412ba3e89cfa"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4b8824833e1d3cc3f5badaf1ff7f4f98"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_rec_filter.html">RecFilter</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a4b8824833e1d3cc3f5badaf1ff7f4f98">overlap_to_higher_order_filter</a> (<a class="el" href="class_rec_filter.html">RecFilter</a> fA, std::string <a class="el" href="class_rec_filter.html#a37a0864233f2ff9e93cdaa4062d2956a">name</a>=&quot;O&quot;)</td></tr>
-<tr class="memdesc:a4b8824833e1d3cc3f5badaf1ff7f4f98"><td class="mdescLeft">&#160;</td><td class="mdescRight">Overlap a given filter with the current filter.  <a href="#a4b8824833e1d3cc3f5badaf1ff7f4f98">More...</a><br/></td></tr>
+<tr class="memdesc:a4b8824833e1d3cc3f5badaf1ff7f4f98"><td class="mdescLeft">&#160;</td><td class="mdescRight">Overlap a given filter with the current filter creating a higher order filter.  <a href="#a4b8824833e1d3cc3f5badaf1ff7f4f98">More...</a><br/></td></tr>
 <tr class="separator:a4b8824833e1d3cc3f5badaf1ff7f4f98"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr><td colspan="2"><div class="groupHeader">Collective scheduling: generic handles for scheduling</div></td></tr>
+<tr><td colspan="2"><div class="groupHeader">Collective scheduling handles</div></td></tr>
 <tr class="memitem:ad3e03d029cd70d548e94e5cf1ee20f00"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_rec_filter_schedule.html">RecFilterSchedule</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#ad3e03d029cd70d548e94e5cf1ee20f00">intra_schedule</a> (int id=0)</td></tr>
 <tr class="memdesc:ad3e03d029cd70d548e94e5cf1ee20f00"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extract a handle to schedule intra-tile functions of the tiled filter.  <a href="#ad3e03d029cd70d548e94e5cf1ee20f00">More...</a><br/></td></tr>
 <tr class="separator:ad3e03d029cd70d548e94e5cf1ee20f00"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -253,8 +255,11 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a42fba7d2b1aaa2124df1b3e05cebfa7e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_rec_filter_schedule.html">RecFilterSchedule</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a42fba7d2b1aaa2124df1b3e05cebfa7e">full_schedule</a> (void)</td></tr>
 <tr class="memdesc:a42fba7d2b1aaa2124df1b3e05cebfa7e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extract a handle to schedule non-tiled filter.  <a href="#a42fba7d2b1aaa2124df1b3e05cebfa7e">More...</a><br/></td></tr>
 <tr class="separator:a42fba7d2b1aaa2124df1b3e05cebfa7e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8047dc496a564fc2b4b8eafa9e994c2b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a8047dc496a564fc2b4b8eafa9e994c2b">compute_at</a> (<a class="el" href="class_rec_filter.html">RecFilter</a> external)</td></tr>
+<tr class="memdesc:a8047dc496a564fc2b4b8eafa9e994c2b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set final result of filter to be computed at an external recursive filter, useful for merging the filter with external stages; the filter must not depend upon the external function.  <a href="#a8047dc496a564fc2b4b8eafa9e994c2b">More...</a><br/></td></tr>
+<tr class="separator:a8047dc496a564fc2b4b8eafa9e994c2b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a34d7257972c8d9d9cdb4d111f1bf0936"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a34d7257972c8d9d9cdb4d111f1bf0936">compute_at</a> (Halide::Func external, Halide::Var granularity)</td></tr>
-<tr class="memdesc:a34d7257972c8d9d9cdb4d111f1bf0936"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set final result of filter to be computed at an external Func, useful for merging the filter with external stages; the filter must not depend upon the external function - overrides any previous compute_at scheduling.  <a href="#a34d7257972c8d9d9cdb4d111f1bf0936">More...</a><br/></td></tr>
+<tr class="memdesc:a34d7257972c8d9d9cdb4d111f1bf0936"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set final result of filter to be computed at an external Func, useful for merging the filter with external stages; the filter must not depend upon the external function.  <a href="#a34d7257972c8d9d9cdb4d111f1bf0936">More...</a><br/></td></tr>
 <tr class="separator:a34d7257972c8d9d9cdb4d111f1bf0936"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr><td colspan="2"><div class="groupHeader">Automatic scheduling for GPU targets</div></td></tr>
 <tr class="memitem:a4a8e6f9042841f05282a7e8babde3c31"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a4a8e6f9042841f05282a7e8babde3c31">gpu_auto_full_schedule</a> (int max_threads, int tile_width=32)</td></tr>
@@ -282,7 +287,7 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:ad89986ef2db44980026d9aebe00d6195"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#ad89986ef2db44980026d9aebe00d6195">cpu_auto_intra_schedule</a> (int vector_width)</td></tr>
 <tr class="memdesc:ad89986ef2db44980026d9aebe00d6195"><td class="mdescLeft">&#160;</td><td class="mdescRight">Automatic CPU schedule for intra-tile functions if tiled filter.  <a href="#ad89986ef2db44980026d9aebe00d6195">More...</a><br/></td></tr>
 <tr class="separator:ad89986ef2db44980026d9aebe00d6195"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr><td colspan="2"><div class="groupHeader">Generic handles to write scheduled for dimensions of internal functions</div></td></tr>
+<tr><td colspan="2"><div class="groupHeader">Generic handles to write schedules for dimensions of internal functions</div></td></tr>
 <tr class="memitem:a4bc66354c93fd6f9667ba2dd9926c490"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_var_tag.html">VarTag</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#a4bc66354c93fd6f9667ba2dd9926c490">full</a> (int i=-1)</td></tr>
 <tr class="separator:a4bc66354c93fd6f9667ba2dd9926c490"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abd9f6d93e1db70ab9818b6ce2da630b1"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_var_tag.html">VarTag</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter.html#abd9f6d93e1db70ab9818b6ce2da630b1">inner</a> (int i=-1)</td></tr>
@@ -461,6 +466,96 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
+<a class="anchor" id="a37b98112eff6cc3c93b2f1004d9d1986"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="class_rec_filter_ref_expr.html">RecFilterRefExpr</a> RecFilter::operator() </td>
+          <td>(</td>
+          <td class="paramtype">Halide::Var&#160;</td>
+          <td class="paramname"><em>x</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a96f59f79aa1091a29ee9f67baed52212"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="class_rec_filter_ref_expr.html">RecFilterRefExpr</a> RecFilter::operator() </td>
+          <td>(</td>
+          <td class="paramtype">Halide::Var&#160;</td>
+          <td class="paramname"><em>x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Halide::Var&#160;</td>
+          <td class="paramname"><em>y</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a8ba6e6d46148edefd02e33568963aa46"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="class_rec_filter_ref_expr.html">RecFilterRefExpr</a> RecFilter::operator() </td>
+          <td>(</td>
+          <td class="paramtype">Halide::Var&#160;</td>
+          <td class="paramname"><em>x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Halide::Var&#160;</td>
+          <td class="paramname"><em>y</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Halide::Var&#160;</td>
+          <td class="paramname"><em>z</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a5aae2992f981e0553a9f8be1a7e69668"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="class_rec_filter_ref_expr.html">RecFilterRefExpr</a> RecFilter::operator() </td>
+          <td>(</td>
+          <td class="paramtype">std::vector&lt; Halide::Var &gt;&#160;</td>
+          <td class="paramname"><em>x</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a class="anchor" id="ae00b8eac289bbc5adf5386b7f74590ee"></a>
 <div class="memitem">
 <div class="memproto">
@@ -601,6 +696,24 @@ Public Member Functions</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Get the compilation target, inferred from HL_JIT_TARGET. </p>
+
+</div>
+</div>
+<a class="anchor" id="a02d39bba6665e25f820b0cffdaa33512"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void RecFilter::apply_bounds </td>
+          <td>(</td>
+          <td class="paramtype">void&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Apply output domains bounds; this is performed implicitly for tiled filters, but it must be called by the application for non-tiled filters. </p>
 
 </div>
 </div>
@@ -954,11 +1067,12 @@ Public Member Functions</h2></td></tr>
 </ul>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">scan</td><td>list of list of scans, each inner list becomes a separate filter</td></tr>
+    <tr><td class="paramname">a</td><td>list of scans for first filter </td></tr>
+    <tr><td class="paramname">b</td><td>list of scans for second filter</td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>list of cascaded filters </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>two cascaded filters </dd></dl>
 
 </div>
 </div>
@@ -1040,87 +1154,6 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a class="anchor" id="adedac68a87b9819334be3293facf96b8"></a>
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">std::vector&lt;<a class="el" href="class_rec_filter.html">RecFilter</a>&gt; RecFilter::cascade_by_order </td>
-          <td>(</td>
-          <td class="paramtype">std::vector&lt; int &gt;&#160;</td>
-          <td class="paramname"><em>orders</em></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Cascade a higher order filter into multiple lower order filters. </p>
-<p>Preconditions:</p>
-<ul>
-<li>filter must not be tiled</li>
-<li>all scans in the given filter must have the same order</li>
-<li>list of lower orders must add up the to order of given filter</li>
-</ul>
-<p>Precautions:</p>
-<ul>
-<li>all lower order filters will have coefficients 1.0 and the last filter will have coefficients not equal to 1.0; this can lead to numerical issues</li>
-</ul>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">orders</td><td>list of low orders to be used for cascading </td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="section return"><dt>Returns</dt><dd>lower order filters </dd></dl>
-
-</div>
-</div>
-<a class="anchor" id="a1458f3cceb5f73946ab3412ba3e89cfa"></a>
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">std::vector&lt;<a class="el" href="class_rec_filter.html">RecFilter</a>&gt; RecFilter::cascade_by_order </td>
-          <td>(</td>
-          <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>order_a</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>order_b</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Cascade a higher order filter into two lower order filters. </p>
-<p>Preconditions:</p>
-<ul>
-<li>filter must not be tiled</li>
-<li>all scans in the given filter must have the same order</li>
-<li>lower orders must add up the to order of given filter</li>
-</ul>
-<p>Precautions:</p>
-<ul>
-<li>first lower order filter will have coefficients 1.0 and the second filter will have coefficients not equal to 1.0; this can lead to numerical issues</li>
-</ul>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">order_a</td><td>order of first filter after cascading </td></tr>
-    <tr><td class="paramname">order_b</td><td>order of second filter after cascading</td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="section return"><dt>Returns</dt><dd>pair of lower order filters </dd></dl>
-
-</div>
-</div>
 <a class="anchor" id="a4b8824833e1d3cc3f5badaf1ff7f4f98"></a>
 <div class="memitem">
 <div class="memproto">
@@ -1145,13 +1178,14 @@ Public Member Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Overlap a given filter with the current filter. </p>
+<p>Overlap a given filter with the current filter creating a higher order filter. </p>
 <p>Preconditions:</p>
 <ul>
 <li>filter must not be tiled</li>
 <li>given filter must have same number of dimensions in the same order</li>
 <li>each scan of each dimension of given filter must have same causality</li>
 </ul>
+<dl class="todo"><dt><b><a class="el" href="todo.html#_todo000003">Todo:</a></b></dt><dd>This function is only partially tested and may be unstable</dd></dl>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">fA</td><td>filter to be overlapped with current filter </td></tr>
@@ -1223,6 +1257,30 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
+<a class="anchor" id="a8047dc496a564fc2b4b8eafa9e994c2b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void RecFilter::compute_at </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="class_rec_filter.html">RecFilter</a>&#160;</td>
+          <td class="paramname"><em>external</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Set final result of filter to be computed at an external recursive filter, useful for merging the filter with external stages; the filter must not depend upon the external function. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">external</td><td>function inside which the filter must be computed </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
 <a class="anchor" id="a34d7257972c8d9d9cdb4d111f1bf0936"></a>
 <div class="memitem">
 <div class="memproto">
@@ -1247,7 +1305,7 @@ Public Member Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Set final result of filter to be computed at an external Func, useful for merging the filter with external stages; the filter must not depend upon the external function - overrides any previous compute_at scheduling. </p>
+<p>Set final result of filter to be computed at an external Func, useful for merging the filter with external stages; the filter must not depend upon the external function. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">external</td><td>function inside which the filter must be computed </td></tr>
@@ -1286,7 +1344,7 @@ Public Member Functions</h2></td></tr>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">max_threads</td><td>maximum threads in a CUDA warp </td></tr>
-    <tr><td class="paramname">tile_width</td><td>tiling factor to split full dimensions into CUDA blocks and CUDA tiles </td></tr>
+    <tr><td class="paramname">tile_width</td><td>tiling factor to split non-tiled dimensions into CUDA blocks and CUDA tiles </td></tr>
   </table>
   </dd>
 </dl>
@@ -1321,7 +1379,7 @@ Public Member Functions</h2></td></tr>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">max_threads</td><td>maximum threads in a CUDA warp </td></tr>
-    <tr><td class="paramname">tile_width</td><td>tiling factor to split full dimensions into CUDA blocks and CUDA tiles (only used if filter is not tiled) </td></tr>
+    <tr><td class="paramname">tile_width</td><td>tiling factor to non-tiled full dimensions into CUDA blocks and CUDA tiles (only used if filter is not tiled) </td></tr>
   </table>
   </dd>
 </dl>
@@ -1692,7 +1750,7 @@ Public Member Functions</h2></td></tr>
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following file:<ul>
-<li><a class="el" href="recfilter_8h_source.html">recfilter.h</a></li>
+<li>lib/<a class="el" href="recfilter_8h_source.html">recfilter.h</a></li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->

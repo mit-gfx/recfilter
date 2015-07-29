@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.6"/>
-<title>RecursiveFilter: Data Fields</title>
+<title>RecFilter: Data Fields</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -29,7 +29,7 @@
  <tbody>
  <tr style="height: 56px;">
   <td style="padding-left: 0.5em;">
-   <div id="projectname">RecursiveFilter
+   <div id="projectname">RecFilter
    </div>
   </td>
  </tr>
@@ -44,6 +44,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li class="current"><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
       <li><a href="files.html"><span>Files</span></a></li>
       <li>
@@ -122,7 +123,7 @@ $(document).ready(function(){initNavTree('functions.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Data Structures</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerator</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Data Structures</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -137,6 +138,9 @@ $(document).ready(function(){initNavTree('functions.html','');});
 <h3><a class="anchor" id="index_a"></a>- a -</h3><ul>
 <li>add_filter()
 : <a class="el" href="class_rec_filter.html#a5c2f413766eca7830f430d37ca49028b">RecFilter</a>
+</li>
+<li>apply_bounds()
+: <a class="el" href="class_rec_filter.html#a02d39bba6665e25f820b0cffdaa33512">RecFilter</a>
 </li>
 <li>Arguments()
 : <a class="el" href="class_arguments.html#a37ca9b921df1132fd139a2becd500db0">Arguments</a>
@@ -159,12 +163,6 @@ $(document).ready(function(){initNavTree('functions.html','');});
 
 
 <h3><a class="anchor" id="index_c"></a>- c -</h3><ul>
-<li>callee_func
-: <a class="el" href="class_rec_filter_func.html#ad8eb7b80f11e10375c4cf82d45642a83">RecFilterFunc</a>
-</li>
-<li>caller_func
-: <a class="el" href="class_rec_filter_func.html#a634f09437e84ae47c184fc2e545c5d1f">RecFilterFunc</a>
-</li>
 <li>cascade()
 : <a class="el" href="class_rec_filter.html#a014f6e2309aee9827237495bd977cc78">RecFilter</a>
 </li>
@@ -173,9 +171,6 @@ $(document).ready(function(){initNavTree('functions.html','');});
 </li>
 <li>cascade_by_dimension()
 : <a class="el" href="class_rec_filter.html#ac0ee44f54ea0788f74a1ce839701bc17">RecFilter</a>
-</li>
-<li>cascade_by_order()
-: <a class="el" href="class_rec_filter.html#adedac68a87b9819334be3293facf96b8">RecFilter</a>
 </li>
 <li>causal()
 : <a class="el" href="class_rec_filter_dim_and_causality.html#a6a62cbe7ece62597158f246daf049fb5">RecFilterDimAndCausality</a>
@@ -199,13 +194,16 @@ $(document).ready(function(){initNavTree('functions.html','');});
 : <a class="el" href="struct_rec_filter_contents.html#a24319adb0c4ed7bbceb3a7585c93e068">RecFilterContents</a>
 </li>
 <li>compute_at()
-: <a class="el" href="class_rec_filter.html#a34d7257972c8d9d9cdb4d111f1bf0936">RecFilter</a>
+: <a class="el" href="class_rec_filter.html#a8047dc496a564fc2b4b8eafa9e994c2b">RecFilter</a>
 </li>
 <li>compute_globally()
 : <a class="el" href="class_rec_filter_schedule.html#ac48cf3c21d619904119675f31cd38397">RecFilterSchedule</a>
 </li>
 <li>compute_locally()
 : <a class="el" href="class_rec_filter_schedule.html#a9f164d99764f089c27c78467d6869630">RecFilterSchedule</a>
+</li>
+<li>consumer_func
+: <a class="el" href="class_rec_filter_func.html#a465fa01fc02dbd831e0a243d64e460a2">RecFilterFunc</a>
 </li>
 <li>contains_vars_with_tag()
 : <a class="el" href="class_rec_filter_schedule.html#a7e70ffb5ea61bd1d62c35ba5eb8f5d7b">RecFilterSchedule</a>
@@ -245,6 +243,12 @@ $(document).ready(function(){initNavTree('functions.html','');});
 <li>extent()
 : <a class="el" href="class_rec_filter_dim.html#a666043c9786f87f033e5bb0f2a7adc0b">RecFilterDim</a>
 , <a class="el" href="class_rec_filter_dim_and_causality.html#a8208bb9695087f0b12c76ef3ca20ea79">RecFilterDimAndCausality</a>
+</li>
+<li>external_consumer_func
+: <a class="el" href="class_rec_filter_func.html#a1d574b57f88c6e0674c0be53d5963350">RecFilterFunc</a>
+</li>
+<li>external_consumer_var
+: <a class="el" href="class_rec_filter_func.html#a2a064d652dabdb750279f7254d373a0f">RecFilterFunc</a>
 </li>
 </ul>
 
@@ -396,7 +400,7 @@ $(document).ready(function(){initNavTree('functions.html','');});
 , <a class="el" href="class_rec_filter_ref_var.html#a49c6831c54e083ba4ee34cee7c692df6">RecFilterRefVar</a>
 </li>
 <li>operator()()
-: <a class="el" href="class_rec_filter.html#ae00b8eac289bbc5adf5386b7f74590ee">RecFilter</a>
+: <a class="el" href="class_rec_filter.html#a69bb99a78cf5fa4dfb7fb7ee5900dbbc">RecFilter</a>
 </li>
 <li>operator&lt;&lt;()
 : <a class="el" href="class_log.html#a3d586ed099af6cf984e360bbbd0b8876">Log</a>
@@ -404,7 +408,7 @@ $(document).ready(function(){initNavTree('functions.html','');});
 <li>operator=()
 : <a class="el" href="class_func_tag.html#a2dfb925936cee765c0008bdb0dd26967">FuncTag</a>
 , <a class="el" href="class_rec_filter.html#a77471b4e462a755d32e5f7e5ea0fa677">RecFilter</a>
-, <a class="el" href="class_rec_filter_ref_var.html#a4d773aaa0a0a8becaad0cc533a112082">RecFilterRefVar</a>
+, <a class="el" href="class_rec_filter_ref_var.html#a7e208135b49e2bdfff67de66a0b93710">RecFilterRefVar</a>
 , <a class="el" href="class_var_tag.html#a79704fe95e95a1f527476b37697e147e">VarTag</a>
 </li>
 <li>operator[]()
@@ -444,6 +448,9 @@ $(document).ready(function(){initNavTree('functions.html','');});
 </li>
 <li>print_synopsis()
 : <a class="el" href="class_rec_filter.html#a08d15e61cd2ab18c95ac23d4f9b752d3">RecFilter</a>
+</li>
+<li>producer_func
+: <a class="el" href="class_rec_filter_func.html#ae7f0bad170326a779fdffb9563935be9">RecFilterFunc</a>
 </li>
 <li>profile()
 : <a class="el" href="class_rec_filter.html#a966478f0506b8b5fab094069b1c9ff74">RecFilter</a>

@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.6"/>
-<title>RecursiveFilter: RecFilterFunc Class Reference</title>
+<title>RecFilter: RecFilterFunc Class Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -29,7 +29,7 @@
  <tbody>
  <tr style="height: 56px;">
   <td style="padding-left: 0.5em;">
-   <div id="projectname">RecursiveFilter
+   <div id="projectname">RecFilter
    </div>
   </td>
  </tr>
@@ -44,6 +44,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li class="current"><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
       <li><a href="files.html"><span>Files</span></a></li>
       <li>
@@ -91,7 +92,7 @@ $(document).ready(function(){initNavTree('class_rec_filter_func.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Data Structures</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerator</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Data Structures</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -136,12 +137,18 @@ std::string &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el
 &lt; std::string, std::string &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter_func.html#aa1ede42c4ffc126eb53d0f01ebf8e158">update_var_splits</a></td></tr>
 <tr class="memdesc:aa1ede42c4ffc126eb53d0f01ebf8e158"><td class="mdescLeft">&#160;</td><td class="mdescRight">List of new vars created by <a class="el" href="class_rec_filter_schedule.html#a81d0c77f7700a0e69b7940591b69ace8">RecFilterSchedule::split()</a> on update definitions.  <a href="#aa1ede42c4ffc126eb53d0f01ebf8e158">More...</a><br/></td></tr>
 <tr class="separator:aa1ede42c4ffc126eb53d0f01ebf8e158"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a634f09437e84ae47c184fc2e545c5d1f"><td class="memItemLeft" align="right" valign="top">std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter_func.html#a634f09437e84ae47c184fc2e545c5d1f">caller_func</a></td></tr>
-<tr class="memdesc:a634f09437e84ae47c184fc2e545c5d1f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Name of a function that calls this function; set if this function has the REINDEX_FOR_READ tag set.  <a href="#a634f09437e84ae47c184fc2e545c5d1f">More...</a><br/></td></tr>
-<tr class="separator:a634f09437e84ae47c184fc2e545c5d1f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad8eb7b80f11e10375c4cf82d45642a83"><td class="memItemLeft" align="right" valign="top">std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter_func.html#ad8eb7b80f11e10375c4cf82d45642a83">callee_func</a></td></tr>
-<tr class="memdesc:ad8eb7b80f11e10375c4cf82d45642a83"><td class="mdescLeft">&#160;</td><td class="mdescRight">Name of a function that this function calls; set if this function has the REINDEX_FOR_WRITE tag set.  <a href="#ad8eb7b80f11e10375c4cf82d45642a83">More...</a><br/></td></tr>
-<tr class="separator:ad8eb7b80f11e10375c4cf82d45642a83"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a465fa01fc02dbd831e0a243d64e460a2"><td class="memItemLeft" align="right" valign="top">std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter_func.html#a465fa01fc02dbd831e0a243d64e460a2">consumer_func</a></td></tr>
+<tr class="memdesc:a465fa01fc02dbd831e0a243d64e460a2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Name of consumer function.  <a href="#a465fa01fc02dbd831e0a243d64e460a2">More...</a><br/></td></tr>
+<tr class="separator:a465fa01fc02dbd831e0a243d64e460a2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae7f0bad170326a779fdffb9563935be9"><td class="memItemLeft" align="right" valign="top">std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter_func.html#ae7f0bad170326a779fdffb9563935be9">producer_func</a></td></tr>
+<tr class="memdesc:ae7f0bad170326a779fdffb9563935be9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Name of producer function.  <a href="#ae7f0bad170326a779fdffb9563935be9">More...</a><br/></td></tr>
+<tr class="separator:ae7f0bad170326a779fdffb9563935be9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1d574b57f88c6e0674c0be53d5963350"><td class="memItemLeft" align="right" valign="top">Halide::Func&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter_func.html#a1d574b57f88c6e0674c0be53d5963350">external_consumer_func</a></td></tr>
+<tr class="memdesc:a1d574b57f88c6e0674c0be53d5963350"><td class="mdescLeft">&#160;</td><td class="mdescRight">External consumer function which consumes <a class="el" href="class_rec_filter.html" title="Recursive filter class. ">RecFilter</a>'s output; external consumer means a Func outside the <a class="el" href="class_rec_filter.html" title="Recursive filter class. ">RecFilter</a> pipeline that consumes the output of the <a class="el" href="class_rec_filter.html" title="Recursive filter class. ">RecFilter</a>.  <a href="#a1d574b57f88c6e0674c0be53d5963350">More...</a><br/></td></tr>
+<tr class="separator:a1d574b57f88c6e0674c0be53d5963350"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2a064d652dabdb750279f7254d373a0f"><td class="memItemLeft" align="right" valign="top">Halide::Var&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter_func.html#a2a064d652dabdb750279f7254d373a0f">external_consumer_var</a></td></tr>
+<tr class="memdesc:a2a064d652dabdb750279f7254d373a0f"><td class="mdescLeft">&#160;</td><td class="mdescRight">External consumer function's loop level at which the <a class="el" href="class_rec_filter.html" title="Recursive filter class. ">RecFilter</a>'s output is consumed; external consumer means a Func outside the <a class="el" href="class_rec_filter.html" title="Recursive filter class. ">RecFilter</a> pipeline that consumes the output of the <a class="el" href="class_rec_filter.html" title="Recursive filter class. ">RecFilter</a>.  <a href="#a2a064d652dabdb750279f7254d373a0f">More...</a><br/></td></tr>
+<tr class="separator:a2a064d652dabdb750279f7254d373a0f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab8fbf48f4e68005e9bf7dc9f676858ef"><td class="memItemLeft" align="right" valign="top">std::vector&lt; std::string &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_rec_filter_func.html#ab8fbf48f4e68005e9bf7dc9f676858ef">pure_schedule</a></td></tr>
 <tr class="memdesc:ab8fbf48f4e68005e9bf7dc9f676858ef"><td class="mdescLeft">&#160;</td><td class="mdescRight">Schedule for pure def of the function as valid Halide code.  <a href="#ab8fbf48f4e68005e9bf7dc9f676858ef">More...</a><br/></td></tr>
 <tr class="separator:ab8fbf48f4e68005e9bf7dc9f676858ef"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -251,35 +258,71 @@ std::string &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el
 
 </div>
 </div>
-<a class="anchor" id="a634f09437e84ae47c184fc2e545c5d1f"></a>
+<a class="anchor" id="a465fa01fc02dbd831e0a243d64e460a2"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">std::string RecFilterFunc::caller_func</td>
+          <td class="memname">std::string RecFilterFunc::consumer_func</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Name of a function that calls this function; set if this function has the REINDEX_FOR_READ tag set. </p>
+<p>Name of consumer function. </p>
+<p>This can be set if this function has REINDEX tag set because only REINDEX functions are guaranteed to have a single consumer </p>
 
 <p>Definition at line <a class="el" href="recfilter__internals_8h_source.html#l00111">111</a> of file <a class="el" href="recfilter__internals_8h_source.html">recfilter_internals.h</a>.</p>
 
 </div>
 </div>
-<a class="anchor" id="ad8eb7b80f11e10375c4cf82d45642a83"></a>
+<a class="anchor" id="ae7f0bad170326a779fdffb9563935be9"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">std::string RecFilterFunc::callee_func</td>
+          <td class="memname">std::string RecFilterFunc::producer_func</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Name of a function that this function calls; set if this function has the REINDEX_FOR_WRITE tag set. </p>
+<p>Name of producer function. </p>
+<p>This can be set if this function has REINDEX tag set because only REINDEX functions are guaranteed to have a single producer </p>
 
 <p>Definition at line <a class="el" href="recfilter__internals_8h_source.html#l00115">115</a> of file <a class="el" href="recfilter__internals_8h_source.html">recfilter_internals.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a1d574b57f88c6e0674c0be53d5963350"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Halide::Func RecFilterFunc::external_consumer_func</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>External consumer function which consumes <a class="el" href="class_rec_filter.html" title="Recursive filter class. ">RecFilter</a>'s output; external consumer means a Func outside the <a class="el" href="class_rec_filter.html" title="Recursive filter class. ">RecFilter</a> pipeline that consumes the output of the <a class="el" href="class_rec_filter.html" title="Recursive filter class. ">RecFilter</a>. </p>
+<p>This is set by <a class="el" href="class_rec_filter.html#a8047dc496a564fc2b4b8eafa9e994c2b" title="Set final result of filter to be computed at an external recursive filter, useful for merging the fil...">RecFilter::compute_at()</a> and is useful for merging the final stage of the recfilter and initial stage of next filter. This can be set if this function has REINDEX tag set; only REINDEX functions are guaranteed to have a single consumer </p>
+
+<p>Definition at line <a class="el" href="recfilter__internals_8h_source.html#l00123">123</a> of file <a class="el" href="recfilter__internals_8h_source.html">recfilter_internals.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a2a064d652dabdb750279f7254d373a0f"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Halide::Var RecFilterFunc::external_consumer_var</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>External consumer function's loop level at which the <a class="el" href="class_rec_filter.html" title="Recursive filter class. ">RecFilter</a>'s output is consumed; external consumer means a Func outside the <a class="el" href="class_rec_filter.html" title="Recursive filter class. ">RecFilter</a> pipeline that consumes the output of the <a class="el" href="class_rec_filter.html" title="Recursive filter class. ">RecFilter</a>. </p>
+<p>This is set by <a class="el" href="class_rec_filter.html#a8047dc496a564fc2b4b8eafa9e994c2b" title="Set final result of filter to be computed at an external recursive filter, useful for merging the fil...">RecFilter::compute_at()</a> and is useful for merging the final stage of the recfilter and initial stage of next filter. This can be set if this function has REINDEX tag set; only REINDEX functions are guaranteed to have a single consumer </p>
+
+<p>Definition at line <a class="el" href="recfilter__internals_8h_source.html#l00131">131</a> of file <a class="el" href="recfilter__internals_8h_source.html">recfilter_internals.h</a>.</p>
 
 </div>
 </div>
@@ -295,7 +338,7 @@ std::string &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el
 
 <p>Schedule for pure def of the function as valid Halide code. </p>
 
-<p>Definition at line <a class="el" href="recfilter__internals_8h_source.html#l00118">118</a> of file <a class="el" href="recfilter__internals_8h_source.html">recfilter_internals.h</a>.</p>
+<p>Definition at line <a class="el" href="recfilter__internals_8h_source.html#l00134">134</a> of file <a class="el" href="recfilter__internals_8h_source.html">recfilter_internals.h</a>.</p>
 
 </div>
 </div>
@@ -311,12 +354,12 @@ std::string &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el
 
 <p>Schedule for update defs of the function as valid Halide code. </p>
 
-<p>Definition at line <a class="el" href="recfilter__internals_8h_source.html#l00121">121</a> of file <a class="el" href="recfilter__internals_8h_source.html">recfilter_internals.h</a>.</p>
+<p>Definition at line <a class="el" href="recfilter__internals_8h_source.html#l00137">137</a> of file <a class="el" href="recfilter__internals_8h_source.html">recfilter_internals.h</a>.</p>
 
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following file:<ul>
-<li><a class="el" href="recfilter__internals_8h_source.html">recfilter_internals.h</a></li>
+<li>lib/<a class="el" href="recfilter__internals_8h_source.html">recfilter_internals.h</a></li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->

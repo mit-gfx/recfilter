@@ -20,5 +20,6 @@ var modifiers_8h =
     [ "remove_lets", "modifiers_8h.html#ae43d0dbc43669018cc13975713f840a8", null ],
     [ "extract_buffer_calls", "modifiers_8h.html#a1d41d9e40c26e4fb6da20f5b973a1467", null ],
     [ "reassign_vartag_counts", "modifiers_8h.html#a866410e753cc1683988b2c69d0efa11b", null ],
-    [ "reassign_vartag_counts", "modifiers_8h.html#a17a8aeb4cd5257cfa19fa60a10cff72a", null ]
+    [ "reassign_vartag_counts", "modifiers_8h.html#a17a8aeb4cd5257cfa19fa60a10cff72a", null ],
+    [ "inline_function", "modifiers_8h.html#a67e1644a20d2857ac9de063ce05f7ec0", null ]
 ];

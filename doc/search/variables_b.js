@@ -1,7 +1,5 @@
 var searchData=
 [
-  ['target',['target',['../struct_rec_filter_contents.html#a75b11e454b36bdd75a2cad8112201f03',1,'RecFilterContents']]],
-  ['tile_5fwidth',['tile_width',['../struct_filter_info.html#a0c7106e219edeb6dc1aa4d3c41b1a73a',1,'FilterInfo']]],
-  ['tiled',['tiled',['../struct_rec_filter_contents.html#a0ceb50a66eb03f7982e525f3e7fb031d',1,'RecFilterContents']]],
-  ['type',['type',['../struct_rec_filter_contents.html#ade4ad8a8cf58db831e9cd7832669ce4a',1,'RecFilterContents']]]
+  ['scan_5fcausal',['scan_causal',['../struct_filter_info.html#aec0dfbc9e4f4052b2df972b3709079cc',1,'FilterInfo']]],
+  ['scan_5fid',['scan_id',['../struct_filter_info.html#a3eeccf61ca4c83f00d2697224e018206',1,'FilterInfo']]]
 ];

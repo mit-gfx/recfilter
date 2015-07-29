@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.6"/>
-<title>RecursiveFilter: modifiers.h File Reference</title>
+<title>RecFilter: lib/modifiers.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -29,7 +29,7 @@
  <tbody>
  <tr style="height: 56px;">
   <td style="padding-left: 0.5em;">
-   <div id="projectname">RecursiveFilter
+   <div id="projectname">RecFilter
    </div>
   </td>
  </tr>
@@ -44,6 +44,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
       <li class="current"><a href="files.html"><span>Files</span></a></li>
       <li>
@@ -90,7 +91,7 @@ $(document).ready(function(){initNavTree('modifiers_8h.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Data Structures</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerator</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Data Structures</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -171,11 +172,14 @@ Halide::Buffer &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class=
 <tr class="memdesc:a1d41d9e40c26e4fb6da20f5b973a1467"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extract the list of buffers called in the definition a function.  <a href="#a1d41d9e40c26e4fb6da20f5b973a1467">More...</a><br/></td></tr>
 <tr class="separator:a1d41d9e40c26e4fb6da20f5b973a1467"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a866410e753cc1683988b2c69d0efa11b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="modifiers_8h.html#a866410e753cc1683988b2c69d0efa11b">reassign_vartag_counts</a> (std::map&lt; std::string, <a class="el" href="class_var_tag.html">VarTag</a> &gt; &amp;var_tags, std::vector&lt; std::string &gt; args, std::map&lt; std::string, std::string &gt; var_splits)</td></tr>
-<tr class="memdesc:a866410e753cc1683988b2c69d0efa11b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Make sure that all vars with tags INNER, OUTER or FULL have <a class="el" href="class_var_tag.html" title="Scheduling tags for Function dimensions. ">VarTag</a> count in the same order as they appear in the function definition; this continuity was broken during tiling or by <a class="el" href="class_rec_filter_schedule.html#a81d0c77f7700a0e69b7940591b69ace8">RecFilterSchedule::split()</a>  <a href="#a866410e753cc1683988b2c69d0efa11b">More...</a><br/></td></tr>
+<tr class="memdesc:a866410e753cc1683988b2c69d0efa11b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Make sure that all vars with tags INNER, OUTER or FULL have <a class="el" href="class_var_tag.html" title="Scheduling tags for RecFilter function dimensions. ">VarTag</a> count in the same order as they appear in the function definition; this continuity was broken during tiling or by <a class="el" href="class_rec_filter_schedule.html#a81d0c77f7700a0e69b7940591b69ace8">RecFilterSchedule::split()</a>  <a href="#a866410e753cc1683988b2c69d0efa11b">More...</a><br/></td></tr>
 <tr class="separator:a866410e753cc1683988b2c69d0efa11b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a17a8aeb4cd5257cfa19fa60a10cff72a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="modifiers_8h.html#a17a8aeb4cd5257cfa19fa60a10cff72a">reassign_vartag_counts</a> (std::map&lt; std::string, <a class="el" href="class_var_tag.html">VarTag</a> &gt; &amp;var_tags, std::vector&lt; Halide::Expr &gt; args, std::map&lt; std::string, std::string &gt; var_splits)</td></tr>
-<tr class="memdesc:a17a8aeb4cd5257cfa19fa60a10cff72a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Make sure that all vars with tags INNER, OUTER or FULL have <a class="el" href="class_var_tag.html" title="Scheduling tags for Function dimensions. ">VarTag</a> count in the same order as they appear in the function definition; this continuity was broken during tiling or by <a class="el" href="class_rec_filter_schedule.html#a81d0c77f7700a0e69b7940591b69ace8">RecFilterSchedule::split()</a>  <a href="#a17a8aeb4cd5257cfa19fa60a10cff72a">More...</a><br/></td></tr>
+<tr class="memdesc:a17a8aeb4cd5257cfa19fa60a10cff72a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Make sure that all vars with tags INNER, OUTER or FULL have <a class="el" href="class_var_tag.html" title="Scheduling tags for RecFilter function dimensions. ">VarTag</a> count in the same order as they appear in the function definition; this continuity was broken during tiling or by <a class="el" href="class_rec_filter_schedule.html#a81d0c77f7700a0e69b7940591b69ace8">RecFilterSchedule::split()</a>  <a href="#a17a8aeb4cd5257cfa19fa60a10cff72a">More...</a><br/></td></tr>
 <tr class="separator:a17a8aeb4cd5257cfa19fa60a10cff72a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a67e1644a20d2857ac9de063ce05f7ec0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="modifiers_8h.html#a67e1644a20d2857ac9de063ce05f7ec0">inline_function</a> (Halide::Internal::Function f, std::vector&lt; Halide::Func &gt; func_list)</td></tr>
+<tr class="memdesc:a67e1644a20d2857ac9de063ce05f7ec0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Inline a pure function in a list of other functions.  <a href="#a67e1644a20d2857ac9de063ce05f7ec0">More...</a><br/></td></tr>
+<tr class="separator:a67e1644a20d2857ac9de063ce05f7ec0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Function Documentation</h2>
 <a class="anchor" id="a98a1f903c7f5f768bfb189ff344d223e"></a>
@@ -945,7 +949,7 @@ Halide::Buffer &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class=
       </table>
 </div><div class="memdoc">
 
-<p>Make sure that all vars with tags INNER, OUTER or FULL have <a class="el" href="class_var_tag.html" title="Scheduling tags for Function dimensions. ">VarTag</a> count in the same order as they appear in the function definition; this continuity was broken during tiling or by <a class="el" href="class_rec_filter_schedule.html#a81d0c77f7700a0e69b7940591b69ace8">RecFilterSchedule::split()</a> </p>
+<p>Make sure that all vars with tags INNER, OUTER or FULL have <a class="el" href="class_var_tag.html" title="Scheduling tags for RecFilter function dimensions. ">VarTag</a> count in the same order as they appear in the function definition; this continuity was broken during tiling or by <a class="el" href="class_rec_filter_schedule.html#a81d0c77f7700a0e69b7940591b69ace8">RecFilterSchedule::split()</a> </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramdir">[in,out]</td><td class="paramname">var_tags</td><td>list of variable tags to be modified </td></tr>
@@ -987,12 +991,47 @@ Halide::Buffer &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class=
       </table>
 </div><div class="memdoc">
 
-<p>Make sure that all vars with tags INNER, OUTER or FULL have <a class="el" href="class_var_tag.html" title="Scheduling tags for Function dimensions. ">VarTag</a> count in the same order as they appear in the function definition; this continuity was broken during tiling or by <a class="el" href="class_rec_filter_schedule.html#a81d0c77f7700a0e69b7940591b69ace8">RecFilterSchedule::split()</a> </p>
+<p>Make sure that all vars with tags INNER, OUTER or FULL have <a class="el" href="class_var_tag.html" title="Scheduling tags for RecFilter function dimensions. ">VarTag</a> count in the same order as they appear in the function definition; this continuity was broken during tiling or by <a class="el" href="class_rec_filter_schedule.html#a81d0c77f7700a0e69b7940591b69ace8">RecFilterSchedule::split()</a> </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramdir">[in,out]</td><td class="paramname">var_tags</td><td>list of variable tags to be modified </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">args</td><td>update definition args </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">var_splits</td><td>list of variables created by <a class="el" href="class_rec_filter_schedule.html#a81d0c77f7700a0e69b7940591b69ace8">RecFilterSchedule::split()</a> and the corresponding old variables for this update definition </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a class="anchor" id="a67e1644a20d2857ac9de063ce05f7ec0"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void inline_function </td>
+          <td>(</td>
+          <td class="paramtype">Halide::Internal::Function&#160;</td>
+          <td class="paramname"><em>f</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">std::vector&lt; Halide::Func &gt;&#160;</td>
+          <td class="paramname"><em>func_list</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Inline a pure function in a list of other functions. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">f</td><td>function to be inlined </td></tr>
+    <tr><td class="paramdir">[in,out]</td><td class="paramname">func_list</td><td>list of functions in which calls to first parameter must be inlined </td></tr>
   </table>
   </dd>
 </dl>
