@@ -179,16 +179,16 @@ vector<float> gaussian_weights(float sigma, int order) {
 Expr gaussian(Expr x, float mu, float sigma) {
     Expr xx = Internal::Cast::make(type_of<float>(),x);
     Expr y = (xx - mu) / sigma;
-    return Halide::fast_exp(-0.5*y*y) / (sigma * 2.50662827463);
+    return Halide::fast_exp(-0.5f*y*y) / (sigma * 2.50662827463f);
 }
 Expr gaussDerivative(Expr x, float mu, float sigma) {
     Expr xx = Internal::Cast::make(type_of<float>(),x);
     Expr y = (xx - mu) / sigma;
-    return (mu - xx) * Halide::fast_exp(-0.5*y*y) / (sigma*sigma*sigma * 2.50662827463);
+    return (mu - xx) * Halide::fast_exp(-0.5f*y*y) / (sigma*sigma*sigma * 2.50662827463f);
 }
 Expr gaussIntegral(Expr x, float mu, float sigma) {
     Expr xx = Internal::Cast::make(type_of<float>(),x);
-    return 0.5 * ( 1.0 + Halide::erf((xx-mu) / (sigma * 1.41421356237)) );
+    return 0.5f * ( 1.0f + Halide::erf((xx-mu) / (sigma * 1.41421356237f)) );
 }
 float gaussian(float x, float mu, float sigma) {
     float y = (x - mu) / sigma;
