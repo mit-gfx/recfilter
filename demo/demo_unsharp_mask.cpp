@@ -45,6 +45,8 @@ int main(int argc, char **argv) {
     RecFilter GaussianX;
     RecFilter GaussianY;
 
+    RecFilter::set_max_threads_per_cuda_warp(128);
+
     // some low pass blur
     {
         RecFilter S("Gaussian");
@@ -95,9 +97,9 @@ int main(int argc, char **argv) {
         USM.apply_bounds();
 
         // auto schedule for GPU
-        GaussianX.gpu_auto_schedule(128);
-        GaussianY.gpu_auto_schedule(128);
-        USM      .gpu_auto_schedule(128, 32);
+        GaussianX.gpu_auto_schedule();
+        GaussianY.gpu_auto_schedule();
+        USM      .gpu_auto_schedule(32);
     }
 
     // assemble channels again and save result

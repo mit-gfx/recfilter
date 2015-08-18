@@ -61,9 +61,10 @@ int main(int argc, char **argv) {
     USM(x,y) = (1.0f+weight)*image(x,y) - (weight)*fc[1](x,y);
 
     // auto schedule for GPU
-    fc[0].gpu_auto_schedule(128);
-    fc[1].gpu_auto_schedule(128);
-    USM  .gpu_auto_schedule(128, tile_width);
+    RecFilter::set_max_threads_per_cuda_warp(128);
+    fc[0].gpu_auto_schedule();
+    fc[1].gpu_auto_schedule();
+    USM  .gpu_auto_schedule(tile_width);
 
     USM.profile(iter);
 

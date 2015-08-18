@@ -92,6 +92,12 @@ RecFilterDimAndCausality operator-(RecFilterDim x);
 class RecFilter {
 private:
 
+    /** Maximum threads to launch per CUDA warp, global constant required for GPU targets */
+    static int max_threads_per_cuda_warp;
+
+    /** Vectorization width, global constant global constant required for CPU targets */
+    static int vectorization_width;
+
     /** Data members of the recursive filter */
     Halide::Internal::IntrusivePtr<RecFilterContents> contents;
 
@@ -371,30 +377,25 @@ public:
     /**@name Automatic scheduling for GPU targets */
     // {@
     /** Automatic GPU schedule for non-tiled filter and return a handle for additional scheduling
-     * \param max_threads maximum threads in a CUDA warp
-     * \param tile_width  tiling factor to split non-tiled dimensions into CUDA blocks and CUDA tiles
+     * \param tile_width tiling factor to split non-tiled dimensions into CUDA blocks and CUDA tiles
      */
-    void gpu_auto_full_schedule(int max_threads, int tile_width=32);
+    void gpu_auto_full_schedule(int tile_width=32);
 
     /** Automatic GPU schedule for tiled or non-tiled recursive filter;
      * calls RecFilter::gpu_auto_full_schedule(),
      * RecFilter::gpu_auto_intra_schedule() and
      * RecFilter::gpu_auto_inter_schedule().
-     * \param max_threads maximum threads in a CUDA warp
      * \param tile_width  tiling factor to non-tiled full dimensions into CUDA blocks and CUDA tiles (only used if filter is not tiled)
      */
-    void gpu_auto_schedule(int max_threads, int tile_width=32);
+    void gpu_auto_schedule(int tile_width=32);
 
-    /** Automatic GPU schedule for inter-tile functions of tiled filter
-     * \param max_threads maximum threads in a CUDA warp
-     */
-    void gpu_auto_inter_schedule(int max_threads);
+    /** Automatic GPU schedule for inter-tile functions of tiled filter */
+    void gpu_auto_inter_schedule(void);
 
     /** Automatic GPU schedule for intra-tile functions if tiled filter
      * \param id 0 for all intra tile functions, 1 for nD intra-tile functions, otherwise 1D intra-tile functions
-     * \param max_threads maximum threads in a CUDA warp
      */
-    void gpu_auto_intra_schedule(int id, int max_threads);
+    void gpu_auto_intra_schedule(int id);
     // @}
 
     /**@name Automatic scheduling for CPU targets */
@@ -404,24 +405,17 @@ public:
      * calls RecFilter::cpu_auto_full_schedule(),
      * RecFilter::cpu_auto_intra_schedule() and
      * RecFilter::cpu_auto_inter_schedule().
-     * \param vector_width vectorization width of the target platform
      */
-    void cpu_auto_schedule(int vector_width);
+    void cpu_auto_schedule(void);
 
-    /** Automatic CPU schedule for non-tiled filter
-     * \param vector_width vectorization width of the target platform
-     */
-    void cpu_auto_full_schedule(int vector_width);
+    /** Automatic CPU schedule for non-tiled filter */
+    void cpu_auto_full_schedule(void);
 
-    /** Automatic CPU schedule for inter-tile functions of tiled filter
-     * \param vector_width vectorization width of the target platform
-     */
-    void cpu_auto_inter_schedule(int vector_width);
+    /** Automatic CPU schedule for inter-tile functions of tiled filter */
+    void cpu_auto_inter_schedule(void);
 
-    /** Automatic CPU schedule for intra-tile functions if tiled filter
-     * \param vector_width vectorization width of the target platform
-     */
-    void cpu_auto_intra_schedule(int vector_width);
+    /** Automatic CPU schedule for intra-tile functions if tiled filter */
+    void cpu_auto_intra_schedule(void);
     // @}
 
     /** @name Generic handles to write schedules for dimensions of internal functions */
@@ -443,6 +437,16 @@ public:
     std::string print_synopsis (void) const;
     std::string print_schedule (void) const;
     std::string print_hl_code  (void) const;
+    // @}
+
+    /**@name Global constants for scheduling */
+    // {@
+
+    /** Set the maximum threads to launch per CUDA warp, must be called before scheduling the RecFilter object */
+    static void set_max_threads_per_cuda_warp(int v);
+
+    /** Set the vectorization width, must be called before scheduling the RecFilter object */
+    static void set_vectorization_width(int v);
     // @}
 
 protected:

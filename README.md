@@ -32,10 +32,6 @@ $(RECFILTER_DIR)
 
 
 ### TODO list:
-- Change number of threads to a global constant instead of specifying
-  it for each auto GPU scheduling command.
-- Change vectorization width to a global constant instead of specifying
-  it for each auto CPU scheduling command.
 - Allow initializing ``RecFilter`` from another ``RecFilter`` directly, i.e.
 allow ``R(x,y) = S(x,y)``, currently this is done using ``R(x,y) = S.as_func()(x,y)``.
 - Provide better interoperability between ``Halide::Var`` and ``RecFilter::RecFilterDim``.

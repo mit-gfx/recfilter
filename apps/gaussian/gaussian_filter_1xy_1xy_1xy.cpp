@@ -55,8 +55,9 @@ int main(int argc, char **argv) {
 
     for (size_t k=0; k<fc.size(); k++) {
         RecFilter f = fc[k];
+        RecFilter::set_max_threads_per_cuda_warp(128);
         f.split_all_dimensions(tile_width);
-        f.gpu_auto_schedule(128);
+        f.gpu_auto_schedule();
     }
 
     fc[fc.size()-1].profile(iter);

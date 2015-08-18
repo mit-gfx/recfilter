@@ -40,6 +40,8 @@ int main(int argc, char **argv) {
     RecFilter GaussianX;
     RecFilter GaussianY;
 
+    RecFilter::set_max_threads_per_cuda_warp(128);
+
     // perform the Gaussian blur
     {
         RecFilter S("Gaussian");
@@ -66,8 +68,8 @@ int main(int argc, char **argv) {
         GaussianX.split_all_dimensions(32);
         GaussianY.split_all_dimensions(32);
 
-        GaussianX.gpu_auto_schedule(128);
-        GaussianY.gpu_auto_schedule(128);
+        GaussianX.gpu_auto_schedule();
+        GaussianY.gpu_auto_schedule();
     }
 
     // assemble channels again and save result
