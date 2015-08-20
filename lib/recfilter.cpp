@@ -221,7 +221,7 @@ void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
         s.var          = pure_args[i].var();
 
         // extent and domain of all scans in this dimension
-        s.image_width = pure_args[i].extent();
+        s.image_width = pure_args[i].num_pixels();
         s.tile_width  = s.image_width;
         s.rdom        = RDom(0, s.image_width, unique_name("r"+s.var.name()));
 

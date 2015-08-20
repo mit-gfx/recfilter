@@ -30,6 +30,39 @@ enum FunctionTag : int;
 
 // ----------------------------------------------------------------------------
 
+/**@name Dimensions for defining a recursive filter */
+// {@
+
+// /** Filter dimension for channels */
+// class RecFilterChannel {
+// private:
+//     Halide::Var v;  ///< variable for the dimension
+//     int         e;  ///< number of channels
+//
+// public:
+//     /** Empty constructor */
+//     RecFilterChannel(void) {}
+//
+//     /** Constructor
+//      * @param var_name name of dimension
+//      * @param num_channels number of channels
+//      */
+//     RecFilterChannel(std::string var_name, int num_channels):
+//         v(var_name), e(num_channels) {}
+//
+//     /** Convert into Halide::Var for interoperability with Halide code */
+//     Halide::Var var(void) const { return v; }
+//
+//     /** Number of channels traversed by this dimension */
+//     int num_channels(void) const { return e; }
+//
+//     /** Express as Halide::Expr so that it can be used to index other Halide
+//      * functions and buffers */
+//     operator Halide::Expr(void) {
+//         return Halide::Internal::Variable::make(Halide::Int(32), v.name());
+//     }
+// };
+
 
 /** Filter dimension with variable name and width of image in the dimension */
 class RecFilterDim {
@@ -38,12 +71,21 @@ private:
     int         e;  ///< size of input/output buffer in the dimension
 
 public:
+    /** Empty constructor */
     RecFilterDim(void) {}
+
+    /** Constructor
+     * @param var_name name of dimension
+     * @param var_extent size of dimension, i.e. image width or height
+     */
     RecFilterDim(std::string var_name, int var_extent):
         v(var_name), e(var_extent) {}
 
-    Halide::Var  var   (void) const { return v; }
-    int          extent(void) const { return e; }
+    /** Convert into Halide::Var for interoperability with Halide code */
+    Halide::Var var(void) const { return v; }
+
+    /** Size of input/output buffer indexed by this dimension */
+    int num_pixels(void) const { return e; }
 
     /** Express as Halide::Expr so that it can be used to index other Halide
      * functions and buffers */
@@ -59,13 +101,24 @@ private:
     bool         c; ///< causality
 
 public:
+    /** Empty constructor */
     RecFilterDimAndCausality(void) {}
+
+    /** Constructor
+     * @param rec_var RecFilterDim object
+     * @param causal causality of the dimension
+     */
     RecFilterDimAndCausality(RecFilterDim rec_var, bool causal):
         r(rec_var), c(causal) {}
 
-    Halide::Var  var   (void) const { return r.var();    }
-    int          extent(void) const { return r.extent(); }
-    bool         causal(void) const { return c;          }
+    /** Convert into Halide::Var for interoperability with Halide code */
+    Halide::Var var(void) const { return r.var(); }
+
+    /** Size of input/output buffer indexed by this dimension */
+    int num_pixels(void) const { return r.num_pixels(); }
+
+    /** Causality of the dimension */
+    bool causal(void) const { return c; }
 
     /** Express as Halide::Expr so that it can be used to index other Halide
      * functions and buffers */
@@ -73,8 +126,9 @@ public:
         return Halide::Internal::Variable::make(Halide::Int(32), r.var().name());
     }
 };
+// @}
 
-/** Operators to indicate causal and anticausal scans in a particular filter dimension */
+/**@name Operators to indicate causal and anticausal scans in a particular filter dimension */
 // {@
 /** Operator to create causal scan indication, +x indicates causal scan where
  * x is a RecFilterDim object */
@@ -467,10 +521,13 @@ private:
     std::map<int,std::vector<Halide::VarOrRVar> > var_list_by_tag(RecFilterFunc f, VarTag vtag);
     std::map<int,Halide::VarOrRVar> var_by_tag(RecFilterFunc f, VarTag vtag);
 
-public:
-    bool empty(void);
     bool contains_vars_with_tag(VarTag vtag);
 
+protected:
+    bool empty(void);
+    friend class RecFilter;
+
+public:
     RecFilterSchedule(RecFilter& r, std::vector<std::string> fl);
 
     RecFilterSchedule& compute_globally(void);
