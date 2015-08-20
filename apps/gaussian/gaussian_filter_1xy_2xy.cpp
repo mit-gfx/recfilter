@@ -61,7 +61,8 @@ int main(int argc, char **argv) {
         if (nosched) {
             manual_schedule(f);
         } else {
-            f.gpu_auto_schedule(128);
+            RecFilter::set_max_threads_per_cuda_warp(128);
+            f.gpu_auto_schedule();
         }
     }
 

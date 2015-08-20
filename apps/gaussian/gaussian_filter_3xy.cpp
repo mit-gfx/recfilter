@@ -50,7 +50,8 @@ int main(int argc, char **argv) {
     if (nosched) {
         manual_schedule(F);
     } else {
-        F.gpu_auto_schedule(128);
+        RecFilter::set_max_threads_per_cuda_warp(128);
+        F.gpu_auto_schedule();
     }
 
     F.profile(iter);

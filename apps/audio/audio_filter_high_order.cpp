@@ -45,6 +45,8 @@ int main(int argc, char **argv) {
 
         int vector_width = 8;
 
+        RecFilter::set_vectorization_width(vector_width);
+
         RecFilterDim x("x", width);
 
         // non-tiled implementation
@@ -55,7 +57,7 @@ int main(int argc, char **argv) {
             if (nosched) {
                 F.as_func().compute_root();
             } else {
-                F.cpu_auto_schedule(vector_width);
+                F.cpu_auto_schedule();
             }
             time_naive.push_back(F.profile(iterations));
         }
@@ -71,7 +73,7 @@ int main(int argc, char **argv) {
                 F.intra_schedule().compute_locally() .vectorize(F.inner(0),vector_width).parallel(F.outer(0));
                 F.inter_schedule().compute_globally().vectorize(F.inner(0),vector_width);
             } else {
-                F.cpu_auto_schedule(vector_width);
+                F.cpu_auto_schedule();
             }
 
             time_tiled.push_back(F.profile(iterations));

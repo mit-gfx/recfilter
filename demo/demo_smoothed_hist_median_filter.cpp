@@ -92,9 +92,11 @@ int main(int argc, char **argv) {
         median_rgb.push_back(median);
     }
 
+    RecFilter::set_max_threads_per_cuda_warp(128);
+
     RecFilter Median("Median");
     Median(x,y) = median_rgb;
-    Median.gpu_auto_schedule(128, 32);
+    Median.gpu_auto_schedule(32);
 
     // assemble channels again and save result
     // should also be done on the GPU
@@ -134,8 +136,8 @@ Func smooth(Func I, RecFilterDim x, RecFilterDim y, float sigma) {
 
     fc[0].split_all_dimensions(32);     // tile width = 32
     fc[1].split_all_dimensions(32);
-    fc[0].gpu_auto_schedule(128);       // max threads per CUDA tile = 128
-    fc[1].gpu_auto_schedule(128);
+    fc[0].gpu_auto_schedule();          // max threads per CUDA tile = 128
+    fc[1].gpu_auto_schedule();
 
     return fc[1].as_func();
 }

@@ -64,7 +64,7 @@ RecFilter box_filter_order_1(Image<float> I, int width, int height, int B, int t
     // schedule for the recursive filters
 
     if (autoschedule) {
-        F.gpu_auto_schedule(128);
+        F.gpu_auto_schedule();
     }
     else {
         int n_scans  = 2;
@@ -171,8 +171,8 @@ RecFilter box_filter_order_2(Func I, int width, int height, int B, int tile_widt
     // schedule for the recursive filters
 
     if (autoschedule) {
-        sat_x.gpu_auto_schedule(128);
-        sat_y.gpu_auto_schedule(128);
+        sat_x.gpu_auto_schedule();
+        sat_y.gpu_auto_schedule();
     }
     else {
         int ws       = 32;

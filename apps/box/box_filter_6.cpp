@@ -37,6 +37,8 @@ int main(int argc, char **argv) {
     Func b0;
     b0(x,y) = in_image(x,y);
 
+    RecFilter::set_max_threads_per_cuda_warp(128);
+
     RecFilter b1 = box_filter_order_2(b0,           width, height, B, tile_width, !nosched);
     RecFilter b2 = box_filter_order_2(b1.as_func(), width, height, B, tile_width, !nosched);
     RecFilter b3 = box_filter_order_2(b2.as_func(), width, height, B, tile_width, !nosched);

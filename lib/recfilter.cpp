@@ -33,12 +33,37 @@ using namespace Halide::Internal;
 
 // -----------------------------------------------------------------------------
 
+int RecFilter::max_threads_per_cuda_warp = 0;
+int RecFilter::vectorization_width       = 0;
+
+void RecFilter::set_max_threads_per_cuda_warp(int v) {
+    if (v%32 == 0) {
+        max_threads_per_cuda_warp = v;
+    } else {
+        cerr << "RecFilter::set_max_threads_per_cuda_warp(): max "
+                "threads in CUDA warp must be a multiple of 32" << endl;
+        assert(false);
+    }
+}
+
+void RecFilter::set_vectorization_width(int v) {
+    if (v==1 || v==2 || v==4 || v==8 || v==16 || v==32 || v==64) {
+        vectorization_width = v;
+    } else {
+        cerr << "RecFilter::set_vectorization_width(): vectorization width "
+             << "must be a power of 2, 4, 8, 16, 32 or 64" << endl;
+        assert(false);
+    }
+}
+
+// -----------------------------------------------------------------------------
+
 RecFilterRefVar::RecFilterRefVar(RecFilter r, std::vector<RecFilterDim> a) :
     rf(r), args(a) {}
 
-void RecFilterRefVar::operator=(Expr pure_def) {
-    rf.define(args, { pure_def });
-}
+    void RecFilterRefVar::operator=(Expr pure_def) {
+        rf.define(args, { pure_def });
+    }
 
 void RecFilterRefVar::operator=(const Tuple &pure_def) {
     rf.define(args, pure_def.as_vector());
@@ -196,7 +221,7 @@ void RecFilter::define(vector<RecFilterDim> pure_args, vector<Expr> pure_def) {
         s.var          = pure_args[i].var();
 
         // extent and domain of all scans in this dimension
-        s.image_width = pure_args[i].extent();
+        s.image_width = pure_args[i].num_pixels();
         s.tile_width  = s.image_width;
         s.rdom        = RDom(0, s.image_width, unique_name("r"+s.var.name()));
 
@@ -549,19 +574,26 @@ void RecFilter::compute_at(Func external, Var looplevel) {
 
 // -----------------------------------------------------------------------------
 
-void RecFilter::cpu_auto_schedule(int vector_width) {
+void RecFilter::cpu_auto_schedule(void) {
     if (contents.ptr->tiled) {
-        cpu_auto_intra_schedule(vector_width);
-        cpu_auto_inter_schedule(vector_width);
+        cpu_auto_intra_schedule();
+        cpu_auto_inter_schedule();
     } else {
-        cpu_auto_full_schedule(vector_width);
+        cpu_auto_full_schedule();
     }
 }
 
-void RecFilter::cpu_auto_full_schedule(int vector_width) {
+void RecFilter::cpu_auto_full_schedule(void) {
     if (contents.ptr->tiled) {
         cerr << "Filter is tiled, use RecFilter::cpu_auto_intra_schedule() "
             << "and RecFilter::cpu_auto_inter_schedule()\n" << endl;
+        assert(false);
+    }
+
+    int vector_width = RecFilter::vectorization_width;
+    if (vector_width<=0) {
+        cerr << "Use RecFilter::set_vectorization_width() to specify "
+             << "the CPU target's native SSE width" << endl;
         assert(false);
     }
 
@@ -575,9 +607,16 @@ void RecFilter::cpu_auto_full_schedule(int vector_width) {
         .parallel(full());                  // TODO: only parallelize outermost, not all
 }
 
-void RecFilter::cpu_auto_intra_schedule(int vector_width) {
+void RecFilter::cpu_auto_intra_schedule(void) {
     if (!contents.ptr->tiled) {
         cerr << "Filter is not tiled, use RecFilter::cpu_auto_full_schedule()\n" << endl;
+        assert(false);
+    }
+
+    int vector_width = RecFilter::vectorization_width;
+    if (vector_width<=0) {
+        cerr << "Use RecFilter::set_vectorization_width() to specify "
+             << "the CPU target's native SSE width" << endl;
         assert(false);
     }
 
@@ -603,9 +642,16 @@ void RecFilter::cpu_auto_intra_schedule(int vector_width) {
         .parallel(outer());                          // TODO: only parallelize outermost
 }
 
-void RecFilter::cpu_auto_inter_schedule(int vector_width) {
+void RecFilter::cpu_auto_inter_schedule(void) {
     if (!contents.ptr->tiled) {
         cerr << "Filter is not tiled, use RecFilter::cpu_auto_full_schedule()\n" << endl;
+        assert(false);
+    }
+
+    int vector_width = RecFilter::vectorization_width;
+    if (vector_width<=0) {
+        cerr << "Use RecFilter::set_vectorization_width() to specify "
+             << "the CPU target's native SSE width" << endl;
         assert(false);
     }
 
@@ -633,20 +679,27 @@ void RecFilter::cpu_auto_inter_schedule(int vector_width) {
 
 // -----------------------------------------------------------------------------
 
-void RecFilter::gpu_auto_schedule(int max_threads, int tile_width) {
+void RecFilter::gpu_auto_schedule(int tile_width) {
     if (contents.ptr->tiled) {
-        gpu_auto_intra_schedule(1,max_threads);
-        gpu_auto_intra_schedule(2,max_threads);
-        gpu_auto_inter_schedule(max_threads);
+        gpu_auto_intra_schedule(1);
+        gpu_auto_intra_schedule(2);
+        gpu_auto_inter_schedule();
     } else {
-        gpu_auto_full_schedule(max_threads, tile_width);
+        gpu_auto_full_schedule(tile_width);
     }
 }
 
-void RecFilter::gpu_auto_full_schedule(int max_threads, int tile_width) {
+void RecFilter::gpu_auto_full_schedule(int tile_width) {
     if (contents.ptr->tiled) {
         cerr << "Filter is tiled, use RecFilter::gpu_auto_intra_schedule() "
              << "and RecFilter::gpu_auto_inter_schedule()\n" << endl;
+        assert(false);
+    }
+
+    int max_threads = RecFilter::max_threads_per_cuda_warp;
+    if (max_threads<=0) {
+        cerr << "Use RecFilter::set_max_threads_per_cuda_warp() to specify the "
+             << "maximum number of threads in each CUDA warp" << endl;
         assert(false);
     }
 
@@ -672,7 +725,7 @@ void RecFilter::gpu_auto_full_schedule(int max_threads, int tile_width) {
         .gpu_blocks(outer(0), outer(1), outer(2));
 }
 
-void RecFilter::gpu_auto_inter_schedule(int max_threads) {
+void RecFilter::gpu_auto_inter_schedule(void) {
     if (!contents.ptr->tiled) {
         cerr << "Filter is not tiled, use RecFilter::gpu_auto_full_schedule()\n" << endl;
         assert(false);
@@ -680,6 +733,13 @@ void RecFilter::gpu_auto_inter_schedule(int max_threads) {
 
     if (contents.ptr->filter_info.size()>AUTO_SCHEDULE_MAX_DIMENSIONS) {
         cerr << "Auto schedules are not supported for more than " << AUTO_SCHEDULE_MAX_DIMENSIONS << " filter dimensions" << endl;
+        assert(false);
+    }
+
+    int max_threads = RecFilter::max_threads_per_cuda_warp;
+    if (max_threads<=0) {
+        cerr << "Use RecFilter::set_max_threads_per_cuda_warp() to specify the "
+             << "maximum number of threads in each CUDA warp" << endl;
         assert(false);
     }
 
@@ -725,7 +785,7 @@ void RecFilter::gpu_auto_inter_schedule(int max_threads) {
         .gpu_blocks (bx, by);
 }
 
-void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
+void RecFilter::gpu_auto_intra_schedule(int id) {
     if (!contents.ptr->tiled) {
         cerr << "Filter is not tiled, use RecFilter::gpu_auto_full_schedule()\n" << endl;
         assert(false);
@@ -733,6 +793,13 @@ void RecFilter::gpu_auto_intra_schedule(int id, int max_threads) {
 
     if (contents.ptr->filter_info.size()>AUTO_SCHEDULE_MAX_DIMENSIONS) {
         cerr << "Auto schedules are not supported for more than " << AUTO_SCHEDULE_MAX_DIMENSIONS << " filter dimensions" << endl;
+        assert(false);
+    }
+
+    int max_threads = RecFilter::max_threads_per_cuda_warp;
+    if (max_threads<=0) {
+        cerr << "Use RecFilter::set_max_threads_per_cuda_warp() to specify the "
+             << "maximum number of threads in each CUDA warp" << endl;
         assert(false);
     }
 

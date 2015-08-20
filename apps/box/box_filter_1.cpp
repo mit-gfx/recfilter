@@ -32,6 +32,8 @@ int main(int argc, char **argv) {
         }
     }
 
+    RecFilter::set_max_threads_per_cuda_warp(128);
+
     RecFilter b1 = box_filter_order_1(I, width, height, B, tile_width, !nosched);
 
     b1.profile(iter);

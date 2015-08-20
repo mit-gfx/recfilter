@@ -112,13 +112,15 @@ int main(int argc, char** argv) {
     // -------------------------------------------------------------------------
     // schedules
 
-    SAT  .gpu_auto_schedule(128);
-    SAT2x.gpu_auto_schedule(128);
-    SAT2y.gpu_auto_schedule(128);
+    RecFilter::set_max_threads_per_cuda_warp(128);
 
-    Box1 .gpu_auto_schedule(128, tile_width);
-    Box2x.gpu_auto_schedule(128, tile_width);
-    DoG  .gpu_auto_schedule(128, tile_width);
+    SAT  .gpu_auto_schedule();
+    SAT2x.gpu_auto_schedule();
+    SAT2y.gpu_auto_schedule();
+
+    Box1 .gpu_auto_schedule(tile_width);
+    Box2x.gpu_auto_schedule(tile_width);
+    DoG  .gpu_auto_schedule(tile_width);
 
     // -------------------------------------------------------------------------
     // compile and profile

@@ -30,6 +30,39 @@ enum FunctionTag : int;
 
 // ----------------------------------------------------------------------------
 
+/**@name Dimensions for defining a recursive filter */
+// {@
+
+// /** Filter dimension for channels */
+// class RecFilterChannel {
+// private:
+//     Halide::Var v;  ///< variable for the dimension
+//     int         e;  ///< number of channels
+//
+// public:
+//     /** Empty constructor */
+//     RecFilterChannel(void) {}
+//
+//     /** Constructor
+//      * @param var_name name of dimension
+//      * @param num_channels number of channels
+//      */
+//     RecFilterChannel(std::string var_name, int num_channels):
+//         v(var_name), e(num_channels) {}
+//
+//     /** Convert into Halide::Var for interoperability with Halide code */
+//     Halide::Var var(void) const { return v; }
+//
+//     /** Number of channels traversed by this dimension */
+//     int num_channels(void) const { return e; }
+//
+//     /** Express as Halide::Expr so that it can be used to index other Halide
+//      * functions and buffers */
+//     operator Halide::Expr(void) {
+//         return Halide::Internal::Variable::make(Halide::Int(32), v.name());
+//     }
+// };
+
 
 /** Filter dimension with variable name and width of image in the dimension */
 class RecFilterDim {
@@ -38,12 +71,21 @@ private:
     int         e;  ///< size of input/output buffer in the dimension
 
 public:
+    /** Empty constructor */
     RecFilterDim(void) {}
+
+    /** Constructor
+     * @param var_name name of dimension
+     * @param var_extent size of dimension, i.e. image width or height
+     */
     RecFilterDim(std::string var_name, int var_extent):
         v(var_name), e(var_extent) {}
 
-    Halide::Var  var   (void) const { return v; }
-    int          extent(void) const { return e; }
+    /** Convert into Halide::Var for interoperability with Halide code */
+    Halide::Var var(void) const { return v; }
+
+    /** Size of input/output buffer indexed by this dimension */
+    int num_pixels(void) const { return e; }
 
     /** Express as Halide::Expr so that it can be used to index other Halide
      * functions and buffers */
@@ -59,13 +101,24 @@ private:
     bool         c; ///< causality
 
 public:
+    /** Empty constructor */
     RecFilterDimAndCausality(void) {}
+
+    /** Constructor
+     * @param rec_var RecFilterDim object
+     * @param causal causality of the dimension
+     */
     RecFilterDimAndCausality(RecFilterDim rec_var, bool causal):
         r(rec_var), c(causal) {}
 
-    Halide::Var  var   (void) const { return r.var();    }
-    int          extent(void) const { return r.extent(); }
-    bool         causal(void) const { return c;          }
+    /** Convert into Halide::Var for interoperability with Halide code */
+    Halide::Var var(void) const { return r.var(); }
+
+    /** Size of input/output buffer indexed by this dimension */
+    int num_pixels(void) const { return r.num_pixels(); }
+
+    /** Causality of the dimension */
+    bool causal(void) const { return c; }
 
     /** Express as Halide::Expr so that it can be used to index other Halide
      * functions and buffers */
@@ -73,8 +126,9 @@ public:
         return Halide::Internal::Variable::make(Halide::Int(32), r.var().name());
     }
 };
+// @}
 
-/** Operators to indicate causal and anticausal scans in a particular filter dimension */
+/**@name Operators to indicate causal and anticausal scans in a particular filter dimension */
 // {@
 /** Operator to create causal scan indication, +x indicates causal scan where
  * x is a RecFilterDim object */
@@ -91,6 +145,12 @@ RecFilterDimAndCausality operator-(RecFilterDim x);
 /** Recursive filter class */
 class RecFilter {
 private:
+
+    /** Maximum threads to launch per CUDA warp, global constant required for GPU targets */
+    static int max_threads_per_cuda_warp;
+
+    /** Vectorization width, global constant global constant required for CPU targets */
+    static int vectorization_width;
 
     /** Data members of the recursive filter */
     Halide::Internal::IntrusivePtr<RecFilterContents> contents;
@@ -371,30 +431,25 @@ public:
     /**@name Automatic scheduling for GPU targets */
     // {@
     /** Automatic GPU schedule for non-tiled filter and return a handle for additional scheduling
-     * \param max_threads maximum threads in a CUDA warp
-     * \param tile_width  tiling factor to split non-tiled dimensions into CUDA blocks and CUDA tiles
+     * \param tile_width tiling factor to split non-tiled dimensions into CUDA blocks and CUDA tiles
      */
-    void gpu_auto_full_schedule(int max_threads, int tile_width=32);
+    void gpu_auto_full_schedule(int tile_width=32);
 
     /** Automatic GPU schedule for tiled or non-tiled recursive filter;
      * calls RecFilter::gpu_auto_full_schedule(),
      * RecFilter::gpu_auto_intra_schedule() and
      * RecFilter::gpu_auto_inter_schedule().
-     * \param max_threads maximum threads in a CUDA warp
      * \param tile_width  tiling factor to non-tiled full dimensions into CUDA blocks and CUDA tiles (only used if filter is not tiled)
      */
-    void gpu_auto_schedule(int max_threads, int tile_width=32);
+    void gpu_auto_schedule(int tile_width=32);
 
-    /** Automatic GPU schedule for inter-tile functions of tiled filter
-     * \param max_threads maximum threads in a CUDA warp
-     */
-    void gpu_auto_inter_schedule(int max_threads);
+    /** Automatic GPU schedule for inter-tile functions of tiled filter */
+    void gpu_auto_inter_schedule(void);
 
     /** Automatic GPU schedule for intra-tile functions if tiled filter
      * \param id 0 for all intra tile functions, 1 for nD intra-tile functions, otherwise 1D intra-tile functions
-     * \param max_threads maximum threads in a CUDA warp
      */
-    void gpu_auto_intra_schedule(int id, int max_threads);
+    void gpu_auto_intra_schedule(int id);
     // @}
 
     /**@name Automatic scheduling for CPU targets */
@@ -404,24 +459,17 @@ public:
      * calls RecFilter::cpu_auto_full_schedule(),
      * RecFilter::cpu_auto_intra_schedule() and
      * RecFilter::cpu_auto_inter_schedule().
-     * \param vector_width vectorization width of the target platform
      */
-    void cpu_auto_schedule(int vector_width);
+    void cpu_auto_schedule(void);
 
-    /** Automatic CPU schedule for non-tiled filter
-     * \param vector_width vectorization width of the target platform
-     */
-    void cpu_auto_full_schedule(int vector_width);
+    /** Automatic CPU schedule for non-tiled filter */
+    void cpu_auto_full_schedule(void);
 
-    /** Automatic CPU schedule for inter-tile functions of tiled filter
-     * \param vector_width vectorization width of the target platform
-     */
-    void cpu_auto_inter_schedule(int vector_width);
+    /** Automatic CPU schedule for inter-tile functions of tiled filter */
+    void cpu_auto_inter_schedule(void);
 
-    /** Automatic CPU schedule for intra-tile functions if tiled filter
-     * \param vector_width vectorization width of the target platform
-     */
-    void cpu_auto_intra_schedule(int vector_width);
+    /** Automatic CPU schedule for intra-tile functions if tiled filter */
+    void cpu_auto_intra_schedule(void);
     // @}
 
     /** @name Generic handles to write schedules for dimensions of internal functions */
@@ -445,6 +493,16 @@ public:
     std::string print_hl_code  (void) const;
     // @}
 
+    /**@name Global constants for scheduling */
+    // {@
+
+    /** Set the maximum threads to launch per CUDA warp, must be called before scheduling the RecFilter object */
+    static void set_max_threads_per_cuda_warp(int v);
+
+    /** Set the vectorization width, must be called before scheduling the RecFilter object */
+    static void set_vectorization_width(int v);
+    // @}
+
 protected:
     /** Allow scheduler access to internal functions; only needed to append the
      * scheduling commands to each RecFilterFunc::schedule for debugging purposes */
@@ -463,10 +521,13 @@ private:
     std::map<int,std::vector<Halide::VarOrRVar> > var_list_by_tag(RecFilterFunc f, VarTag vtag);
     std::map<int,Halide::VarOrRVar> var_by_tag(RecFilterFunc f, VarTag vtag);
 
-public:
-    bool empty(void);
     bool contains_vars_with_tag(VarTag vtag);
 
+protected:
+    bool empty(void);
+    friend class RecFilter;
+
+public:
     RecFilterSchedule(RecFilter& r, std::vector<std::string> fl);
 
     RecFilterSchedule& compute_globally(void);
