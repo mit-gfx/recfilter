@@ -1,5 +1,7 @@
 var NAVTREEINDEX1 =
 {
+"recfilter__internals_8h.html":[2,0,0,4],
+"recfilter__internals_8h.html#a049dfc57e69b671dcdf61868e63e1ee4":[2,0,0,4,16],
 "recfilter__internals_8h.html#a1bd791f96ae660e742a883807c6ee65a":[2,0,0,4,11],
 "recfilter__internals_8h.html#a24f4ff81b72a8fccb3a70152a21bc063":[2,0,0,4,5],
 "recfilter__internals_8h.html#a24f4ff81b72a8fccb3a70152a21bc063a1530ce0729d9b8c90e3f90fd0b009d44":[2,0,0,4,5,9],

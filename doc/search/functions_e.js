@@ -2,6 +2,8 @@ var searchData=
 [
   ['same_5fexcept_5fcount',['same_except_count',['../class_var_tag.html#ab8473dfe32da95c831b7c1fce62314d4',1,'VarTag']]],
   ['set_5fclamped_5fimage_5fborder',['set_clamped_image_border',['../class_rec_filter.html#a743a239a5c3668859936751b029bc468',1,'RecFilter']]],
+  ['set_5fmax_5fthreads_5fper_5fcuda_5fwarp',['set_max_threads_per_cuda_warp',['../class_rec_filter.html#a05efc6ae9b4231ff277ee2e0d414abd3',1,'RecFilter']]],
+  ['set_5fvectorization_5fwidth',['set_vectorization_width',['../class_rec_filter.html#a53f974ca8501269fede3fd18ffb09ad2',1,'RecFilter']]],
   ['split',['split',['../class_rec_filter.html#a9e4e6144a8ca33c281ddb9b1afedc57e',1,'RecFilter::split(RecFilterDim x, int tx)'],['../class_rec_filter.html#a26a0ae3a383f221db2b20bb6c5055edd',1,'RecFilter::split(RecFilterDim x, int tx, RecFilterDim y, int ty)'],['../class_rec_filter.html#a3f92df46549b11e387cfa2e19cdb1da2',1,'RecFilter::split(RecFilterDim x, int tx, RecFilterDim y, int ty, RecFilterDim z, int tz)'],['../class_rec_filter.html#a7f6a9ed94a44eb190ec8f8fcb989f5c9',1,'RecFilter::split(std::map&lt; std::string, int &gt; dims)'],['../class_rec_filter_schedule.html#a81d0c77f7700a0e69b7940591b69ace8',1,'RecFilterSchedule::split(VarTag v, int factor)'],['../class_rec_filter_schedule.html#ad197b96acbab9c0e602d1d43fcb54b6d',1,'RecFilterSchedule::split(VarTag v, int factor, VarTag vin)'],['../class_rec_filter_schedule.html#a6e41c8f3f8e123fa18db4f9deeaf80ed',1,'RecFilterSchedule::split(VarTag v, int factor, VarTag vin, VarTag vout)']]],
   ['split_5fall_5fdimensions',['split_all_dimensions',['../class_rec_filter.html#aeacd059770a9578ad0242f5072450cc4',1,'RecFilter']]],
   ['split_5fvar',['split_var',['../class_var_tag.html#aebf138693811564ef8a02af6d9efd76d',1,'VarTag']]],

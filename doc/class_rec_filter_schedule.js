@@ -2,7 +2,6 @@ var class_rec_filter_schedule =
 [
     [ "RecFilterSchedule", "class_rec_filter_schedule.html#a4b6e7966cd70b5c9a6de04ce5cad7742", null ],
     [ "empty", "class_rec_filter_schedule.html#a61e8333781126192da229f28856c518b", null ],
-    [ "contains_vars_with_tag", "class_rec_filter_schedule.html#a7e70ffb5ea61bd1d62c35ba5eb8f5d7b", null ],
     [ "compute_globally", "class_rec_filter_schedule.html#ac48cf3c21d619904119675f31cd38397", null ],
     [ "compute_locally", "class_rec_filter_schedule.html#a9f164d99764f089c27c78467d6869630", null ],
     [ "fuse", "class_rec_filter_schedule.html#a77a51dc9342857fe00cb2a212257d009", null ],
@@ -30,5 +29,6 @@ var class_rec_filter_schedule =
     [ "gpu_threads", "class_rec_filter_schedule.html#aa64c5c28604d0c5d6c23bb2caf280a1f", null ],
     [ "gpu_blocks", "class_rec_filter_schedule.html#a3a7ba29e916d123766025055b5ee623c", null ],
     [ "gpu_blocks", "class_rec_filter_schedule.html#ae5a58030bf02e114096f375f2ab20968", null ],
-    [ "gpu_blocks", "class_rec_filter_schedule.html#ae1ce0d3017be5417a9c91f04892a5b3c", null ]
+    [ "gpu_blocks", "class_rec_filter_schedule.html#ae1ce0d3017be5417a9c91f04892a5b3c", null ],
+    [ "RecFilter", "class_rec_filter_schedule.html#acb1f9546a62dfac40f6f76a742ba0d96", null ]
 ];

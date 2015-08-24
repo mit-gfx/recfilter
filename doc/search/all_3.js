@@ -16,10 +16,9 @@ var searchData=
   ['compute_5fglobally',['compute_globally',['../class_rec_filter_schedule.html#ac48cf3c21d619904119675f31cd38397',1,'RecFilterSchedule']]],
   ['compute_5flocally',['compute_locally',['../class_rec_filter_schedule.html#a9f164d99764f089c27c78467d6869630',1,'RecFilterSchedule']]],
   ['consumer_5ffunc',['consumer_func',['../class_rec_filter_func.html#a465fa01fc02dbd831e0a243d64e460a2',1,'RecFilterFunc']]],
-  ['contains_5fvars_5fwith_5ftag',['contains_vars_with_tag',['../class_rec_filter_schedule.html#a7e70ffb5ea61bd1d62c35ba5eb8f5d7b',1,'RecFilterSchedule']]],
   ['count',['count',['../class_var_tag.html#a5da63a0e1c238c827fc8b9dd71e72a88',1,'VarTag']]],
-  ['cpu_5fauto_5ffull_5fschedule',['cpu_auto_full_schedule',['../class_rec_filter.html#a6b7bbd2c913016654cf78813cf650d5c',1,'RecFilter']]],
-  ['cpu_5fauto_5finter_5fschedule',['cpu_auto_inter_schedule',['../class_rec_filter.html#ad80da9cc4eea2a434337a7f0cab4df23',1,'RecFilter']]],
-  ['cpu_5fauto_5fintra_5fschedule',['cpu_auto_intra_schedule',['../class_rec_filter.html#ad89986ef2db44980026d9aebe00d6195',1,'RecFilter']]],
-  ['cpu_5fauto_5fschedule',['cpu_auto_schedule',['../class_rec_filter.html#aa7832a39d40fd6ea18ef88f25409e156',1,'RecFilter']]]
+  ['cpu_5fauto_5ffull_5fschedule',['cpu_auto_full_schedule',['../class_rec_filter.html#a50b7184b1093077df99bc17fce938ef2',1,'RecFilter']]],
+  ['cpu_5fauto_5finter_5fschedule',['cpu_auto_inter_schedule',['../class_rec_filter.html#a994df68e2bd2d4f604e79d631bb66c4e',1,'RecFilter']]],
+  ['cpu_5fauto_5fintra_5fschedule',['cpu_auto_intra_schedule',['../class_rec_filter.html#a943a6ee61736b5e1f5169113ec8da943',1,'RecFilter']]],
+  ['cpu_5fauto_5fschedule',['cpu_auto_schedule',['../class_rec_filter.html#a1f6dbd3c8180d38da31a2068ca1f46fd',1,'RecFilter']]]
 ];
