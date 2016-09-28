@@ -9,8 +9,8 @@ implementation of recursive or IIR filters for n-dimensional data.
     - included as submodule, it should download and build automatically upon running `make`
     - uses NVIDIA's nvvm backend for CUDA ptx generation rather than the open source ptx backend
     - other minor modifications
-- Halide requirements: [llvm](http://llvm.org/), [clang](http://clang.llvm.org/) (see [Halide building instructions](https://github.com/halide/Halide))
-- [NVIDIA CUDA toolkit 7](https://developer.nvidia.com/cuda-toolkit) (version 6.0 or 6.5 will not suffice)
+- Halide requirements: [llvm 3.4](http://llvm.org/), [clang 3.4](http://clang.llvm.org/) (see [Halide building instructions](https://github.com/halide/Halide))
+- [NVIDIA CUDA toolkit 7 and above](https://developer.nvidia.com/cuda-toolkit) (version 6.0 or 6.5 will not suffice)
 
 The makefile in the base directory should build everything and place the executables in `bin`.
 
